@@ -104,14 +104,6 @@ Generate a task handoff from a chat transcript:
 python3 cli/crumb.py from-chat --input chat.txt --output handoff.crumb
 ```
 
-## Launch checklist
-
-- Set repo description
-- Add GitHub topics: `ai-handoff`, `ai-agents`, `llm`, `prompt-engineering`, `open-standard`, `context-engineering`
-- Turn on Issues, Actions, and Discussions
-- Publish one before/after handoff demo
-- Cut the first GitHub release from `RELEASE_NOTES_v0.1.0.md`
-
 ## Positioning
 
 - **Category:** AI handoff format
@@ -123,6 +115,7 @@ python3 cli/crumb.py from-chat --input chat.txt --output handoff.crumb
 - Spec status: Draft RFC
 - Canonical form: text-first `.crumb`
 - Optional binary transport: out of core spec scope for now
+- Release notes and launch post drafts are included in the repo
 
 ## License
 
