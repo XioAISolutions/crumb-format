@@ -1,0 +1,22 @@
+BEGIN CRUMB
+v=1.1
+kind=task
+title=Fix login redirect bug
+source=cursor.agent
+project=web-app
+max_index_tokens=512
+max_total_tokens=2048
+---
+[goal]
+Fix the bug where authenticated users are redirected back to /login after refresh.
+
+[context]
+- App uses JWT cookie auth
+- Redirect loop happens only on full page refresh
+- Middleware reads auth state before cookie parsing is complete
+
+[constraints]
+- Do not change the login UI
+- Preserve existing cookie names
+- Add a regression check before merging
+END CRUMB

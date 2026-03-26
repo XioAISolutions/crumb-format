@@ -1,0 +1,22 @@
+BEGIN CRUMB
+v=1.1
+kind=mem
+title=Builder preferences
+source=human.notes
+dream_pass=2026-03-26T12:00:00Z
+dream_sessions=4
+max_index_tokens=512
+max_total_tokens=2048
+---
+[consolidated]
+- Prefers direct technical answers with minimal fluff
+- Wants copy-pasteable outputs when possible
+- Cares about launch speed more than theoretical purity
+- Prefers solutions that survive switching between AI tools
+
+[dream]
+- last_pass: 2026-03-26T12:00:00Z
+- sessions_seen: 4
+- notes:
+  - Merged repeated notes about portability and launch speed
+END CRUMB

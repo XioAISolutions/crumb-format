@@ -1,0 +1,24 @@
+BEGIN CRUMB
+v=1.1
+kind=map
+title=CRUMB repo onboarding
+source=human.notes
+project=crumb-format
+max_index_tokens=768
+max_total_tokens=3072
+---
+[project]
+CRUMB is a text-first AI handoff format for moving work between tools without losing context.
+
+[modules]
+- SPEC.md: core format specification
+- DREAMING.md: memory consolidation guidance
+- validators/: reference validators in Python and Node
+- cli/: tiny helper CLI
+- examples/: handoff examples to copy and adapt
+
+[invariants]
+- The canonical form is plain text `.crumb`
+- Unknown headers and sections should be ignored, not rejected
+- The format should stay small enough to paste into ordinary chats
+END CRUMB

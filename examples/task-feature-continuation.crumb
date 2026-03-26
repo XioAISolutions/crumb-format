@@ -1,0 +1,23 @@
+BEGIN CRUMB
+v=1.1
+kind=task
+title=Continue export feature
+source=claude.chat
+project=apps/dashboard
+max_index_tokens=512
+max_total_tokens=2048
+---
+[goal]
+Finish wiring the Export to CSV feature for the Orders page.
+
+[context]
+- Repo: /apps/dashboard
+- Tech: Next.js 14, React 18, PostgreSQL 15
+- Existing UI button is already on the Orders page
+- API route skeleton exists at /api/orders/export
+
+[constraints]
+- Do not change the existing UI layout
+- Use the existing db helpers
+- Handle large exports without blocking the UI
+END CRUMB
