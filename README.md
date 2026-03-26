@@ -1,12 +1,21 @@
-# CRUMB
+# CRUMB 🍞
 
 **CRUMB is the copy-paste AI handoff format.**
 
 > **Switch AIs without losing the plot.**
+>
+> Pass the crumb. 🍞
 
 CRUMB exists for one common failure: when work moves from one AI tool, session, or teammate to another, the important context gets lost and people have to re-explain everything.
 
 CRUMB gives that handoff a small, structured, plain-text shape that survives ordinary copy-paste.
+
+## Why people care
+
+- You can paste it into another AI without extra tooling
+- It is readable by humans and LLMs
+- It is small enough to travel through chats, docs, issues, and notes
+- It keeps the next step clear instead of dumping raw history
 
 ## Quick example
 
@@ -35,6 +44,12 @@ END CRUMB
 
 Paste that into another AI and it can continue the work with less re-explaining.
 
+## Core file kinds
+
+- `kind=task` — what to do next
+- `kind=mem` — consolidated long-term memory
+- `kind=map` — repo or project map
+
 ## What CRUMB is
 
 CRUMB is:
@@ -48,12 +63,6 @@ CRUMB is not:
 - primarily a compression format
 - a replacement for MCP, A2A, JSON, or OpenAPI
 - a promise that every vendor supports it natively today
-
-## Core file kinds
-
-- `kind=task` — what to do next
-- `kind=mem` — consolidated long-term memory
-- `kind=map` — repo or project map
 
 ## Repository contents
 
@@ -78,6 +87,15 @@ Generate a task handoff from a chat transcript:
 ```bash
 python3 cli/crumb.py from-chat --input chat.txt --output handoff.crumb
 ```
+
+## Launch checklist
+
+- [ ] Set repo description to:
+  `CRUMB is the copy-paste AI handoff format. Switch AIs without losing the plot.`
+- [ ] Add GitHub topics:
+  `ai-handoff`, `ai-agents`, `llm`, `prompt-engineering`, `open-standard`, `context-engineering`
+- [ ] Turn on Issues, Actions, and Discussions
+- [ ] Publish one before/after handoff demo
 
 ## Positioning
 

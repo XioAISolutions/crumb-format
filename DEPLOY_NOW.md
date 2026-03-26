@@ -1,4 +1,4 @@
-# Deploy CRUMB Now
+# Deploy CRUMB Now 🍞
 
 ## 1. Repo setup
 
@@ -27,15 +27,27 @@ git push -u origin main
 - Actions
 - Discussions
 
-## 4. Add topics
+## 4. Add topics in GitHub repo settings
+
+Paste these into the Topics area:
 
 - ai-handoff
 - ai-agents
 - llm
 - prompt-engineering
 - open-standard
+- context-engineering
 
-## 5. Publish the first demo
+## 5. Make the page feel alive
+
+Recommended small touches:
+
+- Use 🍞 once or twice in the README and release copy
+- Keep the visual identity simple: CRUMB, handoff, portability, clarity
+- Show one tiny `.crumb` block near the top
+- Show one real before/after demo
+
+## 6. Publish the first demo
 
 The fastest useful demo is:
 
