@@ -1,0 +1,36 @@
+BEGIN CRUMB
+v=1.1
+kind=map
+title=Client website takeover map
+source=human.notes
+project=luxury-builder-site
+max_index_tokens=768
+max_total_tokens=2800
+---
+[project]
+Luxury custom home builder website focused on high-end leads, authority, and premium trust signals.
+
+[modules]
+- Home page: positioning, trust, hero CTA, featured projects
+- Projects page: case studies and visual proof
+- About page: founder credibility and process
+- Contact / book page: inquiry funnel and lead capture
+- CMS / blog: optional authority content and SEO support
+
+[invariants]
+- The site must feel premium, calm, and expensive.
+- Lead quality matters more than traffic volume.
+- Copy should sound decisive, not hype-heavy.
+- Visual clutter hurts trust.
+
+[flows]
+- Visitor lands on home page and understands positioning in under 10 seconds.
+- Visitor sees project proof and trust signals.
+- Visitor reaches a clear CTA to inquire or book.
+- Follow-up handoff to AI should preserve page priorities, trust rules, and conversion goals.
+
+[dependencies]
+- Brand photos and project visuals
+- Lead form or booking target
+- Clear CTA destinations for calls, forms, or consultations
+END CRUMB

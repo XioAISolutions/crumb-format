@@ -1,0 +1,29 @@
+BEGIN CRUMB
+v=1.1
+kind=task
+title=Turn founder notes into launch thread and landing copy
+source=chatgpt.chat
+project=crumb-format
+max_index_tokens=640
+max_total_tokens=2400
+---
+[goal]
+Turn raw founder notes about CRUMB into a sharp X thread and a short landing-page value proposition.
+
+[context]
+- Raw notes are repetitive and mix product vision with implementation details.
+- The core message is: CRUMB is the copy-paste AI handoff format.
+- Audience is technical founders, builders, and agent-heavy users.
+- Strongest pain point is losing context when switching AI tools.
+- Strongest proof is a before/after cross-tool handoff demo.
+
+[constraints]
+- Lead with the pain, not the spec.
+- Avoid academic wording like "semantic context container".
+- Keep the thread punchy and screenshot-friendly.
+- Keep landing copy direct and simple.
+
+[notes]
+- The best line to preserve is: Switch AIs without losing the plot.
+- The next AI should produce one thread, one hero section, and one subheadline.
+END CRUMB
