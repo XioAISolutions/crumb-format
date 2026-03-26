@@ -1,23 +1,52 @@
 # CRUMB v0.1.0 🍞
 
-## What this release includes
+CRUMB is a **copy-paste AI handoff format** for moving work between AIs without losing context.
 
-- text-first CRUMB v1.1 specification
-- dreaming guide for consolidation passes
-- Python and Node validators
-- tiny CLI for generating task handoffs from chat logs
-- starter examples for task, memory, and repo-map crumbs
-- GitHub Actions workflow for validating examples
+This first release ships the **text-first** foundation:
+- a small human-readable spec
+- a dreaming/consolidation guide
+- validators
+- a tiny CLI
+- starter examples
 
-## What CRUMB solves
+## Why this exists
 
-CRUMB gives AI work a small handoff shape that survives tool switching.
+When work moves from one AI tool, session, or teammate to another, the important context usually gets lost.
 
-Instead of pasting giant transcripts or rewriting context from scratch, you pass a compact block that tells the next AI:
+People end up:
+- pasting giant transcripts
+- rewriting the same background
+- losing constraints, decisions, and next steps
 
-- what the goal is
-- what context matters
-- what constraints must hold
+CRUMB gives that handoff a compact shape that survives ordinary copy-paste.
+
+## What’s in v0.1.0
+
+- `SPEC.md` — CRUMB v1.1 draft spec
+- `DREAMING.md` — consolidation guidance for long-term memory
+- `validators/validate.py` — Python validator
+- `validators/validate.js` — Node validator
+- `cli/crumb.py` — tiny CLI for generating task handoffs from chat logs
+- `examples/` — starter crumbs for task continuation, bug fixing, memory/preferences, and repo onboarding
+
+## Core idea
+
+CRUMB is:
+- plain UTF-8 text
+- readable by humans
+- understandable by LLMs without a decoder
+- small enough to paste into chats, docs, notes, and issues
+
+CRUMB is not:
+- primarily a compression format
+- a replacement for MCP, A2A, JSON, or OpenAPI
+- a claim of native vendor support today
+
+## Core file kinds
+
+- `kind=task` — what to do next
+- `kind=mem` — consolidated long-term memory
+- `kind=map` — repo or project map
 
 ## Recommended first demo
 
