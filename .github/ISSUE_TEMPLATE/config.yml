@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: CRUMB spec discussion
+    url: https://github.com/XioAISolutions/crumb-format/discussions
+    about: Use discussions for bigger format ideas and design debates.
