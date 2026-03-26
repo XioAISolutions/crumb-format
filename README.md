@@ -70,12 +70,24 @@ CRUMB is not:
 
 - `SPEC.md` — CRUMB v1.1 spec
 - `DREAMING.md` — consolidation guidance
+- `FAQ.md` — quick answers to common questions
 - `examples/` — ready-to-paste CRUMB files
 - `examples/README.md` — how to use the example crumbs
 - `docs/HANDOFF_PATTERNS.md` — practical handoff patterns
+- `docs/CRUMB_vs_CLAUDE_MD.md` — where CRUMB fits vs `CLAUDE.md`
+- `docs/CRUMB_vs_AGENTS_MD.md` — where CRUMB fits vs `AGENTS.md`
 - `validators/` — Python and Node validators
 - `cli/crumb.py` — tiny CLI for creating and validating `.crumb` files
 - `.github/workflows/validate-examples.yml` — CI for example validation
+
+## Start here
+
+- Read [`FAQ.md`](FAQ.md)
+- Read [`SPEC.md`](SPEC.md)
+- Read [`DREAMING.md`](DREAMING.md)
+- Browse [`examples/README.md`](examples/README.md)
+- Compare [`CRUMB vs CLAUDE.md`](docs/CRUMB_vs_CLAUDE_MD.md)
+- Compare [`CRUMB vs AGENTS.md`](docs/CRUMB_vs_AGENTS_MD.md)
 
 ## Quickstart
 
@@ -94,12 +106,11 @@ python3 cli/crumb.py from-chat --input chat.txt --output handoff.crumb
 
 ## Launch checklist
 
-- [x] Set repo description
-- [ ] Add GitHub topics:
-  `ai-handoff`, `ai-agents`, `llm`, `prompt-engineering`, `open-standard`, `context-engineering`
-- [ ] Turn on Issues, Actions, and Discussions
-- [ ] Publish one before/after handoff demo
-- [ ] Cut the first GitHub release from `RELEASE_NOTES_v0.1.0.md`
+- Set repo description
+- Add GitHub topics: `ai-handoff`, `ai-agents`, `llm`, `prompt-engineering`, `open-standard`, `context-engineering`
+- Turn on Issues, Actions, and Discussions
+- Publish one before/after handoff demo
+- Cut the first GitHub release from `RELEASE_NOTES_v0.1.0.md`
 
 ## Positioning
 
