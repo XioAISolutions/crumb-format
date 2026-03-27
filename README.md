@@ -37,15 +37,23 @@ END CRUMB
 
 That's it. The next AI knows what to fix, what it can't change, and why.
 
-## Real-world examples
+## Three kinds
 
-### Debug handoff across tools
+Pick the kind that matches what you're handing off:
 
-You found the bug in Cursor but need Claude to write the regression test. Instead of pasting 200 lines of chat history, you hand off a 15-line crumb. The receiving AI skips straight to writing the test because the goal, root cause, and constraints are already structured.
+| Kind | Use when | Required sections |
+|---|---|---|
+| `task` | You know the next action | `[goal]` `[context]` `[constraints]` |
+| `mem` | Preferences that survive across sessions | `[consolidated]` |
+| `map` | An AI needs to understand a codebase | `[project]` `[modules]` |
 
-### Project memory that follows you
+### task -- what to do next
 
-Tired of re-explaining your preferences every session? A `mem` crumb captures your working style and survives across tools and sessions:
+The example above is a task crumb. Use it for bug fixes, feature continuations, code reviews, or any handoff where the next step is clear.
+
+### mem -- long-term memory
+
+Capture your working style, project conventions, or decisions that should persist across sessions and tools:
 
 ```text
 BEGIN CRUMB
@@ -62,7 +70,101 @@ source=human.notes
 END CRUMB
 ```
 
-Three kinds: **task** (what to do next), **mem** (long-term memory), **map** (repo or project map). See the [spec](SPEC.md) for details.
+Paste this at the start of any AI session. No more "I like concise answers, don't use emojis, prefer TypeScript..." every time.
+
+### map -- repo or project structure
+
+Onboard a new AI to your codebase in seconds instead of letting it guess the architecture:
+
+```text
+BEGIN CRUMB
+v=1.1
+kind=map
+title=CRUMB repo onboarding
+source=human.notes
+project=crumb-format
+---
+[project]
+CRUMB is a text-first AI handoff format for moving work between tools without losing context.
+
+[modules]
+- SPEC.md: core format specification
+- DREAMING.md: memory consolidation guidance
+- validators/: reference validators in Python and Node
+- cli/: tiny helper CLI
+- examples/: handoff examples to copy and adapt
+
+[invariants]
+- The canonical form is plain text .crumb
+- Unknown headers and sections should be ignored, not rejected
+- The format should stay small enough to paste into ordinary chats
+END CRUMB
+```
+
+## Templates
+
+Blank templates you can copy and fill in:
+
+<details>
+<summary><b>task template</b></summary>
+
+```text
+BEGIN CRUMB
+v=1.1
+kind=task
+title=
+source=
+---
+[goal]
+
+
+[context]
+
+
+[constraints]
+
+END CRUMB
+```
+
+</details>
+
+<details>
+<summary><b>mem template</b></summary>
+
+```text
+BEGIN CRUMB
+v=1.1
+kind=mem
+title=
+source=
+---
+[consolidated]
+
+END CRUMB
+```
+
+</details>
+
+<details>
+<summary><b>map template</b></summary>
+
+```text
+BEGIN CRUMB
+v=1.1
+kind=map
+title=
+source=
+project=
+---
+[project]
+
+
+[modules]
+
+END CRUMB
+```
+
+</details>
 
 ## How it compares
 
@@ -79,50 +181,72 @@ Three kinds: **task** (what to do next), **mem** (long-term memory), **map** (re
 Add this to your AI's custom instructions and it will generate CRUMBs automatically:
 
 ```text
-When I say "crumb it" or when a task is being handed off, generate a CRUMB
-summarizing the current state. Use this format:
+When I say "crumb it", generate a CRUMB summarizing the current state.
 
-BEGIN CRUMB
-v=1.1
-kind=task
-title=<short description>
-source=<this tool>
----
-[goal]
-<what needs to happen next>
+For tasks and handoffs, use kind=task:
+  BEGIN CRUMB
+  v=1.1
+  kind=task
+  title=<short description>
+  source=<this tool>
+  ---
+  [goal]       <what needs to happen next>
+  [context]    <key facts, decisions, current state>
+  [constraints] <what must not change>
+  END CRUMB
 
-[context]
-<key facts, decisions, and current state>
+For preferences and memory, use kind=mem:
+  BEGIN CRUMB
+  v=1.1
+  kind=mem
+  title=<topic>
+  source=<this tool>
+  ---
+  [consolidated] <durable facts, preferences, decisions>
+  END CRUMB
 
-[constraints]
-<what must not change>
-END CRUMB
+For repo/project overviews, use kind=map:
+  BEGIN CRUMB
+  v=1.1
+  kind=map
+  title=<project name>
+  source=<this tool>
+  ---
+  [project]  <one-line description>
+  [modules]  <key files and directories>
+  END CRUMB
 ```
 
 Works in ChatGPT custom instructions, Claude Projects, Cursor rules, or any AI that accepts system prompts.
+
+## CLI and validators
+
+Validate a crumb:
+
+```bash
+python3 validators/validate.py examples/task-bug-fix.crumb
+# or
+node validators/validate.js examples/task-bug-fix.crumb
+```
+
+Generate a task crumb from a chat transcript:
+
+```bash
+# from a file
+python3 cli/crumb.py from-chat --input chat.txt --output handoff.crumb
+
+# from clipboard (macOS)
+pbpaste | python3 cli/crumb.py from-chat --title "Continue auth work" --source claude.chat
+```
 
 ## What's in this repo
 
 - [`SPEC.md`](SPEC.md) -- the format specification
 - [`DREAMING.md`](DREAMING.md) -- how memory consolidation works
-- [`examples/`](examples/) -- ready-to-paste `.crumb` files
+- [`examples/`](examples/) -- ready-to-paste `.crumb` files for every kind
 - [`cli/crumb.py`](cli/crumb.py) -- CLI for creating and validating crumbs
 - [`validators/`](validators/) -- Python and Node reference validators
 - [`docs/HANDOFF_PATTERNS.md`](docs/HANDOFF_PATTERNS.md) -- practical handoff patterns
-
-## Quickstart
-
-Validate an example:
-
-```bash
-python3 validators/validate.py examples/task-bug-fix.crumb
-```
-
-Generate a task handoff from a chat transcript:
-
-```bash
-python3 cli/crumb.py from-chat --input chat.txt --output handoff.crumb
-```
 
 ## License
 
