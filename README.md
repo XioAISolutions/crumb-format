@@ -1,101 +1,121 @@
-# CRUMB 🍞
+# CRUMB
 
-[![Validate examples](https://github.com/XioAISolutions/crumb-format/actions/workflows/validate-examples.yml/badge.svg)](https://github.com/XioAISolutions/crumb-format/actions/workflows/validate-examples.yml)
+The copy-paste AI handoff format.
 
-**CRUMB is the copy-paste AI handoff format.**
+---
 
-> **Switch AIs without losing the plot.**
->
-> Pass the crumb. 🍞
+Ever been deep into a task with one AI, then need to switch to another? You either paste an enormous chat log and hope it picks up the thread, or you start over and re-explain everything from scratch.
 
-CRUMB exists for one common failure: when work moves from one AI tool, session, or teammate to another, the important context gets lost and people have to re-explain everything.
+CRUMB is a third option. It's a small, structured text block you copy-paste between AI tools. The next AI gets exactly what it needs to continue your work -- the goal, the context, and the constraints -- without the noise.
 
-CRUMB gives that handoff a small, structured, plain-text shape that survives ordinary copy-paste.
+## Try it right now
 
-## Why people care
-
-- You can paste it into another AI without extra tooling
-- It is readable by humans and LLMs
-- It is small enough to travel through chats, docs, issues, and notes
-- It keeps the next step clear instead of dumping raw history
-
-## Quick example
+Copy this and paste it into any AI:
 
 ```text
 BEGIN CRUMB
 v=1.1
 kind=task
-title=Continue dark mode work
-source=chatgpt.chat
-max_index_tokens=512
-max_total_tokens=2048
+title=Fix login redirect bug
+source=cursor.agent
+project=web-app
 ---
 [goal]
-Finish the dark mode feature without changing app navigation.
+Fix the bug where authenticated users are redirected back to /login after refresh.
 
 [context]
-- Theme context exists.
-- Settings toggle UI is half-done.
-- Persistence is not wired yet.
+- App uses JWT cookie auth
+- Redirect loop happens only on full page refresh
+- Middleware reads auth state before cookie parsing is complete
 
 [constraints]
-- Keep Expo setup unchanged.
-- No new dependencies.
+- Do not change the login UI
+- Preserve existing cookie names
+- Add a regression check before merging
 END CRUMB
 ```
 
-Paste that into another AI and it can continue the work with less re-explaining.
+That's it. The next AI knows what to fix, what it can't change, and why.
 
-## Core file kinds
+## Real-world examples
 
-- `kind=task` — what to do next
-- `kind=mem` — consolidated long-term memory
-- `kind=map` — repo or project map
+### Debug handoff across tools
 
-## What CRUMB is
+You found the bug in Cursor but need Claude to write the regression test. Instead of pasting 200 lines of chat history, you hand off a 15-line crumb. The receiving AI skips straight to writing the test because the goal, root cause, and constraints are already structured.
 
-CRUMB is:
-- plain UTF-8 text
-- readable by humans
-- parseable by tiny scripts
-- understandable by LLMs without a decoder
-- durable under chat, docs, notes, issues, commits, and email copy-paste
+### Project memory that follows you
 
-CRUMB is not:
-- primarily a compression format
-- a replacement for MCP, A2A, JSON, or OpenAPI
-- a promise that every vendor supports it natively today
+Tired of re-explaining your preferences every session? A `mem` crumb captures your working style and survives across tools and sessions:
 
-## Repository contents
+```text
+BEGIN CRUMB
+v=1.1
+kind=mem
+title=Builder preferences
+source=human.notes
+---
+[consolidated]
+- Prefers direct technical answers with minimal fluff
+- Wants copy-pasteable outputs when possible
+- Cares about launch speed more than theoretical purity
+- Prefers solutions that survive switching between AI tools
+END CRUMB
+```
 
-- `SPEC.md` — CRUMB v1.1 spec
-- `DREAMING.md` — consolidation guidance
-- `FAQ.md` — quick answers to common questions
-- `examples/` — ready-to-paste CRUMB files
-- `examples/README.md` — how to use the example crumbs
-- `docs/HANDOFF_PATTERNS.md` — practical handoff patterns
-- `docs/CRUMB_vs_CLAUDE_MD.md` — where CRUMB fits vs `CLAUDE.md`
-- `docs/CRUMB_vs_AGENTS_MD.md` — where CRUMB fits vs `AGENTS.md`
-- `validators/` — Python and Node validators
-- `cli/crumb.py` — tiny CLI for creating and validating `.crumb` files
-- `.github/workflows/validate-examples.yml` — CI for example validation
+Three kinds: **task** (what to do next), **mem** (long-term memory), **map** (repo or project map). See the [spec](SPEC.md) for details.
 
-## Start here
+## How it compares
 
-- Read [`FAQ.md`](FAQ.md)
-- Read [`SPEC.md`](SPEC.md)
-- Read [`DREAMING.md`](DREAMING.md)
-- Browse [`examples/README.md`](examples/README.md)
-- Compare [`CRUMB vs CLAUDE.md`](docs/CRUMB_vs_CLAUDE_MD.md)
-- Compare [`CRUMB vs AGENTS.md`](docs/CRUMB_vs_AGENTS_MD.md)
+| | Paste raw chat | Start over | Use CRUMB |
+|---|---|---|---|
+| Context preserved | Partial, noisy | None | Structured, high-signal |
+| Next AI acts immediately | Unlikely | No | Yes |
+| Works across all AI tools | Yes | Yes | Yes |
+| Token-efficient | No | Yes (but lossy) | Yes |
+| Human-readable | Barely | N/A | Yes |
+
+## Add to your AI workflow
+
+Add this to your AI's custom instructions and it will generate CRUMBs automatically:
+
+```text
+When I say "crumb it" or when a task is being handed off, generate a CRUMB
+summarizing the current state. Use this format:
+
+BEGIN CRUMB
+v=1.1
+kind=task
+title=<short description>
+source=<this tool>
+---
+[goal]
+<what needs to happen next>
+
+[context]
+<key facts, decisions, and current state>
+
+[constraints]
+<what must not change>
+END CRUMB
+```
+
+Works in ChatGPT custom instructions, Claude Projects, Cursor rules, or any AI that accepts system prompts.
+
+## What's in this repo
+
+- [`SPEC.md`](SPEC.md) -- the format specification
+- [`DREAMING.md`](DREAMING.md) -- how memory consolidation works
+- [`examples/`](examples/) -- ready-to-paste `.crumb` files
+- [`cli/crumb.py`](cli/crumb.py) -- CLI for creating and validating crumbs
+- [`validators/`](validators/) -- Python and Node reference validators
+- [`docs/HANDOFF_PATTERNS.md`](docs/HANDOFF_PATTERNS.md) -- practical handoff patterns
 
 ## Quickstart
 
 Validate an example:
 
 ```bash
-python3 validators/validate.py examples/task-feature-continuation.crumb
-node validators/validate.js examples/task-feature-continuation.crumb
+python3 validators/validate.py examples/task-bug-fix.crumb
 ```
 
 Generate a task handoff from a chat transcript:
@@ -104,19 +124,8 @@ Generate a task handoff from a chat transcript:
 python3 cli/crumb.py from-chat --input chat.txt --output handoff.crumb
 ```
 
-## Positioning
-
-- **Category:** AI handoff format
-- **Tagline:** Switch AIs without losing the plot.
-- **Pitch:** CRUMB is a copy-paste handoff format for moving work between AIs without losing context.
-
-## Status
-
-- Spec status: Draft RFC
-- Canonical form: text-first `.crumb`
-- Optional binary transport: out of core spec scope for now
-- Release notes and launch post drafts are included in the repo
-
 ## License
 
-MIT for spec and reference code. See `TRADEMARK.md` for brand guidance.
+MIT for spec and reference code. See [`TRADEMARK.md`](TRADEMARK.md) for brand guidance.
+
+CRUMB is plain text. It works everywhere text works.
