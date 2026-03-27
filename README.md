@@ -219,24 +219,60 @@ For repo/project overviews, use kind=map:
 
 Works in ChatGPT custom instructions, Claude Projects, Cursor rules, or any AI that accepts system prompts.
 
-## CLI and validators
+## CLI
 
-Validate a crumb:
+Create a crumb from the command line:
 
 ```bash
-python3 validators/validate.py examples/task-bug-fix.crumb
-# or
-node validators/validate.js examples/task-bug-fix.crumb
+# create a task crumb
+python3 cli/crumb.py new task \
+  --title "Fix auth" \
+  --source cursor.agent \
+  --goal "Fix the token refresh race condition" \
+  --context "App uses JWT" "Refresh token expires silently" \
+  --constraints "Don't change login flow"
+
+# create a mem crumb
+python3 cli/crumb.py new mem \
+  --title "My prefs" \
+  --source human.notes \
+  --entries "Prefers TypeScript" "No ORMs" "Keep it simple"
+
+# create a map crumb
+python3 cli/crumb.py new map \
+  --title "My API" \
+  --source human.notes \
+  --project myapp \
+  --description "REST API for task management" \
+  --modules "src/routes: endpoints" "src/db: database layer"
 ```
 
-Generate a task crumb from a chat transcript:
+Convert a chat log into a task crumb:
 
 ```bash
-# from a file
 python3 cli/crumb.py from-chat --input chat.txt --output handoff.crumb
 
-# from clipboard (macOS)
+# or from clipboard (macOS)
 pbpaste | python3 cli/crumb.py from-chat --title "Continue auth work" --source claude.chat
+```
+
+Validate and inspect:
+
+```bash
+# validate (uses full spec parser, not just marker checks)
+python3 cli/crumb.py validate examples/*.crumb
+
+# inspect a crumb's structure
+python3 cli/crumb.py inspect examples/task-bug-fix.crumb
+
+# headers and section names only
+python3 cli/crumb.py inspect examples/task-bug-fix.crumb --headers-only
+```
+
+Node validator also available:
+
+```bash
+node validators/validate.js examples/task-bug-fix.crumb
 ```
 
 ## What's in this repo
