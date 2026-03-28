@@ -405,6 +405,125 @@ class TestCmdInit:
         assert "CRUMB" in claude_md.read_text()
 
 
+# ── extract_keywords ─────────────────────────────────────────────────
+
+class TestExtractKeywords:
+    def test_removes_stopwords(self):
+        kw = crumb.extract_keywords("Use the TypeScript compiler for building")
+        assert "typescript" in kw
+        assert "compiler" in kw
+        assert "the" not in kw
+        assert "for" not in kw
+
+    def test_empty_string(self):
+        assert crumb.extract_keywords("") == set()
+
+    def test_only_stopwords(self):
+        assert crumb.extract_keywords("the is a an") == set()
+
+    def test_technical_terms(self):
+        kw = crumb.extract_keywords("PostgreSQL v14 with pgvector")
+        assert "postgresql" in kw
+        assert "pgvector" in kw
+
+
+# ── score_entry ──────────────────────────────────────────────────────
+
+class TestScoreEntry:
+    def test_unique_entry_scores_higher(self):
+        entries = ["- Use postgres", "- Use postgres", "- Use redis"]
+        kw = {crumb.normalize_entry(e): crumb.extract_keywords(e) for e in entries}
+        pg_score = crumb.score_entry(entries[0], entries, kw)
+        redis_score = crumb.score_entry(entries[2], entries, kw)
+        # "redis" is unique (appears once), "postgres" appears twice
+        assert redis_score > pg_score
+
+    def test_technical_entry_gets_bonus(self):
+        entries = ["- Use v14 of src/db", "- Keep it simple"]
+        kw = {crumb.normalize_entry(e): crumb.extract_keywords(e) for e in entries}
+        tech_score = crumb.score_entry(entries[0], entries, kw)
+        plain_score = crumb.score_entry(entries[1], entries, kw)
+        assert tech_score > plain_score
+
+    def test_empty_entry_scores_zero(self):
+        entries = ["", "- Something"]
+        kw = {crumb.normalize_entry(e): crumb.extract_keywords(e) for e in entries}
+        assert crumb.score_entry("", entries, kw) == 0.0
+
+
+# ── cmd_compact ──────────────────────────────────────────────────────
+
+class TestCmdCompact:
+    def test_compact_strips_optional_headers(self, tmp_path, capsys):
+        f = tmp_path / "mem.crumb"
+        f.write_text(VALID_MEM)
+        out = tmp_path / "compact.crumb"
+        crumb.main(["compact", str(f), "-o", str(out)])
+        result = crumb.parse_crumb(out.read_text())
+        # Should keep v, kind, source, title but not extras
+        assert "v" in result["headers"]
+        assert "kind" in result["headers"]
+        assert "title" in result["headers"]
+        assert "source" in result["headers"]
+
+    def test_compact_keeps_required_sections_only(self, tmp_path, capsys):
+        # Add an extra section to a mem crumb
+        text = VALID_MEM.replace("END CRUMB", "[notes]\nSome notes\nEND CRUMB")
+        f = tmp_path / "mem.crumb"
+        f.write_text(text)
+        out = tmp_path / "compact.crumb"
+        crumb.main(["compact", str(f), "-o", str(out)])
+        result = crumb.parse_crumb(out.read_text())
+        assert "consolidated" in result["sections"]
+        assert "notes" not in result["sections"]
+
+    def test_compact_reduces_tokens(self, tmp_path, capsys):
+        f = tmp_path / "mem.crumb"
+        # Use the dogfood mem which has dream headers and dream section
+        dogfood = (Path(__file__).resolve().parent.parent / "crumbs" / "mem.crumb").read_text()
+        f.write_text(dogfood)
+        out = tmp_path / "compact.crumb"
+        crumb.main(["compact", str(f), "-o", str(out)])
+        output = capsys.readouterr().out
+        assert "reduction" in output
+        original_tokens = crumb.estimate_tokens(dogfood)
+        compact_tokens = crumb.estimate_tokens(out.read_text())
+        assert compact_tokens < original_tokens
+
+    def test_compact_stdout(self, tmp_path, capsys):
+        f = tmp_path / "mem.crumb"
+        f.write_text(VALID_MEM)
+        crumb.main(["compact", str(f)])
+        output = capsys.readouterr().out
+        assert "BEGIN CRUMB" in output
+
+    def test_compact_map_keeps_project_header(self, tmp_path, capsys):
+        f = tmp_path / "map.crumb"
+        f.write_text(VALID_MAP)
+        out = tmp_path / "compact.crumb"
+        crumb.main(["compact", str(f), "-o", str(out)])
+        result = crumb.parse_crumb(out.read_text())
+        assert result["headers"].get("project") == "myapp"
+
+
+# ── signal-scored dream pruning ──────────────────────────────────────
+
+class TestDreamSignalPruning:
+    def test_dream_keeps_unique_entries_over_duplicates(self, tmp_path):
+        """When pruning is needed, unique high-signal entries survive."""
+        f = tmp_path / "mem.crumb"
+        f.write_text(VALID_MEM)
+        # Append several entries including duplicates
+        crumb.main(["append", str(f), "Use PostgreSQL v14", "Use PostgreSQL v14", "Keep it simple"])
+        crumb.main(["dream", str(f)])
+        text = f.read_text()
+        parsed = crumb.parse_crumb(text)
+        entries = [l.strip() for l in parsed["sections"]["consolidated"] if l.strip()]
+        # PostgreSQL should appear only once (deduped), and all unique entries kept
+        pg_count = sum(1 for e in entries if "postgresql" in e.lower())
+        assert pg_count == 1
+
+
 # ── Validate all repo examples ───────────────────────────────────────
 
 EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"

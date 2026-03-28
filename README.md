@@ -324,11 +324,14 @@ python3 cli/crumb.py init --project myapp --description "REST API for tasks"
 python3 cli/crumb.py init --project myapp --claude-md
 ```
 
-Compare two crumbs:
+Compare and compress:
 
 ```bash
 # see what changed between dream passes or versions
 crumb diff prefs-v1.crumb prefs-v2.crumb
+
+# strip a crumb to minimum viable form (required headers + sections only)
+crumb compact handoff.crumb -o slim.crumb
 ```
 
 Node validator also available:

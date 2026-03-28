@@ -117,6 +117,65 @@ def estimate_tokens(text: str) -> int:
     return len(text) // 4
 
 
+def extract_keywords(text: str) -> set:
+    """Extract meaningful keywords from an entry (stopwords removed)."""
+    STOPWORDS = {
+        'a', 'an', 'the', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+        'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+        'should', 'may', 'might', 'can', 'shall', 'to', 'of', 'in', 'for',
+        'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'during',
+        'before', 'after', 'above', 'below', 'between', 'out', 'off', 'over',
+        'under', 'again', 'further', 'then', 'once', 'and', 'but', 'or',
+        'nor', 'not', 'no', 'so', 'if', 'that', 'this', 'it', 'its',
+        'all', 'each', 'every', 'both', 'few', 'more', 'most', 'other',
+        'some', 'such', 'only', 'own', 'same', 'than', 'too', 'very',
+        'just', 'about', 'also', 'use', 'using', 'prefers', 'prefer',
+        'wants', 'like', 'likes',
+    }
+    words = set(re.findall(r'[a-z0-9]+', text.lower()))
+    return words - STOPWORDS
+
+
+def score_entry(entry: str, all_entries: list, entry_keywords: dict) -> float:
+    """Score an entry by information density (TurboQuant-inspired signal ranking).
+
+    Higher score = more unique information = higher priority to keep.
+    Factors: keyword uniqueness across all entries, entry specificity (length),
+    and whether it contains concrete nouns (technical terms, proper nouns).
+    """
+    norm = normalize_entry(entry)
+    keywords = entry_keywords.get(norm, set())
+    if not keywords:
+        return 0.0
+
+    # Keyword uniqueness: how many other entries share these keywords?
+    # Rare keywords = high signal (like rare tokens in TF-IDF)
+    keyword_counts = Counter()
+    for e in all_entries:
+        e_norm = normalize_entry(e)
+        for kw in entry_keywords.get(e_norm, set()):
+            keyword_counts[kw] += 1
+
+    uniqueness = 0.0
+    for kw in keywords:
+        count = keyword_counts.get(kw, 1)
+        uniqueness += 1.0 / count  # rare keywords score higher
+
+    # Specificity: longer entries with more keywords carry more information
+    specificity = len(keywords) * 0.5
+
+    # Technical term bonus: entries with specific terms (numbers, paths, versions)
+    tech_bonus = 0.0
+    if re.search(r'\d', entry):
+        tech_bonus += 1.0  # contains numbers
+    if re.search(r'[/\\.]', entry):
+        tech_bonus += 1.0  # contains paths or extensions
+    if re.search(r'v\d|[A-Z][a-z]+[A-Z]', entry):
+        tech_bonus += 1.0  # version numbers or camelCase
+
+    return uniqueness + specificity + tech_bonus
+
+
 # ── new ──────────────────────────────────────────────────────────────
 
 TEMPLATES = {
@@ -385,13 +444,24 @@ def cmd_dream(args: argparse.Namespace) -> None:
             seen.add(norm)
             merged.append(entry)
 
-    # Prune to budget if max_index_tokens is set
+    # Prune to budget using signal scoring (TurboQuant-inspired)
+    # Instead of dropping from the end, score entries by information density
+    # and drop lowest-signal entries first
     budget = int(headers.get('max_index_tokens', '0'))
     pruned = 0
-    if budget > 0:
-        while merged and estimate_tokens('\n'.join(merged)) > budget:
-            merged.pop()  # drop from the end (oldest surviving entries)
+    if budget > 0 and estimate_tokens('\n'.join(merged)) > budget:
+        # Build keyword index for scoring
+        entry_kw = {normalize_entry(e): extract_keywords(e) for e in merged}
+        # Score and sort: keep highest-signal entries
+        scored = [(score_entry(e, merged, entry_kw), i, e) for i, e in enumerate(merged)]
+        while scored and estimate_tokens('\n'.join(s[2] for s in scored)) > budget:
+            # Remove lowest-scoring entry
+            scored.sort(key=lambda x: (x[0], -x[1]))  # lowest score first, oldest first on tie
+            scored.pop(0)
             pruned += 1
+        # Restore original order for surviving entries
+        scored.sort(key=lambda x: x[1])
+        merged = [s[2] for s in scored]
 
     # Update sections
     sections['consolidated'] = [f"{e}" for e in merged] + ['']
@@ -562,6 +632,52 @@ def cmd_merge(args: argparse.Namespace) -> None:
     write_text(args.output, output)
     if args.output != '-':
         print(f"Merged {len(args.files)} files → {len(merged)} entries in {args.output}")
+
+
+# ── compact ──────────────────────────────────────────────────────────
+
+# TurboQuant-inspired: eliminate overhead. Strip a crumb to its minimum
+# viable form — required headers, required sections, nothing else.
+
+OPTIONAL_HEADERS = {'title', 'dream_pass', 'dream_sessions', 'max_index_tokens',
+                    'max_total_tokens', 'id', 'project', 'env', 'tags', 'url'}
+
+
+def cmd_compact(args: argparse.Namespace) -> None:
+    """Strip a crumb to minimum viable form. Removes optional headers and sections."""
+    text = read_text(args.file)
+    parsed = parse_crumb(text)
+    headers = parsed['headers']
+    sections = parsed['sections']
+    kind = headers['kind']
+
+    # Keep only required headers + title (title is too useful to strip)
+    compact_headers = {}
+    keep_headers = set(REQUIRED_HEADERS) | {'title'}
+    if kind == 'map':
+        keep_headers.add('project')
+    for key in headers:
+        if key in keep_headers:
+            compact_headers[key] = headers[key]
+
+    # Keep only required sections, strip empty lines within sections
+    required = set(REQUIRED_SECTIONS.get(kind, []))
+    compact_sections = {}
+    for name in sections:
+        if name in required:
+            compact_sections[name] = [l for l in sections[name] if l.strip()]
+            if compact_sections[name]:
+                compact_sections[name].append('')
+
+    output = render_crumb(compact_headers, compact_sections)
+
+    original_tokens = estimate_tokens(text)
+    compact_tokens = estimate_tokens(output)
+    reduction = ((original_tokens - compact_tokens) / original_tokens * 100) if original_tokens > 0 else 0
+
+    write_text(args.output, output)
+    if args.output != '-':
+        print(f"Compacted {args.file}: {original_tokens} → {compact_tokens} tokens ({reduction:.0f}% reduction)")
 
 
 # ── diff ─────────────────────────────────────────────────────────────
@@ -847,6 +963,12 @@ def build_parser() -> argparse.ArgumentParser:
     merge.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
     merge.add_argument('--title', '-t', help='Title for the merged crumb.')
     merge.set_defaults(func=cmd_merge)
+
+    # compact
+    compact = sub.add_parser('compact', help='Strip a crumb to minimum viable form.')
+    compact.add_argument('file', nargs='?', help='.crumb file to compact (default: stdin).')
+    compact.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
+    compact.set_defaults(func=cmd_compact)
 
     # diff
     diff = sub.add_parser('diff', help='Compare two .crumb files.')
