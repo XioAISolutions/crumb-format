@@ -462,6 +462,23 @@ Node validator also available:
 node validators/validate.js examples/task-bug-fix.crumb
 ```
 
+## ClawHub Skill (OpenClaw)
+
+Install CRUMB as an OpenClaw skill so your agent can create, manage, and search crumbs natively:
+
+```bash
+# from ClawHub (when published)
+openclaw skills install crumb
+
+# or manual install
+cp -r clawhub-skill/ ~/.openclaw/skills/crumb/
+pip install crumb-format
+```
+
+Once installed, say **"crumb it"** and your OpenClaw agent generates a structured handoff. Paste a `BEGIN CRUMB` block and it acts on it directly.
+
+See [`clawhub-skill/README.md`](clawhub-skill/README.md) for configuration options.
+
 ## GitHub Action
 
 Add CRUMB validation to any repo's CI:

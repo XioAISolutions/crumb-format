@@ -1,0 +1,39 @@
+{
+  "id": "crumb-format",
+  "name": "CRUMB Format",
+  "description": "Structured AI handoff format — create, manage, and search .crumb files for portable context between tools.",
+  "kind": "memory",
+  "skills": ["."],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "crumbDir": {
+        "type": "string",
+        "description": "Directory to store .crumb files (default: ./crumbs)"
+      },
+      "autoSource": {
+        "type": "string",
+        "description": "Source label for generated crumbs (default: openclaw)"
+      },
+      "autoDreamThreshold": {
+        "type": "number",
+        "description": "Auto-dream when raw entries exceed this count (default: 5)"
+      }
+    }
+  },
+  "uiHints": {
+    "crumbDir": {
+      "label": "Crumb Directory",
+      "placeholder": "./crumbs"
+    },
+    "autoSource": {
+      "label": "Source Label",
+      "placeholder": "openclaw"
+    },
+    "autoDreamThreshold": {
+      "label": "Auto-Dream Threshold",
+      "placeholder": "5"
+    }
+  }
+}
