@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Minimal CLI for creating, validating, and inspecting .crumb handoff files."""
+"""Minimal CLI for creating, validating, inspecting, and managing .crumb handoff files."""
 
 import argparse
+import datetime
+import glob
+import re
 import sys
+from collections import Counter
 from pathlib import Path
 from textwrap import dedent
 from typing import Dict, List
@@ -82,6 +86,35 @@ def parse_crumb(text: str) -> Dict[str, object]:
         if not any(item.strip() for item in sections[section]):
             raise ValueError(f"section [{section}] is empty")
     return {"headers": headers, "sections": sections}
+
+
+def render_crumb(headers: Dict[str, str], sections: Dict[str, List[str]]) -> str:
+    """Render headers and sections back into a .crumb file string."""
+    lines = ["BEGIN CRUMB"]
+    for key, value in headers.items():
+        lines.append(f"{key}={value}")
+    lines.append("---")
+    for name, body in sections.items():
+        lines.append(f"[{name}]")
+        lines.extend(body)
+        if body and body[-1].strip():
+            lines.append("")
+    lines.append("END CRUMB")
+    return "\n".join(lines) + "\n"
+
+
+def normalize_entry(text: str) -> str:
+    """Normalize a bullet entry for deduplication comparison."""
+    text = text.strip()
+    while text.startswith(('-', '*', ' ')):
+        text = text.lstrip('-* ')
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text.lower()
+
+
+def estimate_tokens(text: str) -> int:
+    """Rough token estimate: ~4 chars per token for English text."""
+    return len(text) // 4
 
 
 # ── new ──────────────────────────────────────────────────────────────
@@ -284,12 +317,259 @@ def cmd_inspect(args: argparse.Namespace) -> None:
         print(f"\nOptional sections: {', '.join(f'[{s}]' for s in sorted(extra))}")
 
 
+# ── append ───────────────────────────────────────────────────────────
+
+def cmd_append(args: argparse.Namespace) -> None:
+    """Append raw observations to a mem crumb's [raw] section."""
+    path = Path(args.file)
+    text = path.read_text(encoding='utf-8')
+    parsed = parse_crumb(text)
+
+    if parsed['headers']['kind'] != 'mem':
+        print(f"Error: {args.file} is kind={parsed['headers']['kind']}, expected kind=mem", file=sys.stderr)
+        sys.exit(1)
+
+    if 'raw' not in parsed['sections']:
+        parsed['sections']['raw'] = ['']
+
+    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    for entry in args.entries:
+        parsed['sections']['raw'].append(f"- [{timestamp}] {entry}")
+    parsed['sections']['raw'].append('')
+
+    output = render_crumb(parsed['headers'], parsed['sections'])
+    path.write_text(output, encoding='utf-8')
+    print(f"Appended {len(args.entries)} entries to [raw] in {args.file}")
+
+
+# ── dream ────────────────────────────────────────────────────────────
+
+def cmd_dream(args: argparse.Namespace) -> None:
+    """Run a consolidation pass: deduplicate, merge [raw] into [consolidated], prune to budget."""
+    path = Path(args.file)
+    text = path.read_text(encoding='utf-8')
+    parsed = parse_crumb(text)
+
+    if parsed['headers']['kind'] != 'mem':
+        print(f"Error: {args.file} is kind={parsed['headers']['kind']}, expected kind=mem", file=sys.stderr)
+        sys.exit(1)
+
+    headers = parsed['headers']
+    sections = parsed['sections']
+
+    # Collect all entries from [consolidated] and [raw]
+    existing = [l.strip() for l in sections.get('consolidated', []) if l.strip()]
+    raw = [l.strip() for l in sections.get('raw', []) if l.strip()]
+
+    # Strip timestamps from raw entries for merging: "- [2026-03-28T...] fact" → "- fact"
+    cleaned_raw = []
+    for entry in raw:
+        stripped = re.sub(r'^-\s*\[\d{4}-\d{2}-\d{2}T[^\]]*\]\s*', '- ', entry)
+        cleaned_raw.append(stripped)
+
+    # Deduplicate: normalize and track seen entries
+    seen = set()
+    merged = []
+
+    # Raw entries take priority (newer truth wins), so process them first
+    for entry in cleaned_raw:
+        norm = normalize_entry(entry)
+        if norm and norm not in seen:
+            seen.add(norm)
+            merged.append(entry)
+
+    # Then add existing entries that aren't duplicated by raw
+    for entry in existing:
+        norm = normalize_entry(entry)
+        if norm and norm not in seen:
+            seen.add(norm)
+            merged.append(entry)
+
+    # Prune to budget if max_index_tokens is set
+    budget = int(headers.get('max_index_tokens', '0'))
+    pruned = 0
+    if budget > 0:
+        while merged and estimate_tokens('\n'.join(merged)) > budget:
+            merged.pop()  # drop from the end (oldest surviving entries)
+            pruned += 1
+
+    # Update sections
+    sections['consolidated'] = [f"{e}" for e in merged] + ['']
+    sections.pop('raw', None)
+
+    # Update dream metadata
+    now = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    headers['dream_pass'] = now
+    prev_sessions = int(headers.get('dream_sessions', '0'))
+    headers['dream_sessions'] = str(prev_sessions + 1)
+
+    # Update [dream] section
+    notes = [f"- last_pass: {now}"]
+    notes.append(f"- sessions_seen: {prev_sessions + 1}")
+    notes.append(f"- entries_before: {len(existing) + len(raw)}")
+    notes.append(f"- entries_after: {len(merged)}")
+    notes.append(f"- deduplicated: {len(existing) + len(cleaned_raw) - len(merged)}")
+    if pruned:
+        notes.append(f"- pruned_for_budget: {pruned}")
+    sections['dream'] = notes + ['']
+
+    output = render_crumb(headers, sections)
+    if args.dry_run:
+        sys.stdout.write(output)
+    else:
+        path.write_text(output, encoding='utf-8')
+        print(f"Dream pass complete on {args.file}")
+        print(f"  {len(existing)} existing + {len(raw)} raw → {len(merged)} consolidated")
+        if pruned:
+            print(f"  Pruned {pruned} entries to fit budget ({budget} tokens)")
+
+
+# ── search ───────────────────────────────────────────────────────────
+
+def cmd_search(args: argparse.Namespace) -> None:
+    """Search across .crumb files by keyword. Ranks results by match density."""
+    pattern = args.query.lower().split()
+    search_dir = Path(args.dir)
+
+    if not search_dir.is_dir():
+        print(f"Error: {args.dir} is not a directory", file=sys.stderr)
+        sys.exit(1)
+
+    crumb_files = sorted(search_dir.rglob('*.crumb'))
+    if not crumb_files:
+        print(f"No .crumb files found in {args.dir}")
+        return
+
+    results = []
+    for path in crumb_files:
+        try:
+            text = path.read_text(encoding='utf-8')
+            parsed = parse_crumb(text)
+        except (ValueError, Exception):
+            continue
+
+        headers = parsed['headers']
+        sections = parsed['sections']
+
+        # Build searchable text from all sections
+        all_text = ' '.join(
+            ' '.join(lines) for lines in sections.values()
+        ).lower()
+
+        # Also search headers
+        header_text = ' '.join(f"{k} {v}" for k, v in headers.items()).lower()
+        full_text = header_text + ' ' + all_text
+
+        # Score: count how many query terms match, weighted by frequency
+        score = 0
+        matched_terms = []
+        for term in pattern:
+            count = full_text.count(term)
+            if count > 0:
+                score += count
+                matched_terms.append(term)
+
+        if not matched_terms:
+            continue
+
+        # Bonus for matching all query terms
+        if len(matched_terms) == len(pattern):
+            score += 10
+
+        # Find matching sections for display
+        matching_sections = []
+        for name, lines in sections.items():
+            section_text = ' '.join(lines).lower()
+            if any(term in section_text for term in pattern):
+                matching_sections.append(name)
+
+        results.append({
+            'path': path,
+            'score': score,
+            'kind': headers['kind'],
+            'title': headers.get('title', ''),
+            'matched_terms': matched_terms,
+            'matching_sections': matching_sections,
+        })
+
+    results.sort(key=lambda r: r['score'], reverse=True)
+
+    if not results:
+        print(f"No matches for: {args.query}")
+        return
+
+    limit = args.limit or len(results)
+    for r in results[:limit]:
+        title_part = f"  title={r['title']}" if r['title'] else ""
+        sections_part = f"  in [{', '.join(r['matching_sections'])}]" if r['matching_sections'] else ""
+        print(f"  {r['score']:3d}  {r['path']}  kind={r['kind']}{title_part}{sections_part}")
+
+
+# ── merge ────────────────────────────────────────────────────────────
+
+def cmd_merge(args: argparse.Namespace) -> None:
+    """Merge multiple mem crumbs into one consolidated file."""
+    all_entries = []
+    sources = []
+
+    for filepath in args.files:
+        text = Path(filepath).read_text(encoding='utf-8')
+        parsed = parse_crumb(text)
+        if parsed['headers']['kind'] != 'mem':
+            print(f"Skipping {filepath}: kind={parsed['headers']['kind']}, expected mem", file=sys.stderr)
+            continue
+        sources.append(parsed['headers'].get('source', 'unknown'))
+
+        for section_name in ('consolidated', 'raw'):
+            for line in parsed['sections'].get(section_name, []):
+                if line.strip():
+                    all_entries.append(line.strip())
+
+    # Deduplicate
+    seen = set()
+    merged = []
+    for entry in all_entries:
+        norm = normalize_entry(entry)
+        if norm and norm not in seen:
+            seen.add(norm)
+            merged.append(entry)
+
+    title = args.title or "Merged memory"
+    source = ', '.join(sorted(set(sources))) if sources else "merged"
+    now = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+
+    headers = {
+        'v': '1.1',
+        'kind': 'mem',
+        'title': title,
+        'source': source,
+        'dream_pass': now,
+        'dream_sessions': '1',
+    }
+    sections = {
+        'consolidated': merged + [''],
+        'dream': [
+            f"- last_pass: {now}",
+            f"- merged_from: {len(args.files)} files",
+            f"- entries_before: {len(all_entries)}",
+            f"- entries_after: {len(merged)}",
+            f"- deduplicated: {len(all_entries) - len(merged)}",
+            '',
+        ],
+    }
+
+    output = render_crumb(headers, sections)
+    write_text(args.output, output)
+    if args.output != '-':
+        print(f"Merged {len(args.files)} files → {len(merged)} entries in {args.output}")
+
+
 # ── argument parser ──────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog='crumb',
-        description='Create, validate, and inspect .crumb handoff files.',
+        description='Create, validate, inspect, and manage .crumb handoff files.',
     )
     sub = parser.add_subparsers(dest='command', required=True)
 
@@ -331,6 +611,32 @@ def build_parser() -> argparse.ArgumentParser:
     inspect_cmd.add_argument('file', nargs='?', help='.crumb file to inspect (default: stdin).')
     inspect_cmd.add_argument('--headers-only', '-H', action='store_true', help='Show only headers and section names.')
     inspect_cmd.set_defaults(func=cmd_inspect)
+
+    # append
+    append_cmd = sub.add_parser('append', help='Append raw observations to a mem crumb.')
+    append_cmd.add_argument('file', help='Path to an existing kind=mem .crumb file.')
+    append_cmd.add_argument('entries', nargs='+', help='Observations to append to [raw].')
+    append_cmd.set_defaults(func=cmd_append)
+
+    # dream
+    dream = sub.add_parser('dream', help='Run a consolidation pass on a mem crumb.')
+    dream.add_argument('file', help='Path to a kind=mem .crumb file.')
+    dream.add_argument('--dry-run', action='store_true', help='Print result to stdout instead of writing.')
+    dream.set_defaults(func=cmd_dream)
+
+    # search
+    search = sub.add_parser('search', help='Search .crumb files by keyword.')
+    search.add_argument('query', help='Search query (space-separated terms).')
+    search.add_argument('--dir', default='.', help='Directory to search (default: current).')
+    search.add_argument('--limit', '-n', type=int, help='Max results to show.')
+    search.set_defaults(func=cmd_search)
+
+    # merge
+    merge = sub.add_parser('merge', help='Merge multiple mem crumbs into one.')
+    merge.add_argument('files', nargs='+', help='Mem .crumb files to merge.')
+    merge.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
+    merge.add_argument('--title', '-t', help='Title for the merged crumb.')
+    merge.set_defaults(func=cmd_merge)
 
     return parser
 

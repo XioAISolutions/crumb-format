@@ -269,6 +269,23 @@ python3 cli/crumb.py inspect examples/task-bug-fix.crumb
 python3 cli/crumb.py inspect examples/task-bug-fix.crumb --headers-only
 ```
 
+Memory lifecycle (append → dream → search → merge):
+
+```bash
+# append raw observations to an existing mem crumb
+python3 cli/crumb.py append prefs.crumb "Switched to Neovim" "Dropped Redux for Zustand"
+
+# run a consolidation pass: deduplicate, merge [raw] → [consolidated], prune to budget
+python3 cli/crumb.py dream prefs.crumb
+python3 cli/crumb.py dream prefs.crumb --dry-run  # preview without writing
+
+# search across all .crumb files in a directory
+python3 cli/crumb.py search "auth JWT" --dir ./crumbs/
+
+# merge multiple mem crumbs into one
+python3 cli/crumb.py merge team/*.crumb --title "Team preferences" -o merged.crumb
+```
+
 Node validator also available:
 
 ```bash
