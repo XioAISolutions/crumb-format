@@ -334,6 +334,58 @@ crumb diff prefs-v1.crumb prefs-v2.crumb
 crumb compact handoff.crumb -o slim.crumb
 ```
 
+Export to other formats:
+
+```bash
+# JSON (for APIs, databases, integrations)
+crumb export handoff.crumb -f json -o handoff.json
+
+# Markdown (for docs, wikis, PRs)
+crumb export handoff.crumb -f markdown
+
+# Clipboard-friendly (for pasting into ChatGPT, Claude, Cursor)
+crumb export handoff.crumb -f clipboard
+```
+
+Import from other formats:
+
+```bash
+# import from JSON
+crumb import --from json -i data.json -o handoff.crumb
+
+# import from structured markdown
+crumb import --from markdown -i notes.md -o handoff.crumb
+```
+
+Templates — start from a proven pattern:
+
+```bash
+# see all available templates
+crumb template list
+
+# scaffold from a template
+crumb template use bug-fix -o fix.crumb
+crumb template use feature -o feature.crumb
+crumb template use onboarding -o onboard.crumb
+
+# save your own template
+crumb template add my-template my-handoff.crumb
+```
+
+Automation hooks (`.crumbrc`):
+
+```ini
+# .crumbrc — runs shell commands on crumb events
+[hooks]
+post_dream = git add *.crumb && git commit -m 'dream pass'
+post_append = echo "Entry added to $CRUMB_FILE"
+```
+
+```bash
+# see configured hooks
+crumb hooks
+```
+
 Node validator also available:
 
 ```bash

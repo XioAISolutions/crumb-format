@@ -524,6 +524,180 @@ class TestDreamSignalPruning:
         assert pg_count == 1
 
 
+# ── cmd_export ────────────────────────────────────────────────────────
+
+class TestCmdExport:
+    def test_export_json(self, tmp_path, capsys):
+        f = tmp_path / "task.crumb"
+        f.write_text(VALID_TASK)
+        crumb.main(["export", str(f), "-f", "json"])
+        output = capsys.readouterr().out
+        import json
+        obj = json.loads(output)
+        assert obj["headers"]["kind"] == "task"
+        assert "goal" in obj["sections"]
+
+    def test_export_markdown(self, tmp_path, capsys):
+        f = tmp_path / "task.crumb"
+        f.write_text(VALID_TASK)
+        crumb.main(["export", str(f), "-f", "markdown"])
+        output = capsys.readouterr().out
+        assert "# Fix login bug" in output
+        assert "| kind | task |" in output
+
+    def test_export_clipboard(self, tmp_path, capsys):
+        f = tmp_path / "task.crumb"
+        f.write_text(VALID_TASK)
+        crumb.main(["export", str(f), "-f", "clipboard"])
+        output = capsys.readouterr().out
+        assert "[CRUMB handoff" in output
+        assert "Goal:" in output
+        assert "github.com/XioAISolutions/crumb-format" in output
+
+    def test_export_to_file(self, tmp_path, capsys):
+        f = tmp_path / "mem.crumb"
+        f.write_text(VALID_MEM)
+        out = tmp_path / "mem.json"
+        crumb.main(["export", str(f), "-f", "json", "-o", str(out)])
+        import json
+        obj = json.loads(out.read_text())
+        assert obj["headers"]["kind"] == "mem"
+
+    def test_export_mem_clipboard(self, tmp_path, capsys):
+        f = tmp_path / "mem.crumb"
+        f.write_text(VALID_MEM)
+        crumb.main(["export", str(f), "-f", "clipboard"])
+        output = capsys.readouterr().out
+        assert "Known facts:" in output
+
+    def test_export_map_clipboard(self, tmp_path, capsys):
+        f = tmp_path / "map.crumb"
+        f.write_text(VALID_MAP)
+        crumb.main(["export", str(f), "-f", "clipboard"])
+        output = capsys.readouterr().out
+        assert "Key modules:" in output
+
+
+# ── cmd_import ────────────────────────────────────────────────────────
+
+class TestCmdImport:
+    def test_import_json_round_trip(self, tmp_path, capsys):
+        f = tmp_path / "task.crumb"
+        f.write_text(VALID_TASK)
+        # Export to JSON
+        j = tmp_path / "task.json"
+        crumb.main(["export", str(f), "-f", "json", "-o", str(j)])
+        # Import back
+        out = tmp_path / "reimported.crumb"
+        crumb.main(["import", "--from", "json", "-i", str(j), "-o", str(out)])
+        # Validate the result
+        result = crumb.parse_crumb(out.read_text())
+        assert result["headers"]["kind"] == "task"
+        assert "goal" in result["sections"]
+
+    def test_import_markdown_round_trip(self, tmp_path, capsys):
+        f = tmp_path / "mem.crumb"
+        f.write_text(VALID_MEM)
+        # Export to markdown
+        md = tmp_path / "mem.md"
+        crumb.main(["export", str(f), "-f", "markdown", "-o", str(md)])
+        # Import back
+        out = tmp_path / "reimported.crumb"
+        crumb.main(["import", "--from", "markdown", "-i", str(md), "-o", str(out)])
+        result = crumb.parse_crumb(out.read_text())
+        assert result["headers"]["kind"] == "mem"
+        assert "consolidated" in result["sections"]
+
+    def test_import_json_missing_kind(self, tmp_path, capsys):
+        j = tmp_path / "bad.json"
+        j.write_text('{"headers": {"v": "1.1"}, "sections": {}}')
+        with pytest.raises(SystemExit) as exc:
+            crumb.main(["import", "--from", "json", "-i", str(j)])
+        assert exc.value.code == 1
+
+
+# ── hooks ────────────────────────────────────────────────────────────
+
+class TestHooks:
+    def test_load_hooks_no_file(self, tmp_path):
+        hooks = crumb.load_hooks(str(tmp_path))
+        assert hooks == {}
+
+    def test_load_hooks_with_file(self, tmp_path):
+        rc = tmp_path / ".crumbrc"
+        rc.write_text("[hooks]\npost_dream = echo done\npost_append = echo added\n")
+        hooks = crumb.load_hooks(str(tmp_path))
+        assert hooks["post_dream"] == "echo done"
+        assert hooks["post_append"] == "echo added"
+
+    def test_load_hooks_ignores_comments(self, tmp_path):
+        rc = tmp_path / ".crumbrc"
+        rc.write_text("[hooks]\n# this is a comment\npost_dream = echo done\n")
+        hooks = crumb.load_hooks(str(tmp_path))
+        assert len(hooks) == 1
+
+    def test_load_hooks_multiple_sections(self, tmp_path):
+        rc = tmp_path / ".crumbrc"
+        rc.write_text("[settings]\nfoo = bar\n[hooks]\npost_dream = echo ok\n[other]\nx = y\n")
+        hooks = crumb.load_hooks(str(tmp_path))
+        assert hooks == {"post_dream": "echo ok"}
+
+    def test_run_hook_not_defined(self):
+        assert crumb.run_hook('nonexistent_hook') is True
+
+    def test_cmd_hooks_no_config(self, capsys):
+        crumb.main(["hooks", "--dir", "/tmp"])
+        output = capsys.readouterr().out
+        assert "No hooks configured" in output
+
+
+# ── templates ────────────────────────────────────────────────────────
+
+class TestTemplates:
+    def test_template_list(self, capsys):
+        crumb.main(["template", "list"])
+        output = capsys.readouterr().out
+        assert "bug-fix" in output
+        assert "feature" in output
+        assert "onboarding" in output
+
+    def test_template_use_builtin(self, capsys):
+        crumb.main(["template", "use", "bug-fix"])
+        output = capsys.readouterr().out
+        assert "BEGIN CRUMB" in output
+        assert "kind=task" in output
+        # Must be a valid crumb
+        crumb.parse_crumb(output)
+
+    def test_template_use_to_file(self, tmp_path, capsys):
+        out = tmp_path / "new.crumb"
+        crumb.main(["template", "use", "preferences", "-o", str(out)])
+        result = crumb.parse_crumb(out.read_text())
+        assert result["headers"]["kind"] == "mem"
+
+    def test_template_use_unknown(self):
+        with pytest.raises(SystemExit) as exc:
+            crumb.main(["template", "use", "nonexistent-template"])
+        assert exc.value.code == 1
+
+    def test_template_add_and_use(self, tmp_path, capsys, monkeypatch):
+        # Override template dir to tmp
+        monkeypatch.setattr(crumb, 'TEMPLATE_DIR', tmp_path / 'templates')
+        # Create a valid crumb to use as template
+        src = tmp_path / "my.crumb"
+        src.write_text(VALID_MEM)
+        crumb.main(["template", "add", "my-prefs", str(src)])
+        # Now use it
+        crumb.main(["template", "use", "my-prefs"])
+        output = capsys.readouterr().out
+        assert "Prefers TypeScript" in output
+
+    def test_all_builtin_templates_valid(self):
+        for name, tmpl in crumb.BUILTIN_TEMPLATES.items():
+            parsed = crumb.parse_crumb(tmpl['content'])
+            assert parsed['headers']['kind'] == tmpl['kind'], f"Template '{name}' kind mismatch"
+
+
 # ── Validate all repo examples ───────────────────────────────────────
 
 EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
