@@ -40,7 +40,7 @@ END CRUMB
 
 That's it. The next AI knows what to fix, what it can't change, and why.
 
-## Three kinds
+## Five kinds
 
 Pick the kind that matches what you're handing off:
 
@@ -49,6 +49,8 @@ Pick the kind that matches what you're handing off:
 | `task` | You know the next action | `[goal]` `[context]` `[constraints]` |
 | `mem` | Preferences that survive across sessions | `[consolidated]` |
 | `map` | An AI needs to understand a codebase | `[project]` `[modules]` |
+| `log` | Append-only session transcript | `[entries]` |
+| `todo` | Track work items with checkbox state | `[tasks]` |
 
 ### task -- what to do next
 
@@ -102,6 +104,53 @@ CRUMB is a text-first AI handoff format for moving work between tools without lo
 - Unknown headers and sections should be ignored, not rejected
 - The format should stay small enough to paste into ordinary chats
 END CRUMB
+```
+
+### log -- append-only session transcript
+
+Immutable audit trail. Never consolidated — entries stay exactly as logged:
+
+```text
+BEGIN CRUMB
+v=1.1
+kind=log
+title=Debug session
+source=cursor.agent
+---
+[entries]
+- [2026-03-28T14:00:00Z] Found null pointer in auth middleware
+- [2026-03-28T14:05:00Z] Root cause: cookie parsing runs after redirect check
+- [2026-03-28T14:10:00Z] Fixed by reordering middleware chain
+- [2026-03-28T14:12:00Z] All tests passing, deployed to staging
+END CRUMB
+```
+
+### todo -- foresight memory
+
+Track work items across AI sessions. Completed tasks get archived by dream passes:
+
+```text
+BEGIN CRUMB
+v=1.1
+kind=todo
+title=Sprint 12 tasks
+source=human.notes
+---
+[tasks]
+- [ ] Migrate auth to Clerk
+- [ ] Add rate limiting to API
+- [x] Fix login redirect bug
+- [ ] Write integration tests
+END CRUMB
+```
+
+```bash
+# full todo workflow
+crumb todo-add tasks.crumb "Add caching layer" "Update API docs"
+crumb todo-done tasks.crumb "caching"       # marks matching task as [x]
+crumb todo-list tasks.crumb                 # show open tasks
+crumb todo-list tasks.crumb --all           # include completed
+crumb todo-dream tasks.crumb               # archive [x] items to [archived]
 ```
 
 ## Templates
@@ -375,6 +424,22 @@ crumb template use onboarding -o onboard.crumb
 
 # save your own template
 crumb template add my-template my-handoff.crumb
+```
+
+Session logging:
+
+```bash
+# append timestamped entries (creates file if missing)
+crumb log session.crumb "Found the bug" "Fixed middleware ordering"
+
+# log crumbs are append-only — entries are never consolidated or pruned
+```
+
+Watch mode (auto-dream):
+
+```bash
+# watch a directory, auto-dream when raw entries exceed threshold
+crumb watch ./crumbs/ --threshold 5 --interval 3
 ```
 
 Automation hooks (`.crumbrc`):

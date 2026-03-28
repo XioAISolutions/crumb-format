@@ -22,6 +22,8 @@ REQUIRED_SECTIONS = {
     "task": ["goal", "context", "constraints"],
     "mem": ["consolidated"],
     "map": ["project", "modules"],
+    "log": ["entries"],
+    "todo": ["tasks"],
 }
 
 
@@ -227,6 +229,28 @@ TEMPLATES = {
         {modules}
         END CRUMB
     """),
+    "log": dedent("""\
+        BEGIN CRUMB
+        v=1.1
+        kind=log
+        title={title}
+        source={source}
+        ---
+        [entries]
+        {entries}
+        END CRUMB
+    """),
+    "todo": dedent("""\
+        BEGIN CRUMB
+        v=1.1
+        kind=todo
+        title={title}
+        source={source}
+        ---
+        [tasks]
+        {tasks}
+        END CRUMB
+    """),
 }
 
 PLACEHOLDERS = {
@@ -241,6 +265,12 @@ PLACEHOLDERS = {
     "map": {
         "project_desc": "<one-line project description>",
         "modules": "<key files and directories>",
+    },
+    "log": {
+        "entries": "<timestamped session log entries>",
+    },
+    "todo": {
+        "tasks": "- [ ] <task description>",
     },
 }
 
@@ -274,6 +304,17 @@ def cmd_new(args: argparse.Namespace) -> None:
             values["modules"] = "\n".join(f"- {m}" for m in args.modules)
         else:
             values["modules"] = PLACEHOLDERS["map"]["modules"]
+    elif kind == "log":
+        if args.entries:
+            now = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+            values["entries"] = "\n".join(f"- [{now}] {e}" for e in args.entries)
+        else:
+            values["entries"] = PLACEHOLDERS["log"]["entries"]
+    elif kind == "todo":
+        if args.entries:
+            values["tasks"] = "\n".join(f"- [ ] {e}" for e in args.entries)
+        else:
+            values["tasks"] = PLACEHOLDERS["todo"]["tasks"]
 
     crumb = TEMPLATES[kind].format(**values)
     write_text(args.output, crumb)
@@ -1092,6 +1133,228 @@ def cmd_init(args: argparse.Namespace) -> None:
     print(f"  - Add receiver instruction to the AI that receives crumbs")
 
 
+# ── log (append-only session transcript) ────────────────────────────
+
+def cmd_log(args: argparse.Namespace) -> None:
+    """Append timestamped entries to a log crumb. Creates the file if it doesn't exist."""
+    path = Path(args.file)
+
+    if path.exists():
+        text = path.read_text(encoding='utf-8')
+        parsed = parse_crumb(text)
+        if parsed['headers']['kind'] != 'log':
+            print(f"Error: {args.file} is kind={parsed['headers']['kind']}, expected kind=log", file=sys.stderr)
+            sys.exit(1)
+    else:
+        # Create a new log crumb
+        title = args.title or path.stem
+        parsed = {
+            'headers': {'v': '1.1', 'kind': 'log', 'title': title, 'source': args.source or 'cli'},
+            'sections': {'entries': ['']},
+        }
+
+    timestamp = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    for entry in args.entries:
+        parsed['sections']['entries'].append(f"- [{timestamp}] {entry}")
+    parsed['sections']['entries'].append('')
+
+    output = render_crumb(parsed['headers'], parsed['sections'])
+    path.write_text(output, encoding='utf-8')
+    print(f"Logged {len(args.entries)} entries to {args.file}")
+
+
+# ── todo (foresight memory) ─────────────────────────────────────────
+
+def cmd_todo_add(args: argparse.Namespace) -> None:
+    """Add tasks to a todo crumb. Creates the file if it doesn't exist."""
+    path = Path(args.file)
+
+    if path.exists():
+        text = path.read_text(encoding='utf-8')
+        parsed = parse_crumb(text)
+        if parsed['headers']['kind'] != 'todo':
+            print(f"Error: {args.file} is kind={parsed['headers']['kind']}, expected kind=todo", file=sys.stderr)
+            sys.exit(1)
+    else:
+        title = args.title or path.stem
+        parsed = {
+            'headers': {'v': '1.1', 'kind': 'todo', 'title': title, 'source': args.source or 'cli'},
+            'sections': {'tasks': ['']},
+        }
+
+    for task in args.tasks:
+        parsed['sections']['tasks'].append(f"- [ ] {task}")
+    parsed['sections']['tasks'].append('')
+
+    output = render_crumb(parsed['headers'], parsed['sections'])
+    path.write_text(output, encoding='utf-8')
+    print(f"Added {len(args.tasks)} tasks to {args.file}")
+
+
+def cmd_todo_done(args: argparse.Namespace) -> None:
+    """Mark tasks as done in a todo crumb by substring match."""
+    path = Path(args.file)
+    text = path.read_text(encoding='utf-8')
+    parsed = parse_crumb(text)
+
+    if parsed['headers']['kind'] != 'todo':
+        print(f"Error: {args.file} is kind={parsed['headers']['kind']}, expected kind=todo", file=sys.stderr)
+        sys.exit(1)
+
+    query = args.query.lower()
+    completed = 0
+    new_tasks = []
+    for line in parsed['sections']['tasks']:
+        if line.strip().startswith('- [ ]') and query in line.lower():
+            new_tasks.append(line.replace('- [ ]', '- [x]', 1))
+            completed += 1
+        else:
+            new_tasks.append(line)
+
+    if completed == 0:
+        print(f"No open tasks matching '{args.query}' found.")
+        return
+
+    parsed['sections']['tasks'] = new_tasks
+    output = render_crumb(parsed['headers'], parsed['sections'])
+    path.write_text(output, encoding='utf-8')
+    print(f"Completed {completed} task(s) matching '{args.query}'")
+
+
+def cmd_todo_list(args: argparse.Namespace) -> None:
+    """List tasks from a todo crumb, optionally filtering by status."""
+    text = read_text(args.file)
+    parsed = parse_crumb(text)
+
+    if parsed['headers']['kind'] != 'todo':
+        print(f"Error: not a todo crumb (kind={parsed['headers']['kind']})", file=sys.stderr)
+        sys.exit(1)
+
+    show_all = args.show_all
+    title = parsed['headers'].get('title', '')
+    if title:
+        print(f"Todo: {title}")
+
+    open_count = 0
+    done_count = 0
+    for line in parsed['sections']['tasks']:
+        stripped = line.strip()
+        if stripped.startswith('- [x]'):
+            done_count += 1
+            if show_all:
+                print(f"  {stripped}")
+        elif stripped.startswith('- [ ]'):
+            open_count += 1
+            print(f"  {stripped}")
+
+    print(f"\n  {open_count} open, {done_count} done")
+
+
+def cmd_todo_dream(args: argparse.Namespace) -> None:
+    """Archive completed tasks from [tasks] to [archived], keeping the todo crumb clean."""
+    path = Path(args.file)
+    text = path.read_text(encoding='utf-8')
+    parsed = parse_crumb(text)
+
+    if parsed['headers']['kind'] != 'todo':
+        print(f"Error: {args.file} is kind={parsed['headers']['kind']}, expected kind=todo", file=sys.stderr)
+        sys.exit(1)
+
+    open_tasks = []
+    archived = []
+    for line in parsed['sections']['tasks']:
+        stripped = line.strip()
+        if stripped.startswith('- [x]'):
+            archived.append(stripped)
+        else:
+            open_tasks.append(line)
+
+    if not archived:
+        print("No completed tasks to archive.")
+        return
+
+    parsed['sections']['tasks'] = open_tasks if any(l.strip() for l in open_tasks) else ['']
+    if 'archived' not in parsed['sections']:
+        parsed['sections']['archived'] = ['']
+    parsed['sections']['archived'] = archived + parsed['sections']['archived']
+
+    now = datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+    parsed['headers']['dream_pass'] = now
+
+    output = render_crumb(parsed['headers'], parsed['sections'])
+    path.write_text(output, encoding='utf-8')
+    print(f"Archived {len(archived)} completed tasks from {args.file}")
+
+
+# ── watch ───────────────────────────────────────────────────────────
+
+def cmd_watch(args: argparse.Namespace) -> None:
+    """Watch a .crumb file or directory and auto-dream when raw entries exceed threshold."""
+    import time
+
+    target = Path(args.target)
+    threshold = args.threshold
+    interval = args.interval
+
+    if target.is_file():
+        files_to_watch = [target]
+    elif target.is_dir():
+        files_to_watch = sorted(target.rglob('*.crumb'))
+    else:
+        print(f"Error: {args.target} not found", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Watching {len(files_to_watch)} file(s), auto-dream threshold={threshold} raw entries, interval={interval}s")
+    print("Press Ctrl+C to stop.\n")
+
+    # Track file modification times
+    mtimes = {}
+    for f in files_to_watch:
+        mtimes[f] = f.stat().st_mtime if f.exists() else 0
+
+    try:
+        while True:
+            # Re-scan directory if watching a dir
+            if target.is_dir():
+                files_to_watch = sorted(target.rglob('*.crumb'))
+
+            for f in files_to_watch:
+                if not f.exists():
+                    continue
+                current_mtime = f.stat().st_mtime
+                if current_mtime == mtimes.get(f, 0):
+                    continue
+
+                mtimes[f] = current_mtime
+
+                try:
+                    text = f.read_text(encoding='utf-8')
+                    parsed = parse_crumb(text)
+                except (ValueError, Exception):
+                    continue
+
+                kind = parsed['headers']['kind']
+
+                # Auto-dream for mem crumbs with enough raw entries
+                if kind == 'mem' and 'raw' in parsed['sections']:
+                    raw_entries = [l for l in parsed['sections']['raw'] if l.strip()]
+                    if len(raw_entries) >= threshold:
+                        print(f"[auto-dream] {f.name}: {len(raw_entries)} raw entries (threshold={threshold})")
+
+                        # Create a namespace that looks like dream args
+                        class DreamArgs:
+                            file = str(f)
+                            dry_run = False
+                        cmd_dream(DreamArgs())
+
+                # Run on-change hook
+                run_hook('on_change', {'file': str(f), 'kind': kind})
+
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        print("\nStopped watching.")
+
+
 # ── export ──────────────────────────────────────────────────────────
 
 def crumb_to_json(parsed: Dict) -> str:
@@ -1167,6 +1430,14 @@ def crumb_to_clipboard(parsed: Dict) -> str:
         if mods:
             lines.append("Key modules:")
             lines.extend(f"  {l}" for l in mods)
+    elif kind == 'log':
+        entries = [l.strip() for l in sections.get('entries', []) if l.strip()]
+        lines.append("Session log:")
+        lines.extend(f"  {l}" for l in entries)
+    elif kind == 'todo':
+        tasks = [l.strip() for l in sections.get('tasks', []) if l.strip()]
+        lines.append("Tasks:")
+        lines.extend(f"  {l}" for l in tasks)
 
     lines.append("")
     lines.append(f"(Generated by CRUMB — https://github.com/XioAISolutions/crumb-format)")
@@ -1570,7 +1841,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # new
     new = sub.add_parser('new', help='Create a new .crumb file.')
-    new.add_argument('kind', choices=['task', 'mem', 'map'], help='Kind of crumb to create.')
+    new.add_argument('kind', choices=['task', 'mem', 'map', 'log', 'todo'], help='Kind of crumb to create.')
     new.add_argument('--title', '-t', help='Title for the crumb.')
     new.add_argument('--source', '-s', help='Source label (e.g. claude.chat, cursor.agent).')
     new.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
@@ -1656,6 +1927,46 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument('--description', '-d', help='One-line project description.')
     init.add_argument('--claude-md', action='store_true', help='Also create/update CLAUDE.md with CRUMB instructions.')
     init.set_defaults(func=cmd_init)
+
+    # log
+    log_cmd = sub.add_parser('log', help='Append timestamped entries to a log crumb.')
+    log_cmd.add_argument('file', help='Path to a log crumb (created if missing).')
+    log_cmd.add_argument('entries', nargs='+', help='Entries to log.')
+    log_cmd.add_argument('--title', '-t', help='Title (for new log crumbs).')
+    log_cmd.add_argument('--source', '-s', help='Source label.')
+    log_cmd.set_defaults(func=cmd_log)
+
+    # todo-add
+    todo_add_cmd = sub.add_parser('todo-add', help='Add tasks to a todo crumb.')
+    todo_add_cmd.add_argument('file', help='Path to a todo crumb (created if missing).')
+    todo_add_cmd.add_argument('tasks', nargs='+', help='Tasks to add.')
+    todo_add_cmd.add_argument('--title', '-t', help='Title (for new todo crumbs).')
+    todo_add_cmd.add_argument('--source', '-s', help='Source label.')
+    todo_add_cmd.set_defaults(func=cmd_todo_add)
+
+    # todo-done
+    todo_done_cmd = sub.add_parser('todo-done', help='Mark tasks as done by substring match.')
+    todo_done_cmd.add_argument('file', help='Path to a todo crumb.')
+    todo_done_cmd.add_argument('query', help='Substring to match against open tasks.')
+    todo_done_cmd.set_defaults(func=cmd_todo_done)
+
+    # todo-list
+    todo_list_cmd = sub.add_parser('todo-list', help='List tasks from a todo crumb.')
+    todo_list_cmd.add_argument('file', nargs='?', help='Path to a todo crumb.')
+    todo_list_cmd.add_argument('--all', '-a', dest='show_all', action='store_true', help='Show completed tasks too.')
+    todo_list_cmd.set_defaults(func=cmd_todo_list)
+
+    # todo-dream
+    todo_dream_cmd = sub.add_parser('todo-dream', help='Archive completed tasks to [archived] section.')
+    todo_dream_cmd.add_argument('file', help='Path to a todo crumb.')
+    todo_dream_cmd.set_defaults(func=cmd_todo_dream)
+
+    # watch
+    watch_cmd = sub.add_parser('watch', help='Watch crumbs and auto-dream when raw exceeds threshold.')
+    watch_cmd.add_argument('target', help='File or directory to watch.')
+    watch_cmd.add_argument('--threshold', type=int, default=5, help='Raw entries before auto-dream (default: 5).')
+    watch_cmd.add_argument('--interval', type=int, default=3, help='Poll interval in seconds (default: 3).')
+    watch_cmd.set_defaults(func=cmd_watch)
 
     # export
     export_cmd = sub.add_parser('export', help='Export a .crumb to another format.')

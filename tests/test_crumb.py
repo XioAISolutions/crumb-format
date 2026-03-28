@@ -524,6 +524,154 @@ class TestDreamSignalPruning:
         assert pg_count == 1
 
 
+# ── kind=log ─────────────────────────────────────────────────────────
+
+VALID_LOG = """\
+BEGIN CRUMB
+v=1.1
+kind=log
+title=Debug session
+source=cli
+---
+[entries]
+- [2026-03-28T12:00:00Z] Started debugging
+END CRUMB
+"""
+
+VALID_TODO = """\
+BEGIN CRUMB
+v=1.1
+kind=todo
+title=Sprint tasks
+source=cli
+---
+[tasks]
+- [ ] Fix auth bug
+- [ ] Add tests
+- [x] Write spec
+END CRUMB
+"""
+
+
+class TestNewKinds:
+    def test_parse_log(self):
+        result = crumb.parse_crumb(VALID_LOG)
+        assert result["headers"]["kind"] == "log"
+        assert "entries" in result["sections"]
+
+    def test_parse_todo(self):
+        result = crumb.parse_crumb(VALID_TODO)
+        assert result["headers"]["kind"] == "todo"
+        assert "tasks" in result["sections"]
+
+    def test_new_log(self, tmp_path, capsys):
+        out = tmp_path / "session.crumb"
+        crumb.main(["new", "log", "-t", "My session", "-s", "cli",
+                     "-e", "Started work", "-o", str(out)])
+        result = crumb.parse_crumb(out.read_text())
+        assert result["headers"]["kind"] == "log"
+        entries = [l for l in result["sections"]["entries"] if l.strip()]
+        assert any("Started work" in e for e in entries)
+
+    def test_new_todo(self, tmp_path, capsys):
+        out = tmp_path / "tasks.crumb"
+        crumb.main(["new", "todo", "-t", "My tasks", "-s", "cli",
+                     "-e", "Do something", "-o", str(out)])
+        result = crumb.parse_crumb(out.read_text())
+        assert result["headers"]["kind"] == "todo"
+        tasks = [l for l in result["sections"]["tasks"] if l.strip()]
+        assert any("Do something" in t for t in tasks)
+
+
+class TestCmdLog:
+    def test_log_creates_file(self, tmp_path, capsys):
+        f = tmp_path / "session.crumb"
+        crumb.main(["log", str(f), "First entry", "Second entry"])
+        assert f.exists()
+        result = crumb.parse_crumb(f.read_text())
+        assert result["headers"]["kind"] == "log"
+        entries = [l for l in result["sections"]["entries"] if l.strip()]
+        assert len(entries) == 2
+
+    def test_log_appends(self, tmp_path, capsys):
+        f = tmp_path / "session.crumb"
+        f.write_text(VALID_LOG)
+        crumb.main(["log", str(f), "New entry"])
+        result = crumb.parse_crumb(f.read_text())
+        entries = [l for l in result["sections"]["entries"] if l.strip()]
+        assert len(entries) == 2
+        assert any("New entry" in e for e in entries)
+
+    def test_log_rejects_non_log(self, tmp_path, capsys):
+        f = tmp_path / "mem.crumb"
+        f.write_text(VALID_MEM)
+        with pytest.raises(SystemExit) as exc:
+            crumb.main(["log", str(f), "Entry"])
+        assert exc.value.code == 1
+
+
+class TestCmdTodo:
+    def test_todo_add_creates_file(self, tmp_path, capsys):
+        f = tmp_path / "tasks.crumb"
+        crumb.main(["todo-add", str(f), "Build feature", "Write tests"])
+        result = crumb.parse_crumb(f.read_text())
+        tasks = [l.strip() for l in result["sections"]["tasks"] if l.strip()]
+        assert sum(1 for t in tasks if t.startswith("- [ ]")) == 2
+
+    def test_todo_done(self, tmp_path, capsys):
+        f = tmp_path / "tasks.crumb"
+        f.write_text(VALID_TODO)
+        crumb.main(["todo-done", str(f), "auth"])
+        result = crumb.parse_crumb(f.read_text())
+        tasks = [l.strip() for l in result["sections"]["tasks"] if l.strip()]
+        # "Fix auth bug" should now be [x]
+        auth_tasks = [t for t in tasks if "auth" in t.lower()]
+        assert all("[x]" in t for t in auth_tasks)
+
+    def test_todo_done_no_match(self, tmp_path, capsys):
+        f = tmp_path / "tasks.crumb"
+        f.write_text(VALID_TODO)
+        crumb.main(["todo-done", str(f), "nonexistent_xyz"])
+        output = capsys.readouterr().out
+        assert "No open tasks" in output
+
+    def test_todo_list(self, tmp_path, capsys):
+        f = tmp_path / "tasks.crumb"
+        f.write_text(VALID_TODO)
+        crumb.main(["todo-list", str(f)])
+        output = capsys.readouterr().out
+        assert "2 open" in output
+        assert "1 done" in output
+
+    def test_todo_list_all(self, tmp_path, capsys):
+        f = tmp_path / "tasks.crumb"
+        f.write_text(VALID_TODO)
+        crumb.main(["todo-list", str(f), "--all"])
+        output = capsys.readouterr().out
+        assert "[x] Write spec" in output
+
+    def test_todo_dream_archives(self, tmp_path, capsys):
+        f = tmp_path / "tasks.crumb"
+        f.write_text(VALID_TODO)
+        crumb.main(["todo-dream", str(f)])
+        result = crumb.parse_crumb(f.read_text())
+        # [x] Write spec should be in [archived]
+        assert "archived" in result["sections"]
+        archived = [l.strip() for l in result["sections"]["archived"] if l.strip()]
+        assert any("Write spec" in a for a in archived)
+        # Open tasks remain in [tasks]
+        tasks = [l.strip() for l in result["sections"]["tasks"] if l.strip()]
+        assert not any("[x]" in t for t in tasks)
+
+    def test_todo_dream_nothing_to_archive(self, tmp_path, capsys):
+        todo = VALID_TODO.replace("- [x] Write spec\n", "")
+        f = tmp_path / "tasks.crumb"
+        f.write_text(todo)
+        crumb.main(["todo-dream", str(f)])
+        output = capsys.readouterr().out
+        assert "No completed tasks" in output
+
+
 # ── parse_chat_lines ─────────────────────────────────────────────────
 
 class TestParseChatLines:
