@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crumb-format"
+version = "0.1.0"
+description = "The copy-paste AI handoff format."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [{ name = "XIO AI Solutions" }]
+keywords = ["ai", "handoff", "llm", "context", "prompt-engineering"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries",
+]
+
+[project.urls]
+Homepage = "https://github.com/XioAISolutions/crumb-format"
+Repository = "https://github.com/XioAISolutions/crumb-format"
+
+[project.scripts]
+crumb = "crumb_cli:main"
+
+[tool.setuptools]
+py-modules = ["crumb_cli"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

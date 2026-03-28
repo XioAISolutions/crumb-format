@@ -231,6 +231,19 @@ directly — do not ask the user to re-explain what is already in the crumb.
 
 Both sides of the loop matter. A crumb is only viral if the receiving AI knows what to do with it.
 
+## Install
+
+```bash
+pip install crumb-format
+```
+
+Or clone and use directly:
+
+```bash
+git clone https://github.com/XioAISolutions/crumb-format.git
+python3 cli/crumb.py --help
+```
+
 ## CLI
 
 Create a crumb from the command line:
