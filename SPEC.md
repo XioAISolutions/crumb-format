@@ -79,6 +79,7 @@ Allowed `kind` values:
 - `project`
 - `env`
 - `tags`
+- `url` — link to the CRUMB spec or project; helps recipients understand the format
 
 ---
 

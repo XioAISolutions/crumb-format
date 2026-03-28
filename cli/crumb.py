@@ -564,6 +564,150 @@ def cmd_merge(args: argparse.Namespace) -> None:
         print(f"Merged {len(args.files)} files → {len(merged)} entries in {args.output}")
 
 
+# ── init ─────────────────────────────────────────────────────────────
+
+SENDER_INSTRUCTION = dedent("""\
+    When I say "crumb it", generate a CRUMB summarizing the current state.
+
+    For tasks and handoffs, use kind=task:
+      BEGIN CRUMB
+      v=1.1
+      kind=task
+      title=<short description>
+      source=<this tool>
+      url=https://github.com/XioAISolutions/crumb-format
+      ---
+      [goal]       <what needs to happen next>
+      [context]    <key facts, decisions, current state>
+      [constraints] <what must not change>
+      END CRUMB
+
+    For preferences and memory, use kind=mem:
+      BEGIN CRUMB
+      v=1.1
+      kind=mem
+      title=<topic>
+      source=<this tool>
+      ---
+      [consolidated] <durable facts, preferences, decisions>
+      END CRUMB
+
+    For repo/project overviews, use kind=map:
+      BEGIN CRUMB
+      v=1.1
+      kind=map
+      title=<project name>
+      source=<this tool>
+      ---
+      [project]  <one-line description>
+      [modules]  <key files and directories>
+      END CRUMB
+""")
+
+RECEIVER_INSTRUCTION = dedent("""\
+    When you receive text containing BEGIN CRUMB / END CRUMB markers, treat it
+    as a structured handoff. Parse the headers (kind, title, source) and sections
+    ([goal], [context], [constraints], [consolidated], [project], [modules]).
+    Act on the crumb directly — do not ask the user to re-explain what is already
+    in the crumb. If the crumb is kind=task, start working on the goal. If
+    kind=mem, use the consolidated facts as context. If kind=map, use it to
+    understand the codebase.
+""")
+
+CLAUDE_MD_SNIPPET = dedent("""\
+    ## CRUMB handoffs
+
+    This project uses [CRUMB](https://github.com/XioAISolutions/crumb-format)
+    for AI handoffs. When switching between AI tools:
+
+    - Say "crumb it" to generate a structured handoff
+    - Paste a received crumb to continue work from another AI
+    - Store .crumb files in the `crumbs/` directory
+
+    When you receive a BEGIN CRUMB / END CRUMB block, parse it and act on it
+    directly. When asked to "crumb it", generate a crumb summarizing the current
+    goal, context, and constraints.
+""")
+
+CURSORRULES_SNIPPET = dedent("""\
+    # CRUMB handoffs
+    # This project uses CRUMB (https://github.com/XioAISolutions/crumb-format)
+    # for structured AI handoffs.
+    #
+    # When the user says "crumb it", generate a CRUMB block summarizing the
+    # current task state (goal, context, constraints).
+    #
+    # When you receive a BEGIN CRUMB / END CRUMB block, parse it as a structured
+    # handoff and act on it directly without asking the user to re-explain.
+""")
+
+
+def cmd_init(args: argparse.Namespace) -> None:
+    """Initialize CRUMB in a project: generate map crumb and integration snippets."""
+    project_dir = Path(args.dir)
+    crumbs_dir = project_dir / 'crumbs'
+    crumbs_dir.mkdir(exist_ok=True)
+
+    # Detect project name from directory
+    project_name = args.project or project_dir.resolve().name
+
+    # Generate map crumb from directory structure
+    modules = []
+    for item in sorted(project_dir.iterdir()):
+        if item.name.startswith('.') or item.name == 'crumbs' or item.name == '__pycache__' or item.name == 'node_modules':
+            continue
+        if item.is_dir():
+            modules.append(f"- {item.name}/")
+        elif item.is_file() and item.suffix in ('.py', '.js', '.ts', '.go', '.rs', '.md', '.toml', '.json', '.yaml', '.yml'):
+            modules.append(f"- {item.name}")
+
+    if not modules:
+        modules = ['- <add key files and directories>']
+
+    map_headers = {
+        'v': '1.1',
+        'kind': 'map',
+        'title': f'{project_name} project map',
+        'source': 'crumb.init',
+        'project': project_name,
+        'url': 'https://github.com/XioAISolutions/crumb-format',
+    }
+    map_sections = {
+        'project': [args.description or '<one-line project description>', ''],
+        'modules': modules + [''],
+    }
+    map_crumb = render_crumb(map_headers, map_sections)
+
+    map_path = crumbs_dir / 'map.crumb'
+    map_path.write_text(map_crumb, encoding='utf-8')
+    print(f"  Created {map_path}")
+
+    # Write integration snippets
+    if args.claude_md:
+        claude_md_path = project_dir / 'CLAUDE.md'
+        if claude_md_path.exists():
+            existing = claude_md_path.read_text(encoding='utf-8')
+            if 'CRUMB' not in existing:
+                claude_md_path.write_text(existing.rstrip() + '\n\n' + CLAUDE_MD_SNIPPET, encoding='utf-8')
+                print(f"  Appended CRUMB section to {claude_md_path}")
+            else:
+                print(f"  Skipped {claude_md_path} (already has CRUMB section)")
+        else:
+            claude_md_path.write_text(CLAUDE_MD_SNIPPET, encoding='utf-8')
+            print(f"  Created {claude_md_path}")
+
+    # Print custom instruction snippets
+    print(f"\n--- Sender instruction (add to your AI's custom instructions) ---\n")
+    print(SENDER_INSTRUCTION)
+    print(f"--- Receiver instruction (add to the receiving AI) ---\n")
+    print(RECEIVER_INSTRUCTION)
+
+    print(f"Done. CRUMB initialized in {project_dir}")
+    print(f"  - Map crumb: {map_path}")
+    print(f"  - Add sender instruction to your AI's custom instructions")
+    print(f"  - Add receiver instruction to the AI that receives crumbs")
+
+
 # ── argument parser ──────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
@@ -637,6 +781,14 @@ def build_parser() -> argparse.ArgumentParser:
     merge.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
     merge.add_argument('--title', '-t', help='Title for the merged crumb.')
     merge.set_defaults(func=cmd_merge)
+
+    # init
+    init = sub.add_parser('init', help='Initialize CRUMB in a project.')
+    init.add_argument('--dir', default='.', help='Project directory (default: current).')
+    init.add_argument('--project', '-p', help='Project name (default: directory name).')
+    init.add_argument('--description', '-d', help='One-line project description.')
+    init.add_argument('--claude-md', action='store_true', help='Also create/update CLAUDE.md with CRUMB instructions.')
+    init.set_defaults(func=cmd_init)
 
     return parser
 

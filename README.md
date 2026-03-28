@@ -219,6 +219,18 @@ For repo/project overviews, use kind=map:
 
 Works in ChatGPT custom instructions, Claude Projects, Cursor rules, or any AI that accepts system prompts.
 
+### Teach your AI to receive crumbs
+
+The instruction above teaches an AI to *generate* crumbs. Add this to teach it to *act on* crumbs it receives:
+
+```text
+When you receive text containing BEGIN CRUMB / END CRUMB markers, treat it
+as a structured handoff. Parse the headers and sections, then act on the crumb
+directly — do not ask the user to re-explain what is already in the crumb.
+```
+
+Both sides of the loop matter. A crumb is only viral if the receiving AI knows what to do with it.
+
 ## CLI
 
 Create a crumb from the command line:
@@ -284,6 +296,16 @@ python3 cli/crumb.py search "auth JWT" --dir ./crumbs/
 
 # merge multiple mem crumbs into one
 python3 cli/crumb.py merge team/*.crumb --title "Team preferences" -o merged.crumb
+```
+
+Initialize CRUMB in any project:
+
+```bash
+# generates a map crumb + prints custom instruction snippets
+python3 cli/crumb.py init --project myapp --description "REST API for tasks"
+
+# also create/update CLAUDE.md with CRUMB instructions
+python3 cli/crumb.py init --project myapp --claude-md
 ```
 
 Node validator also available:
