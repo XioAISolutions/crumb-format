@@ -1,0 +1,28 @@
+BEGIN CRUMB
+v=1.1
+kind=mem
+title=CRUMB project decisions
+source=human.notes
+project=crumb-format
+dream_pass=2026-03-28T00:00:00Z
+dream_sessions=1
+max_index_tokens=512
+---
+[consolidated]
+- Format must survive copy-paste through chat, docs, issues, and email
+- Plain text is the canonical form; binary transport is optional
+- Three kinds only: task, mem, map. Resist adding more.
+- CLI must have zero external dependencies (stdlib only)
+- Prefer showing over telling in documentation
+- Custom instructions are the primary viral mechanism
+- Both sender and receiver sides must be taught
+- Every crumb should optionally link back to the spec via url header
+- Dream passes prefer newer facts over older ones
+- Token budgets are advisory, not enforced
+
+[dream]
+- last_pass: 2026-03-28T00:00:00Z
+- sessions_seen: 1
+- notes:
+  - Initial consolidation from README rewrite and repo cleanup decisions
+END CRUMB

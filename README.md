@@ -1,5 +1,8 @@
 # CRUMB
 
+[![Validate and test](https://github.com/XioAISolutions/crumb-format/actions/workflows/validate-examples.yml/badge.svg)](https://github.com/XioAISolutions/crumb-format/actions/workflows/validate-examples.yml)
+[![CRUMB ready](https://img.shields.io/badge/CRUMB-ready-orange)](https://github.com/XioAISolutions/crumb-format)
+
 The copy-paste AI handoff format.
 
 ---
@@ -321,10 +324,41 @@ python3 cli/crumb.py init --project myapp --description "REST API for tasks"
 python3 cli/crumb.py init --project myapp --claude-md
 ```
 
+Compare two crumbs:
+
+```bash
+# see what changed between dream passes or versions
+crumb diff prefs-v1.crumb prefs-v2.crumb
+```
+
 Node validator also available:
 
 ```bash
 node validators/validate.js examples/task-bug-fix.crumb
+```
+
+## GitHub Action
+
+Add CRUMB validation to any repo's CI:
+
+```yaml
+# .github/workflows/validate-crumbs.yml
+name: Validate .crumb files
+on: [push, pull_request]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: XioAISolutions/crumb-format@main
+        with:
+          path: '**/*.crumb'
+```
+
+Add the badge to your README:
+
+```markdown
+[![CRUMB ready](https://img.shields.io/badge/CRUMB-ready-orange)](https://github.com/XioAISolutions/crumb-format)
 ```
 
 ## What's in this repo

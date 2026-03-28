@@ -348,6 +348,42 @@ class TestCmdMerge:
         assert len(entries) == 2  # deduplicated
 
 
+# ── cmd_diff ─────────────────────────────────────────────────────────
+
+class TestCmdDiff:
+    def test_diff_identical(self, tmp_path, capsys):
+        f1 = tmp_path / "a.crumb"
+        f2 = tmp_path / "b.crumb"
+        f1.write_text(VALID_MEM)
+        f2.write_text(VALID_MEM)
+        crumb.main(["diff", str(f1), str(f2)])
+        output = capsys.readouterr().out
+        assert "No differences" in output
+
+    def test_diff_added_entries(self, tmp_path, capsys):
+        f1 = tmp_path / "a.crumb"
+        f2 = tmp_path / "b.crumb"
+        f1.write_text(VALID_MEM)
+        f2.write_text(VALID_MEM)
+        crumb.main(["append", str(f2), "Likes Rust"])
+        crumb.main(["dream", str(f2)])
+        crumb.main(["diff", str(f1), str(f2)])
+        output = capsys.readouterr().out
+        assert "+ " in output
+        assert "likes rust" in output.lower()
+
+    def test_diff_removed_entries(self, tmp_path, capsys):
+        f1 = tmp_path / "a.crumb"
+        f2 = tmp_path / "b.crumb"
+        f1.write_text(VALID_MEM)
+        # f2 has only one entry instead of two
+        f2.write_text(VALID_MEM.replace("- No ORMs\n", ""))
+        crumb.main(["diff", str(f1), str(f2)])
+        output = capsys.readouterr().out
+        assert "- " in output
+        assert "change(s)" in output
+
+
 # ── cmd_init ─────────────────────────────────────────────────────────
 
 class TestCmdInit:
@@ -372,11 +408,20 @@ class TestCmdInit:
 # ── Validate all repo examples ───────────────────────────────────────
 
 EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
+CRUMBS_DIR = Path(__file__).resolve().parent.parent / "crumbs"
 
 
 @pytest.mark.parametrize("example", sorted(EXAMPLES_DIR.glob("*.crumb")))
 def test_example_validates(example):
     text = example.read_text(encoding="utf-8")
+    result = crumb.parse_crumb(text)
+    assert "headers" in result
+    assert "sections" in result
+
+
+@pytest.mark.parametrize("crumb_file", sorted(CRUMBS_DIR.glob("*.crumb")))
+def test_dogfood_crumb_validates(crumb_file):
+    text = crumb_file.read_text(encoding="utf-8")
     result = crumb.parse_crumb(text)
     assert "headers" in result
     assert "sections" in result

@@ -1,0 +1,28 @@
+BEGIN CRUMB
+v=1.1
+kind=map
+title=CRUMB project map
+source=crumb.init
+project=crumb-format
+url=https://github.com/XioAISolutions/crumb-format
+---
+[project]
+CRUMB is a copy-paste AI handoff format. Small structured text blocks that let you switch between AI tools without losing context.
+
+[modules]
+- SPEC.md: v1.1 format specification (kinds: task, mem, map)
+- DREAMING.md: memory consolidation / dream-pass guidance
+- cli/crumb.py: Python CLI (10 commands: new, from-chat, validate, inspect, append, dream, search, merge, diff, init)
+- validators/validate.py: Python reference validator
+- validators/validate.js: Node.js reference validator
+- examples/: 7 ready-to-paste .crumb files covering all kinds
+- tests/test_crumb.py: 50+ unit tests
+- action.yml: reusable GitHub Action for CI validation
+- pyproject.toml: pip installable as crumb-format
+
+[invariants]
+- The canonical form is plain text .crumb
+- Unknown headers and sections must be ignored, not rejected
+- The format must stay small enough to paste into ordinary chats
+- Zero external dependencies in the CLI
+END CRUMB

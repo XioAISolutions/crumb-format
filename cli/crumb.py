@@ -564,6 +564,72 @@ def cmd_merge(args: argparse.Namespace) -> None:
         print(f"Merged {len(args.files)} files → {len(merged)} entries in {args.output}")
 
 
+# ── diff ─────────────────────────────────────────────────────────────
+
+def cmd_diff(args: argparse.Namespace) -> None:
+    """Compare two .crumb files and show what changed."""
+    text_a = Path(args.file_a).read_text(encoding='utf-8')
+    text_b = Path(args.file_b).read_text(encoding='utf-8')
+    parsed_a = parse_crumb(text_a)
+    parsed_b = parse_crumb(text_b)
+
+    headers_a = parsed_a['headers']
+    headers_b = parsed_b['headers']
+    sections_a = parsed_a['sections']
+    sections_b = parsed_b['sections']
+
+    changes = 0
+
+    # Compare headers
+    all_keys = sorted(set(list(headers_a.keys()) + list(headers_b.keys())))
+    header_diffs = []
+    for key in all_keys:
+        val_a = headers_a.get(key)
+        val_b = headers_b.get(key)
+        if val_a != val_b:
+            if val_a is None:
+                header_diffs.append(f"  + {key}={val_b}")
+            elif val_b is None:
+                header_diffs.append(f"  - {key}={val_a}")
+            else:
+                header_diffs.append(f"  - {key}={val_a}")
+                header_diffs.append(f"  + {key}={val_b}")
+            changes += 1
+
+    if header_diffs:
+        print("Headers:")
+        for line in header_diffs:
+            print(line)
+        print()
+
+    # Compare sections
+    all_sections = sorted(set(list(sections_a.keys()) + list(sections_b.keys())))
+    for section in all_sections:
+        entries_a = set(normalize_entry(l) for l in sections_a.get(section, []) if l.strip())
+        entries_b = set(normalize_entry(l) for l in sections_b.get(section, []) if l.strip())
+        raw_a = {normalize_entry(l): l.strip() for l in sections_a.get(section, []) if l.strip()}
+        raw_b = {normalize_entry(l): l.strip() for l in sections_b.get(section, []) if l.strip()}
+
+        added = entries_b - entries_a
+        removed = entries_a - entries_b
+
+        if not added and not removed:
+            continue
+
+        changes += len(added) + len(removed)
+        print(f"[{section}]:")
+        for norm in sorted(removed):
+            print(f"  - {raw_a[norm]}")
+        for norm in sorted(added):
+            print(f"  + {raw_b[norm]}")
+        print()
+
+    if changes == 0:
+        print("No differences found.")
+    else:
+        print(f"{changes} change(s) total.")
+
+
 # ── init ─────────────────────────────────────────────────────────────
 
 SENDER_INSTRUCTION = dedent("""\
@@ -781,6 +847,12 @@ def build_parser() -> argparse.ArgumentParser:
     merge.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
     merge.add_argument('--title', '-t', help='Title for the merged crumb.')
     merge.set_defaults(func=cmd_merge)
+
+    # diff
+    diff = sub.add_parser('diff', help='Compare two .crumb files.')
+    diff.add_argument('file_a', help='First .crumb file.')
+    diff.add_argument('file_b', help='Second .crumb file.')
+    diff.set_defaults(func=cmd_diff)
 
     # init
     init = sub.add_parser('init', help='Initialize CRUMB in a project.')
