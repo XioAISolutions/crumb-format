@@ -524,6 +524,115 @@ class TestDreamSignalPruning:
         assert pg_count == 1
 
 
+# ── parse_chat_lines ─────────────────────────────────────────────────
+
+class TestParseChatLines:
+    def test_detects_code_blocks(self):
+        chat = "user: show me code\n```python\ndef hello():\n    pass\n```\nuser: thanks"
+        user, ai, code, decisions = crumb.parse_chat_lines(chat)
+        assert len(code) == 1
+        assert code[0]['lang'] == 'python'
+        assert 'def hello' in code[0]['code']
+
+    def test_extracts_decisions(self):
+        chat = "claude: Decided to use PostgreSQL.\nclaude: Going with Redis for caching."
+        user, ai, code, decisions = crumb.parse_chat_lines(chat)
+        assert len(decisions) == 2
+        assert any('PostgreSQL' in d for d in decisions)
+        assert any('Redis' in d for d in decisions)
+
+    def test_separates_user_and_ai(self):
+        chat = "user: hello\nclaude: hi there\nuser: bye"
+        user, ai, code, decisions = crumb.parse_chat_lines(chat)
+        assert len(user) == 2
+        assert len(ai) == 1
+
+    def test_handles_multiline_code_blocks(self):
+        chat = "```js\nconst x = 1;\nconst y = 2;\nreturn x + y;\n```"
+        user, ai, code, decisions = crumb.parse_chat_lines(chat)
+        assert len(code) == 1
+        assert 'const x = 1' in code[0]['code']
+        assert code[0]['lang'] == 'js'
+
+    def test_no_decisions_found(self):
+        chat = "user: just chatting\nclaude: hello there"
+        user, ai, code, decisions = crumb.parse_chat_lines(chat)
+        assert decisions == []
+
+
+class TestFromChatSmart:
+    def test_from_chat_extracts_decisions(self, tmp_path, capsys):
+        chat_file = tmp_path / "chat.txt"
+        chat_file.write_text("claude: Decided to use React.\nclaude: Switched to TypeScript.")
+        crumb.main(["from-chat", "-i", str(chat_file)])
+        output = capsys.readouterr().out
+        assert "Decisions made:" in output
+
+    def test_from_chat_extracts_code_blocks(self, tmp_path, capsys):
+        chat_file = tmp_path / "chat.txt"
+        chat_file.write_text("user: show code\n```python\ndef foo(): pass\n```\nuser: ok")
+        crumb.main(["from-chat", "-i", str(chat_file)])
+        output = capsys.readouterr().out
+        assert "Code discussed" in output
+        assert "(python)" in output
+
+    def test_from_chat_mem_kind(self, tmp_path, capsys):
+        chat_file = tmp_path / "chat.txt"
+        chat_file.write_text("claude: Decided to use Postgres.\nclaude: Switched to Prisma ORM.")
+        crumb.main(["from-chat", "-i", str(chat_file), "--kind", "mem", "--title", "Decisions"])
+        output = capsys.readouterr().out
+        parsed = crumb.parse_crumb(output)
+        assert parsed["headers"]["kind"] == "mem"
+        entries = [l.strip() for l in parsed["sections"]["consolidated"] if l.strip()]
+        assert len(entries) >= 2
+
+    def test_from_chat_still_works_plain(self, tmp_path, capsys):
+        chat_file = tmp_path / "chat.txt"
+        chat_file.write_text("user: fix the bug\nclaude: I fixed it")
+        crumb.main(["from-chat", "-i", str(chat_file), "--title", "Bug fix"])
+        output = capsys.readouterr().out
+        assert "BEGIN CRUMB" in output
+        assert "kind=task" in output
+
+
+# ── search modes ─────────────────────────────────────────────────────
+
+class TestSearchModes:
+    @pytest.fixture()
+    def search_dir(self, tmp_path):
+        """Create a directory with several crumb files for search testing."""
+        (tmp_path / "auth.crumb").write_text(VALID_TASK)
+        (tmp_path / "prefs.crumb").write_text(VALID_MEM)
+        (tmp_path / "project.crumb").write_text(VALID_MAP)
+        return tmp_path
+
+    def test_keyword_search(self, search_dir, capsys):
+        crumb.main(["search", "TypeScript", "--dir", str(search_dir)])
+        output = capsys.readouterr().out
+        assert "prefs.crumb" in output
+
+    def test_keyword_no_match(self, search_dir, capsys):
+        crumb.main(["search", "nonexistent_xyz", "--dir", str(search_dir)])
+        output = capsys.readouterr().out
+        assert "No matches" in output
+
+    def test_fuzzy_search_finds_approximate(self, search_dir, capsys):
+        # "Typscript" (misspelled) should fuzzy-match "TypeScript"
+        crumb.main(["search", "Typscript", "--dir", str(search_dir), "--method", "fuzzy"])
+        output = capsys.readouterr().out
+        assert "prefs.crumb" in output
+
+    def test_ranked_search(self, search_dir, capsys):
+        crumb.main(["search", "TypeScript", "--dir", str(search_dir), "--method", "ranked"])
+        output = capsys.readouterr().out
+        assert "prefs.crumb" in output
+
+    def test_fuzzy_search_no_match(self, search_dir, capsys):
+        crumb.main(["search", "zzzzxxxxxqqqq", "--dir", str(search_dir), "--method", "fuzzy"])
+        output = capsys.readouterr().out
+        assert "No matches" in output
+
+
 # ── cmd_export ────────────────────────────────────────────────────────
 
 class TestCmdExport:

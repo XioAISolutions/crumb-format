@@ -275,12 +275,15 @@ python3 cli/crumb.py new map \
   --modules "src/routes: endpoints" "src/db: database layer"
 ```
 
-Convert a chat log into a task crumb:
+Convert a chat log into a crumb (auto-extracts decisions and code blocks):
 
 ```bash
 python3 cli/crumb.py from-chat --input chat.txt --output handoff.crumb
 
-# or from clipboard (macOS)
+# extract just decisions as a mem crumb
+python3 cli/crumb.py from-chat --input chat.txt --kind mem --title "Stack decisions"
+
+# from clipboard (macOS)
 pbpaste | python3 cli/crumb.py from-chat --title "Continue auth work" --source claude.chat
 ```
 
@@ -307,8 +310,10 @@ python3 cli/crumb.py append prefs.crumb "Switched to Neovim" "Dropped Redux for 
 python3 cli/crumb.py dream prefs.crumb
 python3 cli/crumb.py dream prefs.crumb --dry-run  # preview without writing
 
-# search across all .crumb files in a directory
+# search across all .crumb files (keyword, fuzzy, or ranked)
 python3 cli/crumb.py search "auth JWT" --dir ./crumbs/
+python3 cli/crumb.py search "authenication" --dir ./crumbs/ --method fuzzy   # typo-tolerant
+python3 cli/crumb.py search "auth JWT" --dir ./crumbs/ --method ranked       # TF-IDF scoring
 
 # merge multiple mem crumbs into one
 python3 cli/crumb.py merge team/*.crumb --title "Team preferences" -o merged.crumb

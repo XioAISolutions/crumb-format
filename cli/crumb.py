@@ -3,6 +3,7 @@
 
 import argparse
 import datetime
+import difflib
 import glob
 import json
 import os
@@ -282,18 +283,85 @@ def cmd_new(args: argparse.Namespace) -> None:
 
 AI_PREFIXES = ('assistant:', 'ai:', 'claude:', 'gpt:', 'chatgpt:', 'copilot:', 'gemini:', 'system:')
 
+DECISION_PATTERNS = [
+    re.compile(r"(?:let's|we'll|we should|decided to|going with|chose|picking|switched to|using)\s+(.+)", re.IGNORECASE),
+    re.compile(r"(?:decision|conclusion|agreed|settled on)[:\s]+(.+)", re.IGNORECASE),
+]
+
+
+def parse_chat_lines(raw: str) -> tuple:
+    """Parse chat text into structured segments: user lines, AI lines, code blocks, decisions."""
+    lines = raw.splitlines()
+    user_lines = []
+    ai_lines = []
+    code_blocks = []
+    decisions = []
+
+    in_code_block = False
+    current_code = []
+    code_lang = ''
+
+    for line in lines:
+        stripped = line.strip()
+
+        # Code block detection
+        if stripped.startswith('```'):
+            if in_code_block:
+                code_blocks.append({'lang': code_lang, 'code': '\n'.join(current_code)})
+                current_code = []
+                in_code_block = False
+            else:
+                in_code_block = True
+                code_lang = stripped[3:].strip()
+            continue
+
+        if in_code_block:
+            current_code.append(line)
+            continue
+
+        if not stripped:
+            continue
+
+        # Decision extraction
+        for pat in DECISION_PATTERNS:
+            m = pat.search(stripped)
+            if m:
+                decisions.append(m.group(0).strip())
+                break
+
+        # Classify as user or AI
+        if stripped.lower().startswith(AI_PREFIXES):
+            ai_lines.append(stripped)
+        else:
+            user_lines.append(stripped)
+
+    return user_lines, ai_lines, code_blocks, decisions
+
 
 def cmd_from_chat(args: argparse.Namespace) -> None:
     raw = read_text(args.input)
-    lines = [line.strip() for line in raw.splitlines() if line.strip()]
-    user_lines = [line for line in lines if not line.lower().startswith(AI_PREFIXES)]
-    ai_lines = [line for line in lines if line not in user_lines]
+    user_lines, ai_lines, code_blocks, decisions = parse_chat_lines(raw)
 
     goal = args.goal.strip() if args.goal else 'Continue this work from where the last assistant left off.'
     title = args.title or 'Continue previous session'
     source = args.source or 'chat.log'
 
     context_lines = []
+
+    # Decisions first — highest signal
+    if decisions:
+        context_lines.append('- Decisions made:')
+        for d in decisions[:6]:
+            context_lines.append(f'  - {d}')
+
+    # Code blocks — concrete artifacts
+    if code_blocks:
+        context_lines.append(f'- Code discussed ({len(code_blocks)} block{"s" if len(code_blocks) != 1 else ""}):')
+        for block in code_blocks[:3]:
+            lang_label = f' ({block["lang"]})' if block["lang"] else ''
+            preview = block["code"].strip().split('\n')[0][:80]
+            context_lines.append(f'  - {preview}...{lang_label}')
+
     if user_lines:
         context_lines.append('- User conversation (selected lines):')
         context_lines.extend([f'  - {line}' for line in user_lines[:8]])
@@ -307,7 +375,20 @@ def cmd_from_chat(args: argparse.Namespace) -> None:
     if not constraints:
         constraints = ['- No additional constraints; follow best practices.']
 
-    crumb = dedent(f'''\
+    # Build output based on kind
+    kind = args.kind
+
+    if kind == 'mem' and decisions:
+        # Extract decisions as mem entries
+        entries = [f'- {d}' for d in decisions]
+        headers = {
+            'v': '1.1', 'kind': 'mem', 'title': title,
+            'source': source,
+        }
+        sections = {'consolidated': entries + ['']}
+        crumb_text = render_crumb(headers, sections)
+    else:
+        crumb_text = dedent(f'''\
 BEGIN CRUMB
 v=1.1
 kind=task
@@ -319,9 +400,10 @@ source={source}
 
 [context]
 ''')
-    crumb += '\n'.join(context_lines) + '\n\n[constraints]\n'
-    crumb += '\n'.join(constraints) + '\nEND CRUMB\n'
-    write_text(args.output, crumb)
+        crumb_text += '\n'.join(context_lines) + '\n\n[constraints]\n'
+        crumb_text += '\n'.join(constraints) + '\nEND CRUMB\n'
+
+    write_text(args.output, crumb_text)
 
 
 # ── validate ─────────────────────────────────────────────────────────
@@ -502,44 +584,33 @@ def cmd_dream(args: argparse.Namespace) -> None:
 
 # ── search ───────────────────────────────────────────────────────────
 
-def cmd_search(args: argparse.Namespace) -> None:
-    """Search across .crumb files by keyword. Ranks results by match density."""
-    pattern = args.query.lower().split()
-    search_dir = Path(args.dir)
-
-    if not search_dir.is_dir():
-        print(f"Error: {args.dir} is not a directory", file=sys.stderr)
-        sys.exit(1)
-
-    crumb_files = sorted(search_dir.rglob('*.crumb'))
-    if not crumb_files:
-        print(f"No .crumb files found in {args.dir}")
-        return
-
+def _load_crumb_files(search_dir: Path) -> list:
+    """Load and parse all .crumb files in a directory."""
     results = []
-    for path in crumb_files:
+    for path in sorted(search_dir.rglob('*.crumb')):
         try:
             text = path.read_text(encoding='utf-8')
             parsed = parse_crumb(text)
+            results.append((path, text, parsed))
         except (ValueError, Exception):
             continue
+    return results
 
+
+def _search_keyword(query_terms: list, crumb_files: list) -> list:
+    """Keyword search: exact term matching with frequency scoring."""
+    results = []
+    for path, text, parsed in crumb_files:
         headers = parsed['headers']
         sections = parsed['sections']
 
-        # Build searchable text from all sections
-        all_text = ' '.join(
-            ' '.join(lines) for lines in sections.values()
-        ).lower()
-
-        # Also search headers
+        all_text = ' '.join(' '.join(lines) for lines in sections.values()).lower()
         header_text = ' '.join(f"{k} {v}" for k, v in headers.items()).lower()
         full_text = header_text + ' ' + all_text
 
-        # Score: count how many query terms match, weighted by frequency
         score = 0
         matched_terms = []
-        for term in pattern:
+        for term in query_terms:
             count = full_text.count(term)
             if count > 0:
                 score += count
@@ -548,25 +619,150 @@ def cmd_search(args: argparse.Namespace) -> None:
         if not matched_terms:
             continue
 
-        # Bonus for matching all query terms
-        if len(matched_terms) == len(pattern):
+        if len(matched_terms) == len(query_terms):
             score += 10
 
-        # Find matching sections for display
         matching_sections = []
         for name, lines in sections.items():
             section_text = ' '.join(lines).lower()
-            if any(term in section_text for term in pattern):
+            if any(term in section_text for term in query_terms):
                 matching_sections.append(name)
 
         results.append({
-            'path': path,
-            'score': score,
-            'kind': headers['kind'],
-            'title': headers.get('title', ''),
-            'matched_terms': matched_terms,
+            'path': path, 'score': score, 'kind': headers['kind'],
+            'title': headers.get('title', ''), 'matched_terms': matched_terms,
             'matching_sections': matching_sections,
         })
+    return results
+
+
+def _search_fuzzy(query_terms: list, crumb_files: list) -> list:
+    """Fuzzy search: uses difflib for approximate matching."""
+    query = ' '.join(query_terms)
+    results = []
+    for path, text, parsed in crumb_files:
+        headers = parsed['headers']
+        sections = parsed['sections']
+
+        # Collect all text lines for fuzzy matching
+        all_lines = []
+        for name, lines in sections.items():
+            for line in lines:
+                if line.strip():
+                    all_lines.append((name, line.strip()))
+
+        # Also match against title and headers
+        title = headers.get('title', '')
+        if title:
+            all_lines.append(('title', title))
+
+        best_ratio = 0.0
+        best_section = ''
+        matched_terms = []
+
+        for section_name, line in all_lines:
+            ratio = difflib.SequenceMatcher(None, query.lower(), line.lower()).ratio()
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_section = section_name
+
+            # Also check individual term fuzzy matches
+            words = line.lower().split()
+            for term in query_terms:
+                matches = difflib.get_close_matches(term, words, n=1, cutoff=0.6)
+                if matches and term not in matched_terms:
+                    matched_terms.append(term)
+
+        if best_ratio < 0.3 and not matched_terms:
+            continue
+
+        score = int(best_ratio * 100)
+        matching_sections = [best_section] if best_section else []
+
+        results.append({
+            'path': path, 'score': score, 'kind': headers['kind'],
+            'title': headers.get('title', ''), 'matched_terms': matched_terms or query_terms,
+            'matching_sections': matching_sections,
+        })
+    return results
+
+
+def _search_ranked(query_terms: list, crumb_files: list) -> list:
+    """Ranked search: uses TF-IDF keyword scoring for information-density ranking."""
+    results = []
+    for path, text, parsed in crumb_files:
+        headers = parsed['headers']
+        sections = parsed['sections']
+
+        all_entries = []
+        for name, lines in sections.items():
+            for line in lines:
+                if line.strip():
+                    all_entries.append(line.strip())
+
+        if not all_entries:
+            continue
+
+        # Build keyword index
+        entry_kw = {normalize_entry(e): extract_keywords(e) for e in all_entries}
+        query_kw = set(query_terms)
+
+        # Score each entry by: query relevance × information density
+        total_score = 0.0
+        matched_terms = []
+        matching_sections = []
+
+        for name, lines in sections.items():
+            section_matched = False
+            for line in lines:
+                if not line.strip():
+                    continue
+                entry = line.strip()
+                kw = entry_kw.get(normalize_entry(entry), set())
+                overlap = kw & query_kw
+                if overlap:
+                    # Query relevance
+                    relevance = len(overlap) / len(query_kw)
+                    # Information density from score_entry
+                    density = score_entry(entry, all_entries, entry_kw)
+                    total_score += relevance * density
+                    matched_terms.extend(t for t in overlap if t not in matched_terms)
+                    section_matched = True
+            if section_matched:
+                matching_sections.append(name)
+
+        if total_score == 0:
+            continue
+
+        results.append({
+            'path': path, 'score': int(total_score * 10), 'kind': headers['kind'],
+            'title': headers.get('title', ''), 'matched_terms': matched_terms,
+            'matching_sections': matching_sections,
+        })
+    return results
+
+
+def cmd_search(args: argparse.Namespace) -> None:
+    """Search across .crumb files by keyword, fuzzy match, or ranked relevance."""
+    query_terms = args.query.lower().split()
+    search_dir = Path(args.dir)
+    method = args.method
+
+    if not search_dir.is_dir():
+        print(f"Error: {args.dir} is not a directory", file=sys.stderr)
+        sys.exit(1)
+
+    crumb_files = _load_crumb_files(search_dir)
+    if not crumb_files:
+        print(f"No .crumb files found in {args.dir}")
+        return
+
+    if method == 'fuzzy':
+        results = _search_fuzzy(query_terms, crumb_files)
+    elif method == 'ranked':
+        results = _search_ranked(query_terms, crumb_files)
+    else:
+        results = _search_keyword(query_terms, crumb_files)
 
     results.sort(key=lambda r: r['score'], reverse=True)
 
@@ -1391,12 +1587,14 @@ def build_parser() -> argparse.ArgumentParser:
     new.set_defaults(func=cmd_new)
 
     # from-chat
-    from_chat = sub.add_parser('from-chat', help='Convert a chat log into a task crumb.')
+    from_chat = sub.add_parser('from-chat', help='Convert a chat log into a task or mem crumb.')
     from_chat.add_argument('--input', '-i', default='-', help='Input file or - for stdin.')
     from_chat.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
     from_chat.add_argument('--title', help='Title for the crumb.')
     from_chat.add_argument('--source', help='Source label (e.g. chatgpt.chat, claude.chat).')
     from_chat.add_argument('--goal', help='Override the default goal text.')
+    from_chat.add_argument('--kind', '-k', choices=['task', 'mem'], default='task',
+                           help='Output kind: task (default) or mem (extracts decisions).')
     from_chat.add_argument('--constraints', '-c', nargs='*', help='Constraints as separate arguments.')
     from_chat.set_defaults(func=cmd_from_chat)
 
@@ -1424,9 +1622,11 @@ def build_parser() -> argparse.ArgumentParser:
     dream.set_defaults(func=cmd_dream)
 
     # search
-    search = sub.add_parser('search', help='Search .crumb files by keyword.')
+    search = sub.add_parser('search', help='Search .crumb files by keyword, fuzzy, or ranked.')
     search.add_argument('query', help='Search query (space-separated terms).')
     search.add_argument('--dir', default='.', help='Directory to search (default: current).')
+    search.add_argument('--method', '-m', choices=['keyword', 'fuzzy', 'ranked'], default='keyword',
+                        help='Search method: keyword (exact), fuzzy (approximate), ranked (TF-IDF).')
     search.add_argument('--limit', '-n', type=int, help='Max results to show.')
     search.set_defaults(func=cmd_search)
 
