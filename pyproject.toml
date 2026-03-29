@@ -27,6 +27,7 @@ crumb = "crumb_cli:main"
 
 [tool.setuptools]
 py-modules = ["crumb_cli"]
+packages = ["cli"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
