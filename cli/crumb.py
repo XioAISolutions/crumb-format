@@ -7,7 +7,9 @@ import difflib
 import glob
 import json
 import os
+import platform
 import re
+import base64
 import shutil
 import subprocess
 import sys
@@ -1911,6 +1913,104 @@ def cmd_template(args: argparse.Namespace) -> None:
         print(f"Saved template '{name}' to {dest}")
 
 
+# ── share ───────────────────────────────────────────────────────────
+
+def cmd_share(args: argparse.Namespace) -> None:
+    """Share a .crumb file via GitHub Gist or as a data URI fallback."""
+    filepath = args.file
+    text = Path(filepath).read_text(encoding='utf-8')
+
+    # Extract title from the crumb for the gist description
+    title = ''
+    try:
+        parsed = parse_crumb(text)
+        title = parsed['headers'].get('title', '')
+    except ValueError:
+        pass
+
+    description = f"CRUMB handoff: {title} — https://github.com/XioAISolutions/crumb-format"
+
+    # Try gh gist create first
+    try:
+        result = subprocess.run(
+            ["gh", "gist", "create", "--public", "-d", description, filepath],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode == 0:
+            url = result.stdout.strip()
+            print(url)
+            return
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    # Fallback: generate a self-contained data URI
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>{title or 'CRUMB handoff'}</title>
+<style>
+body {{ font-family: monospace; max-width: 800px; margin: 2em auto; padding: 1em; background: #1e1e2e; color: #cdd6f4; }}
+pre {{ white-space: pre-wrap; word-wrap: break-word; background: #313244; padding: 1em; border-radius: 8px; }}
+footer {{ margin-top: 2em; color: #6c7086; text-align: center; }}
+</style></head><body>
+<h2>{title or 'CRUMB handoff'}</h2>
+<pre>{text}</pre>
+<footer>Get CRUMB: pip install crumb-format</footer>
+</body></html>"""
+    encoded = base64.b64encode(html.encode('utf-8')).decode('ascii')
+    data_uri = f"data:text/html;base64,{encoded}"
+    print(data_uri)
+
+
+# ── handoff ─────────────────────────────────────────────────────────
+
+def _copy_to_clipboard(text: str) -> bool:
+    """Copy text to clipboard using platform-appropriate tool. Returns True on success."""
+    system = platform.system()
+    cmds = []
+    if system == 'Darwin':
+        cmds = [['pbcopy']]
+    elif system == 'Linux':
+        # Check for WSL
+        if 'microsoft' in platform.uname().release.lower():
+            cmds = [['clip.exe']]
+        else:
+            cmds = [['xclip', '-selection', 'clipboard'], ['xsel', '--clipboard', '--input']]
+    elif system == 'Windows':
+        cmds = [['clip.exe']]
+
+    for cmd in cmds:
+        try:
+            proc = subprocess.run(cmd, input=text, text=True, capture_output=True, timeout=5)
+            if proc.returncode == 0:
+                return True
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            continue
+    return False
+
+
+def cmd_handoff(args: argparse.Namespace) -> None:
+    """Copy a .crumb file to clipboard for pasting into an AI tool."""
+    filepath = args.file
+    text = Path(filepath).read_text(encoding='utf-8')
+
+    target = args.target
+
+    messages = {
+        'claude': 'Crumb copied! Open Claude and paste.',
+        'cursor': 'Crumb copied! Open Cursor and paste into chat.',
+        'chatgpt': 'Crumb copied! Open ChatGPT and paste.',
+        'gemini': 'Crumb copied! Open Gemini and paste.',
+    }
+
+    if _copy_to_clipboard(text):
+        if target:
+            print(messages.get(target, f'Crumb copied! Open {target} and paste.'))
+        else:
+            print('Crumb copied to clipboard! Paste into any AI tool.')
+    else:
+        print(text)
+        print('\n---\nCopy the above and paste into your AI tool', file=sys.stderr)
+
+
 # ── argument parser ──────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
@@ -2081,6 +2181,18 @@ def build_parser() -> argparse.ArgumentParser:
     template_cmd.add_argument('source_file', nargs='?', help='Source .crumb file (for add).')
     template_cmd.add_argument('--output', '-o', default='-', help='Output file (for use).')
     template_cmd.set_defaults(func=cmd_template)
+
+    # share
+    share_cmd = sub.add_parser('share', help='Share a .crumb file via GitHub Gist or data URI.')
+    share_cmd.add_argument('file', help='.crumb file to share.')
+    share_cmd.set_defaults(func=cmd_share)
+
+    # handoff
+    handoff_cmd = sub.add_parser('handoff', help='Copy a .crumb to clipboard for pasting into an AI tool.')
+    handoff_cmd.add_argument('file', help='.crumb file to hand off.')
+    handoff_cmd.add_argument('--target', choices=['claude', 'cursor', 'chatgpt', 'gemini'],
+                             help='Target AI tool (optional).')
+    handoff_cmd.set_defaults(func=cmd_handoff)
 
     return parser
 

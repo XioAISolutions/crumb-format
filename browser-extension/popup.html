@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=360">
+  <title>CRUMB</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 320px;
+      background: #1a1a1a;
+      color: #e5e5e5;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f97316;
+      margin-bottom: 12px;
+    }
+
+    .instruction {
+      background: #262626;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+
+    .instruction strong {
+      color: #f97316;
+    }
+
+    .links {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .links a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #f97316;
+      text-decoration: none;
+      font-size: 13px;
+      padding: 8px 12px;
+      background: #262626;
+      border-radius: 6px;
+      transition: background 0.15s;
+    }
+
+    .links a:hover {
+      background: #333;
+    }
+
+    .links .label {
+      color: #a3a3a3;
+      font-size: 11px;
+      display: block;
+    }
+
+    .pip-cmd {
+      font-family: 'Courier New', monospace;
+      background: #333;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 12px;
+      color: #f97316;
+      user-select: all;
+    }
+
+    .footer {
+      margin-top: 16px;
+      text-align: center;
+      font-size: 11px;
+      color: #525252;
+    }
+  </style>
+</head>
+<body>
+  <h1>CRUMB — AI Handoff Format</h1>
+
+  <div class="instruction">
+    Select text in any AI chat and right-click &rarr; <strong>Crumb it</strong>
+  </div>
+
+  <div class="links">
+    <a href="https://github.com/XioAISolutions/crumb-format" target="_blank" id="github-link">
+      <span>
+        <span class="label">GitHub</span>
+        github.com/XioAISolutions/crumb-format
+      </span>
+    </a>
+    <a href="#" id="pip-link">
+      <span>
+        <span class="label">Install via pip</span>
+        <span class="pip-cmd">pip install crumb-format</span>
+      </span>
+    </a>
+  </div>
+
+  <div class="footer">v1.0.0</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

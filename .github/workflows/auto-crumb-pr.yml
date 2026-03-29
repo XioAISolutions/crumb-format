@@ -1,0 +1,120 @@
+# auto-crumb-pr.yml
+#
+# Reusable workflow: automatically generates a .crumb handoff file for every PR.
+# Other repositories can reference this workflow via:
+#
+#   uses: your-org/crumb-format/.github/workflows/auto-crumb-pr.yml@main
+#
+# Or copy the template version (auto-crumb-template.yml) into your own repo.
+
+name: Auto-Generate Crumb from PR
+
+on:
+  workflow_call:
+    inputs:
+      crumb-path:
+        description: "Path to write the generated crumb file"
+        required: false
+        default: ".crumb/latest.crumb"
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  generate-crumb:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+          token: ${{ github.token }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install crumb-format
+        run: pip install crumb-format
+
+      - name: Get changed files
+        id: changed
+        run: |
+          FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | head -100)
+          {
+            echo "files<<CRUMB_EOF"
+            echo "$FILES"
+            echo "CRUMB_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Extract PR description
+        id: pr_info
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          # Extract first paragraph of PR body as the goal
+          GOAL=$(echo "$PR_BODY" | awk '/^[[:space:]]*$/{if(found) exit} /[^[:space:]]/{found=1; print}')
+          if [ -z "$GOAL" ]; then
+            GOAL="$PR_TITLE"
+          fi
+          {
+            echo "goal<<CRUMB_EOF"
+            echo "$GOAL"
+            echo "CRUMB_EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "title=$PR_TITLE" >> "$GITHUB_OUTPUT"
+
+      - name: Generate crumb file
+        env:
+          CRUMB_PATH: ${{ inputs.crumb-path }}
+          PR_TITLE: ${{ steps.pr_info.outputs.title }}
+          PR_GOAL: ${{ steps.pr_info.outputs.goal }}
+          CHANGED_FILES: ${{ steps.changed.outputs.files }}
+        run: |
+          mkdir -p "$(dirname "$CRUMB_PATH")"
+
+          # Build the crumb content
+          cat > "$CRUMB_PATH" << CRUMB_EOF
+          --- task: ${PR_TITLE}
+          source: github.pr
+          pr: #${{ github.event.pull_request.number }}
+          generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          ---
+
+          [goal]
+          ${PR_GOAL}
+
+          [context]
+          Changed files in this PR:
+          $(echo "$CHANGED_FILES" | sed 's/^/- /')
+
+          [constraints]
+          Review checklist: tests pass, no breaking changes, follows project conventions
+          CRUMB_EOF
+
+          # Strip leading whitespace from heredoc indentation
+          sed -i 's/^          //' "$CRUMB_PATH"
+
+      - name: Check for changes
+        id: diff
+        run: |
+          git add -N "${{ inputs.crumb-path }}"
+          if git diff --quiet "${{ inputs.crumb-path }}"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit and push crumb file
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${{ inputs.crumb-path }}"
+          git commit -m "chore: auto-generate .crumb handoff for PR #${{ github.event.pull_request.number }}"
+          git push
