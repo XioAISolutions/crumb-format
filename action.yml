@@ -1,0 +1,41 @@
+name: Validate .crumb files
+description: Validate .crumb files using the CRUMB reference validator
+branding:
+  icon: check-circle
+  color: orange
+
+inputs:
+  path:
+    description: 'Glob pattern or directory to find .crumb files'
+    required: false
+    default: '**/*.crumb'
+  python-version:
+    description: 'Python version to use'
+    required: false
+    default: '3.11'
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Download validator
+      shell: bash
+      run: |
+        curl -sL -o /tmp/crumb_validate.py \
+          https://raw.githubusercontent.com/XioAISolutions/crumb-format/main/validators/validate.py
+
+    - name: Find and validate .crumb files
+      shell: bash
+      run: |
+        shopt -s globstar nullglob
+        files=( ${{ inputs.path }} )
+        if [ ${#files[@]} -eq 0 ]; then
+          echo "No .crumb files found matching: ${{ inputs.path }}"
+          exit 0
+        fi
+        echo "Validating ${#files[@]} .crumb file(s)..."
+        python3 /tmp/crumb_validate.py "${files[@]}"

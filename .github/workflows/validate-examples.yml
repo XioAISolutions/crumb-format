@@ -1,4 +1,4 @@
-name: Validate examples
+name: Validate and test
 
 on:
   push:
@@ -15,6 +15,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Install test dependencies
+        run: pip install pytest
       - name: Validate with Python
         run: python3 validators/validate.py examples/*.crumb
       - name: Validate with Node
@@ -22,3 +24,5 @@ jobs:
           for f in examples/*.crumb; do
             node validators/validate.js "$f"
           done
+      - name: Run tests
+        run: python3 -m pytest tests/ -v

@@ -1,0 +1,7 @@
+- id: validate-crumbs
+  name: Validate .crumb files
+  description: Validate all .crumb files using the CRUMB format spec
+  entry: python3 cli/crumb.py validate
+  language: python
+  files: '\.crumb$'
+  types: [file]

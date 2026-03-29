@@ -64,6 +64,8 @@ Allowed `kind` values:
 - `task`
 - `mem`
 - `map`
+- `log`
+- `todo`
 
 ### 3.2 Recommended fields
 
@@ -79,6 +81,7 @@ Allowed `kind` values:
 - `project`
 - `env`
 - `tags`
+- `url` — link to the CRUMB spec or project; helps recipients understand the format
 
 ---
 
@@ -112,6 +115,21 @@ Optional sections:
 - `[invariants]`
 - `[flows]`
 - `[dependencies]`
+
+### 4.4 `kind=log`
+Append-only session transcript. Never consolidated — entries are immutable.
+
+Required sections:
+- `[entries]` — timestamped lines in `- [ISO8601] text` format
+
+### 4.5 `kind=todo`
+Foresight/prospective memory. Tracks work items with checkbox state.
+
+Required sections:
+- `[tasks]` — entries in `- [ ] task` (open) or `- [x] task` (done) format
+
+Optional sections:
+- `[archived]` — completed tasks moved here by a dream pass
 
 ---
 
