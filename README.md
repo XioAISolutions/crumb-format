@@ -1,8 +1,5 @@
 # CRUMB
 
-[![Validate and test](https://github.com/XioAISolutions/crumb-format/actions/workflows/validate-examples.yml/badge.svg)](https://github.com/XioAISolutions/crumb-format/actions/workflows/validate-examples.yml)
-[![CRUMB ready](https://img.shields.io/badge/CRUMB-ready-orange)](https://github.com/XioAISolutions/crumb-format)
-
 The copy-paste AI handoff format.
 
 ---
@@ -40,25 +37,11 @@ END CRUMB
 
 That's it. The next AI knows what to fix, what it can't change, and why.
 
-## Five kinds
+## Two real-world scenarios
 
-Pick the kind that matches what you're handing off:
+**Found the bug in Cursor, need Claude to write the test.** Generate a task crumb from Cursor with `crumb it`, paste it into Claude. Claude sees the goal, the surrounding code context, and the constraints -- and writes the test without asking you to re-explain anything.
 
-| Kind | Use when | Required sections |
-|---|---|---|
-| `task` | You know the next action | `[goal]` `[context]` `[constraints]` |
-| `mem` | Preferences that survive across sessions | `[consolidated]` |
-| `map` | An AI needs to understand a codebase | `[project]` `[modules]` |
-| `log` | Append-only session transcript | `[entries]` |
-| `todo` | Track work items with checkbox state | `[tasks]` |
-
-### task -- what to do next
-
-The example above is a task crumb. Use it for bug fixes, feature continuations, code reviews, or any handoff where the next step is clear.
-
-### mem -- long-term memory
-
-Capture your working style, project conventions, or decisions that should persist across sessions and tools:
+**Re-explaining your preferences every session?** A mem crumb stores your working style once:
 
 ```text
 BEGIN CRUMB
@@ -75,213 +58,35 @@ source=human.notes
 END CRUMB
 ```
 
-Paste this at the start of any AI session. No more "I like concise answers, don't use emojis, prefer TypeScript..." every time.
+Paste it at the start of any session. No more "I like concise answers, don't use emojis, prefer TypeScript..." every time.
 
-### map -- repo or project structure
-
-Onboard a new AI to your codebase in seconds instead of letting it guess the architecture:
-
-```text
-BEGIN CRUMB
-v=1.1
-kind=map
-title=CRUMB repo onboarding
-source=human.notes
-project=crumb-format
----
-[project]
-CRUMB is a text-first AI handoff format for moving work between tools without losing context.
-
-[modules]
-- SPEC.md: core format specification
-- DREAMING.md: memory consolidation guidance
-- validators/: reference validators in Python and Node
-- cli/: tiny helper CLI
-- examples/: handoff examples to copy and adapt
-
-[invariants]
-- The canonical form is plain text .crumb
-- Unknown headers and sections should be ignored, not rejected
-- The format should stay small enough to paste into ordinary chats
-END CRUMB
-```
-
-### log -- append-only session transcript
-
-Immutable audit trail. Never consolidated — entries stay exactly as logged:
-
-```text
-BEGIN CRUMB
-v=1.1
-kind=log
-title=Debug session
-source=cursor.agent
----
-[entries]
-- [2026-03-28T14:00:00Z] Found null pointer in auth middleware
-- [2026-03-28T14:05:00Z] Root cause: cookie parsing runs after redirect check
-- [2026-03-28T14:10:00Z] Fixed by reordering middleware chain
-- [2026-03-28T14:12:00Z] All tests passing, deployed to staging
-END CRUMB
-```
-
-### todo -- foresight memory
-
-Track work items across AI sessions. Completed tasks get archived by dream passes:
-
-```text
-BEGIN CRUMB
-v=1.1
-kind=todo
-title=Sprint 12 tasks
-source=human.notes
----
-[tasks]
-- [ ] Migrate auth to Clerk
-- [ ] Add rate limiting to API
-- [x] Fix login redirect bug
-- [ ] Write integration tests
-END CRUMB
-```
-
-```bash
-# full todo workflow
-crumb todo-add tasks.crumb "Add caching layer" "Update API docs"
-crumb todo-done tasks.crumb "caching"       # marks matching task as [x]
-crumb todo-list tasks.crumb                 # show open tasks
-crumb todo-list tasks.crumb --all           # include completed
-crumb todo-dream tasks.crumb               # archive [x] items to [archived]
-```
-
-## Templates
-
-Blank templates you can copy and fill in:
-
-<details>
-<summary><b>task template</b></summary>
-
-```text
-BEGIN CRUMB
-v=1.1
-kind=task
-title=
-source=
----
-[goal]
-
-
-[context]
-
-
-[constraints]
-
-END CRUMB
-```
-
-</details>
-
-<details>
-<summary><b>mem template</b></summary>
-
-```text
-BEGIN CRUMB
-v=1.1
-kind=mem
-title=
-source=
----
-[consolidated]
-
-END CRUMB
-```
-
-</details>
-
-<details>
-<summary><b>map template</b></summary>
-
-```text
-BEGIN CRUMB
-v=1.1
-kind=map
-title=
-source=
-project=
----
-[project]
-
-
-[modules]
-
-END CRUMB
-```
-
-</details>
+Five kinds: `task` (what to do next), `mem` (long-term memory), `map` (repo overview), `log` (session transcript), `todo` (work items).
 
 ## How it compares
 
 | | Paste raw chat | Start over | Use CRUMB |
 |---|---|---|---|
-| Context preserved | Partial, noisy | None | Structured, high-signal |
+| Context preserved | Partial, noisy | None | Structured |
 | Next AI acts immediately | Unlikely | No | Yes |
 | Works across all AI tools | Yes | Yes | Yes |
-| Token-efficient | No | Yes (but lossy) | Yes |
+| Token-efficient | No | Yes (lossy) | Yes |
 | Human-readable | Barely | N/A | Yes |
 
-## Add to your AI workflow
+## Add "crumb it" to your AI
 
-Add this to your AI's custom instructions and it will generate CRUMBs automatically:
+Add this to your AI's custom instructions and it generates CRUMBs on command:
 
 ```text
 When I say "crumb it", generate a CRUMB summarizing the current state.
 
-For tasks and handoffs, use kind=task:
-  BEGIN CRUMB
-  v=1.1
-  kind=task
-  title=<short description>
-  source=<this tool>
-  ---
-  [goal]       <what needs to happen next>
-  [context]    <key facts, decisions, current state>
-  [constraints] <what must not change>
-  END CRUMB
+For tasks: kind=task with [goal], [context], [constraints]
+For memory: kind=mem with [consolidated]
+For repos: kind=map with [project], [modules]
 
-For preferences and memory, use kind=mem:
-  BEGIN CRUMB
-  v=1.1
-  kind=mem
-  title=<topic>
-  source=<this tool>
-  ---
-  [consolidated] <durable facts, preferences, decisions>
-  END CRUMB
-
-For repo/project overviews, use kind=map:
-  BEGIN CRUMB
-  v=1.1
-  kind=map
-  title=<project name>
-  source=<this tool>
-  ---
-  [project]  <one-line description>
-  [modules]  <key files and directories>
-  END CRUMB
+Format: BEGIN CRUMB / v=1.1 / headers / --- / sections / END CRUMB
 ```
 
-Works in ChatGPT custom instructions, Claude Projects, Cursor rules, or any AI that accepts system prompts.
-
-### Teach your AI to receive crumbs
-
-The instruction above teaches an AI to *generate* crumbs. Add this to teach it to *act on* crumbs it receives:
-
-```text
-When you receive text containing BEGIN CRUMB / END CRUMB markers, treat it
-as a structured handoff. Parse the headers and sections, then act on the crumb
-directly — do not ask the user to re-explain what is already in the crumb.
-```
-
-Both sides of the loop matter. A crumb is only viral if the receiving AI knows what to do with it.
+Works in ChatGPT custom instructions, Claude Projects, Cursor rules, or any AI with system prompts.
 
 ## Install
 
@@ -289,204 +94,38 @@ Both sides of the loop matter. A crumb is only viral if the receiving AI knows w
 pip install crumb-format
 ```
 
-Or clone and use directly:
-
-```bash
-git clone https://github.com/XioAISolutions/crumb-format.git
-python3 cli/crumb.py --help
-```
-
-## CLI
-
-Create a crumb from the command line:
+## Quick start
 
 ```bash
 # create a task crumb
-python3 cli/crumb.py new task \
-  --title "Fix auth" \
-  --source cursor.agent \
-  --goal "Fix the token refresh race condition" \
-  --context "App uses JWT" "Refresh token expires silently" \
-  --constraints "Don't change login flow"
+crumb new task --title "Fix auth" --goal "Fix token refresh race condition"
 
-# create a mem crumb
-python3 cli/crumb.py new mem \
-  --title "My prefs" \
-  --source human.notes \
-  --entries "Prefers TypeScript" "No ORMs" "Keep it simple"
+# validate
+crumb validate examples/*.crumb
 
-# create a map crumb
-python3 cli/crumb.py new map \
-  --title "My API" \
-  --source human.notes \
-  --project myapp \
-  --description "REST API for task management" \
-  --modules "src/routes: endpoints" "src/db: database layer"
+# append observations to memory, then consolidate
+crumb append prefs.crumb "Switched to Neovim" "Dropped Redux"
+crumb dream prefs.crumb
+
+# search across crumbs (keyword, fuzzy, or TF-IDF ranked)
+crumb search "auth JWT" --dir ./crumbs/
+
+# seed all your AI tools at once
+crumb init --all
 ```
 
-Convert a chat log into a crumb (auto-extracts decisions and code blocks):
+Full command reference: `crumb --help` (22 commands including export, import, templates, todos, watch mode, and more).
 
+## Integrations
+
+**MCP Server** -- native tool integration with Claude Desktop, Cursor, Claude Code:
 ```bash
-python3 cli/crumb.py from-chat --input chat.txt --output handoff.crumb
-
-# extract just decisions as a mem crumb
-python3 cli/crumb.py from-chat --input chat.txt --kind mem --title "Stack decisions"
-
-# from clipboard (macOS)
-pbpaste | python3 cli/crumb.py from-chat --title "Continue auth work" --source claude.chat
-```
-
-Validate and inspect:
-
-```bash
-# validate (uses full spec parser, not just marker checks)
-python3 cli/crumb.py validate examples/*.crumb
-
-# inspect a crumb's structure
-python3 cli/crumb.py inspect examples/task-bug-fix.crumb
-
-# headers and section names only
-python3 cli/crumb.py inspect examples/task-bug-fix.crumb --headers-only
-```
-
-Memory lifecycle (append → dream → search → merge):
-
-```bash
-# append raw observations to an existing mem crumb
-python3 cli/crumb.py append prefs.crumb "Switched to Neovim" "Dropped Redux for Zustand"
-
-# run a consolidation pass: deduplicate, merge [raw] → [consolidated], prune to budget
-python3 cli/crumb.py dream prefs.crumb
-python3 cli/crumb.py dream prefs.crumb --dry-run  # preview without writing
-
-# search across all .crumb files (keyword, fuzzy, or ranked)
-python3 cli/crumb.py search "auth JWT" --dir ./crumbs/
-python3 cli/crumb.py search "authenication" --dir ./crumbs/ --method fuzzy   # typo-tolerant
-python3 cli/crumb.py search "auth JWT" --dir ./crumbs/ --method ranked       # TF-IDF scoring
-
-# merge multiple mem crumbs into one
-python3 cli/crumb.py merge team/*.crumb --title "Team preferences" -o merged.crumb
-```
-
-Initialize CRUMB in any project:
-
-```bash
-# seed all AI tools at once (Claude, Cursor, Windsurf, ChatGPT)
-crumb init --project myapp --description "REST API for tasks" --all
-
-# or pick specific tools
-crumb init --claude-md          # creates CLAUDE.md
-crumb init --cursor-rules       # creates .cursor/rules
-crumb init --windsurf-rules     # creates .windsurfrules
-crumb init --chatgpt-rules      # prints Custom Instructions to paste
-```
-
-Compare and compress:
-
-```bash
-# see what changed between dream passes or versions
-crumb diff prefs-v1.crumb prefs-v2.crumb
-
-# strip a crumb to minimum viable form (required headers + sections only)
-crumb compact handoff.crumb -o slim.crumb
-```
-
-Export to other formats:
-
-```bash
-# JSON (for APIs, databases, integrations)
-crumb export handoff.crumb -f json -o handoff.json
-
-# Markdown (for docs, wikis, PRs)
-crumb export handoff.crumb -f markdown
-
-# Clipboard-friendly (for pasting into ChatGPT, Claude, Cursor)
-crumb export handoff.crumb -f clipboard
-```
-
-Import from other formats:
-
-```bash
-# import from JSON
-crumb import --from json -i data.json -o handoff.crumb
-
-# import from structured markdown
-crumb import --from markdown -i notes.md -o handoff.crumb
-```
-
-Templates — start from a proven pattern:
-
-```bash
-# see all available templates
-crumb template list
-
-# scaffold from a template
-crumb template use bug-fix -o fix.crumb
-crumb template use feature -o feature.crumb
-crumb template use onboarding -o onboard.crumb
-
-# save your own template
-crumb template add my-template my-handoff.crumb
-```
-
-Session logging:
-
-```bash
-# append timestamped entries (creates file if missing)
-crumb log session.crumb "Found the bug" "Fixed middleware ordering"
-
-# log crumbs are append-only — entries are never consolidated or pruned
-```
-
-Watch mode (auto-dream):
-
-```bash
-# watch a directory, auto-dream when raw entries exceed threshold
-crumb watch ./crumbs/ --threshold 5 --interval 3
-```
-
-Automation hooks (`.crumbrc`):
-
-```ini
-# .crumbrc — runs shell commands on crumb events
-[hooks]
-post_dream = git add *.crumb && git commit -m 'dream pass'
-post_append = echo "Entry added to $CRUMB_FILE"
-```
-
-```bash
-# see configured hooks
-crumb hooks
-```
-
-Node validator also available:
-
-```bash
-node validators/validate.js examples/task-bug-fix.crumb
-```
-
-## MCP Server (Claude Desktop, Cursor, Claude Code)
-
-CRUMB ships an MCP server that exposes 11 tools to any MCP-compatible client:
-
-```bash
-# Claude Code
 claude mcp add crumb python3 /path/to/crumb-format/mcp/server.py
-
-# Claude Desktop — add to claude_desktop_config.json:
-{ "mcpServers": { "crumb": { "command": "python3", "args": ["/path/to/mcp/server.py"] } } }
-
-# Cursor — add to .cursor/mcp.json (same format)
 ```
+See [`mcp/README.md`](mcp/README.md) for setup.
 
-Once connected, your AI can create crumbs, search, dream, manage todos, and export — all via native tool calls. See [`mcp/README.md`](mcp/README.md).
-
-## Pre-commit Hook
-
-Validate `.crumb` files on every commit:
-
+**Pre-commit hook** -- validate `.crumb` files on every commit:
 ```yaml
-# .pre-commit-config.yaml
 repos:
   - repo: https://github.com/XioAISolutions/crumb-format
     rev: main
@@ -494,58 +133,19 @@ repos:
       - id: validate-crumbs
 ```
 
-## ClawHub Skill (OpenClaw)
-
-Install CRUMB as an OpenClaw skill so your agent can create, manage, and search crumbs natively:
-
-```bash
-# from ClawHub (when published)
-openclaw skills install crumb
-
-# or manual install
-cp -r clawhub-skill/ ~/.openclaw/skills/crumb/
-pip install crumb-format
-```
-
-Once installed, say **"crumb it"** and your OpenClaw agent generates a structured handoff. Paste a `BEGIN CRUMB` block and it acts on it directly.
-
-See [`clawhub-skill/README.md`](clawhub-skill/README.md) for configuration options.
-
-## GitHub Action
-
-Add CRUMB validation to any repo's CI:
-
-```yaml
-# .github/workflows/validate-crumbs.yml
-name: Validate .crumb files
-on: [push, pull_request]
-jobs:
-  validate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: XioAISolutions/crumb-format@main
-        with:
-          path: '**/*.crumb'
-```
-
-Add the badge to your README:
-
-```markdown
-[![CRUMB ready](https://img.shields.io/badge/CRUMB-ready-orange)](https://github.com/XioAISolutions/crumb-format)
-```
+**ClawHub skill** -- install as an OpenClaw agent skill. See [`clawhub-skill/`](clawhub-skill/).
 
 ## What's in this repo
 
 - [`SPEC.md`](SPEC.md) -- the format specification
 - [`DREAMING.md`](DREAMING.md) -- how memory consolidation works
-- [`examples/`](examples/) -- ready-to-paste `.crumb` files for every kind
-- [`cli/crumb.py`](cli/crumb.py) -- CLI for creating and validating crumbs
+- [`examples/`](examples/) -- ready-to-paste `.crumb` files
+- [`cli/crumb.py`](cli/crumb.py) -- full CLI (22 commands)
 - [`validators/`](validators/) -- Python and Node reference validators
 - [`docs/HANDOFF_PATTERNS.md`](docs/HANDOFF_PATTERNS.md) -- practical handoff patterns
 
 ## License
 
-MIT for spec and reference code. See [`TRADEMARK.md`](TRADEMARK.md) for brand guidance.
+MIT. See [`TRADEMARK.md`](TRADEMARK.md) for brand guidance.
 
 CRUMB is plain text. It works everywhere text works.
