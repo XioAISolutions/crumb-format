@@ -371,11 +371,14 @@ python3 cli/crumb.py merge team/*.crumb --title "Team preferences" -o merged.cru
 Initialize CRUMB in any project:
 
 ```bash
-# generates a map crumb + prints custom instruction snippets
-python3 cli/crumb.py init --project myapp --description "REST API for tasks"
+# seed all AI tools at once (Claude, Cursor, Windsurf, ChatGPT)
+crumb init --project myapp --description "REST API for tasks" --all
 
-# also create/update CLAUDE.md with CRUMB instructions
-python3 cli/crumb.py init --project myapp --claude-md
+# or pick specific tools
+crumb init --claude-md          # creates CLAUDE.md
+crumb init --cursor-rules       # creates .cursor/rules
+crumb init --windsurf-rules     # creates .windsurfrules
+crumb init --chatgpt-rules      # prints Custom Instructions to paste
 ```
 
 Compare and compress:
@@ -460,6 +463,35 @@ Node validator also available:
 
 ```bash
 node validators/validate.js examples/task-bug-fix.crumb
+```
+
+## MCP Server (Claude Desktop, Cursor, Claude Code)
+
+CRUMB ships an MCP server that exposes 11 tools to any MCP-compatible client:
+
+```bash
+# Claude Code
+claude mcp add crumb python3 /path/to/crumb-format/mcp/server.py
+
+# Claude Desktop — add to claude_desktop_config.json:
+{ "mcpServers": { "crumb": { "command": "python3", "args": ["/path/to/mcp/server.py"] } } }
+
+# Cursor — add to .cursor/mcp.json (same format)
+```
+
+Once connected, your AI can create crumbs, search, dream, manage todos, and export — all via native tool calls. See [`mcp/README.md`](mcp/README.md).
+
+## Pre-commit Hook
+
+Validate `.crumb` files on every commit:
+
+```yaml
+# .pre-commit-config.yaml
+repos:
+  - repo: https://github.com/XioAISolutions/crumb-format
+    rev: main
+    hooks:
+      - id: validate-crumbs
 ```
 
 ## ClawHub Skill (OpenClaw)

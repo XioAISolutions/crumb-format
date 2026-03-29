@@ -1064,6 +1064,63 @@ CURSORRULES_SNIPPET = dedent("""\
     #
     # When you receive a BEGIN CRUMB / END CRUMB block, parse it as a structured
     # handoff and act on it directly without asking the user to re-explain.
+    #
+    # CRUMB format:
+    #   BEGIN CRUMB
+    #   v=1.1
+    #   kind=task|mem|map|log|todo
+    #   title=<short description>
+    #   source=cursor.agent
+    #   url=https://github.com/XioAISolutions/crumb-format
+    #   ---
+    #   [goal]       <what needs to happen next>
+    #   [context]    <key facts, decisions, current state>
+    #   [constraints] <what must not change>
+    #   END CRUMB
+""")
+
+WINDSURF_RULES_SNIPPET = dedent("""\
+    # CRUMB handoffs
+    # This project uses CRUMB (https://github.com/XioAISolutions/crumb-format)
+    # for structured AI handoffs between tools.
+    #
+    # "crumb it" = generate a CRUMB block summarizing current work state.
+    # BEGIN CRUMB / END CRUMB blocks = structured handoffs, act on them directly.
+    #
+    # Kinds: task (goal/context/constraints), mem (consolidated preferences),
+    #        map (project/modules), log (timestamped entries), todo (checkbox tasks)
+    # Always set source=windsurf.agent and include the url header.
+""")
+
+CHATGPT_RULES_SNIPPET = dedent("""\
+    ## CRUMB handoffs
+
+    This conversation may involve CRUMB handoffs
+    (https://github.com/XioAISolutions/crumb-format).
+
+    When the user says "crumb it", generate a structured handoff:
+
+    BEGIN CRUMB
+    v=1.1
+    kind=task
+    title=<short description>
+    source=chatgpt
+    url=https://github.com/XioAISolutions/crumb-format
+    ---
+    [goal]
+    <what needs to happen next>
+
+    [context]
+    <key facts, decisions, current state>
+
+    [constraints]
+    <what must not change>
+    END CRUMB
+
+    When you receive a BEGIN CRUMB / END CRUMB block, parse it and act on it
+    directly — do not ask the user to re-explain what is already in the crumb.
+
+    Other kinds: mem (preferences), map (codebase), log (transcript), todo (tasks).
 """)
 
 
@@ -1108,29 +1165,53 @@ def cmd_init(args: argparse.Namespace) -> None:
     print(f"  Created {map_path}")
 
     # Write integration snippets
-    if args.claude_md:
-        claude_md_path = project_dir / 'CLAUDE.md'
-        if claude_md_path.exists():
-            existing = claude_md_path.read_text(encoding='utf-8')
-            if 'CRUMB' not in existing:
-                claude_md_path.write_text(existing.rstrip() + '\n\n' + CLAUDE_MD_SNIPPET, encoding='utf-8')
-                print(f"  Appended CRUMB section to {claude_md_path}")
+    def _write_or_append(filepath, snippet, marker='CRUMB'):
+        if filepath.exists():
+            existing = filepath.read_text(encoding='utf-8')
+            if marker not in existing:
+                filepath.write_text(existing.rstrip() + '\n\n' + snippet, encoding='utf-8')
+                print(f"  Appended CRUMB section to {filepath}")
             else:
-                print(f"  Skipped {claude_md_path} (already has CRUMB section)")
+                print(f"  Skipped {filepath} (already has CRUMB section)")
         else:
-            claude_md_path.write_text(CLAUDE_MD_SNIPPET, encoding='utf-8')
-            print(f"  Created {claude_md_path}")
+            filepath.write_text(snippet, encoding='utf-8')
+            print(f"  Created {filepath}")
 
-    # Print custom instruction snippets
-    print(f"\n--- Sender instruction (add to your AI's custom instructions) ---\n")
-    print(SENDER_INSTRUCTION)
-    print(f"--- Receiver instruction (add to the receiving AI) ---\n")
-    print(RECEIVER_INSTRUCTION)
+    if args.claude_md:
+        _write_or_append(project_dir / 'CLAUDE.md', CLAUDE_MD_SNIPPET)
+
+    if args.cursor_rules:
+        cursor_dir = project_dir / '.cursor'
+        cursor_dir.mkdir(exist_ok=True)
+        _write_or_append(cursor_dir / 'rules', CURSORRULES_SNIPPET)
+
+    if args.windsurf_rules:
+        _write_or_append(project_dir / '.windsurfrules', WINDSURF_RULES_SNIPPET)
+
+    if args.chatgpt_rules:
+        print(f"\n--- ChatGPT Custom Instructions (paste into Settings > Custom Instructions) ---\n")
+        print(CHATGPT_RULES_SNIPPET)
+
+    if args.all_rules:
+        _write_or_append(project_dir / 'CLAUDE.md', CLAUDE_MD_SNIPPET)
+        cursor_dir = project_dir / '.cursor'
+        cursor_dir.mkdir(exist_ok=True)
+        _write_or_append(cursor_dir / 'rules', CURSORRULES_SNIPPET)
+        _write_or_append(project_dir / '.windsurfrules', WINDSURF_RULES_SNIPPET)
+        print(f"\n--- ChatGPT Custom Instructions (paste into Settings > Custom Instructions) ---\n")
+        print(CHATGPT_RULES_SNIPPET)
+
+    # Print custom instruction snippets (unless --all already printed)
+    if not args.all_rules:
+        print(f"\n--- Sender instruction (add to your AI's custom instructions) ---\n")
+        print(SENDER_INSTRUCTION)
+        print(f"--- Receiver instruction (add to the receiving AI) ---\n")
+        print(RECEIVER_INSTRUCTION)
 
     print(f"Done. CRUMB initialized in {project_dir}")
     print(f"  - Map crumb: {map_path}")
-    print(f"  - Add sender instruction to your AI's custom instructions")
-    print(f"  - Add receiver instruction to the AI that receives crumbs")
+    if not any([args.claude_md, args.cursor_rules, args.windsurf_rules, args.chatgpt_rules, args.all_rules]):
+        print(f"  Tip: run with --all to seed Claude, Cursor, Windsurf, and ChatGPT at once")
 
 
 # ── log (append-only session transcript) ────────────────────────────
@@ -1925,7 +2006,11 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument('--dir', default='.', help='Project directory (default: current).')
     init.add_argument('--project', '-p', help='Project name (default: directory name).')
     init.add_argument('--description', '-d', help='One-line project description.')
-    init.add_argument('--claude-md', action='store_true', help='Also create/update CLAUDE.md with CRUMB instructions.')
+    init.add_argument('--claude-md', action='store_true', help='Create/update CLAUDE.md with CRUMB instructions.')
+    init.add_argument('--cursor-rules', action='store_true', help='Create .cursor/rules with CRUMB instructions.')
+    init.add_argument('--windsurf-rules', action='store_true', help='Create .windsurfrules with CRUMB instructions.')
+    init.add_argument('--chatgpt-rules', action='store_true', help='Print ChatGPT custom instructions.')
+    init.add_argument('--all', dest='all_rules', action='store_true', help='Seed all AI tools at once (Claude, Cursor, Windsurf, ChatGPT).')
     init.set_defaults(func=cmd_init)
 
     # log

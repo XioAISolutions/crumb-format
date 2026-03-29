@@ -524,6 +524,94 @@ class TestDreamSignalPruning:
         assert pg_count == 1
 
 
+# ── crumb init (multi-tool seeding) ──────────────────────────────────
+
+class TestCmdInitMultiTool:
+    def test_init_cursor_rules(self, tmp_path, capsys):
+        crumb.main(["init", "--dir", str(tmp_path), "--cursor-rules"])
+        rules_path = tmp_path / ".cursor" / "rules"
+        assert rules_path.exists()
+        content = rules_path.read_text()
+        assert "CRUMB" in content
+        assert "crumb it" in content
+
+    def test_init_windsurf_rules(self, tmp_path, capsys):
+        crumb.main(["init", "--dir", str(tmp_path), "--windsurf-rules"])
+        rules_path = tmp_path / ".windsurfrules"
+        assert rules_path.exists()
+        content = rules_path.read_text()
+        assert "CRUMB" in content
+        assert "windsurf.agent" in content
+
+    def test_init_chatgpt_rules(self, tmp_path, capsys):
+        crumb.main(["init", "--dir", str(tmp_path), "--chatgpt-rules"])
+        output = capsys.readouterr().out
+        assert "ChatGPT" in output
+        assert "crumb it" in output
+        assert "source=chatgpt" in output
+
+    def test_init_all(self, tmp_path, capsys):
+        crumb.main(["init", "--dir", str(tmp_path), "--all"])
+        assert (tmp_path / "CLAUDE.md").exists()
+        assert (tmp_path / ".cursor" / "rules").exists()
+        assert (tmp_path / ".windsurfrules").exists()
+        output = capsys.readouterr().out
+        assert "ChatGPT" in output
+
+    def test_init_idempotent(self, tmp_path, capsys):
+        crumb.main(["init", "--dir", str(tmp_path), "--claude-md"])
+        capsys.readouterr()  # clear
+        crumb.main(["init", "--dir", str(tmp_path), "--claude-md"])
+        output = capsys.readouterr().out
+        assert "already has CRUMB section" in output
+
+    def test_init_tip_shown(self, tmp_path, capsys):
+        crumb.main(["init", "--dir", str(tmp_path)])
+        output = capsys.readouterr().out
+        assert "--all" in output
+
+
+# ── MCP server ───────────────────────────────────────────────────────
+
+class TestMCPServer:
+    def test_mcp_import(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "mcp"))
+        import server as mcp_server
+        assert hasattr(mcp_server, 'TOOLS')
+        assert len(mcp_server.TOOLS) >= 10
+
+    def test_mcp_tool_call_new(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "mcp"))
+        import server as mcp_server
+        result = mcp_server.handle_tool_call("crumb_new", {"kind": "task", "title": "Test"})
+        assert "BEGIN CRUMB" in result
+        assert "kind=task" in result
+
+    def test_mcp_tool_call_template_list(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "mcp"))
+        import server as mcp_server
+        result = mcp_server.handle_tool_call("crumb_template", {"action": "list"})
+        assert "bug-fix" in result
+
+    def test_mcp_tool_call_validate(self, tmp_path):
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "mcp"))
+        import server as mcp_server
+        f = tmp_path / "task.crumb"
+        f.write_text(VALID_TASK)
+        result = mcp_server.handle_tool_call("crumb_validate", {"files": [str(f)]})
+        assert "OK" in result
+
+    def test_mcp_tool_call_export(self, tmp_path):
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "mcp"))
+        import server as mcp_server
+        f = tmp_path / "task.crumb"
+        f.write_text(VALID_TASK)
+        result = mcp_server.handle_tool_call("crumb_export", {"file": str(f), "format": "json"})
+        import json
+        obj = json.loads(result)
+        assert obj["headers"]["kind"] == "task"
+
+
 # ── kind=log ─────────────────────────────────────────────────────────
 
 VALID_LOG = """\
