@@ -1,0 +1,178 @@
+# =============================================================================
+# CRUMB Bench — Copy-Paste Template for Any Repo
+# =============================================================================
+#
+# HOW TO USE:
+#   1. Copy this file into your repo at: .github/workflows/crumb-bench.yml
+#   2. Commit and push to your default branch (main/master).
+#   3. Open a PR that contains .crumb files — the workflow will automatically
+#      run `crumb bench` on every .crumb file and post results as a PR comment.
+#
+# REQUIREMENTS:
+#   - Your repo must have .crumb files somewhere in the tree.
+#   - The GITHUB_TOKEN (automatic) needs pull-requests: write permission.
+#     This is granted by the `permissions` block below.
+#
+# CUSTOMIZATION:
+#   - search-path: change this to limit which directory is searched for .crumb
+#     files (e.g. "prompts/" or "context/"). Defaults to the repo root.
+#   - python-version: change if you need a specific Python version.
+#   - You can also pin to a specific ref of the reusable workflow by changing
+#     @main to a tag or commit SHA.
+#
+# TWO WAYS TO USE THIS:
+#
+#   Option A — Call the reusable workflow from crumb-format (recommended):
+#     This keeps your config minimal and automatically picks up improvements.
+#
+#   Option B — Self-contained (below, commented out):
+#     If you prefer not to depend on the upstream workflow, uncomment the
+#     self-contained version at the bottom of this file.
+#
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Option A: Call the reusable workflow hosted in crumb-format
+# ---------------------------------------------------------------------------
+name: CRUMB Bench
+
+on:
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  bench:
+    uses: XioAISolutions/crumb-format/.github/workflows/bench-pr.yml@main
+    # Uncomment and adjust inputs as needed:
+    # with:
+    #   search-path: "."         # directory to search for .crumb files
+    #   python-version: "3.11"   # Python version
+
+# ---------------------------------------------------------------------------
+# Option B: Self-contained workflow (no external dependency)
+# ---------------------------------------------------------------------------
+# Uncomment everything below (and comment out Option A above) if you want a
+# fully self-contained workflow that does not call the reusable workflow.
+#
+# name: CRUMB Bench (self-contained)
+#
+# on:
+#   pull_request:
+#     branches: [main, master]
+#
+# permissions:
+#   contents: read
+#   pull-requests: write
+#
+# jobs:
+#   bench:
+#     name: Run crumb bench
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+#
+#       - name: Set up Python
+#         uses: actions/setup-python@v5
+#         with:
+#           python-version: "3.11"
+#
+#       - name: Install crumb-format
+#         run: pip install crumb-format
+#
+#       - name: Find and bench .crumb files
+#         id: bench
+#         shell: bash
+#         run: |
+#           mapfile -t CRUMB_FILES < <(find . -name "*.crumb" -not -path "./.git/*" | sort)
+#
+#           if [ ${#CRUMB_FILES[@]} -eq 0 ]; then
+#             echo "No .crumb files found."
+#             echo "found=false" >> "$GITHUB_OUTPUT"
+#             exit 0
+#           fi
+#
+#           echo "found=true" >> "$GITHUB_OUTPUT"
+#
+#           TABLE="| File | Score | Grade | Tokens | Compression |"
+#           TABLE+=$'\n'"|------|-------|-------|--------|-------------|"
+#
+#           for file in "${CRUMB_FILES[@]}"; do
+#             echo "::group::Benching $file"
+#             OUTPUT=$(crumb bench "$file" 2>&1) || true
+#             echo "$OUTPUT"
+#             echo "::endgroup::"
+#
+#             SCORE=$(echo "$OUTPUT" | grep -oP '\d+/100' | head -1 || echo "N/A")
+#             GRADE=$(echo "$OUTPUT" | grep -oP '(?<=Grade:\s)[A-F][+-]?' | head -1 || echo "-")
+#             if [ "$GRADE" = "-" ]; then
+#               GRADE=$(echo "$OUTPUT" | grep -oP '\b[A-F][+-]?\b' | head -1 || echo "-")
+#             fi
+#             TOKENS=$(echo "$OUTPUT" | grep -oP '~?\d+(?=\s*tokens?)' | head -1 || echo "-")
+#             if [ "$TOKENS" = "-" ]; then
+#               TOKENS=$(echo "$OUTPUT" | grep -oP '(?<=Tokens:\s)~?\d+' | head -1 || echo "-")
+#             fi
+#             COMPRESSION=$(echo "$OUTPUT" | grep -oP '\d+\.\d+x' | head -1 || echo "-")
+#
+#             TABLE+=$'\n'"| \`$file\` | $SCORE | $GRADE | $TOKENS | $COMPRESSION |"
+#           done
+#
+#           echo "$TABLE" > /tmp/bench-table.md
+#
+#       - name: Post PR comment
+#         if: steps.bench.outputs.found == 'true'
+#         uses: actions/github-script@v7
+#         with:
+#           script: |
+#             const fs = require('fs');
+#             const table = fs.readFileSync('/tmp/bench-table.md', 'utf8');
+#             const body = `## CRUMB Bench Results\n\n${table}\n\n*Powered by [crumb-format](https://github.com/XioAISolutions/crumb-format) — TurboQuant-inspired context compression*`;
+#
+#             const prNumber = context.payload.pull_request?.number;
+#             if (!prNumber) {
+#               core.warning('No pull request number found — skipping comment.');
+#               return;
+#             }
+#
+#             const { data: comments } = await github.rest.issues.listComments({
+#               owner: context.repo.owner,
+#               repo: context.repo.repo,
+#               issue_number: prNumber,
+#             });
+#
+#             const marker = '## CRUMB Bench Results';
+#             const existing = comments.find(c => c.body.startsWith(marker));
+#
+#             if (existing) {
+#               await github.rest.issues.updateComment({
+#                 owner: context.repo.owner,
+#                 repo: context.repo.repo,
+#                 comment_id: existing.id,
+#                 body,
+#               });
+#             } else {
+#               await github.rest.issues.createComment({
+#                 owner: context.repo.owner,
+#                 repo: context.repo.repo,
+#                 issue_number: prNumber,
+#                 body,
+#               });
+#             }
+#
+#       - name: Post no-files notice
+#         if: steps.bench.outputs.found == 'false'
+#         uses: actions/github-script@v7
+#         with:
+#           script: |
+#             const prNumber = context.payload.pull_request?.number;
+#             if (!prNumber) return;
+#             await github.rest.issues.createComment({
+#               owner: context.repo.owner,
+#               repo: context.repo.repo,
+#               issue_number: prNumber,
+#               body: '## CRUMB Bench Results\n\nNo `.crumb` files found in this repository.',
+#             });

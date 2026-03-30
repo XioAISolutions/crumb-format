@@ -449,6 +449,153 @@ source={source}
     write_text(args.output, crumb_text)
 
 
+# ── from-git ────────────────────────────────────────────────────────
+
+def _git_run(*cmd: str) -> str:
+    """Run a git command and return stripped stdout. Raises SystemExit on failure."""
+    result = subprocess.run(
+        ['git'] + list(cmd),
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        return ''
+    return result.stdout.strip()
+
+
+def _detect_base_branch() -> str:
+    """Auto-detect the base branch: try main, then master, then fall back to None."""
+    for candidate in ('main', 'master'):
+        result = subprocess.run(
+            ['git', 'rev-parse', '--verify', candidate],
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            return candidate
+    return ''
+
+
+def cmd_from_git(args: argparse.Namespace) -> None:
+    """Generate a task crumb from recent git activity."""
+    # Check that we are inside a git repo
+    check = subprocess.run(
+        ['git', 'rev-parse', '--is-inside-work-tree'],
+        capture_output=True, text=True,
+    )
+    if check.returncode != 0:
+        print("Error: not inside a git repository.", file=sys.stderr)
+        sys.exit(1)
+
+    commits = args.commits
+    base = args.branch
+    source = args.source or 'git'
+
+    # Current branch
+    current_branch = _git_run('branch', '--show-current') or 'HEAD'
+
+    # Auto-detect base branch if not provided
+    if not base:
+        base = _detect_base_branch()
+
+    # Recent commit messages (oneline)
+    recent_commits = _git_run('log', '--oneline', f'-{commits}')
+    commit_lines = [l for l in recent_commits.splitlines() if l.strip()] if recent_commits else []
+
+    # Latest commit subject for goal inference
+    latest_subject = _git_run('log', '-1', '--format=%s')
+
+    # Changed files and diff stat
+    if base:
+        changed_files = _git_run('diff', '--name-only', f'{base}...HEAD')
+        diff_stat = _git_run('diff', '--stat', f'{base}...HEAD')
+    else:
+        # No base branch found — compare against HEAD~N
+        changed_files = _git_run('diff', '--name-only', f'HEAD~{commits}', 'HEAD')
+        diff_stat = _git_run('diff', '--stat', f'HEAD~{commits}', 'HEAD')
+
+    changed_file_list = [f for f in changed_files.splitlines() if f.strip()] if changed_files else []
+
+    # --- Infer goal ---
+    if args.title:
+        goal = args.title
+    elif current_branch not in ('main', 'master', 'HEAD', ''):
+        # Feature branch — use branch name as goal hint
+        branch_label = current_branch.replace('-', ' ').replace('_', ' ').replace('/', ': ')
+        goal = f"Continue work on: {branch_label} (latest: {latest_subject})"
+    elif latest_subject:
+        goal = f"Continue from: {latest_subject}"
+    else:
+        goal = "Continue recent work in this repository."
+
+    title = args.title or goal[:80]
+
+    # --- Build context ---
+    context_lines = []
+    context_lines.append(f'- Branch: {current_branch}')
+
+    if base:
+        context_lines.append(f'- Base branch: {base}')
+
+    if commit_lines:
+        context_lines.append(f'- Recent commits ({len(commit_lines)}):')
+        for cl in commit_lines:
+            context_lines.append(f'  - {cl}')
+
+    if changed_file_list:
+        context_lines.append(f'- Changed files ({len(changed_file_list)}):')
+        for cf in changed_file_list[:20]:
+            context_lines.append(f'  - {cf}')
+        if len(changed_file_list) > 20:
+            context_lines.append(f'  - ... and {len(changed_file_list) - 20} more')
+
+    if diff_stat:
+        context_lines.append('- Diff summary:')
+        for line in diff_stat.splitlines()[-3:]:
+            context_lines.append(f'  - {line.strip()}')
+
+    if not context_lines:
+        context_lines = ['- No git context available.']
+
+    # --- Infer constraints ---
+    constraint_lines = []
+
+    # Check for failing tests by looking for common test failure indicators
+    test_result = subprocess.run(
+        ['git', 'log', '-1', '--format=%B'],
+        capture_output=True, text=True,
+    )
+    last_body = test_result.stdout.lower() if test_result.returncode == 0 else ''
+    if any(kw in last_body for kw in ('fixme', 'wip', 'todo', 'broken', 'failing')):
+        constraint_lines.append('- Warning: latest commit may contain incomplete work (WIP/TODO detected in message).')
+
+    # Check for merge conflicts
+    conflict_check = subprocess.run(
+        ['git', 'diff', '--check'],
+        capture_output=True, text=True,
+    )
+    if conflict_check.returncode != 0 and 'conflict' in conflict_check.stdout.lower():
+        constraint_lines.append('- Merge conflicts detected — resolve before continuing.')
+
+    if not constraint_lines:
+        constraint_lines.append('- Review before merging.')
+
+    # --- Render crumb ---
+    crumb_text = render_crumb(
+        headers={
+            'v': '1.1',
+            'kind': 'task',
+            'title': title,
+            'source': source,
+        },
+        sections={
+            'goal': [goal],
+            'context': context_lines,
+            'constraints': constraint_lines,
+        },
+    )
+
+    write_text(args.output, crumb_text)
+
+
 # ── validate ─────────────────────────────────────────────────────────
 
 def cmd_validate(args: argparse.Namespace) -> None:
@@ -2261,6 +2408,15 @@ def build_parser() -> argparse.ArgumentParser:
                            help='Output kind: task (default) or mem (extracts decisions).')
     from_chat.add_argument('--constraints', '-c', nargs='*', help='Constraints as separate arguments.')
     from_chat.set_defaults(func=cmd_from_chat)
+
+    # from-git
+    from_git = sub.add_parser('from-git', help='Generate a task crumb from recent git activity.')
+    from_git.add_argument('--commits', type=int, default=5, help='Number of recent commits to include (default: 5).')
+    from_git.add_argument('--branch', help='Base branch to compare against (default: auto-detect main/master).')
+    from_git.add_argument('--title', help='Override the auto-generated title.')
+    from_git.add_argument('--source', help='Override source label (default: git).')
+    from_git.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
+    from_git.set_defaults(func=cmd_from_git)
 
     # validate
     validate = sub.add_parser('validate', help='Validate one or more .crumb files.')

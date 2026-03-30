@@ -1,0 +1,88 @@
+{
+  "name": "crumb-format",
+  "displayName": "CRUMB — AI Handoff Format",
+  "description": "Create, validate, and manage CRUMB handoff files for switching between AI tools",
+  "version": "0.1.0",
+  "publisher": "xioaisolutions",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Other",
+    "Snippets"
+  ],
+  "activationEvents": [
+    "onLanguage:crumb",
+    "onCommand:crumb.newTask",
+    "onCommand:crumb.newMem",
+    "onCommand:crumb.validate",
+    "onCommand:crumb.compress",
+    "onCommand:crumb.bench",
+    "onCommand:crumb.crumbIt"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "crumb.newTask",
+        "title": "CRUMB: New Task Handoff"
+      },
+      {
+        "command": "crumb.newMem",
+        "title": "CRUMB: New Memory Crumb"
+      },
+      {
+        "command": "crumb.validate",
+        "title": "CRUMB: Validate Current File"
+      },
+      {
+        "command": "crumb.compress",
+        "title": "CRUMB: Compress Current File"
+      },
+      {
+        "command": "crumb.bench",
+        "title": "CRUMB: Bench Current File"
+      },
+      {
+        "command": "crumb.crumbIt",
+        "title": "CRUMB: Crumb It (generate from selection)"
+      }
+    ],
+    "languages": [
+      {
+        "id": "crumb",
+        "aliases": [
+          "CRUMB",
+          "crumb"
+        ],
+        "extensions": [
+          ".crumb"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "crumb",
+        "scopeName": "source.crumb",
+        "path": "./syntaxes/crumb.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "crumb",
+        "path": "./snippets/crumb.json"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.80.0",
+    "@types/node": "^18.0.0",
+    "typescript": "^5.0.0"
+  }
+}

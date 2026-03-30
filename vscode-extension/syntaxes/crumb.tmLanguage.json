@@ -1,0 +1,90 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "CRUMB",
+  "scopeName": "source.crumb",
+  "patterns": [
+    { "include": "#markers" },
+    { "include": "#separator" },
+    { "include": "#sections" },
+    { "include": "#headers" },
+    { "include": "#list-items" },
+    { "include": "#comments" }
+  ],
+  "repository": {
+    "markers": {
+      "patterns": [
+        {
+          "name": "keyword.control.crumb",
+          "match": "^---\\s+(BEGIN|END)\\s+CRUMB\\s+---$"
+        }
+      ]
+    },
+    "separator": {
+      "patterns": [
+        {
+          "name": "meta.separator.crumb",
+          "match": "^---$"
+        }
+      ]
+    },
+    "headers": {
+      "patterns": [
+        {
+          "name": "entity.other.attribute-name.crumb",
+          "match": "^(v|kind|title|source|target|created|updated|status|id|tags|priority|parent|depends)\\s*=",
+          "captures": {
+            "0": {
+              "name": "entity.other.attribute-name.crumb"
+            }
+          }
+        },
+        {
+          "name": "meta.header.crumb",
+          "match": "^([a-zA-Z][a-zA-Z0-9_-]*)\\s*=(.*)",
+          "captures": {
+            "1": {
+              "name": "entity.other.attribute-name.crumb"
+            },
+            "2": {
+              "name": "string.unquoted.crumb"
+            }
+          }
+        }
+      ]
+    },
+    "sections": {
+      "patterns": [
+        {
+          "name": "markup.heading.crumb",
+          "match": "^\\[([a-zA-Z][a-zA-Z0-9_-]*)\\]\\s*$",
+          "captures": {
+            "1": {
+              "name": "entity.name.section.crumb"
+            }
+          }
+        }
+      ]
+    },
+    "list-items": {
+      "patterns": [
+        {
+          "name": "markup.list.unnumbered.crumb",
+          "match": "^\\s*-\\s+(.*)$",
+          "captures": {
+            "1": {
+              "name": "string.unquoted.crumb"
+            }
+          }
+        }
+      ]
+    },
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.crumb",
+          "match": "^#.*$"
+        }
+      ]
+    }
+  }
+}
