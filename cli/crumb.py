@@ -504,6 +504,18 @@ def cmd_inspect(args: argparse.Namespace) -> None:
     if extra:
         print(f"\nOptional sections: {', '.join(f'[{s}]' for s in sorted(extra))}")
 
+    # Token stats
+    tokens = estimate_tokens(text)
+    total_lines = sum(len([l for l in lines if l.strip()]) for lines in sections.values())
+    print(f"\nToken cost: ~{tokens} tokens ({len(text)} chars)")
+    print(f"Content density: {total_lines} lines across {len(sections)} sections")
+
+    # Info density score
+    all_content = ' '.join(' '.join(lines) for lines in sections.values())
+    kw = extract_keywords(all_content)
+    density = len(kw) / max(tokens, 1) * 100
+    print(f"Keyword density: {len(kw)} unique keywords ({density:.1f} per 100 tokens)")
+
 
 # ── append ───────────────────────────────────────────────────────────
 
@@ -614,6 +626,9 @@ def cmd_dream(args: argparse.Namespace) -> None:
     sections['dream'] = notes + ['']
 
     output = render_crumb(headers, sections)
+    original_tokens = estimate_tokens(text)
+    output_tokens = estimate_tokens(output)
+    ratio = ((original_tokens - output_tokens) / original_tokens * 100) if original_tokens > 0 else 0
     if args.dry_run:
         sys.stdout.write(output)
     else:
@@ -622,6 +637,7 @@ def cmd_dream(args: argparse.Namespace) -> None:
         print(f"  {len(existing)} existing + {len(raw)} raw → {len(merged)} consolidated")
         if pruned:
             print(f"  Pruned {pruned} entries to fit budget ({budget} tokens)")
+        print(f"  Compression: {original_tokens} → {output_tokens} tokens ({ratio:.0f}% reduction)")
         run_hook('post_dream', {'file': args.file, 'entries': str(len(merged))})
 
 
@@ -923,6 +939,202 @@ def cmd_compact(args: argparse.Namespace) -> None:
     write_text(args.output, output)
     if args.output != '-':
         print(f"Compacted {args.file}: {original_tokens} → {compact_tokens} tokens ({reduction:.0f}% reduction)")
+
+
+# ── compress (TurboQuant-inspired) ──────────────────────────────────
+
+def _semantic_dedup(entries: list) -> list:
+    """Stage 1: Semantic deduplication — merge near-duplicate entries.
+
+    Like PolarQuant converting to polar coordinates for efficient representation,
+    this normalizes entries and merges those with high similarity.
+    """
+    if not entries:
+        return []
+
+    result = []
+    seen_norms = set()
+    for entry in entries:
+        norm = normalize_entry(entry)
+        if not norm:
+            continue
+        # Exact dedup
+        if norm in seen_norms:
+            continue
+        # Fuzzy dedup: check similarity against existing entries
+        is_dup = False
+        for existing_norm in seen_norms:
+            ratio = difflib.SequenceMatcher(None, norm, existing_norm).ratio()
+            if ratio > 0.8:  # 80% similar = duplicate
+                is_dup = True
+                break
+        if not is_dup:
+            seen_norms.add(norm)
+            result.append(entry)
+    return result
+
+
+def _signal_prune(entries: list, target_ratio: float = 0.5) -> tuple:
+    """Stage 2: Signal-scored pruning — keep high-signal, drop low-signal.
+
+    Like QJL reducing residual error to single bits, this reduces each entry
+    to a keep/drop decision based on information density scoring.
+    Returns (kept_entries, pruned_count).
+    """
+    if not entries or target_ratio >= 1.0:
+        return entries, 0
+
+    target_count = max(1, int(len(entries) * target_ratio))
+    if len(entries) <= target_count:
+        return entries, 0
+
+    # Build keyword index
+    entry_kw = {normalize_entry(e): extract_keywords(e) for e in entries}
+    # Score each entry
+    scored = [(score_entry(e, entries, entry_kw), i, e) for i, e in enumerate(entries)]
+    # Sort by score descending, keep top entries
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    kept = scored[:target_count]
+    # Restore original order
+    kept.sort(key=lambda x: x[1])
+
+    return [s[2] for s in kept], len(entries) - target_count
+
+
+def cmd_compress(args: argparse.Namespace) -> None:
+    """Two-stage TurboQuant-inspired context compression.
+
+    Stage 1 (PolarQuant-like): Semantic deduplication — normalize and merge
+    near-duplicate entries across all sections.
+    Stage 2 (QJL-like): Signal-scored pruning — score entries by information
+    density and drop lowest-signal entries to hit target ratio.
+    """
+    text = read_text(args.file)
+    parsed = parse_crumb(text)
+    headers = parsed['headers']
+    sections = parsed['sections']
+    kind = headers['kind']
+    original_tokens = estimate_tokens(text)
+
+    target = args.target  # target ratio: 0.0 = max compression, 1.0 = no compression
+
+    stats = {'stage1_removed': 0, 'stage2_removed': 0}
+
+    # Apply two-stage compression to content sections
+    for name, lines in sections.items():
+        entries = [l for l in lines if l.strip()]
+        if len(entries) < 2:
+            continue
+
+        # Stage 1: Semantic dedup
+        deduped = _semantic_dedup(entries)
+        stats['stage1_removed'] += len(entries) - len(deduped)
+
+        # Stage 2: Signal pruning (only if target < 1.0)
+        pruned, pruned_count = _signal_prune(deduped, target)
+        stats['stage2_removed'] += pruned_count
+
+        sections[name] = pruned + [''] if pruned else ['']
+
+    # Also strip optional headers
+    keep_headers = set(REQUIRED_HEADERS) | {'title'}
+    if kind == 'map':
+        keep_headers.add('project')
+    compact_headers = {k: v for k, v in headers.items() if k in keep_headers}
+
+    output = render_crumb(compact_headers, sections)
+    output_tokens = estimate_tokens(output)
+    ratio = ((original_tokens - output_tokens) / original_tokens * 100) if original_tokens > 0 else 0
+
+    write_text(args.output, output)
+
+    if args.output != '-':
+        print(f"TurboQuant compression on {args.file}:")
+        print(f"  Stage 1 (semantic dedup):  {stats['stage1_removed']} entries merged")
+        print(f"  Stage 2 (signal pruning):  {stats['stage2_removed']} low-signal entries dropped")
+        print(f"  Result: {original_tokens} → {output_tokens} tokens ({ratio:.0f}% reduction)")
+        multiplier = original_tokens / max(output_tokens, 1)
+        print(f"  Compression ratio: {multiplier:.1f}x")
+
+
+# ── bench ───────────────────────────────────────────────────────────
+
+def cmd_bench(args: argparse.Namespace) -> None:
+    """Benchmark a crumb's compression efficiency and information density."""
+    text = read_text(args.file)
+    parsed = parse_crumb(text)
+    headers = parsed['headers']
+    sections = parsed['sections']
+    kind = headers['kind']
+
+    tokens = estimate_tokens(text)
+    chars = len(text)
+    total_lines = sum(len([l for l in lines if l.strip()]) for lines in sections.values())
+
+    # Keyword analysis
+    all_content = ' '.join(' '.join(lines) for lines in sections.values())
+    keywords = extract_keywords(all_content)
+    keyword_density = len(keywords) / max(tokens, 1) * 100
+
+    # Compute compressibility: simulate two-stage compress
+    sim_sections = {}
+    original_entries = 0
+    after_stage1 = 0
+    after_stage2 = 0
+    for name, lines in sections.items():
+        entries = [l for l in lines if l.strip()]
+        original_entries += len(entries)
+        deduped = _semantic_dedup(entries)
+        after_stage1 += len(deduped)
+        pruned, _ = _signal_prune(deduped, 0.5)
+        after_stage2 += len(pruned)
+        sim_sections[name] = pruned + [''] if pruned else ['']
+
+    keep_h = set(REQUIRED_HEADERS) | {'title'}
+    if kind == 'map':
+        keep_h.add('project')
+    sim_headers = {k: v for k, v in headers.items() if k in keep_h}
+    compressed = render_crumb(sim_headers, sim_sections)
+    compressed_tokens = estimate_tokens(compressed)
+    max_ratio = tokens / max(compressed_tokens, 1)
+
+    # Score components
+    density_score = min(keyword_density * 5, 25)  # max 25
+    compression_score = min(max_ratio * 5, 25)  # max 25
+    structure_score = 25 if not (set(REQUIRED_SECTIONS.get(kind, [])) - set(sections.keys())) else 10
+    conciseness_score = min(25, max(0, 25 - (tokens - 100) / 40))  # smaller = better, max 25
+
+    total = density_score + compression_score + structure_score + conciseness_score
+
+    # Grade
+    if total >= 85:
+        grade = 'A'
+    elif total >= 70:
+        grade = 'B'
+    elif total >= 55:
+        grade = 'C'
+    elif total >= 40:
+        grade = 'D'
+    else:
+        grade = 'F'
+
+    print(f"CRUMB Bench — {args.file}")
+    print(f"{'=' * 50}")
+    print(f"  Kind:              {kind}")
+    print(f"  Token cost:        ~{tokens} tokens ({chars} chars)")
+    print(f"  Content:           {total_lines} lines, {len(sections)} sections")
+    print(f"  Unique keywords:   {len(keywords)}")
+    print(f"  Keyword density:   {keyword_density:.1f} per 100 tokens")
+    print(f"  Max compression:   {max_ratio:.1f}x ({tokens} → {compressed_tokens} tokens)")
+    print(f"  Dedup potential:   {original_entries} → {after_stage1} entries (stage 1)")
+    print(f"  Prune potential:   {after_stage1} → {after_stage2} entries (stage 2)")
+    print(f"{'=' * 50}")
+    print(f"  Density:           {density_score:.0f}/25")
+    print(f"  Compressibility:   {compression_score:.0f}/25")
+    print(f"  Structure:         {structure_score:.0f}/25")
+    print(f"  Conciseness:       {conciseness_score:.0f}/25")
+    print(f"{'=' * 50}")
+    print(f"  SCORE: {total:.0f}/100  Grade: {grade}")
 
 
 # ── diff ─────────────────────────────────────────────────────────────
@@ -2183,6 +2395,19 @@ def build_parser() -> argparse.ArgumentParser:
     template_cmd.set_defaults(func=cmd_template)
 
     # share
+    # compress
+    compress_cmd = sub.add_parser('compress', help='TurboQuant-inspired two-stage context compression.')
+    compress_cmd.add_argument('file', help='.crumb file to compress.')
+    compress_cmd.add_argument('-o', '--output', default='-', help='Output path (default: stdout).')
+    compress_cmd.add_argument('--target', type=float, default=0.5,
+                              help='Target retention ratio 0.0-1.0 (default: 0.5 = keep top 50%%).')
+    compress_cmd.set_defaults(func=cmd_compress)
+
+    # bench
+    bench_cmd = sub.add_parser('bench', help='Benchmark compression efficiency and information density.')
+    bench_cmd.add_argument('file', help='.crumb file to benchmark.')
+    bench_cmd.set_defaults(func=cmd_bench)
+
     share_cmd = sub.add_parser('share', help='Share a .crumb file via GitHub Gist or data URI.')
     share_cmd.add_argument('file', help='.crumb file to share.')
     share_cmd.set_defaults(func=cmd_share)
