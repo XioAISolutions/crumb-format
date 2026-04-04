@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crumb-format"
-version = "0.1.0"
-description = "The copy-paste AI handoff format."
+version = "0.2.0"
+description = "The copy-paste AI handoff format — with agent identity, governance, and audit via AgentAuth."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -15,6 +15,8 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Security",
     "Topic :: Software Development :: Libraries",
 ]
 
@@ -24,10 +26,11 @@ Repository = "https://github.com/XioAISolutions/crumb-format"
 
 [project.scripts]
 crumb = "crumb_cli:main"
+agentauth-mcp = "mcp.agentauth_server:main"
 
 [tool.setuptools]
 py-modules = ["crumb_cli"]
-packages = ["cli"]
+packages = ["cli", "agentauth", "mcp"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -1,0 +1,165 @@
+# shadow-ai-scan.yml
+#
+# Runs `crumb scan` on pull requests and posts findings as a PR comment.
+# Fails the workflow if any CRITICAL findings are detected.
+
+name: Shadow AI Scan
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  shadow-ai-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install crumb-format
+        run: pip install .
+
+      - name: Run scan (JSON)
+        id: scan_json
+        run: |
+          set +e
+          OUTPUT=$(crumb scan --path . --format json --min-risk medium 2>&1)
+          EXIT_CODE=$?
+          set -e
+          {
+            echo "json<<SCAN_EOF"
+            echo "$OUTPUT"
+            echo "SCAN_EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+
+      - name: Run scan (text)
+        id: scan_text
+        run: |
+          set +e
+          OUTPUT=$(crumb scan --path . --format text --min-risk medium 2>&1)
+          set -e
+          {
+            echo "text<<SCAN_EOF"
+            echo "$OUTPUT"
+            echo "SCAN_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Post PR comment
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        env:
+          SCAN_JSON: ${{ steps.scan_json.outputs.json }}
+          SCAN_TEXT: ${{ steps.scan_text.outputs.text }}
+        with:
+          script: |
+            const scanJson = process.env.SCAN_JSON;
+            const scanText = process.env.SCAN_TEXT;
+
+            let report;
+            try {
+              report = JSON.parse(scanJson);
+            } catch (e) {
+              core.warning(`Failed to parse scan JSON: ${e.message}`);
+              report = { total_findings: 0, findings: [] };
+            }
+
+            const findings = report.findings || [];
+            const total = findings.length;
+            const marker = '<!-- shadow-ai-scan -->';
+
+            let body;
+            if (total === 0) {
+              body = [
+                marker,
+                '## :white_check_mark: Shadow AI Scan',
+                '',
+                'No Shadow AI findings detected at or above **medium** risk.',
+              ].join('\n');
+            } else {
+              const critical = findings.filter(f => f.risk_level === 'critical').length;
+              const high     = findings.filter(f => f.risk_level === 'high').length;
+              const medium   = findings.filter(f => f.risk_level === 'medium').length;
+
+              const summaryLine = `**Shadow AI Scan: ${total} findings (${critical} critical, ${high} high, ${medium} medium)**`;
+
+              const rows = findings.map(f => {
+                const risk = f.risk_level.toUpperCase();
+                const badge = risk === 'CRITICAL' ? ':red_circle:'
+                            : risk === 'HIGH'     ? ':orange_circle:'
+                            :                       ':yellow_circle:';
+                const path   = f.path   || '';
+                const type   = f.type   || '';
+                const detail = f.detail || '';
+                return `| ${badge} ${risk} | ${type} | \`${path}\` | ${detail} |`;
+              });
+
+              body = [
+                marker,
+                '## :warning: Shadow AI Scan',
+                '',
+                summaryLine,
+                '',
+                '| Risk | Type | Path | Detail |',
+                '|------|------|------|--------|',
+                ...rows,
+                '',
+                '<details><summary>Full text report</summary>',
+                '',
+                '```',
+                scanText,
+                '```',
+                '',
+                '</details>',
+              ].join('\n');
+            }
+
+            // Find and update existing comment, or create a new one
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Fail on critical findings
+        env:
+          SCAN_JSON: ${{ steps.scan_json.outputs.json }}
+        run: |
+          CRITICAL=$(echo "$SCAN_JSON" | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          count = sum(1 for f in data.get('findings', []) if f.get('risk_level') == 'critical')
+          print(count)
+          ")
+          if [ "$CRITICAL" -gt 0 ]; then
+            echo "::error::Shadow AI Scan found $CRITICAL CRITICAL finding(s). Failing workflow."
+            exit 1
+          fi
+          echo "No critical findings. Scan passed."

@@ -2907,6 +2907,654 @@ def cmd_scan(args: argparse.Namespace) -> None:
     print(output)
 
 
+def cmd_comply(args: argparse.Namespace) -> None:
+    """Generate compliance report from agent passport and audit data."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from agentauth import AgentPassport, ToolPolicy, AuditLogger
+    from agentauth.store import PassportStore
+
+    store = PassportStore()
+    mgr = AgentPassport(store=store)
+    policy = ToolPolicy(store=store)
+    logger = AuditLogger(store=store)
+
+    framework = args.framework
+    now = datetime.datetime.now(datetime.timezone.utc)
+
+    # ── Gather data ──────────────────────────────────────────
+    agents = mgr.list_all()
+    total = len(agents)
+    active = [a for a in agents if a['status'] == 'active']
+    revoked = [a for a in agents if a['status'] == 'revoked']
+    expired = []
+    for a in agents:
+        exp = a.get('expires', '')
+        if exp:
+            try:
+                exp_date = datetime.datetime.strptime(exp, "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
+                if now > exp_date:
+                    expired.append(a)
+            except ValueError:
+                pass
+
+    # Policy coverage
+    agents_with_policy = []
+    agents_without_policy = []
+    for a in agents:
+        name = a.get('name', '')
+        p = store.load_policy(name)
+        if p:
+            agents_with_policy.append(a)
+        else:
+            agents_without_policy.append(a)
+
+    # Audit data
+    audit_paths = store.list_audits()
+    total_actions = 0
+    allow_count = 0
+    deny_count = 0
+    audit_records = []
+    for p in audit_paths:
+        try:
+            data = parse_crumb(p.read_text(encoding='utf-8'))
+            actions = data['sections'].get('actions', [])
+            for line in actions:
+                stripped = line.strip()
+                if not stripped or stripped.startswith('('):
+                    continue
+                total_actions += 1
+                if 'ALLOW' in stripped:
+                    allow_count += 1
+                elif 'DENY' in stripped:
+                    deny_count += 1
+            verdict_lines = data['sections'].get('verdict', [])
+            record = {'headers': data['headers'], 'verdict': {}}
+            for vl in verdict_lines:
+                vl = vl.strip()
+                if ':' in vl:
+                    k, v = vl.split(':', 1)
+                    record['verdict'][k.strip()] = v.strip()
+            audit_records.append(record)
+        except (ValueError, KeyError):
+            continue
+
+    # Compliance score
+    score = 100
+    findings = []
+
+    if total == 0:
+        score = 0
+        findings.append(('CRITICAL', 'No agents registered — no governance in place'))
+    else:
+        # Deduct for missing policies
+        if agents_without_policy:
+            pct = len(agents_without_policy) / total * 30
+            score -= pct
+            findings.append(('HIGH', f'{len(agents_without_policy)}/{total} agents lack tool authorization policies'))
+
+        # Deduct for expired passports
+        if expired:
+            pct = len(expired) / total * 20
+            score -= pct
+            findings.append(('HIGH', f'{len(expired)} agent passport(s) expired — renew or revoke'))
+
+        # Deduct for high deny rate
+        if total_actions > 0 and deny_count / total_actions > 0.2:
+            score -= 15
+            findings.append(('MEDIUM', f'High deny rate: {deny_count}/{total_actions} actions denied ({deny_count/total_actions*100:.0f}%)'))
+
+        # Deduct if no audit data
+        if not audit_records:
+            score -= 20
+            findings.append(('HIGH', 'No audit trail data — enable session logging'))
+
+    score = max(0, min(100, round(score)))
+
+    # Framework-specific findings
+    if framework == 'eu-ai-act':
+        if not agents_with_policy:
+            findings.append(('CRITICAL', 'EU AI Act Art. 9: No risk management policies defined'))
+        if not audit_records:
+            findings.append(('CRITICAL', 'EU AI Act Art. 12: No automatic logging/audit trail'))
+        findings.append(('INFO', 'EU AI Act compliance assessment — review Art. 6-15 requirements'))
+    elif framework == 'soc2':
+        if agents_without_policy:
+            findings.append(('HIGH', 'SOC2 CC6.1: Access control policies incomplete'))
+        if not audit_records:
+            findings.append(('HIGH', 'SOC2 CC7.2: System monitoring not evidenced'))
+        findings.append(('INFO', 'SOC2 Type II assessment — ensure continuous monitoring'))
+
+    # ── Format output ────────────────────────────────────────
+    fmt = args.format
+
+    if fmt == 'json':
+        import json as _json
+        report = {
+            'generated': now.isoformat(),
+            'framework': framework,
+            'compliance_score': score,
+            'summary': {
+                'total_agents': total,
+                'active': len(active),
+                'revoked': len(revoked),
+                'expired': len(expired),
+                'with_policy': len(agents_with_policy),
+                'without_policy': len(agents_without_policy),
+                'total_actions': total_actions,
+                'allowed_actions': allow_count,
+                'denied_actions': deny_count,
+                'audit_sessions': len(audit_records),
+            },
+            'agents': agents,
+            'findings': [{'severity': s, 'message': m} for s, m in findings],
+        }
+        output = _json.dumps(report, indent=2)
+
+    elif fmt == 'html':
+        score_color = '#4caf50' if score >= 80 else '#ff9800' if score >= 50 else '#f44336'
+        fw_label = {'general': 'General', 'eu-ai-act': 'EU AI Act', 'soc2': 'SOC2 Type II'}.get(framework, framework)
+
+        findings_html = ''
+        for sev, msg in findings:
+            sev_colors = {'CRITICAL': '#f44336', 'HIGH': '#ff5722', 'MEDIUM': '#ff9800', 'INFO': '#2196f3'}
+            c = sev_colors.get(sev, '#999')
+            findings_html += f'<tr><td><span style="background:{c};color:#fff;padding:2px 8px;border-radius:3px;font-size:12px;">{sev}</span></td><td>{msg}</td></tr>\n'
+
+        agent_rows = ''
+        for a in agents:
+            st = a.get('status', '')
+            sc = '#4caf50' if st == 'active' else '#f44336' if st == 'revoked' else '#999'
+            has_pol = 'Yes' if any(ap['name'] == a['name'] for ap in agents_with_policy) else '<span style="color:#f44336">No</span>'
+            agent_rows += f'<tr><td>{a.get("agent_id","")}</td><td>{a.get("name","")}</td><td><span style="color:{sc}">{st}</span></td><td>{a.get("issued","")}</td><td>{a.get("expires","")}</td><td>{has_pol}</td></tr>\n'
+
+        output = f'''<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>AgentAuth Compliance Report</title>
+<style>
+body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1a1a2e; color: #e0e0e0; margin: 0; padding: 20px; }}
+.container {{ max-width: 900px; margin: 0 auto; }}
+h1 {{ color: #fff; border-bottom: 2px solid #333; padding-bottom: 10px; }}
+h2 {{ color: #aaa; margin-top: 30px; }}
+.score-box {{ display: inline-block; background: {score_color}; color: #fff; font-size: 48px; font-weight: bold; padding: 20px 40px; border-radius: 12px; }}
+.meta {{ color: #888; font-size: 14px; margin: 10px 0; }}
+.stat-grid {{ display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }}
+.stat {{ background: #16213e; padding: 16px; border-radius: 8px; text-align: center; }}
+.stat .num {{ font-size: 28px; font-weight: bold; color: #fff; }}
+.stat .label {{ font-size: 12px; color: #888; margin-top: 4px; }}
+table {{ width: 100%; border-collapse: collapse; margin: 10px 0; }}
+th, td {{ padding: 10px 12px; text-align: left; border-bottom: 1px solid #2a2a4a; }}
+th {{ color: #888; font-size: 12px; text-transform: uppercase; }}
+.footer {{ margin-top: 40px; padding-top: 10px; border-top: 1px solid #333; color: #666; font-size: 12px; }}
+</style></head><body>
+<div class="container">
+<h1>AgentAuth Compliance Report</h1>
+<p class="meta">Framework: {fw_label} | Generated: {now.strftime("%Y-%m-%d %H:%M UTC")}</p>
+
+<h2>Compliance Score</h2>
+<div class="score-box">{score}</div>
+<span style="margin-left:16px;color:#888;">/ 100</span>
+
+<h2>Executive Summary</h2>
+<div class="stat-grid">
+<div class="stat"><div class="num">{total}</div><div class="label">Total Agents</div></div>
+<div class="stat"><div class="num" style="color:#4caf50">{len(active)}</div><div class="label">Active</div></div>
+<div class="stat"><div class="num" style="color:#f44336">{len(revoked)}</div><div class="label">Revoked</div></div>
+<div class="stat"><div class="num" style="color:#ff9800">{len(expired)}</div><div class="label">Expired</div></div>
+</div>
+<div class="stat-grid">
+<div class="stat"><div class="num">{total_actions}</div><div class="label">Total Actions</div></div>
+<div class="stat"><div class="num" style="color:#4caf50">{allow_count}</div><div class="label">Allowed</div></div>
+<div class="stat"><div class="num" style="color:#f44336">{deny_count}</div><div class="label">Denied</div></div>
+<div class="stat"><div class="num">{len(audit_records)}</div><div class="label">Audit Sessions</div></div>
+</div>
+
+<h2>Agent Inventory</h2>
+<table><tr><th>ID</th><th>Name</th><th>Status</th><th>Issued</th><th>Expires</th><th>Policy</th></tr>
+{agent_rows if agent_rows else '<tr><td colspan="6" style="color:#888;">No agents registered</td></tr>'}
+</table>
+
+<h2>Policy Coverage</h2>
+<div style="background:#16213e;border-radius:8px;padding:16px;margin:10px 0;">
+<div style="display:flex;align-items:center;gap:8px;">
+<div style="flex:1;background:#333;border-radius:4px;height:24px;overflow:hidden;">
+<div style="background:#4caf50;height:100%;width:{len(agents_with_policy)/total*100 if total else 0:.0f}%;"></div>
+</div>
+<span>{len(agents_with_policy)}/{total} agents have policies</span>
+</div>
+</div>
+
+<h2>Findings & Recommendations</h2>
+<table>
+{findings_html if findings_html else '<tr><td colspan="2" style="color:#4caf50;">No findings — all checks passed</td></tr>'}
+</table>
+
+<div class="footer">
+AgentAuth Compliance Report v1.0 | CRUMB Format v1.1 | {fw_label} Framework<br>
+Generated by <code>crumb comply</code> — https://github.com/XioAISolutions/crumb-format
+</div>
+</div></body></html>'''
+
+    else:  # text
+        lines = []
+        lines.append('=' * 70)
+        lines.append('AGENTAUTH COMPLIANCE REPORT')
+        lines.append('=' * 70)
+        fw_label = {'general': 'General', 'eu-ai-act': 'EU AI Act', 'soc2': 'SOC2 Type II'}.get(framework, framework)
+        lines.append(f'Framework:  {fw_label}')
+        lines.append(f'Generated:  {now.strftime("%Y-%m-%d %H:%M UTC")}')
+        lines.append(f'Score:      {score}/100')
+        lines.append('')
+
+        lines.append('EXECUTIVE SUMMARY')
+        lines.append('-' * 40)
+        lines.append(f'  Total agents:      {total}')
+        lines.append(f'  Active:            {len(active)}')
+        lines.append(f'  Revoked:           {len(revoked)}')
+        lines.append(f'  Expired:           {len(expired)}')
+        lines.append(f'  With policy:       {len(agents_with_policy)}')
+        lines.append(f'  Without policy:    {len(agents_without_policy)}')
+        lines.append(f'  Total actions:     {total_actions}')
+        lines.append(f'  Allowed:           {allow_count}')
+        lines.append(f'  Denied:            {deny_count}')
+        lines.append(f'  Audit sessions:    {len(audit_records)}')
+        lines.append('')
+
+        lines.append('AGENT INVENTORY')
+        lines.append('-' * 40)
+        if agents:
+            lines.append(f'  {"ID":<16} {"Name":<24} {"Status":<10} {"Expires":<12} Policy')
+            for a in agents:
+                has_pol = 'Yes' if any(ap['name'] == a['name'] for ap in agents_with_policy) else 'NO'
+                lines.append(f'  {a.get("agent_id",""):<16} {a.get("name",""):<24} {a.get("status",""):<10} {a.get("expires","n/a"):<12} {has_pol}')
+        else:
+            lines.append('  (no agents registered)')
+        lines.append('')
+
+        lines.append('FINDINGS & RECOMMENDATIONS')
+        lines.append('-' * 40)
+        if findings:
+            for sev, msg in findings:
+                lines.append(f'  [{sev}] {msg}')
+        else:
+            lines.append('  No findings — all checks passed.')
+        lines.append('')
+        lines.append('=' * 70)
+        output = '\n'.join(lines)
+
+    if args.output and args.output != '-':
+        write_text(args.output, output)
+        print(f'Compliance report written to {args.output}', file=sys.stderr)
+    else:
+        print(output)
+
+
+def cmd_dashboard(args: argparse.Namespace) -> None:
+    """Generate a self-contained HTML dashboard for agent auth overview."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from agentauth import AgentPassport, ToolPolicy, AuditLogger
+    from agentauth.store import PassportStore
+
+    store = PassportStore()
+    passport_mgr = AgentPassport(store)
+    logger = AuditLogger(store)
+
+    # ── Gather data ───────────────────────────────────────────
+    all_agents = passport_mgr.list_all(status_filter="all")
+    now = datetime.datetime.now(datetime.timezone.utc)
+    now_str = now.strftime("%Y-%m-%d")
+    generated_at = now.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    total = len(all_agents)
+    active = 0
+    revoked = 0
+    expired = 0
+    for a in all_agents:
+        st = a.get("status", "unknown")
+        if st == "revoked":
+            revoked += 1
+        elif a.get("expires", "") and a["expires"] < now_str:
+            expired += 1
+        elif st == "active":
+            active += 1
+
+    # Enrich agents with framework/owner from passport data
+    enriched_agents = []
+    for a in all_agents:
+        agent_id = a["agent_id"]
+        data = passport_mgr.inspect(agent_id)
+        framework = ""
+        owner = ""
+        if data:
+            h = data["headers"]
+            framework = h.get("agent_framework", "")
+            owner = ""
+            # Try to get owner from identity section
+            for line in data["sections"].get("identity", []):
+                stripped = line.strip()
+                if stripped.startswith("owner:"):
+                    owner = stripped.split(":", 1)[1].strip()
+                    break
+        # Determine effective status
+        st = a.get("status", "unknown")
+        if st != "revoked" and a.get("expires", "") and a["expires"] < now_str:
+            effective_status = "expired"
+        else:
+            effective_status = st
+        enriched_agents.append({
+            "agent_id": agent_id,
+            "name": a.get("name", ""),
+            "framework": framework,
+            "owner": owner,
+            "status": effective_status,
+            "issued": a.get("issued", ""),
+            "expires": a.get("expires", ""),
+        })
+
+    # Policy coverage
+    policy_files = set()
+    for p in store.policies_dir.glob("*.json"):
+        policy_files.add(p.stem)
+    agents_with_policy = []
+    agents_without_policy = []
+    for a in enriched_agents:
+        name = a["name"]
+        if name in policy_files or a["agent_id"] in policy_files:
+            agents_with_policy.append(a["name"] or a["agent_id"])
+        else:
+            agents_without_policy.append(a["name"] or a["agent_id"])
+
+    # Audit feed
+    audit_lines = logger.feed()
+    recent_audit = audit_lines[-30:] if len(audit_lines) > 30 else audit_lines
+    recent_audit.reverse()  # newest first
+
+    # Risk summary — count verdicts
+    allow_count = 0
+    deny_count = 0
+    for line in audit_lines:
+        if "] ALLOW " in line or "] ALLOW\t" in line:
+            allow_count += 1
+        elif "] DENY " in line or "] DENY\t" in line:
+            deny_count += 1
+    total_actions = allow_count + deny_count
+
+    # Per-agent risk (deny ratio)
+    agent_deny_map: dict[str, list[int, int]] = {}
+    for line in audit_lines:
+        # Lines look like: [agent_id/session_id] [timestamp] VERDICT tool: detail
+        if line.startswith("["):
+            bracket_end = line.find("]")
+            if bracket_end > 0:
+                inner = line[1:bracket_end]
+                aid = inner.split("/")[0] if "/" in inner else inner
+                if aid not in agent_deny_map:
+                    agent_deny_map[aid] = [0, 0]  # [total, denied]
+                agent_deny_map[aid][0] += 1
+                if "] DENY " in line or "] DENY\t" in line:
+                    agent_deny_map[aid][1] += 1
+
+    # ── Build HTML ────────────────────────────────────────────
+    def _esc(s: str) -> str:
+        return (s.replace("&", "&amp;").replace("<", "&lt;")
+                 .replace(">", "&gt;").replace('"', "&quot;"))
+
+    # Agent table rows
+    agent_rows = ""
+    for a in enriched_agents:
+        status_class = a["status"]
+        agent_rows += (
+            f'<tr class="status-{_esc(status_class)}">'
+            f'<td class="mono">{_esc(a["agent_id"])}</td>'
+            f'<td>{_esc(a["name"])}</td>'
+            f'<td>{_esc(a["framework"])}</td>'
+            f'<td>{_esc(a["owner"])}</td>'
+            f'<td><span class="badge badge-{_esc(status_class)}">{_esc(a["status"])}</span></td>'
+            f'<td>{_esc(a["issued"])}</td>'
+            f'<td>{_esc(a["expires"])}</td>'
+            f'</tr>\n'
+        )
+
+    # Policy coverage items
+    policy_html = ""
+    for name in agents_with_policy:
+        policy_html += f'<div class="policy-item policy-yes"><span class="policy-dot">&#9679;</span> {_esc(name)}</div>\n'
+    for name in agents_without_policy:
+        policy_html += f'<div class="policy-item policy-no"><span class="policy-dot">&#9675;</span> {_esc(name)}</div>\n'
+    if not policy_html:
+        policy_html = '<div class="empty-state">No agents registered.</div>'
+
+    policy_covered = len(agents_with_policy)
+    policy_total = len(agents_with_policy) + len(agents_without_policy)
+    policy_pct = round(policy_covered / policy_total * 100) if policy_total else 0
+
+    # Audit feed HTML
+    audit_html = ""
+    for line in recent_audit:
+        css = "audit-allow" if "ALLOW" in line else "audit-deny" if "DENY" in line else ""
+        audit_html += f'<div class="audit-line {css}">{_esc(line)}</div>\n'
+    if not audit_html:
+        audit_html = '<div class="empty-state">No audit activity recorded.</div>'
+
+    # Risk bars
+    risk_bars_html = ""
+    for aid, (t, d) in sorted(agent_deny_map.items()):
+        pct = round(d / t * 100) if t else 0
+        bar_color = "#4ade80" if pct < 10 else "#facc15" if pct < 30 else "#f87171"
+        name_label = aid
+        for a in enriched_agents:
+            if a["agent_id"] == aid:
+                name_label = a["name"] or aid
+                break
+        risk_bars_html += (
+            f'<div class="risk-row">'
+            f'<span class="risk-label">{_esc(name_label)}</span>'
+            f'<div class="risk-bar-bg">'
+            f'<div class="risk-bar-fill" style="width:{pct}%;background:{bar_color};"></div>'
+            f'</div>'
+            f'<span class="risk-pct">{pct}%</span>'
+            f'</div>\n'
+        )
+    if not risk_bars_html:
+        # Show a summary bar for overall if no per-agent data
+        if total_actions > 0:
+            deny_pct = round(deny_count / total_actions * 100)
+            bar_color = "#4ade80" if deny_pct < 10 else "#facc15" if deny_pct < 30 else "#f87171"
+            risk_bars_html = (
+                f'<div class="risk-row">'
+                f'<span class="risk-label">Overall</span>'
+                f'<div class="risk-bar-bg">'
+                f'<div class="risk-bar-fill" style="width:{deny_pct}%;background:{bar_color};"></div>'
+                f'</div>'
+                f'<span class="risk-pct">{deny_pct}%</span>'
+                f'</div>\n'
+            )
+        else:
+            risk_bars_html = '<div class="empty-state">No actions recorded yet.</div>'
+
+    html = f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentAuth Dashboard</title>
+<style>
+  *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+  body {{
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #0f1117; color: #e2e8f0; line-height: 1.6; padding: 24px;
+  }}
+  h1 {{ font-size: 1.8rem; font-weight: 700; margin-bottom: 4px; color: #f1f5f9; }}
+  .subtitle {{ color: #94a3b8; font-size: 0.85rem; margin-bottom: 28px; }}
+  h2 {{ font-size: 1.1rem; font-weight: 600; color: #cbd5e1; margin-bottom: 14px; }}
+
+  /* Cards */
+  .cards {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 16px; margin-bottom: 32px; }}
+  .card {{
+    background: #1e2030; border: 1px solid #2a2d3e; border-radius: 10px;
+    padding: 20px; text-align: center;
+  }}
+  .card .num {{ font-size: 2.2rem; font-weight: 700; }}
+  .card .label {{ font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }}
+  .card.total .num {{ color: #818cf8; }}
+  .card.active .num {{ color: #4ade80; }}
+  .card.revoked .num {{ color: #f87171; }}
+  .card.expired .num {{ color: #facc15; }}
+
+  /* Table */
+  .table-wrap {{ overflow-x: auto; margin-bottom: 32px; }}
+  table {{ width: 100%; border-collapse: collapse; font-size: 0.88rem; }}
+  th {{
+    background: #1a1c2e; color: #94a3b8; font-weight: 600; text-transform: uppercase;
+    font-size: 0.72rem; letter-spacing: 0.06em; padding: 10px 12px; text-align: left;
+    border-bottom: 2px solid #2a2d3e; cursor: pointer; user-select: none; white-space: nowrap;
+  }}
+  th:hover {{ color: #e2e8f0; }}
+  th .sort-arrow {{ margin-left: 4px; font-size: 0.6rem; }}
+  td {{ padding: 9px 12px; border-bottom: 1px solid #1e2030; }}
+  tr:hover td {{ background: #1a1c2e; }}
+  .mono {{ font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace; font-size: 0.82rem; }}
+
+  /* Badges */
+  .badge {{
+    display: inline-block; padding: 2px 10px; border-radius: 9999px;
+    font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+  }}
+  .badge-active {{ background: #064e3b; color: #4ade80; }}
+  .badge-revoked {{ background: #450a0a; color: #f87171; }}
+  .badge-expired {{ background: #422006; color: #facc15; }}
+  .badge-unknown {{ background: #1e293b; color: #94a3b8; }}
+
+  /* Two-column layout */
+  .grid-2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }}
+  @media (max-width: 800px) {{ .grid-2 {{ grid-template-columns: 1fr; }} }}
+  .panel {{
+    background: #1e2030; border: 1px solid #2a2d3e; border-radius: 10px; padding: 20px;
+  }}
+
+  /* Policy coverage */
+  .policy-bar-bg {{
+    height: 8px; background: #2a2d3e; border-radius: 4px; margin-bottom: 14px; overflow: hidden;
+  }}
+  .policy-bar-fill {{ height: 100%; border-radius: 4px; background: #818cf8; transition: width 0.3s; }}
+  .policy-summary {{ font-size: 0.8rem; color: #94a3b8; margin-bottom: 12px; }}
+  .policy-item {{ font-size: 0.85rem; padding: 3px 0; }}
+  .policy-yes {{ color: #4ade80; }}
+  .policy-no {{ color: #f87171; }}
+  .policy-dot {{ margin-right: 6px; }}
+
+  /* Audit feed */
+  .audit-feed {{ max-height: 340px; overflow-y: auto; }}
+  .audit-line {{
+    font-family: "SF Mono", "Fira Code", monospace; font-size: 0.78rem;
+    padding: 4px 8px; border-radius: 4px; margin-bottom: 3px; white-space: pre-wrap; word-break: break-all;
+  }}
+  .audit-allow {{ background: #0a2e1f; color: #86efac; }}
+  .audit-deny {{ background: #2d0a0a; color: #fca5a5; }}
+
+  /* Risk bars */
+  .risk-row {{ display: flex; align-items: center; margin-bottom: 10px; }}
+  .risk-label {{ width: 140px; font-size: 0.85rem; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+  .risk-bar-bg {{ flex: 1; height: 16px; background: #2a2d3e; border-radius: 4px; margin: 0 12px; overflow: hidden; }}
+  .risk-bar-fill {{ height: 100%; border-radius: 4px; transition: width 0.3s; min-width: 2px; }}
+  .risk-pct {{ width: 48px; text-align: right; font-size: 0.82rem; font-weight: 600; flex-shrink: 0; }}
+
+  .empty-state {{ color: #64748b; font-size: 0.85rem; font-style: italic; padding: 12px 0; }}
+
+  /* Filter */
+  .filter-bar {{ margin-bottom: 14px; }}
+  .filter-bar input {{
+    background: #161825; border: 1px solid #2a2d3e; color: #e2e8f0; border-radius: 6px;
+    padding: 7px 12px; font-size: 0.85rem; width: 260px; outline: none;
+  }}
+  .filter-bar input:focus {{ border-color: #818cf8; }}
+</style>
+</head>
+<body>
+<h1>AgentAuth Dashboard</h1>
+<div class="subtitle">Generated {_esc(generated_at)}</div>
+
+<h2>Agent Overview</h2>
+<div class="cards">
+  <div class="card total"><div class="num">{total}</div><div class="label">Total Agents</div></div>
+  <div class="card active"><div class="num">{active}</div><div class="label">Active</div></div>
+  <div class="card revoked"><div class="num">{revoked}</div><div class="label">Revoked</div></div>
+  <div class="card expired"><div class="num">{expired}</div><div class="label">Expired</div></div>
+</div>
+
+<h2>Agent Table</h2>
+<div class="filter-bar"><input type="text" id="agentFilter" placeholder="Filter agents..." oninput="filterTable()"></div>
+<div class="table-wrap">
+<table id="agentTable">
+<thead>
+<tr>
+  <th onclick="sortTable(0)">ID <span class="sort-arrow">&#9650;&#9660;</span></th>
+  <th onclick="sortTable(1)">Name <span class="sort-arrow">&#9650;&#9660;</span></th>
+  <th onclick="sortTable(2)">Framework <span class="sort-arrow">&#9650;&#9660;</span></th>
+  <th onclick="sortTable(3)">Owner <span class="sort-arrow">&#9650;&#9660;</span></th>
+  <th onclick="sortTable(4)">Status <span class="sort-arrow">&#9650;&#9660;</span></th>
+  <th onclick="sortTable(5)">Issued <span class="sort-arrow">&#9650;&#9660;</span></th>
+  <th onclick="sortTable(6)">Expires <span class="sort-arrow">&#9650;&#9660;</span></th>
+</tr>
+</thead>
+<tbody>
+{agent_rows}</tbody>
+</table>
+</div>
+
+<div class="grid-2">
+  <div class="panel">
+    <h2>Policy Coverage</h2>
+    <div class="policy-summary">{policy_covered} of {policy_total} agents have policies ({policy_pct}%)</div>
+    <div class="policy-bar-bg"><div class="policy-bar-fill" style="width:{policy_pct}%"></div></div>
+    {policy_html}
+  </div>
+  <div class="panel">
+    <h2>Risk Summary</h2>
+    <div class="policy-summary">Denial rate per agent (higher = more blocked actions)</div>
+    {risk_bars_html}
+  </div>
+</div>
+
+<h2>Recent Audit Activity</h2>
+<div class="panel">
+  <div class="audit-feed">
+    {audit_html}
+  </div>
+</div>
+
+<script>
+var sortDir = {{}};
+function sortTable(col) {{
+  var table = document.getElementById("agentTable");
+  var tbody = table.tBodies[0];
+  var rows = Array.from(tbody.rows);
+  var dir = sortDir[col] === "asc" ? "desc" : "asc";
+  sortDir[col] = dir;
+  rows.sort(function(a, b) {{
+    var va = a.cells[col].textContent.trim().toLowerCase();
+    var vb = b.cells[col].textContent.trim().toLowerCase();
+    if (va < vb) return dir === "asc" ? -1 : 1;
+    if (va > vb) return dir === "asc" ? 1 : -1;
+    return 0;
+  }});
+  rows.forEach(function(r) {{ tbody.appendChild(r); }});
+}}
+function filterTable() {{
+  var q = document.getElementById("agentFilter").value.toLowerCase();
+  var rows = document.getElementById("agentTable").tBodies[0].rows;
+  for (var i = 0; i < rows.length; i++) {{
+    var text = rows[i].textContent.toLowerCase();
+    rows[i].style.display = text.indexOf(q) >= 0 ? "" : "none";
+  }}
+}}
+</script>
+</body>
+</html>'''
+
+    output_path = args.output
+    Path(output_path).write_text(html, encoding="utf-8")
+    print(f"Dashboard written to {output_path}")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog='crumb',
@@ -3170,6 +3818,18 @@ def build_parser() -> argparse.ArgumentParser:
     scan_cmd.add_argument('--min-risk', choices=['low', 'medium', 'high', 'critical'], default='low',
                           help='Minimum risk level to report (default: low).')
     scan_cmd.set_defaults(func=cmd_scan)
+
+    # --- Compliance Report ---
+    comply_cmd = sub.add_parser('comply', help='Generate compliance report from agent data.')
+    comply_cmd.add_argument('-f', '--format', choices=['text', 'json', 'html'], default='text')
+    comply_cmd.add_argument('-o', '--output', default='-')
+    comply_cmd.add_argument('--framework', choices=['general', 'eu-ai-act', 'soc2'], default='general')
+    comply_cmd.set_defaults(func=cmd_comply)
+
+    # --- Dashboard ---
+    dash_cmd = sub.add_parser('dashboard', help='Generate agent dashboard (HTML).')
+    dash_cmd.add_argument('-o', '--output', default='agentauth-dashboard.html')
+    dash_cmd.set_defaults(func=cmd_dashboard)
 
     return parser
 
