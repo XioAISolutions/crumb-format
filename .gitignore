@@ -12,3 +12,4 @@ node_modules/
 *~
 .venv/
 .env
+.crumb-auth/

@@ -2482,6 +2482,431 @@ def cmd_audit(args: argparse.Namespace) -> None:
 
 # ── argument parser ──────────────────────────────────────────────────
 
+# ---------------------------------------------------------------------------
+# Shadow AI Scanner
+# ---------------------------------------------------------------------------
+
+RISK_ORDER = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+
+# AI tool config file patterns (glob-style, resolved relative to scan root)
+_AI_CONFIG_GLOBS = [
+    ".cursor/rules",
+    ".cursor/rules/**",
+    ".claude/*",
+    ".windsurf*",
+    "CLAUDE.md",
+    ".github/copilot*",
+    ".github/copilot*/**",
+    ".continue/*",
+    ".continue/**",
+    ".aider*",
+    ".cody*",
+]
+
+# Environment variable names that indicate AI API keys
+_AI_ENV_KEY_PATTERNS = [
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "CLAUDE_API_KEY",
+    "GOOGLE_AI_KEY",
+    "GOOGLE_API_KEY",
+    "COHERE_API_KEY",
+    "HUGGINGFACE_API_KEY",
+    "HF_TOKEN",
+    "REPLICATE_API_TOKEN",
+    "MISTRAL_API_KEY",
+    "GROQ_API_KEY",
+    "TOGETHER_API_KEY",
+    "FIREWORKS_API_KEY",
+    "PERPLEXITY_API_KEY",
+    "AI21_API_KEY",
+    "DEEPSEEK_API_KEY",
+]
+
+# AI SDK package names to look for in dependency manifests
+_AI_SDK_PACKAGES = [
+    "openai",
+    "anthropic",
+    "langchain",
+    "langchain-core",
+    "langchain-community",
+    "langchain-openai",
+    "langchain-anthropic",
+    "langgraph",
+    "crewai",
+    "autogen",
+    "pyautogen",
+    "llama-index",
+    "llama_index",
+    "llamaindex",
+    "transformers",
+    "huggingface-hub",
+    "cohere",
+    "google-generativeai",
+    "google-genai",
+    "replicate",
+    "mistralai",
+    "groq",
+    "together",
+    "ai21",
+    "deepseek",
+    "litellm",
+    "guidance",
+    "semantic-kernel",
+    "promptflow",
+    "dspy",
+    "dspy-ai",
+    "haystack-ai",
+    "vllm",
+    "claude-agent-sdk",
+    "@anthropic-ai/sdk",
+    "@openai/api",
+    "@langchain/core",
+    "@langchain/community",
+    "@langchain/openai",
+    "@langchain/anthropic",
+    "llamaindex",  # npm
+    "cohere-ai",
+    "@google/generative-ai",
+    "@mistralai/mistralai",
+    "groq-sdk",
+]
+
+# Import patterns for code scanning (Python / JS / TS)
+_AI_IMPORT_RES = [
+    re.compile(r"^\s*import\s+(openai|anthropic|langchain|crewai|autogen|cohere|groq|litellm|replicate|mistralai|together|guidance|dspy|haystack)\b"),
+    re.compile(r"^\s*from\s+(openai|anthropic|langchain|crewai|autogen|cohere|groq|litellm|replicate|mistralai|together|guidance|dspy|haystack)\b"),
+    re.compile(r"""^\s*(?:const|let|var|import)\s+.*(?:require|from)\s*\(?\s*['"](@?(?:openai|anthropic|langchain|cohere-ai|groq-sdk|@google/generative-ai|@mistralai/mistralai|@anthropic-ai/sdk|@openai/api|@langchain/\w+|llamaindex))['"]"""),
+]
+
+# MCP config file names
+_MCP_CONFIG_NAMES = [
+    "claude_desktop_config.json",
+    "mcp.json",
+    ".mcp.json",
+    "mcp_config.json",
+]
+
+
+def _scan_config_files(root: Path) -> List[Dict]:
+    """Scan for AI tool configuration files."""
+    findings: List[Dict] = []
+    for pattern in _AI_CONFIG_GLOBS:
+        for match in sorted(root.glob(pattern)):
+            if match.is_file():
+                findings.append({
+                    "type": "ai_config",
+                    "path": str(match.relative_to(root)),
+                    "detail": f"AI tool configuration file: {match.name}",
+                    "risk_level": "medium",
+                })
+    # de-duplicate by path
+    seen: set = set()
+    deduped: List[Dict] = []
+    for f in findings:
+        if f["path"] not in seen:
+            seen.add(f["path"])
+            deduped.append(f)
+    return deduped
+
+
+def _scan_env_files(root: Path) -> List[Dict]:
+    """Scan .env* files for AI API keys."""
+    findings: List[Dict] = []
+    for envfile in sorted(root.rglob(".env*")):
+        if not envfile.is_file():
+            continue
+        # skip directories and binary-looking files
+        try:
+            text = envfile.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#") or "=" not in stripped:
+                continue
+            key = stripped.split("=", 1)[0].strip()
+            for pattern in _AI_ENV_KEY_PATTERNS:
+                if key.upper() == pattern:
+                    findings.append({
+                        "type": "api_key",
+                        "path": str(envfile.relative_to(root)),
+                        "detail": f"AI API key found: {key}",
+                        "risk_level": "critical",
+                    })
+    return findings
+
+
+def _scan_dependencies(root: Path) -> List[Dict]:
+    """Scan dependency manifests for AI SDK packages."""
+    findings: List[Dict] = []
+    sdk_set_lower = {p.lower() for p in _AI_SDK_PACKAGES}
+
+    # --- requirements*.txt ---
+    for req in sorted(root.rglob("requirements*.txt")):
+        if not req.is_file():
+            continue
+        try:
+            text = req.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+        for line in text.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            # extract package name (before any version specifier)
+            pkg = re.split(r"[>=<!\[;@\s]", line)[0].strip().lower()
+            if pkg in sdk_set_lower:
+                findings.append({
+                    "type": "ai_dependency",
+                    "path": str(req.relative_to(root)),
+                    "detail": f"AI SDK dependency: {pkg}",
+                    "risk_level": "high",
+                })
+
+    # --- pyproject.toml ---
+    for pp in sorted(root.rglob("pyproject.toml")):
+        if not pp.is_file():
+            continue
+        try:
+            text = pp.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+        for pkg in _AI_SDK_PACKAGES:
+            # loose check: package name appears in a dependency context
+            if re.search(r'(?:^|\s|"|' + "'" + r')' + re.escape(pkg.lower()) + r'(?:\s|[>=<"\']|$)', text.lower(), re.MULTILINE):
+                findings.append({
+                    "type": "ai_dependency",
+                    "path": str(pp.relative_to(root)),
+                    "detail": f"AI SDK dependency: {pkg}",
+                    "risk_level": "high",
+                })
+
+    # --- package.json ---
+    for pj in sorted(root.rglob("package.json")):
+        if not pj.is_file():
+            continue
+        try:
+            data = json.loads(pj.read_text(encoding="utf-8", errors="replace"))
+        except Exception:
+            continue
+        all_deps: dict = {}
+        for section in ("dependencies", "devDependencies", "peerDependencies"):
+            all_deps.update(data.get(section, {}))
+        for dep_name in all_deps:
+            if dep_name.lower() in sdk_set_lower:
+                findings.append({
+                    "type": "ai_dependency",
+                    "path": str(pj.relative_to(root)),
+                    "detail": f"AI SDK dependency: {dep_name}",
+                    "risk_level": "high",
+                })
+
+    # --- Gemfile ---
+    for gf in sorted(root.rglob("Gemfile")):
+        if not gf.is_file():
+            continue
+        try:
+            text = gf.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            m = re.match(r"""gem\s+['"]([^'"]+)['"]""", stripped)
+            if m:
+                gem = m.group(1).strip().lower()
+                if gem in sdk_set_lower:
+                    findings.append({
+                        "type": "ai_dependency",
+                        "path": str(gf.relative_to(root)),
+                        "detail": f"AI SDK dependency (gem): {gem}",
+                        "risk_level": "high",
+                    })
+
+    return findings
+
+
+def _scan_mcp_configs(root: Path) -> List[Dict]:
+    """Scan for MCP server configuration files."""
+    findings: List[Dict] = []
+    for name in _MCP_CONFIG_NAMES:
+        for match in sorted(root.rglob(name)):
+            if match.is_file():
+                detail = f"MCP server configuration: {match.name}"
+                # peek inside for mcpServers key
+                try:
+                    data = json.loads(match.read_text(encoding="utf-8", errors="replace"))
+                    servers = data.get("mcpServers", {})
+                    if servers:
+                        detail += f" ({len(servers)} server(s): {', '.join(list(servers)[:5])})"
+                except Exception:
+                    pass
+                findings.append({
+                    "type": "mcp_config",
+                    "path": str(match.relative_to(root)),
+                    "detail": detail,
+                    "risk_level": "high",
+                })
+    return findings
+
+
+def _scan_code_imports(root: Path) -> List[Dict]:
+    """Scan .py/.js/.ts files for AI SDK imports."""
+    findings: List[Dict] = []
+    seen: set = set()  # (path, pkg) dedup
+    extensions = {".py", ".js", ".ts", ".tsx", ".jsx", ".mjs", ".cjs"}
+    skip_dirs = {"node_modules", ".venv", "venv", "__pycache__", ".git", ".tox", "dist", "build"}
+
+    for fpath in sorted(root.rglob("*")):
+        if not fpath.is_file() or fpath.suffix not in extensions:
+            continue
+        # skip heavy directories
+        parts = set(fpath.relative_to(root).parts)
+        if parts & skip_dirs:
+            continue
+        try:
+            text = fpath.read_text(encoding="utf-8", errors="replace")
+        except Exception:
+            continue
+        for line in text.splitlines():
+            for pat in _AI_IMPORT_RES:
+                m = pat.match(line)
+                if m:
+                    pkg = m.group(1)
+                    key = (str(fpath.relative_to(root)), pkg)
+                    if key not in seen:
+                        seen.add(key)
+                        findings.append({
+                            "type": "code_import",
+                            "path": str(fpath.relative_to(root)),
+                            "detail": f"AI SDK import: {pkg}",
+                            "risk_level": "low",
+                        })
+    return findings
+
+
+def _format_scan_text(findings: List[Dict], root: Path) -> str:
+    """Format scan findings as human-readable text."""
+    if not findings:
+        return "Shadow AI scan complete: no findings.\n"
+
+    lines: List[str] = []
+    lines.append(f"Shadow AI Scan Report")
+    lines.append(f"Scanned: {root}")
+    lines.append(f"Date: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    lines.append(f"Total findings: {len(findings)}")
+    lines.append("")
+
+    # summary by risk level
+    risk_counts: Dict[str, int] = {}
+    for f in findings:
+        risk_counts[f["risk_level"]] = risk_counts.get(f["risk_level"], 0) + 1
+    for level in ("critical", "high", "medium", "low"):
+        if level in risk_counts:
+            lines.append(f"  {level.upper():10s}: {risk_counts[level]}")
+    lines.append("")
+    lines.append("-" * 72)
+
+    # group by risk level
+    for level in ("critical", "high", "medium", "low"):
+        group = [f for f in findings if f["risk_level"] == level]
+        if not group:
+            continue
+        lines.append(f"\n[{level.upper()}]")
+        for f in group:
+            lines.append(f"  {f['type']:16s} {f['path']}")
+            lines.append(f"                   {f['detail']}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _format_scan_json(findings: List[Dict], root: Path) -> str:
+    """Format scan findings as JSON."""
+    report = {
+        "scan_root": str(root),
+        "date": datetime.datetime.now().isoformat(),
+        "total_findings": len(findings),
+        "findings": findings,
+    }
+    return json.dumps(report, indent=2)
+
+
+def _format_scan_crumb(findings: List[Dict], root: Path) -> str:
+    """Format scan findings as a .crumb audit file."""
+    now = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    actions: List[str] = []
+    for f in findings:
+        actions.append(f"[{f['risk_level'].upper()}] {f['type']} | {f['path']} | {f['detail']}")
+
+    max_risk = "low"
+    for f in findings:
+        if RISK_ORDER.get(f["risk_level"], 0) > RISK_ORDER.get(max_risk, 0):
+            max_risk = f["risk_level"]
+
+    verdict = "pass" if not findings else ("fail" if max_risk in ("critical", "high") else "review")
+
+    lines = [
+        "BEGIN CRUMB",
+        "v = 1.1",
+        "kind = audit",
+        f"source = crumb.scan",
+        f"title = Shadow AI Scan - {root}",
+        f"ts = {now}",
+        "---",
+        "[goal]",
+        f"Discover unauthorized/unregistered AI agents in {root}",
+        "",
+        "[actions]",
+    ]
+    for a in actions:
+        lines.append(f"- {a}")
+    if not actions:
+        lines.append("- No findings")
+    lines.append("")
+    lines.append("[verdict]")
+    lines.append(verdict)
+    lines.append("")
+    lines.append("END CRUMB")
+    return "\n".join(lines)
+
+
+def cmd_scan(args: argparse.Namespace) -> None:
+    """Shadow AI scanner: discover unauthorized AI agents in a project directory."""
+    root = Path(args.path).resolve()
+    if not root.is_dir():
+        print(f"error: {root} is not a directory", file=sys.stderr)
+        sys.exit(1)
+
+    min_risk = RISK_ORDER.get(args.min_risk, 0)
+
+    # Collect all findings
+    findings: List[Dict] = []
+    findings.extend(_scan_config_files(root))
+    findings.extend(_scan_env_files(root))
+    findings.extend(_scan_dependencies(root))
+    findings.extend(_scan_mcp_configs(root))
+    findings.extend(_scan_code_imports(root))
+
+    # Filter by minimum risk level
+    findings = [f for f in findings if RISK_ORDER.get(f["risk_level"], 0) >= min_risk]
+
+    # Sort by risk level descending, then path
+    findings.sort(key=lambda f: (-RISK_ORDER.get(f["risk_level"], 0), f["path"]))
+
+    # Format output
+    fmt = args.format
+    if fmt == "json":
+        output = _format_scan_json(findings, root)
+    elif fmt == "crumb":
+        output = _format_scan_crumb(findings, root)
+    else:
+        output = _format_scan_text(findings, root)
+
+    print(output)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog='crumb',
@@ -2736,6 +3161,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     af = audit_sub.add_parser('feed', help='Live action feed.')
     af.add_argument('--agent', default=None)
+
+    # --- Shadow AI Scanner ---
+    scan_cmd = sub.add_parser('scan', help='Shadow AI scanner: discover unauthorized AI agents in a project.')
+    scan_cmd.add_argument('--path', default='.', help='Directory to scan (default: current directory).')
+    scan_cmd.add_argument('--format', '-f', choices=['text', 'json', 'crumb'], default='text',
+                          help='Output format (default: text).')
+    scan_cmd.add_argument('--min-risk', choices=['low', 'medium', 'high', 'critical'], default='low',
+                          help='Minimum risk level to report (default: low).')
+    scan_cmd.set_defaults(func=cmd_scan)
 
     return parser
 

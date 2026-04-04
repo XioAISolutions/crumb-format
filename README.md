@@ -114,13 +114,61 @@ crumb search "auth JWT" --dir ./crumbs/
 crumb init --all
 ```
 
-Full command reference: `crumb --help` (22 commands including export, import, templates, todos, watch mode, and more).
+Full command reference: `crumb --help` (25+ commands including export, import, templates, todos, watch mode, and more).
+
+## AgentAuth — Agent Identity & Governance
+
+Every AI agent in your org gets a passport. Every tool call gets policy-checked. Every action gets an audit trail. One kill switch revokes everything.
+
+```bash
+# Register an agent — issues a cryptographic passport
+crumb passport register my-claude-agent --framework langchain --owner alice \
+  --tools-allowed "read_*" "search" --tools-denied "delete_*" --ttl-days 90
+
+# Check what an agent is allowed to do
+crumb policy set my-claude-agent --allow "read_*" "search" --deny "delete_*"
+crumb policy test my-claude-agent read_file    # → ALLOW
+crumb policy test my-claude-agent delete_user  # → DENY
+
+# Kill switch — instantly revoke all access
+crumb passport revoke ap_abc12345
+
+# Audit trail — every action logged with risk scoring
+crumb audit export --format json --agent ap_abc12345
+crumb audit feed   # live action stream
+
+# Shadow AI scanner — discover unauthorized agents in your project
+crumb scan --path . --min-risk medium
+```
+
+**Python SDK** for embedding in your own tools:
+
+```python
+from agentauth import AgentPassport, ToolPolicy, CredentialBroker, protect
+
+# Register
+mgr = AgentPassport()
+result = mgr.register("my-agent", framework="crewai", owner="ops-team")
+
+# Policy gate
+policy = ToolPolicy()
+policy.set_policy("my-agent", tools_denied=["rm_rf", "drop_table"])
+
+# Decorator — enforces policy before any function runs
+@protect(agent_id=result["agent_id"], tool="database.query")
+def query_database(sql, _agentauth_credential=None):
+    return db.execute(sql)
+```
 
 ## Integrations
 
 **MCP Server** -- native tool integration with Claude Desktop, Cursor, Claude Code:
 ```bash
+# CRUMB tools (create, validate, search, etc.)
 claude mcp add crumb python3 /path/to/crumb-format/mcp/server.py
+
+# AgentAuth tools (passport, policy, audit — 13 tools)
+claude mcp add agentauth python3 /path/to/crumb-format/mcp/agentauth_server.py
 ```
 See [`mcp/README.md`](mcp/README.md) for setup.
 
@@ -140,7 +188,9 @@ repos:
 - [`SPEC.md`](SPEC.md) -- the format specification
 - [`DREAMING.md`](DREAMING.md) -- how memory consolidation works
 - [`examples/`](examples/) -- ready-to-paste `.crumb` files
-- [`cli/crumb.py`](cli/crumb.py) -- full CLI (22 commands)
+- [`cli/crumb.py`](cli/crumb.py) -- full CLI (25+ commands)
+- [`agentauth/`](agentauth/) -- AgentAuth SDK (passport, policy, credentials, audit)
+- [`mcp/`](mcp/) -- MCP servers for CRUMB and AgentAuth
 - [`validators/`](validators/) -- Python and Node reference validators
 - [`docs/HANDOFF_PATTERNS.md`](docs/HANDOFF_PATTERNS.md) -- practical handoff patterns
 
