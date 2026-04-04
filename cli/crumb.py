@@ -7,7 +7,9 @@ import difflib
 import glob
 import json
 import os
+import platform
 import re
+import base64
 import shutil
 import subprocess
 import sys
@@ -24,6 +26,8 @@ REQUIRED_SECTIONS = {
     "map": ["project", "modules"],
     "log": ["entries"],
     "todo": ["tasks"],
+    "passport": ["identity", "permissions"],
+    "audit": ["goal", "actions", "verdict"],
 }
 
 
@@ -447,6 +451,153 @@ source={source}
     write_text(args.output, crumb_text)
 
 
+# ── from-git ────────────────────────────────────────────────────────
+
+def _git_run(*cmd: str) -> str:
+    """Run a git command and return stripped stdout. Raises SystemExit on failure."""
+    result = subprocess.run(
+        ['git'] + list(cmd),
+        capture_output=True, text=True,
+    )
+    if result.returncode != 0:
+        return ''
+    return result.stdout.strip()
+
+
+def _detect_base_branch() -> str:
+    """Auto-detect the base branch: try main, then master, then fall back to None."""
+    for candidate in ('main', 'master'):
+        result = subprocess.run(
+            ['git', 'rev-parse', '--verify', candidate],
+            capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            return candidate
+    return ''
+
+
+def cmd_from_git(args: argparse.Namespace) -> None:
+    """Generate a task crumb from recent git activity."""
+    # Check that we are inside a git repo
+    check = subprocess.run(
+        ['git', 'rev-parse', '--is-inside-work-tree'],
+        capture_output=True, text=True,
+    )
+    if check.returncode != 0:
+        print("Error: not inside a git repository.", file=sys.stderr)
+        sys.exit(1)
+
+    commits = args.commits
+    base = args.branch
+    source = args.source or 'git'
+
+    # Current branch
+    current_branch = _git_run('branch', '--show-current') or 'HEAD'
+
+    # Auto-detect base branch if not provided
+    if not base:
+        base = _detect_base_branch()
+
+    # Recent commit messages (oneline)
+    recent_commits = _git_run('log', '--oneline', f'-{commits}')
+    commit_lines = [l for l in recent_commits.splitlines() if l.strip()] if recent_commits else []
+
+    # Latest commit subject for goal inference
+    latest_subject = _git_run('log', '-1', '--format=%s')
+
+    # Changed files and diff stat
+    if base:
+        changed_files = _git_run('diff', '--name-only', f'{base}...HEAD')
+        diff_stat = _git_run('diff', '--stat', f'{base}...HEAD')
+    else:
+        # No base branch found — compare against HEAD~N
+        changed_files = _git_run('diff', '--name-only', f'HEAD~{commits}', 'HEAD')
+        diff_stat = _git_run('diff', '--stat', f'HEAD~{commits}', 'HEAD')
+
+    changed_file_list = [f for f in changed_files.splitlines() if f.strip()] if changed_files else []
+
+    # --- Infer goal ---
+    if args.title:
+        goal = args.title
+    elif current_branch not in ('main', 'master', 'HEAD', ''):
+        # Feature branch — use branch name as goal hint
+        branch_label = current_branch.replace('-', ' ').replace('_', ' ').replace('/', ': ')
+        goal = f"Continue work on: {branch_label} (latest: {latest_subject})"
+    elif latest_subject:
+        goal = f"Continue from: {latest_subject}"
+    else:
+        goal = "Continue recent work in this repository."
+
+    title = args.title or goal[:80]
+
+    # --- Build context ---
+    context_lines = []
+    context_lines.append(f'- Branch: {current_branch}')
+
+    if base:
+        context_lines.append(f'- Base branch: {base}')
+
+    if commit_lines:
+        context_lines.append(f'- Recent commits ({len(commit_lines)}):')
+        for cl in commit_lines:
+            context_lines.append(f'  - {cl}')
+
+    if changed_file_list:
+        context_lines.append(f'- Changed files ({len(changed_file_list)}):')
+        for cf in changed_file_list[:20]:
+            context_lines.append(f'  - {cf}')
+        if len(changed_file_list) > 20:
+            context_lines.append(f'  - ... and {len(changed_file_list) - 20} more')
+
+    if diff_stat:
+        context_lines.append('- Diff summary:')
+        for line in diff_stat.splitlines()[-3:]:
+            context_lines.append(f'  - {line.strip()}')
+
+    if not context_lines:
+        context_lines = ['- No git context available.']
+
+    # --- Infer constraints ---
+    constraint_lines = []
+
+    # Check for failing tests by looking for common test failure indicators
+    test_result = subprocess.run(
+        ['git', 'log', '-1', '--format=%B'],
+        capture_output=True, text=True,
+    )
+    last_body = test_result.stdout.lower() if test_result.returncode == 0 else ''
+    if any(kw in last_body for kw in ('fixme', 'wip', 'todo', 'broken', 'failing')):
+        constraint_lines.append('- Warning: latest commit may contain incomplete work (WIP/TODO detected in message).')
+
+    # Check for merge conflicts
+    conflict_check = subprocess.run(
+        ['git', 'diff', '--check'],
+        capture_output=True, text=True,
+    )
+    if conflict_check.returncode != 0 and 'conflict' in conflict_check.stdout.lower():
+        constraint_lines.append('- Merge conflicts detected — resolve before continuing.')
+
+    if not constraint_lines:
+        constraint_lines.append('- Review before merging.')
+
+    # --- Render crumb ---
+    crumb_text = render_crumb(
+        headers={
+            'v': '1.1',
+            'kind': 'task',
+            'title': title,
+            'source': source,
+        },
+        sections={
+            'goal': [goal],
+            'context': context_lines,
+            'constraints': constraint_lines,
+        },
+    )
+
+    write_text(args.output, crumb_text)
+
+
 # ── validate ─────────────────────────────────────────────────────────
 
 def cmd_validate(args: argparse.Namespace) -> None:
@@ -501,6 +652,18 @@ def cmd_inspect(args: argparse.Namespace) -> None:
         print(f"\nMissing required: {', '.join(f'[{s}]' for s in sorted(missing))}")
     if extra:
         print(f"\nOptional sections: {', '.join(f'[{s}]' for s in sorted(extra))}")
+
+    # Token stats
+    tokens = estimate_tokens(text)
+    total_lines = sum(len([l for l in lines if l.strip()]) for lines in sections.values())
+    print(f"\nToken cost: ~{tokens} tokens ({len(text)} chars)")
+    print(f"Content density: {total_lines} lines across {len(sections)} sections")
+
+    # Info density score
+    all_content = ' '.join(' '.join(lines) for lines in sections.values())
+    kw = extract_keywords(all_content)
+    density = len(kw) / max(tokens, 1) * 100
+    print(f"Keyword density: {len(kw)} unique keywords ({density:.1f} per 100 tokens)")
 
 
 # ── append ───────────────────────────────────────────────────────────
@@ -612,6 +775,9 @@ def cmd_dream(args: argparse.Namespace) -> None:
     sections['dream'] = notes + ['']
 
     output = render_crumb(headers, sections)
+    original_tokens = estimate_tokens(text)
+    output_tokens = estimate_tokens(output)
+    ratio = ((original_tokens - output_tokens) / original_tokens * 100) if original_tokens > 0 else 0
     if args.dry_run:
         sys.stdout.write(output)
     else:
@@ -620,6 +786,7 @@ def cmd_dream(args: argparse.Namespace) -> None:
         print(f"  {len(existing)} existing + {len(raw)} raw → {len(merged)} consolidated")
         if pruned:
             print(f"  Pruned {pruned} entries to fit budget ({budget} tokens)")
+        print(f"  Compression: {original_tokens} → {output_tokens} tokens ({ratio:.0f}% reduction)")
         run_hook('post_dream', {'file': args.file, 'entries': str(len(merged))})
 
 
@@ -921,6 +1088,202 @@ def cmd_compact(args: argparse.Namespace) -> None:
     write_text(args.output, output)
     if args.output != '-':
         print(f"Compacted {args.file}: {original_tokens} → {compact_tokens} tokens ({reduction:.0f}% reduction)")
+
+
+# ── compress (TurboQuant-inspired) ──────────────────────────────────
+
+def _semantic_dedup(entries: list) -> list:
+    """Stage 1: Semantic deduplication — merge near-duplicate entries.
+
+    Like PolarQuant converting to polar coordinates for efficient representation,
+    this normalizes entries and merges those with high similarity.
+    """
+    if not entries:
+        return []
+
+    result = []
+    seen_norms = set()
+    for entry in entries:
+        norm = normalize_entry(entry)
+        if not norm:
+            continue
+        # Exact dedup
+        if norm in seen_norms:
+            continue
+        # Fuzzy dedup: check similarity against existing entries
+        is_dup = False
+        for existing_norm in seen_norms:
+            ratio = difflib.SequenceMatcher(None, norm, existing_norm).ratio()
+            if ratio > 0.8:  # 80% similar = duplicate
+                is_dup = True
+                break
+        if not is_dup:
+            seen_norms.add(norm)
+            result.append(entry)
+    return result
+
+
+def _signal_prune(entries: list, target_ratio: float = 0.5) -> tuple:
+    """Stage 2: Signal-scored pruning — keep high-signal, drop low-signal.
+
+    Like QJL reducing residual error to single bits, this reduces each entry
+    to a keep/drop decision based on information density scoring.
+    Returns (kept_entries, pruned_count).
+    """
+    if not entries or target_ratio >= 1.0:
+        return entries, 0
+
+    target_count = max(1, int(len(entries) * target_ratio))
+    if len(entries) <= target_count:
+        return entries, 0
+
+    # Build keyword index
+    entry_kw = {normalize_entry(e): extract_keywords(e) for e in entries}
+    # Score each entry
+    scored = [(score_entry(e, entries, entry_kw), i, e) for i, e in enumerate(entries)]
+    # Sort by score descending, keep top entries
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    kept = scored[:target_count]
+    # Restore original order
+    kept.sort(key=lambda x: x[1])
+
+    return [s[2] for s in kept], len(entries) - target_count
+
+
+def cmd_compress(args: argparse.Namespace) -> None:
+    """Two-stage TurboQuant-inspired context compression.
+
+    Stage 1 (PolarQuant-like): Semantic deduplication — normalize and merge
+    near-duplicate entries across all sections.
+    Stage 2 (QJL-like): Signal-scored pruning — score entries by information
+    density and drop lowest-signal entries to hit target ratio.
+    """
+    text = read_text(args.file)
+    parsed = parse_crumb(text)
+    headers = parsed['headers']
+    sections = parsed['sections']
+    kind = headers['kind']
+    original_tokens = estimate_tokens(text)
+
+    target = args.target  # target ratio: 0.0 = max compression, 1.0 = no compression
+
+    stats = {'stage1_removed': 0, 'stage2_removed': 0}
+
+    # Apply two-stage compression to content sections
+    for name, lines in sections.items():
+        entries = [l for l in lines if l.strip()]
+        if len(entries) < 2:
+            continue
+
+        # Stage 1: Semantic dedup
+        deduped = _semantic_dedup(entries)
+        stats['stage1_removed'] += len(entries) - len(deduped)
+
+        # Stage 2: Signal pruning (only if target < 1.0)
+        pruned, pruned_count = _signal_prune(deduped, target)
+        stats['stage2_removed'] += pruned_count
+
+        sections[name] = pruned + [''] if pruned else ['']
+
+    # Also strip optional headers
+    keep_headers = set(REQUIRED_HEADERS) | {'title'}
+    if kind == 'map':
+        keep_headers.add('project')
+    compact_headers = {k: v for k, v in headers.items() if k in keep_headers}
+
+    output = render_crumb(compact_headers, sections)
+    output_tokens = estimate_tokens(output)
+    ratio = ((original_tokens - output_tokens) / original_tokens * 100) if original_tokens > 0 else 0
+
+    write_text(args.output, output)
+
+    if args.output != '-':
+        print(f"TurboQuant compression on {args.file}:")
+        print(f"  Stage 1 (semantic dedup):  {stats['stage1_removed']} entries merged")
+        print(f"  Stage 2 (signal pruning):  {stats['stage2_removed']} low-signal entries dropped")
+        print(f"  Result: {original_tokens} → {output_tokens} tokens ({ratio:.0f}% reduction)")
+        multiplier = original_tokens / max(output_tokens, 1)
+        print(f"  Compression ratio: {multiplier:.1f}x")
+
+
+# ── bench ───────────────────────────────────────────────────────────
+
+def cmd_bench(args: argparse.Namespace) -> None:
+    """Benchmark a crumb's compression efficiency and information density."""
+    text = read_text(args.file)
+    parsed = parse_crumb(text)
+    headers = parsed['headers']
+    sections = parsed['sections']
+    kind = headers['kind']
+
+    tokens = estimate_tokens(text)
+    chars = len(text)
+    total_lines = sum(len([l for l in lines if l.strip()]) for lines in sections.values())
+
+    # Keyword analysis
+    all_content = ' '.join(' '.join(lines) for lines in sections.values())
+    keywords = extract_keywords(all_content)
+    keyword_density = len(keywords) / max(tokens, 1) * 100
+
+    # Compute compressibility: simulate two-stage compress
+    sim_sections = {}
+    original_entries = 0
+    after_stage1 = 0
+    after_stage2 = 0
+    for name, lines in sections.items():
+        entries = [l for l in lines if l.strip()]
+        original_entries += len(entries)
+        deduped = _semantic_dedup(entries)
+        after_stage1 += len(deduped)
+        pruned, _ = _signal_prune(deduped, 0.5)
+        after_stage2 += len(pruned)
+        sim_sections[name] = pruned + [''] if pruned else ['']
+
+    keep_h = set(REQUIRED_HEADERS) | {'title'}
+    if kind == 'map':
+        keep_h.add('project')
+    sim_headers = {k: v for k, v in headers.items() if k in keep_h}
+    compressed = render_crumb(sim_headers, sim_sections)
+    compressed_tokens = estimate_tokens(compressed)
+    max_ratio = tokens / max(compressed_tokens, 1)
+
+    # Score components
+    density_score = min(keyword_density * 5, 25)  # max 25
+    compression_score = min(max_ratio * 5, 25)  # max 25
+    structure_score = 25 if not (set(REQUIRED_SECTIONS.get(kind, [])) - set(sections.keys())) else 10
+    conciseness_score = min(25, max(0, 25 - (tokens - 100) / 40))  # smaller = better, max 25
+
+    total = density_score + compression_score + structure_score + conciseness_score
+
+    # Grade
+    if total >= 85:
+        grade = 'A'
+    elif total >= 70:
+        grade = 'B'
+    elif total >= 55:
+        grade = 'C'
+    elif total >= 40:
+        grade = 'D'
+    else:
+        grade = 'F'
+
+    print(f"CRUMB Bench — {args.file}")
+    print(f"{'=' * 50}")
+    print(f"  Kind:              {kind}")
+    print(f"  Token cost:        ~{tokens} tokens ({chars} chars)")
+    print(f"  Content:           {total_lines} lines, {len(sections)} sections")
+    print(f"  Unique keywords:   {len(keywords)}")
+    print(f"  Keyword density:   {keyword_density:.1f} per 100 tokens")
+    print(f"  Max compression:   {max_ratio:.1f}x ({tokens} → {compressed_tokens} tokens)")
+    print(f"  Dedup potential:   {original_entries} → {after_stage1} entries (stage 1)")
+    print(f"  Prune potential:   {after_stage1} → {after_stage2} entries (stage 2)")
+    print(f"{'=' * 50}")
+    print(f"  Density:           {density_score:.0f}/25")
+    print(f"  Compressibility:   {compression_score:.0f}/25")
+    print(f"  Structure:         {structure_score:.0f}/25")
+    print(f"  Conciseness:       {conciseness_score:.0f}/25")
+    print(f"{'=' * 50}")
+    print(f"  SCORE: {total:.0f}/100  Grade: {grade}")
 
 
 # ── diff ─────────────────────────────────────────────────────────────
@@ -1911,6 +2274,212 @@ def cmd_template(args: argparse.Namespace) -> None:
         print(f"Saved template '{name}' to {dest}")
 
 
+# ── share ───────────────────────────────────────────────────────────
+
+def cmd_share(args: argparse.Namespace) -> None:
+    """Share a .crumb file via GitHub Gist or as a data URI fallback."""
+    filepath = args.file
+    text = Path(filepath).read_text(encoding='utf-8')
+
+    # Extract title from the crumb for the gist description
+    title = ''
+    try:
+        parsed = parse_crumb(text)
+        title = parsed['headers'].get('title', '')
+    except ValueError:
+        pass
+
+    description = f"CRUMB handoff: {title} — https://github.com/XioAISolutions/crumb-format"
+
+    # Try gh gist create first
+    try:
+        result = subprocess.run(
+            ["gh", "gist", "create", "--public", "-d", description, filepath],
+            capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode == 0:
+            url = result.stdout.strip()
+            print(url)
+            return
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        pass
+
+    # Fallback: generate a self-contained data URI
+    html = f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>{title or 'CRUMB handoff'}</title>
+<style>
+body {{ font-family: monospace; max-width: 800px; margin: 2em auto; padding: 1em; background: #1e1e2e; color: #cdd6f4; }}
+pre {{ white-space: pre-wrap; word-wrap: break-word; background: #313244; padding: 1em; border-radius: 8px; }}
+footer {{ margin-top: 2em; color: #6c7086; text-align: center; }}
+</style></head><body>
+<h2>{title or 'CRUMB handoff'}</h2>
+<pre>{text}</pre>
+<footer>Get CRUMB: pip install crumb-format</footer>
+</body></html>"""
+    encoded = base64.b64encode(html.encode('utf-8')).decode('ascii')
+    data_uri = f"data:text/html;base64,{encoded}"
+    print(data_uri)
+
+
+# ── handoff ─────────────────────────────────────────────────────────
+
+def _copy_to_clipboard(text: str) -> bool:
+    """Copy text to clipboard using platform-appropriate tool. Returns True on success."""
+    system = platform.system()
+    cmds = []
+    if system == 'Darwin':
+        cmds = [['pbcopy']]
+    elif system == 'Linux':
+        # Check for WSL
+        if 'microsoft' in platform.uname().release.lower():
+            cmds = [['clip.exe']]
+        else:
+            cmds = [['xclip', '-selection', 'clipboard'], ['xsel', '--clipboard', '--input']]
+    elif system == 'Windows':
+        cmds = [['clip.exe']]
+
+    for cmd in cmds:
+        try:
+            proc = subprocess.run(cmd, input=text, text=True, capture_output=True, timeout=5)
+            if proc.returncode == 0:
+                return True
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            continue
+    return False
+
+
+def cmd_handoff(args: argparse.Namespace) -> None:
+    """Copy a .crumb file to clipboard for pasting into an AI tool."""
+    filepath = args.file
+    text = Path(filepath).read_text(encoding='utf-8')
+
+    target = args.target
+
+    messages = {
+        'claude': 'Crumb copied! Open Claude and paste.',
+        'cursor': 'Crumb copied! Open Cursor and paste into chat.',
+        'chatgpt': 'Crumb copied! Open ChatGPT and paste.',
+        'gemini': 'Crumb copied! Open Gemini and paste.',
+    }
+
+    if _copy_to_clipboard(text):
+        if target:
+            print(messages.get(target, f'Crumb copied! Open {target} and paste.'))
+        else:
+            print('Crumb copied to clipboard! Paste into any AI tool.')
+    else:
+        print(text)
+        print('\n---\nCopy the above and paste into your AI tool', file=sys.stderr)
+
+
+# ── Agent Passport commands ──────────────────────────────────────────
+
+
+def cmd_passport(args: argparse.Namespace) -> None:
+    """Agent identity management: register, inspect, revoke, list."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from agentauth import AgentPassport
+
+    action = args.passport_action
+    mgr = AgentPassport()
+
+    if action == 'register':
+        result = mgr.register(
+            name=args.name,
+            framework=args.framework,
+            owner=args.owner,
+            tools_allowed=args.tools_allowed if args.tools_allowed else None,
+            tools_denied=args.tools_denied if args.tools_denied else None,
+            ttl_days=args.ttl_days,
+        )
+        print(f"Registered agent '{result['name']}' — id: {result['agent_id']}")
+        print(f"Passport saved to: {result['passport_path']}")
+        if args.output:
+            data = mgr.inspect(result['agent_id'])
+            if data:
+                content = render_crumb(data['headers'], data['sections'])
+                write_text(args.output, content)
+
+    elif action == 'inspect':
+        data = mgr.inspect(args.agent_id)
+        if data is None:
+            print(f"Passport not found: {args.agent_id}", file=sys.stderr)
+            sys.exit(1)
+        print(render_crumb(data['headers'], data['sections']))
+
+    elif action == 'revoke':
+        ok = mgr.revoke(args.agent_id)
+        if ok:
+            print(f"Passport {args.agent_id} revoked.")
+        else:
+            print(f"Could not revoke {args.agent_id} (not found or already revoked).",
+                  file=sys.stderr)
+            sys.exit(1)
+
+    elif action == 'list':
+        agents = mgr.list_all(status_filter=args.status)
+        if not agents:
+            print("No agents found.")
+            return
+        print(f"{'ID':<16} {'Name':<30} {'Status':<10} {'Expires'}")
+        print("-" * 76)
+        for a in agents:
+            print(f"{a['agent_id']:<16} {a['name']:<30} {a['status']:<10} {a.get('expires', 'n/a')}")
+
+
+def cmd_policy(args: argparse.Namespace) -> None:
+    """Tool authorization policy: set, test."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from agentauth import ToolPolicy
+
+    action = args.policy_action
+    policy = ToolPolicy()
+
+    if action == 'set':
+        result = policy.set_policy(
+            agent_name=args.agent_name,
+            tools_allowed=args.allow if args.allow else None,
+            tools_denied=args.deny if args.deny else None,
+            max_actions_per_session=args.max_actions,
+        )
+        print(f"Policy updated for {args.agent_name}.")
+
+    elif action == 'test':
+        result = policy.test(agent_name=args.agent_name, tool=args.tool)
+        if result['allowed']:
+            print(f"\033[32mALLOW\033[0m {args.tool} — {result['reason']}")
+        else:
+            print(f"\033[31mDENY\033[0m {args.tool} — {result['reason']}")
+
+
+def cmd_audit(args: argparse.Namespace) -> None:
+    """Audit trail management: export, feed."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from agentauth import AuditLogger
+
+    action = args.audit_action
+    logger = AuditLogger()
+
+    if action == 'export':
+        evidence = logger.export_evidence(
+            agent_id=args.agent,
+            since=args.since,
+            output_format=args.format,
+        )
+        if args.output and args.output != '-':
+            write_text(args.output, evidence)
+        else:
+            print(evidence)
+
+    elif action == 'feed':
+        lines = logger.feed(agent_id=args.agent)
+        if not lines:
+            print("No audit entries found.")
+            return
+        for line in lines:
+            print(line)
+
+
 # ── argument parser ──────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1949,6 +2518,15 @@ def build_parser() -> argparse.ArgumentParser:
                            help='Output kind: task (default) or mem (extracts decisions).')
     from_chat.add_argument('--constraints', '-c', nargs='*', help='Constraints as separate arguments.')
     from_chat.set_defaults(func=cmd_from_chat)
+
+    # from-git
+    from_git = sub.add_parser('from-git', help='Generate a task crumb from recent git activity.')
+    from_git.add_argument('--commits', type=int, default=5, help='Number of recent commits to include (default: 5).')
+    from_git.add_argument('--branch', help='Base branch to compare against (default: auto-detect main/master).')
+    from_git.add_argument('--title', help='Override the auto-generated title.')
+    from_git.add_argument('--source', help='Override source label (default: git).')
+    from_git.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
+    from_git.set_defaults(func=cmd_from_git)
 
     # validate
     validate = sub.add_parser('validate', help='Validate one or more .crumb files.')
@@ -2081,6 +2659,83 @@ def build_parser() -> argparse.ArgumentParser:
     template_cmd.add_argument('source_file', nargs='?', help='Source .crumb file (for add).')
     template_cmd.add_argument('--output', '-o', default='-', help='Output file (for use).')
     template_cmd.set_defaults(func=cmd_template)
+
+    # share
+    # compress
+    compress_cmd = sub.add_parser('compress', help='TurboQuant-inspired two-stage context compression.')
+    compress_cmd.add_argument('file', help='.crumb file to compress.')
+    compress_cmd.add_argument('-o', '--output', default='-', help='Output path (default: stdout).')
+    compress_cmd.add_argument('--target', type=float, default=0.5,
+                              help='Target retention ratio 0.0-1.0 (default: 0.5 = keep top 50%%).')
+    compress_cmd.set_defaults(func=cmd_compress)
+
+    # bench
+    bench_cmd = sub.add_parser('bench', help='Benchmark compression efficiency and information density.')
+    bench_cmd.add_argument('file', help='.crumb file to benchmark.')
+    bench_cmd.set_defaults(func=cmd_bench)
+
+    share_cmd = sub.add_parser('share', help='Share a .crumb file via GitHub Gist or data URI.')
+    share_cmd.add_argument('file', help='.crumb file to share.')
+    share_cmd.set_defaults(func=cmd_share)
+
+    # handoff
+    handoff_cmd = sub.add_parser('handoff', help='Copy a .crumb to clipboard for pasting into an AI tool.')
+    handoff_cmd.add_argument('file', help='.crumb file to hand off.')
+    handoff_cmd.add_argument('--target', choices=['claude', 'cursor', 'chatgpt', 'gemini'],
+                             help='Target AI tool (optional).')
+    handoff_cmd.set_defaults(func=cmd_handoff)
+
+    # --- Agent Passport ---
+    passport_cmd = sub.add_parser('passport', help='Agent identity management.')
+    passport_sub = passport_cmd.add_subparsers(dest='passport_action', required=True)
+
+    reg = passport_sub.add_parser('register', help='Register an agent, issue passport.')
+    reg.add_argument('name', help='Agent name.')
+    reg.add_argument('--framework', default='unknown')
+    reg.add_argument('--owner', default='')
+    reg.add_argument('--tools-allowed', nargs='*', default=[])
+    reg.add_argument('--tools-denied', nargs='*', default=[])
+    reg.add_argument('--ttl-days', type=int, default=90)
+    reg.add_argument('-o', '--output', default=None)
+    passport_cmd.set_defaults(func=cmd_passport)
+
+    insp = passport_sub.add_parser('inspect', help='View agent passport.')
+    insp.add_argument('agent_id', help='Agent ID or name.')
+
+    rev = passport_sub.add_parser('revoke', help='Revoke passport (kill switch).')
+    rev.add_argument('agent_id', help='Agent ID to revoke.')
+
+    lst = passport_sub.add_parser('list', help='List registered agents.')
+    lst.add_argument('--status', choices=['active', 'revoked', 'expired', 'all'], default='all')
+
+    # --- Policy ---
+    policy_cmd = sub.add_parser('policy', help='Tool authorization policy.')
+    policy_sub = policy_cmd.add_subparsers(dest='policy_action', required=True)
+
+    ps = policy_sub.add_parser('set', help='Set tool authorization rules.')
+    ps.add_argument('agent_name')
+    ps.add_argument('--allow', nargs='*', default=[])
+    ps.add_argument('--deny', nargs='*', default=[])
+    ps.add_argument('--max-actions', type=int, default=1000)
+    policy_cmd.set_defaults(func=cmd_policy)
+
+    pt = policy_sub.add_parser('test', help='Simulate action against policy.')
+    pt.add_argument('agent_name')
+    pt.add_argument('tool')
+
+    # --- Audit ---
+    audit_cmd = sub.add_parser('audit', help='Audit trail management.')
+    audit_sub = audit_cmd.add_subparsers(dest='audit_action', required=True)
+
+    ae = audit_sub.add_parser('export', help='Export audit evidence pack.')
+    ae.add_argument('--agent', default=None)
+    ae.add_argument('--since', default=None)
+    ae.add_argument('-f', '--format', choices=['crumb', 'json', 'csv'], default='crumb')
+    ae.add_argument('-o', '--output', default='-')
+    audit_cmd.set_defaults(func=cmd_audit)
+
+    af = audit_sub.add_parser('feed', help='Live action feed.')
+    af.add_argument('--agent', default=None)
 
     return parser
 
