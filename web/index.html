@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>crumb.new — Convert any AI chat to a structured handoff</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #181a20;
+    --surface2: #1e2028;
+    --border: #2a2d38;
+    --text: #e4e4e7;
+    --text-dim: #9294a0;
+    --accent: #f97316;
+    --accent-dim: rgba(249, 115, 22, 0.12);
+    --accent-hover: #fb923c;
+    --radius: 10px;
+    --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    text-align: center;
+    padding: 2.5rem 1rem 1.5rem;
+  }
+
+  header h1 {
+    font-size: 1.75rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  header h1 span { color: var(--accent); }
+
+  header p {
+    color: var(--text-dim);
+    margin-top: 0.4rem;
+    font-size: 0.95rem;
+  }
+
+  main {
+    flex: 1;
+    max-width: 1100px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 1.25rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .toolbar label {
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+
+  select {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.9rem;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  select:focus { border-color: var(--accent); }
+
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    flex: 1;
+    min-height: 0;
+  }
+
+  @media (max-width: 740px) {
+    .panels { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .panel-label {
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  textarea {
+    flex: 1;
+    min-height: 340px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    line-height: 1.55;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  textarea:focus { border-color: var(--accent); }
+
+  textarea::placeholder { color: #555869; }
+
+  #output { background: var(--surface2); cursor: default; }
+
+  .actions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1.1rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+  }
+
+  button:active { transform: scale(0.97); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .btn-primary:hover { background: var(--accent-hover); }
+
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover { background: var(--surface2); }
+
+  .btn-convert {
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.95rem;
+    padding: 0.65rem 1.6rem;
+    border-radius: 8px;
+  }
+
+  .btn-convert:hover { background: var(--accent-hover); }
+
+  .convert-row {
+    display: flex;
+    justify-content: center;
+  }
+
+  .toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--accent);
+    color: #fff;
+    padding: 0.55rem 1.2rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s;
+    z-index: 100;
+  }
+
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  footer {
+    text-align: center;
+    padding: 1.5rem 1rem;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    border-top: 1px solid var(--border);
+  }
+
+  footer a {
+    color: var(--accent);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  footer a:hover { text-decoration: underline; }
+
+  footer code {
+    background: var(--accent-dim);
+    color: var(--accent);
+    padding: 0.15em 0.45em;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 0.85em;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>crumb</span>.new</h1>
+  <p>Convert any AI chat to a structured handoff</p>
+</header>
+
+<main>
+  <div class="toolbar">
+    <label for="kind-select">Output kind</label>
+    <select id="kind-select">
+      <option value="task" selected>task &mdash; handoff with goals &amp; constraints</option>
+      <option value="mem">mem &mdash; consolidated memory / decisions</option>
+      <option value="map">map &mdash; project map / architecture</option>
+    </select>
+  </div>
+
+  <div class="panels">
+    <div class="panel">
+      <span class="panel-label">Input</span>
+      <textarea id="input" placeholder="Paste any AI chat here&#10;&#10;Supports ChatGPT, Claude, Gemini, or any text conversation..."></textarea>
+    </div>
+    <div class="panel">
+      <span class="panel-label">Output (.crumb)</span>
+      <textarea id="output" readonly placeholder="Your structured .crumb will appear here..."></textarea>
+      <div class="actions">
+        <button class="btn-primary" id="btn-copy" onclick="copyOutput()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy to clipboard
+        </button>
+        <button class="btn-secondary" id="btn-download" onclick="downloadCrumb()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Download .crumb
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="convert-row">
+    <button class="btn-convert" onclick="convert()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      Convert to .crumb
+    </button>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<footer>
+  Powered by <a href="https://github.com/XioAISolutions/crumb-format">CRUMB</a> &mdash;
+  <code>pip install crumb-format</code>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  // --- Utility helpers ---
+
+  function showToast(msg) {
+    var t = document.getElementById("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(function () { t.classList.remove("show"); }, 2000);
+  }
+
+  function timestamp() {
+    return new Date().toISOString().slice(0, 19).replace("T", " ");
+  }
+
+  function slugify(text) {
+    return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 50);
+  }
+
+  // --- Extraction helpers ---
+
+  function extractCodeBlocks(text) {
+    var blocks = [];
+    var re = /```(\w*)\n([\s\S]*?)```/g;
+    var m;
+    while ((m = re.exec(text)) !== null) {
+      var lang = m[1] || "text";
+      var code = m[2].trim();
+      if (code.length > 0) {
+        blocks.push({ lang: lang, code: code });
+      }
+    }
+    return blocks;
+  }
+
+  function extractFileRefs(text) {
+    var refs = [];
+    var patterns = [
+      /(?:^|\s)([\w./-]+\.(py|js|ts|tsx|jsx|html|css|json|yaml|yml|toml|rs|go|java|c|cpp|h|rb|sh|sql|md))\b/gm,
+      /(?:^|\s)([\w/-]+\/[\w.-]+)/gm
+    ];
+    var seen = {};
+    for (var i = 0; i < patterns.length; i++) {
+      var m;
+      while ((m = patterns[i].exec(text)) !== null) {
+        var ref = m[1].trim();
+        if (!seen[ref] && ref.length > 2 && ref.length < 80) {
+          seen[ref] = true;
+          refs.push(ref);
+        }
+      }
+    }
+    return refs;
+  }
+
+  var DECISION_PATTERNS = /decided to|going with|let's use|chose|settled on|switched to|will use|agreed on/i;
+
+  function extractDecisions(text) {
+    var lines = text.split("\n");
+    var decisions = [];
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (line.length > 5 && DECISION_PATTERNS.test(line)) {
+        // Clean up markdown bullets / prefixes
+        var clean = line.replace(/^[-*>]+\s*/, "").replace(/^#+\s*/, "");
+        if (clean.length > 0) decisions.push(clean);
+      }
+    }
+    return decisions;
+  }
+
+  var ACTION_PATTERNS = /\bTODO\b|next step|should\b|need to|fix\b|implement\b|\badd\b/i;
+
+  function extractActionItems(text) {
+    var lines = text.split("\n");
+    var items = [];
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (line.length > 5 && ACTION_PATTERNS.test(line)) {
+        var clean = line.replace(/^[-*>]+\s*/, "").replace(/^#+\s*/, "").replace(/^\d+\.\s*/, "");
+        if (clean.length > 0) items.push(clean);
+      }
+    }
+    return items;
+  }
+
+  function autoTitle(text) {
+    var lines = text.split("\n");
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim().replace(/^#+\s*/, "").replace(/^[-*>]+\s*/, "");
+      if (line.length > 8 && line.length < 120) {
+        return line.slice(0, 80);
+      }
+    }
+    return "Chat handoff";
+  }
+
+  function lastLines(text, n) {
+    var lines = text.split("\n").map(function (l) { return l.trim(); }).filter(function (l) { return l.length > 0; });
+    return lines.slice(-n);
+  }
+
+  // --- CRUMB generators per kind ---
+
+  function generateTask(text) {
+    var title = autoTitle(text);
+    var codeBlocks = extractCodeBlocks(text);
+    var decisions = extractDecisions(text);
+    var actions = extractActionItems(text);
+
+    var out = "";
+    out += "[crumb]\n";
+    out += "v = 1.1\n";
+    out += "kind = task\n";
+    out += 'title = "' + title.replace(/"/g, '\\"') + '"\n';
+    out += "source = crumb.new\n";
+    out += "created = " + timestamp() + "\n";
+    out += "\n";
+
+    // Context
+    out += "[context]\n";
+    if (decisions.length > 0) {
+      out += "# Key decisions from chat\n";
+      for (var i = 0; i < decisions.length; i++) {
+        out += "- " + decisions[i] + "\n";
+      }
+      out += "\n";
+    }
+    if (codeBlocks.length > 0) {
+      out += "# Code referenced in chat\n";
+      for (var j = 0; j < codeBlocks.length; j++) {
+        out += "```" + codeBlocks[j].lang + "\n" + codeBlocks[j].code + "\n```\n";
+      }
+      out += "\n";
+    }
+    if (decisions.length === 0 && codeBlocks.length === 0) {
+      out += "# Conversation context\n";
+      var preview = text.trim().split("\n").slice(0, 6).join("\n");
+      out += preview + "\n\n";
+    }
+
+    // Goal
+    out += "[goal]\n";
+    if (actions.length > 0) {
+      for (var k = 0; k < Math.min(actions.length, 12); k++) {
+        out += "- " + actions[k] + "\n";
+      }
+    } else {
+      out += "# Continue from the conversation above\n";
+      var tail = lastLines(text, 4);
+      for (var l = 0; l < tail.length; l++) {
+        out += "- " + tail[l] + "\n";
+      }
+    }
+    out += "\n";
+
+    // Constraints
+    out += "[constraints]\n";
+    out += "- Maintain consistency with decisions listed in [context]\n";
+    out += "- Preserve existing code patterns and conventions\n";
+    out += "- Ask for clarification if requirements are ambiguous\n";
+
+    return out;
+  }
+
+  function generateMem(text) {
+    var title = autoTitle(text);
+    var decisions = extractDecisions(text);
+    var codeBlocks = extractCodeBlocks(text);
+
+    var out = "";
+    out += "[crumb]\n";
+    out += "v = 1.1\n";
+    out += "kind = mem\n";
+    out += 'title = "' + title.replace(/"/g, '\\"') + '"\n';
+    out += "source = crumb.new\n";
+    out += "created = " + timestamp() + "\n";
+    out += "\n";
+
+    out += "[consolidated]\n";
+    if (decisions.length > 0) {
+      out += "# Decisions\n";
+      for (var i = 0; i < decisions.length; i++) {
+        out += "- " + decisions[i] + "\n";
+      }
+      out += "\n";
+    }
+    if (codeBlocks.length > 0) {
+      out += "# Code artifacts\n";
+      for (var j = 0; j < codeBlocks.length; j++) {
+        out += "- [" + codeBlocks[j].lang + "] " + codeBlocks[j].code.split("\n")[0].slice(0, 80) + "\n";
+      }
+      out += "\n";
+    }
+    if (decisions.length === 0 && codeBlocks.length === 0) {
+      out += "# Key points from conversation\n";
+      var tail = lastLines(text, 6);
+      for (var k = 0; k < tail.length; k++) {
+        out += "- " + tail[k] + "\n";
+      }
+      out += "\n";
+    }
+
+    out += "[context]\n";
+    out += "# Source conversation summary\n";
+    var lines = text.trim().split("\n").filter(function (l) { return l.trim().length > 0; });
+    out += "Total lines in source chat: " + lines.length + "\n";
+    out += "Code blocks found: " + codeBlocks.length + "\n";
+    out += "Decisions extracted: " + decisions.length + "\n";
+
+    return out;
+  }
+
+  function generateMap(text) {
+    var title = autoTitle(text);
+    var codeBlocks = extractCodeBlocks(text);
+    var fileRefs = extractFileRefs(text);
+
+    var out = "";
+    out += "[crumb]\n";
+    out += "v = 1.1\n";
+    out += "kind = map\n";
+    out += 'title = "' + title.replace(/"/g, '\\"') + '"\n';
+    out += "source = crumb.new\n";
+    out += "created = " + timestamp() + "\n";
+    out += "\n";
+
+    out += "[project]\n";
+    // Use the first few meaningful lines as project description
+    var descLines = text.trim().split("\n").filter(function (l) {
+      var t = l.trim();
+      return t.length > 10 && !t.startsWith("```");
+    }).slice(0, 4);
+    if (descLines.length > 0) {
+      out += "# Project description (from conversation)\n";
+      for (var i = 0; i < descLines.length; i++) {
+        out += descLines[i].trim().replace(/^[-*>]+\s*/, "").replace(/^#+\s*/, "") + "\n";
+      }
+    } else {
+      out += "# Project extracted from chat\n";
+    }
+    out += "\n";
+
+    out += "[modules]\n";
+    if (fileRefs.length > 0) {
+      out += "# Files and paths referenced\n";
+      for (var j = 0; j < fileRefs.length; j++) {
+        out += "- " + fileRefs[j] + "\n";
+      }
+      out += "\n";
+    }
+    if (codeBlocks.length > 0) {
+      out += "# Code modules from conversation\n";
+      for (var k = 0; k < codeBlocks.length; k++) {
+        var firstLine = codeBlocks[k].code.split("\n")[0].slice(0, 80);
+        out += "- [" + codeBlocks[k].lang + "] " + firstLine + "\n";
+      }
+      out += "\n";
+    }
+    if (fileRefs.length === 0 && codeBlocks.length === 0) {
+      out += "# No explicit modules detected — add them manually\n";
+      out += "- module_a: description\n";
+      out += "- module_b: description\n";
+    }
+
+    return out;
+  }
+
+  // --- Public API ---
+
+  window.convert = function () {
+    var input = document.getElementById("input").value.trim();
+    if (!input) {
+      showToast("Paste a chat first!");
+      return;
+    }
+    var kind = document.getElementById("kind-select").value;
+    var result;
+    switch (kind) {
+      case "mem": result = generateMem(input); break;
+      case "map": result = generateMap(input); break;
+      default:    result = generateTask(input); break;
+    }
+    document.getElementById("output").value = result;
+    showToast("Converted to ." + kind + " crumb!");
+  };
+
+  window.copyOutput = function () {
+    var output = document.getElementById("output").value;
+    if (!output) { showToast("Nothing to copy"); return; }
+    navigator.clipboard.writeText(output).then(function () {
+      showToast("Copied to clipboard!");
+    }).catch(function () {
+      // Fallback
+      var ta = document.getElementById("output");
+      ta.select();
+      document.execCommand("copy");
+      showToast("Copied to clipboard!");
+    });
+  };
+
+  window.downloadCrumb = function () {
+    var output = document.getElementById("output").value;
+    if (!output) { showToast("Convert a chat first"); return; }
+    var kind = document.getElementById("kind-select").value;
+    var blob = new Blob([output], { type: "text/plain" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "handoff." + kind + ".crumb";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast("Downloaded!");
+  };
+
+  // Auto-convert on kind change if there's already input
+  document.getElementById("kind-select").addEventListener("change", function () {
+    if (document.getElementById("input").value.trim()) {
+      window.convert();
+    }
+  });
+})();
+</script>
+</body>
+</html>

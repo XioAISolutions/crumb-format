@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Dark rounded background -->
+  <rect x="0" y="0" width="128" height="128" rx="16" ry="16" fill="#1a1a2e"/>
+  <!-- Small trailing crumb -->
+  <circle cx="18" cy="64" r="10" fill="#d06010"/>
+  <!-- Main crumb (circle) -->
+  <circle cx="54" cy="64" r="36" fill="#f97316"/>
+  <!-- Arrow shaft -->
+  <rect x="72" y="60" width="30" height="8" fill="#f97316"/>
+  <!-- Arrow head -->
+  <polygon points="105,64 89,52 89,76" fill="#f97316"/>
+</svg>
