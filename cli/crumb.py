@@ -1486,6 +1486,184 @@ CHATGPT_RULES_SNIPPET = dedent("""\
     Other kinds: mem (preferences), map (codebase), log (transcript), todo (tasks).
 """)
 
+GEMINI_SNIPPET = dedent("""\
+    {
+      "crumb_handoffs": {
+        "description": "This project uses CRUMB (https://github.com/XioAISolutions/crumb-format) for structured AI handoffs.",
+        "instructions": [
+          "When the user says 'crumb it', generate a CRUMB block summarizing the current task state.",
+          "When you receive a BEGIN CRUMB / END CRUMB block, parse it and act on it directly.",
+          "Always set source=gemini.agent and include the url header.",
+          "CRUMB kinds: task (goal/context/constraints), mem (consolidated preferences), map (project/modules), log (entries), todo (tasks).",
+          "AgentAuth: If a kind=passport crumb is present, respect its [identity] and [permissions] sections to enforce agent authorization boundaries."
+        ],
+        "format_example": "BEGIN CRUMB\\nv=1.1\\nkind=task\\ntitle=<short description>\\nsource=gemini.agent\\nurl=https://github.com/XioAISolutions/crumb-format\\n---\\n[goal]\\n<what needs to happen>\\n[context]\\n<key facts>\\n[constraints]\\n<what must not change>\\nEND CRUMB"
+      }
+    }
+""")
+
+COPILOT_SNIPPET = dedent("""\
+    ## CRUMB handoffs
+
+    This project uses [CRUMB](https://github.com/XioAISolutions/crumb-format)
+    for structured AI handoffs between tools.
+
+    - When the user says "crumb it", generate a structured CRUMB handoff block
+      summarizing the current goal, context, and constraints.
+    - When you receive a BEGIN CRUMB / END CRUMB block, parse it and act on it
+      directly without asking the user to re-explain.
+    - Always set `source=copilot.agent` and include the `url` header.
+    - CRUMB kinds: task, mem, map, log, todo.
+    - AgentAuth passport: If a kind=passport crumb exists, respect its [identity]
+      and [permissions] sections to enforce agent authorization boundaries.
+
+    Format:
+
+        BEGIN CRUMB
+        v=1.1
+        kind=task
+        title=<short description>
+        source=copilot.agent
+        url=https://github.com/XioAISolutions/crumb-format
+        ---
+        [goal]
+        <what needs to happen next>
+        [context]
+        <key facts, decisions, current state>
+        [constraints]
+        <what must not change>
+        END CRUMB
+""")
+
+CODY_SNIPPET = dedent("""\
+    {
+      "customInstructions": {
+        "crumb_handoffs": "This project uses CRUMB (https://github.com/XioAISolutions/crumb-format) for structured AI handoffs. When the user says 'crumb it', generate a CRUMB block: BEGIN CRUMB / v=1.1 / kind=task / title=<desc> / source=cody.agent / url=https://github.com/XioAISolutions/crumb-format / --- / [goal] / [context] / [constraints] / END CRUMB. When you receive a BEGIN CRUMB / END CRUMB block, parse it and act on it directly. Kinds: task, mem, map, log, todo. AgentAuth: respect kind=passport crumbs with [identity] and [permissions] for agent authorization."
+      }
+    }
+""")
+
+CONTINUE_DEV_SNIPPET = dedent("""\
+    {
+      "systemMessage": "This project uses CRUMB (https://github.com/XioAISolutions/crumb-format) for structured AI handoffs. When the user says 'crumb it', generate a CRUMB block summarizing current work: BEGIN CRUMB, v=1.1, kind=task, title=<desc>, source=continue.agent, url=https://github.com/XioAISolutions/crumb-format, ---, [goal], [context], [constraints], END CRUMB. When you receive a BEGIN CRUMB / END CRUMB block, parse and act on it directly. Other kinds: mem (preferences), map (codebase), log (transcript), todo (tasks). AgentAuth: if a kind=passport crumb is present, respect its [identity] and [permissions] sections to enforce agent authorization boundaries."
+    }
+""")
+
+AIDER_SNIPPET = dedent("""\
+    # CRUMB handoffs
+    # This project uses CRUMB (https://github.com/XioAISolutions/crumb-format)
+    # for structured AI handoffs between tools.
+    #
+    # Conventions:
+    # - When the user says "crumb it", generate a CRUMB block summarizing
+    #   current task state (goal, context, constraints).
+    # - When you receive a BEGIN CRUMB / END CRUMB block, parse it as a
+    #   structured handoff and act on it directly.
+    # - Always set source=aider.agent and include the url header.
+    # - CRUMB kinds: task, mem, map, log, todo.
+    # - AgentAuth: respect kind=passport crumbs with [identity] and
+    #   [permissions] for agent authorization boundaries.
+    #
+    # CRUMB format:
+    #   BEGIN CRUMB
+    #   v=1.1
+    #   kind=task
+    #   title=<short description>
+    #   source=aider.agent
+    #   url=https://github.com/XioAISolutions/crumb-format
+    #   ---
+    #   [goal]       <what needs to happen next>
+    #   [context]    <key facts, decisions, current state>
+    #   [constraints] <what must not change>
+    #   END CRUMB
+""")
+
+REPLIT_SNIPPET = dedent("""\
+    # CRUMB handoffs
+    # This project uses CRUMB (https://github.com/XioAISolutions/crumb-format)
+    # for structured AI handoffs between AI tools.
+    #
+    # When the user says "crumb it", generate a CRUMB block:
+    #   BEGIN CRUMB
+    #   v=1.1
+    #   kind=task
+    #   title=<short description>
+    #   source=replit.agent
+    #   url=https://github.com/XioAISolutions/crumb-format
+    #   ---
+    #   [goal]       <what needs to happen next>
+    #   [context]    <key facts, decisions, current state>
+    #   [constraints] <what must not change>
+    #   END CRUMB
+    #
+    # When you receive a BEGIN CRUMB / END CRUMB block, parse it and act on
+    # it directly without asking the user to re-explain.
+    # Kinds: task, mem, map, log, todo.
+    # AgentAuth: respect kind=passport crumbs with [identity] and [permissions].
+""")
+
+DEVIN_SNIPPET = dedent("""\
+    ## CRUMB handoffs
+
+    This project uses [CRUMB](https://github.com/XioAISolutions/crumb-format)
+    for structured AI handoffs.
+
+    - When asked to "crumb it", generate a CRUMB block summarizing the current
+      goal, context, and constraints. Always set `source=devin.agent`.
+    - When you receive a BEGIN CRUMB / END CRUMB block, parse it and act on it
+      directly — do not ask the user to re-explain what is in the crumb.
+    - Store .crumb files in the `crumbs/` directory.
+    - CRUMB kinds: task (goal/context/constraints), mem (consolidated preferences),
+      map (project/modules), log (timestamped entries), todo (checkbox tasks).
+    - AgentAuth passport: If a kind=passport crumb exists, respect its [identity]
+      and [permissions] sections to enforce agent authorization boundaries.
+
+    Format:
+
+        BEGIN CRUMB
+        v=1.1
+        kind=task
+        title=<short description>
+        source=devin.agent
+        url=https://github.com/XioAISolutions/crumb-format
+        ---
+        [goal]
+        <what needs to happen next>
+        [context]
+        <key facts, decisions, current state>
+        [constraints]
+        <what must not change>
+        END CRUMB
+""")
+
+BOLT_SNIPPET = dedent("""\
+    {
+      "instructions": {
+        "crumb_handoffs": {
+          "description": "This project uses CRUMB (https://github.com/XioAISolutions/crumb-format) for structured AI handoffs.",
+          "on_crumb_it": "Generate a CRUMB block: BEGIN CRUMB / v=1.1 / kind=task / title=<desc> / source=bolt.agent / url=https://github.com/XioAISolutions/crumb-format / --- / [goal] / [context] / [constraints] / END CRUMB",
+          "on_receive": "When you receive a BEGIN CRUMB / END CRUMB block, parse it and act on it directly.",
+          "kinds": "task (goal/context/constraints), mem (preferences), map (project/modules), log (entries), todo (tasks)",
+          "agent_auth": "Respect kind=passport crumbs with [identity] and [permissions] for agent authorization."
+        }
+      }
+    }
+""")
+
+LOVABLE_SNIPPET = dedent("""\
+    {
+      "instructions": {
+        "crumb_handoffs": {
+          "description": "This project uses CRUMB (https://github.com/XioAISolutions/crumb-format) for structured AI handoffs.",
+          "on_crumb_it": "Generate a CRUMB block: BEGIN CRUMB / v=1.1 / kind=task / title=<desc> / source=lovable.agent / url=https://github.com/XioAISolutions/crumb-format / --- / [goal] / [context] / [constraints] / END CRUMB",
+          "on_receive": "When you receive a BEGIN CRUMB / END CRUMB block, parse it and act on it directly.",
+          "kinds": "task (goal/context/constraints), mem (preferences), map (project/modules), log (entries), todo (tasks)",
+          "agent_auth": "Respect kind=passport crumbs with [identity] and [permissions] for agent authorization."
+        }
+      }
+    }
+""")
+
 
 def cmd_init(args: argparse.Namespace) -> None:
     """Initialize CRUMB in a project: generate map crumb and integration snippets."""
@@ -1555,6 +1733,45 @@ def cmd_init(args: argparse.Namespace) -> None:
         print(f"\n--- ChatGPT Custom Instructions (paste into Settings > Custom Instructions) ---\n")
         print(CHATGPT_RULES_SNIPPET)
 
+    if args.gemini:
+        gemini_dir = project_dir / '.gemini'
+        gemini_dir.mkdir(exist_ok=True)
+        _write_or_append(gemini_dir / 'settings.json', GEMINI_SNIPPET)
+
+    if args.copilot:
+        github_dir = project_dir / '.github'
+        github_dir.mkdir(exist_ok=True)
+        _write_or_append(github_dir / 'copilot-instructions.md', COPILOT_SNIPPET)
+
+    if args.cody:
+        sg_dir = project_dir / '.sourcegraph'
+        sg_dir.mkdir(exist_ok=True)
+        _write_or_append(sg_dir / 'cody.json', CODY_SNIPPET)
+
+    if args.continue_dev:
+        cont_dir = project_dir / '.continue'
+        cont_dir.mkdir(exist_ok=True)
+        _write_or_append(cont_dir / 'config.json', CONTINUE_DEV_SNIPPET)
+
+    if args.aider:
+        _write_or_append(project_dir / '.aider.conf.yml', AIDER_SNIPPET)
+
+    if args.replit:
+        _write_or_append(project_dir / '.replit', REPLIT_SNIPPET)
+
+    if args.devin:
+        _write_or_append(project_dir / 'devin.md', DEVIN_SNIPPET)
+
+    if args.bolt:
+        bolt_dir = project_dir / '.bolt'
+        bolt_dir.mkdir(exist_ok=True)
+        _write_or_append(bolt_dir / 'config.json', BOLT_SNIPPET)
+
+    if args.lovable:
+        lovable_dir = project_dir / '.lovable'
+        lovable_dir.mkdir(exist_ok=True)
+        _write_or_append(lovable_dir / 'config.json', LOVABLE_SNIPPET)
+
     if args.all_rules:
         _write_or_append(project_dir / 'CLAUDE.md', CLAUDE_MD_SNIPPET)
         cursor_dir = project_dir / '.cursor'
@@ -1563,6 +1780,27 @@ def cmd_init(args: argparse.Namespace) -> None:
         _write_or_append(project_dir / '.windsurfrules', WINDSURF_RULES_SNIPPET)
         print(f"\n--- ChatGPT Custom Instructions (paste into Settings > Custom Instructions) ---\n")
         print(CHATGPT_RULES_SNIPPET)
+        gemini_dir = project_dir / '.gemini'
+        gemini_dir.mkdir(exist_ok=True)
+        _write_or_append(gemini_dir / 'settings.json', GEMINI_SNIPPET)
+        github_dir = project_dir / '.github'
+        github_dir.mkdir(exist_ok=True)
+        _write_or_append(github_dir / 'copilot-instructions.md', COPILOT_SNIPPET)
+        sg_dir = project_dir / '.sourcegraph'
+        sg_dir.mkdir(exist_ok=True)
+        _write_or_append(sg_dir / 'cody.json', CODY_SNIPPET)
+        cont_dir = project_dir / '.continue'
+        cont_dir.mkdir(exist_ok=True)
+        _write_or_append(cont_dir / 'config.json', CONTINUE_DEV_SNIPPET)
+        _write_or_append(project_dir / '.aider.conf.yml', AIDER_SNIPPET)
+        _write_or_append(project_dir / '.replit', REPLIT_SNIPPET)
+        _write_or_append(project_dir / 'devin.md', DEVIN_SNIPPET)
+        bolt_dir = project_dir / '.bolt'
+        bolt_dir.mkdir(exist_ok=True)
+        _write_or_append(bolt_dir / 'config.json', BOLT_SNIPPET)
+        lovable_dir = project_dir / '.lovable'
+        lovable_dir.mkdir(exist_ok=True)
+        _write_or_append(lovable_dir / 'config.json', LOVABLE_SNIPPET)
 
     # Print custom instruction snippets (unless --all already printed)
     if not args.all_rules:
@@ -1573,8 +1811,11 @@ def cmd_init(args: argparse.Namespace) -> None:
 
     print(f"Done. CRUMB initialized in {project_dir}")
     print(f"  - Map crumb: {map_path}")
-    if not any([args.claude_md, args.cursor_rules, args.windsurf_rules, args.chatgpt_rules, args.all_rules]):
-        print(f"  Tip: run with --all to seed Claude, Cursor, Windsurf, and ChatGPT at once")
+    all_flags = [args.claude_md, args.cursor_rules, args.windsurf_rules, args.chatgpt_rules,
+                 args.gemini, args.copilot, args.cody, args.continue_dev, args.aider,
+                 args.replit, args.devin, args.bolt, args.lovable, args.all_rules]
+    if not any(all_flags):
+        print(f"  Tip: run with --all to seed all AI tools at once")
 
 
 # ── log (append-only session transcript) ────────────────────────────
@@ -3555,6 +3796,304 @@ function filterTable() {{
     print(f"Dashboard written to {output_path}")
 
 
+# ── Format bridges ───────────────────────────────────────────────────
+
+def _bridge_export_openai(data):
+    """CRUMB → OpenAI Assistant thread messages."""
+    import json as _json
+    headers = data['headers']
+    sections = data['sections']
+    messages = []
+    # System message with goal/context
+    goal = '\n'.join(sections.get('goal', []))
+    context = '\n'.join(sections.get('context', []))
+    constraints = '\n'.join(sections.get('constraints', []))
+    consolidated = '\n'.join(sections.get('consolidated', []))
+    if goal or context or consolidated:
+        sys_content = ''
+        if goal:
+            sys_content += f"Goal: {goal.strip()}\n"
+        if context:
+            sys_content += f"Context: {context.strip()}\n"
+        if constraints:
+            sys_content += f"Constraints: {constraints.strip()}\n"
+        if consolidated:
+            sys_content += consolidated.strip()
+        messages.append({"role": "system", "content": sys_content.strip()})
+    # Raw observations as user messages
+    for line in sections.get('raw', []):
+        line = line.strip()
+        if line:
+            messages.append({"role": "user", "content": line})
+    result = {
+        "messages": messages,
+        "metadata": {
+            "title": headers.get('title', ''),
+            "kind": headers.get('kind', ''),
+            "source": headers.get('source', ''),
+        }
+    }
+    return _json.dumps(result, indent=2)
+
+
+def _bridge_export_langchain(data):
+    """CRUMB → LangChain ConversationBufferMemory."""
+    import json as _json
+    sections = data['sections']
+    messages = []
+    consolidated = sections.get('consolidated', [])
+    raw = sections.get('raw', [])
+    for line in consolidated:
+        line = line.strip()
+        if line:
+            messages.append({"type": "ai", "content": line})
+    for line in raw:
+        line = line.strip()
+        if line:
+            messages.append({"type": "human", "content": line})
+    return _json.dumps({"chat_memory": {"messages": messages}}, indent=2)
+
+
+def _bridge_export_crewai(data):
+    """CRUMB → CrewAI task definition."""
+    import json as _json
+    headers = data['headers']
+    sections = data['sections']
+    goal = '\n'.join(l.strip() for l in sections.get('goal', []))
+    context = '\n'.join(l.strip() for l in sections.get('context', []))
+    constraints = '\n'.join(l.strip() for l in sections.get('constraints', []))
+    return _json.dumps({
+        "description": goal or headers.get('title', ''),
+        "expected_output": constraints or "Complete the task as specified.",
+        "agent": headers.get('source', ''),
+        "context": context,
+    }, indent=2)
+
+
+def _bridge_export_autogen(data):
+    """CRUMB → AutoGen conversation messages."""
+    import json as _json
+    headers = data['headers']
+    sections = data['sections']
+    messages = []
+    goal = '\n'.join(l.strip() for l in sections.get('goal', []))
+    if goal:
+        messages.append({"role": "user", "content": goal, "name": "user"})
+    context = '\n'.join(l.strip() for l in sections.get('context', []))
+    if context:
+        messages.append({"role": "assistant", "content": f"Context: {context}", "name": headers.get('source', 'assistant')})
+    for line in sections.get('consolidated', []):
+        line = line.strip()
+        if line:
+            messages.append({"role": "assistant", "content": line, "name": "memory"})
+    return _json.dumps(messages, indent=2)
+
+
+def _bridge_export_claude_project(data):
+    """CRUMB → Claude Project custom instructions."""
+    headers = data['headers']
+    sections = data['sections']
+    lines = []
+    lines.append(f"# {headers.get('title', 'Project Context')}")
+    lines.append('')
+    for section_name in ('goal', 'context', 'constraints', 'consolidated', 'project', 'modules'):
+        content = sections.get(section_name, [])
+        if content:
+            lines.append(f"## {section_name.title()}")
+            for l in content:
+                lines.append(l.rstrip())
+            lines.append('')
+    lines.append('---')
+    lines.append('When I say "crumb it", generate a CRUMB summarizing the current state.')
+    lines.append('Format: BEGIN CRUMB / v=1.1 / headers / --- / sections / END CRUMB')
+    return '\n'.join(lines)
+
+
+def _bridge_import_openai(text):
+    """OpenAI thread JSON → CRUMB."""
+    import json as _json
+    data = _json.loads(text)
+    messages = data.get('messages', data if isinstance(data, list) else [])
+    meta = data.get('metadata', {})
+    goal_parts = []
+    context_parts = []
+    for msg in messages:
+        role = msg.get('role', '')
+        content = msg.get('content', '')
+        if role == 'system':
+            context_parts.append(content)
+        elif role == 'user':
+            goal_parts.append(content)
+    headers = {'v': '1.1', 'kind': meta.get('kind', 'task'), 'title': meta.get('title', 'Imported from OpenAI')}
+    sections = {}
+    if goal_parts:
+        sections['goal'] = [f'  {g}' for g in goal_parts]
+    if context_parts:
+        sections['context'] = [f'  {c}' for c in context_parts]
+    return render_crumb(headers, sections)
+
+
+def _bridge_import_langchain(text):
+    """LangChain memory JSON → CRUMB."""
+    import json as _json
+    data = _json.loads(text)
+    messages = data.get('chat_memory', {}).get('messages', [])
+    consolidated = []
+    raw = []
+    for msg in messages:
+        t = msg.get('type', '')
+        c = msg.get('content', '')
+        if t == 'ai':
+            consolidated.append(f'  {c}')
+        else:
+            raw.append(f'  {c}')
+    headers = {'v': '1.1', 'kind': 'mem', 'title': 'Imported from LangChain'}
+    sections = {}
+    if consolidated:
+        sections['consolidated'] = consolidated
+    if raw:
+        sections['raw'] = raw
+    return render_crumb(headers, sections)
+
+
+def _bridge_import_crewai(text):
+    """CrewAI task JSON → CRUMB."""
+    import json as _json
+    data = _json.loads(text)
+    headers = {'v': '1.1', 'kind': 'task', 'title': data.get('description', 'CrewAI Task')[:80]}
+    if data.get('agent'):
+        headers['source'] = data['agent']
+    sections = {
+        'goal': [f"  {data.get('description', '')}"],
+    }
+    if data.get('context'):
+        sections['context'] = [f"  {data['context']}"]
+    if data.get('expected_output'):
+        sections['constraints'] = [f"  Expected output: {data['expected_output']}"]
+    return render_crumb(headers, sections)
+
+
+def _bridge_import_autogen(text):
+    """AutoGen message array → CRUMB."""
+    import json as _json
+    messages = _json.loads(text)
+    if not isinstance(messages, list):
+        messages = [messages]
+    goal_parts = []
+    context_parts = []
+    for msg in messages:
+        role = msg.get('role', '')
+        content = msg.get('content', '')
+        if role == 'user':
+            goal_parts.append(f'  {content}')
+        else:
+            context_parts.append(f'  {content}')
+    headers = {'v': '1.1', 'kind': 'task', 'title': 'Imported from AutoGen'}
+    sections = {}
+    if goal_parts:
+        sections['goal'] = goal_parts
+    if context_parts:
+        sections['context'] = context_parts
+    return render_crumb(headers, sections)
+
+
+BRIDGE_EXPORTERS = {
+    'openai-threads': _bridge_export_openai,
+    'langchain-memory': _bridge_export_langchain,
+    'crewai-task': _bridge_export_crewai,
+    'autogen': _bridge_export_autogen,
+    'claude-project': _bridge_export_claude_project,
+}
+
+BRIDGE_IMPORTERS = {
+    'openai-threads': _bridge_import_openai,
+    'langchain-memory': _bridge_import_langchain,
+    'crewai-task': _bridge_import_crewai,
+    'autogen': _bridge_import_autogen,
+}
+
+
+def cmd_bridge(args: argparse.Namespace) -> None:
+    """Convert between CRUMB and other AI agent formats."""
+    action = args.bridge_action
+
+    if action == 'export':
+        fmt = args.to
+        if fmt not in BRIDGE_EXPORTERS:
+            print(f"Unknown export format: {fmt}", file=sys.stderr)
+            sys.exit(1)
+        text = read_text(args.input)
+        data = parse_crumb(text)
+        result = BRIDGE_EXPORTERS[fmt](data)
+        if args.output and args.output != '-':
+            write_text(args.output, result)
+        else:
+            print(result)
+
+    elif action == 'import':
+        fmt = args.source_format
+        if fmt not in BRIDGE_IMPORTERS:
+            print(f"Unknown import format: {fmt}", file=sys.stderr)
+            sys.exit(1)
+        text = read_text(args.input)
+        result = BRIDGE_IMPORTERS[fmt](text)
+        if args.output and args.output != '-':
+            write_text(args.output, result)
+        else:
+            print(result)
+
+    elif action == 'list':
+        print("Export formats:")
+        for k in BRIDGE_EXPORTERS:
+            print(f"  {k}")
+        print("\nImport formats:")
+        for k in BRIDGE_IMPORTERS:
+            print(f"  {k}")
+
+
+# ── Webhook commands ─────────────────────────────────────────────────
+
+def cmd_webhook(args: argparse.Namespace) -> None:
+    """Manage webhook subscriptions for AgentAuth events."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from agentauth.webhooks import WebhookManager
+
+    mgr = WebhookManager()
+    action = args.webhook_action
+
+    if action == 'add':
+        wh = mgr.register(args.url, args.events)
+        print(f"Webhook registered: {wh['id']}")
+        print(f"  URL: {wh['url']}")
+        print(f"  Events: {', '.join(wh['events'])}")
+
+    elif action == 'list':
+        hooks = mgr.list_hooks()
+        if not hooks:
+            print("No webhooks registered.")
+            return
+        print(f"{'ID':<16} {'URL':<40} Events")
+        print("-" * 76)
+        for h in hooks:
+            print(f"{h['id']:<16} {h['url']:<40} {', '.join(h['events'])}")
+
+    elif action == 'remove':
+        ok = mgr.remove(args.webhook_id)
+        if ok:
+            print(f"Webhook {args.webhook_id} removed.")
+        else:
+            print(f"Webhook not found: {args.webhook_id}", file=sys.stderr)
+            sys.exit(1)
+
+    elif action == 'test':
+        result = mgr.test(args.webhook_id)
+        if result['success']:
+            print(f"Test event sent to {result['url']} — status: {result.get('status_code', 'ok')}")
+        else:
+            print(f"Test failed: {result.get('error', 'unknown')}", file=sys.stderr)
+            sys.exit(1)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog='crumb',
@@ -3661,7 +4200,16 @@ def build_parser() -> argparse.ArgumentParser:
     init.add_argument('--cursor-rules', action='store_true', help='Create .cursor/rules with CRUMB instructions.')
     init.add_argument('--windsurf-rules', action='store_true', help='Create .windsurfrules with CRUMB instructions.')
     init.add_argument('--chatgpt-rules', action='store_true', help='Print ChatGPT custom instructions.')
-    init.add_argument('--all', dest='all_rules', action='store_true', help='Seed all AI tools at once (Claude, Cursor, Windsurf, ChatGPT).')
+    init.add_argument('--gemini', action='store_true', help='Create .gemini/settings.json with CRUMB instructions.')
+    init.add_argument('--copilot', action='store_true', help='Create .github/copilot-instructions.md with CRUMB instructions.')
+    init.add_argument('--cody', action='store_true', help='Create .sourcegraph/cody.json with CRUMB instructions.')
+    init.add_argument('--continue-dev', action='store_true', help='Create .continue/config.json with CRUMB system message.')
+    init.add_argument('--aider', action='store_true', help='Create .aider.conf.yml with CRUMB conventions.')
+    init.add_argument('--replit', action='store_true', help='Create .replit with CRUMB instructions.')
+    init.add_argument('--devin', action='store_true', help='Create devin.md with CRUMB instructions.')
+    init.add_argument('--bolt', action='store_true', help='Create .bolt/config.json with CRUMB instructions.')
+    init.add_argument('--lovable', action='store_true', help='Create .lovable/config.json with CRUMB instructions.')
+    init.add_argument('--all', dest='all_rules', action='store_true', help='Seed all AI tools at once.')
     init.set_defaults(func=cmd_init)
 
     # log
@@ -3830,6 +4378,43 @@ def build_parser() -> argparse.ArgumentParser:
     dash_cmd = sub.add_parser('dashboard', help='Generate agent dashboard (HTML).')
     dash_cmd.add_argument('-o', '--output', default='agentauth-dashboard.html')
     dash_cmd.set_defaults(func=cmd_dashboard)
+
+    # --- Format Bridges ---
+    bridge_cmd = sub.add_parser('bridge', help='Convert between CRUMB and other AI formats.')
+    bridge_sub = bridge_cmd.add_subparsers(dest='bridge_action', required=True)
+
+    br_export = bridge_sub.add_parser('export', help='Export CRUMB to another format.')
+    br_export.add_argument('--to', required=True,
+                           choices=['openai-threads', 'langchain-memory', 'crewai-task', 'autogen', 'claude-project'],
+                           help='Target format.')
+    br_export.add_argument('input', help='Input .crumb file.')
+    br_export.add_argument('-o', '--output', default='-', help='Output file.')
+    bridge_cmd.set_defaults(func=cmd_bridge)
+
+    br_import = bridge_sub.add_parser('import', help='Import from another format to CRUMB.')
+    br_import.add_argument('--from', dest='source_format', required=True,
+                           choices=['openai-threads', 'langchain-memory', 'crewai-task', 'autogen'],
+                           help='Source format.')
+    br_import.add_argument('input', help='Input file.')
+    br_import.add_argument('-o', '--output', default='-', help='Output .crumb file.')
+
+    br_list = bridge_sub.add_parser('list', help='List available bridge formats.')
+
+    # --- Webhooks ---
+    wh_cmd = sub.add_parser('webhook', help='Manage AgentAuth event webhooks.')
+    wh_sub = wh_cmd.add_subparsers(dest='webhook_action', required=True)
+
+    wh_add = wh_sub.add_parser('add', help='Register a webhook.')
+    wh_add.add_argument('url', help='Webhook URL.')
+    wh_add.add_argument('--events', nargs='+', required=True,
+                        help='Events to subscribe to (e.g. passport.revoked policy.denied).')
+    wh_cmd.set_defaults(func=cmd_webhook)
+
+    wh_list = wh_sub.add_parser('list', help='List registered webhooks.')
+    wh_remove = wh_sub.add_parser('remove', help='Remove a webhook.')
+    wh_remove.add_argument('webhook_id', help='Webhook ID to remove.')
+    wh_test = wh_sub.add_parser('test', help='Send a test event to a webhook.')
+    wh_test.add_argument('webhook_id', help='Webhook ID to test.')
 
     return parser
 

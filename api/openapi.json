@@ -1,0 +1,1409 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Crumb Format API",
+    "description": "REST API for the Crumb Format ecosystem. Provides endpoints for validating, parsing, and rendering .crumb files, as well as the AgentAuth subsystem for managing agent passports, tool policies, short-lived credentials, and session-based audit trails.\n",
+    "version": "0.2.0",
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8420",
+      "description": "Local development server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "CRUMB",
+      "description": "Validate, parse, and render .crumb formatted text"
+    },
+    {
+      "name": "Passport",
+      "description": "Register, inspect, verify, revoke, and list agent passports"
+    },
+    {
+      "name": "Policy",
+      "description": "Set and check tool-level permissions for agents"
+    },
+    {
+      "name": "Credentials",
+      "description": "Issue and validate short-lived tool credentials"
+    },
+    {
+      "name": "Audit",
+      "description": "Session-based audit trails for agent actions"
+    }
+  ],
+  "paths": {
+    "/crumb/validate": {
+      "post": {
+        "tags": [
+          "CRUMB"
+        ],
+        "summary": "Validate a .crumb document",
+        "operationId": "crumbValidate",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrumbTextInput"
+              },
+              "example": {
+                "text": "BEGIN CRUMB\nv=1.1\nkind=task\nsource=demo\n---\n[goal]\n  Build feature X\n[context]\n  Greenfield\n[constraints]\n  None\nEND CRUMB"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationResult"
+                },
+                "example": {
+                  "valid": true,
+                  "error": null
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/crumb/parse": {
+      "post": {
+        "tags": [
+          "CRUMB"
+        ],
+        "summary": "Parse a .crumb document into JSON",
+        "operationId": "crumbParse",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrumbTextInput"
+              },
+              "example": {
+                "text": "BEGIN CRUMB\nv=1.1\nkind=task\nsource=demo\n---\n[goal]\n  Build feature X\n[context]\n  Greenfield\n[constraints]\n  None\nEND CRUMB"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Parsed crumb as JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParsedCrumb"
+                },
+                "example": {
+                  "headers": {
+                    "v": "1.1",
+                    "kind": "task",
+                    "source": "demo"
+                  },
+                  "sections": {
+                    "goal": [
+                      "Build feature X"
+                    ],
+                    "context": [
+                      "Greenfield"
+                    ],
+                    "constraints": [
+                      "None"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parse error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/crumb/render": {
+      "post": {
+        "tags": [
+          "CRUMB"
+        ],
+        "summary": "Render headers and sections into .crumb text",
+        "operationId": "crumbRender",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CrumbRenderInput"
+              },
+              "example": {
+                "headers": {
+                  "v": "1.1",
+                  "kind": "task",
+                  "source": "demo"
+                },
+                "sections": {
+                  "goal": [
+                    "Build feature X"
+                  ],
+                  "context": [
+                    "Greenfield"
+                  ],
+                  "constraints": [
+                    "None"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rendered crumb text",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RenderResult"
+                },
+                "example": {
+                  "text": "BEGIN CRUMB\nv=1.1\nkind=task\nsource=demo\n---\n[goal]\n  Build feature X\n[context]\n  Greenfield\n[constraints]\n  None\nEND CRUMB\n"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/passport/register": {
+      "post": {
+        "tags": [
+          "Passport"
+        ],
+        "summary": "Register a new agent passport",
+        "operationId": "passportRegister",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PassportRegisterInput"
+              },
+              "example": {
+                "name": "my-agent",
+                "framework": "langchain",
+                "owner": "alice",
+                "tools_allowed": [
+                  "read_file",
+                  "write_file"
+                ],
+                "tools_denied": [
+                  "exec_shell"
+                ],
+                "ttl_days": 90
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Passport registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PassportRegisterResult"
+                },
+                "example": {
+                  "agent_id": "ap_a1b2c3d4",
+                  "name": "my-agent",
+                  "passport_path": ".crumb-passports/ap_a1b2c3d4.crumb"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/passport/{id}": {
+      "get": {
+        "tags": [
+          "Passport"
+        ],
+        "summary": "Inspect a passport by agent ID",
+        "operationId": "passportInspect",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PassportId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Parsed passport data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParsedCrumb"
+                },
+                "example": {
+                  "headers": {
+                    "v": "1.1",
+                    "kind": "passport",
+                    "source": "agentauth/my-agent",
+                    "id": "ap_a1b2c3d4",
+                    "agent_name": "my-agent",
+                    "agent_framework": "langchain",
+                    "issued": "2026-01-01",
+                    "expires": "2026-04-01",
+                    "status": "active"
+                  },
+                  "sections": {
+                    "identity": [
+                      "name: my-agent",
+                      "framework: langchain",
+                      "owner: alice",
+                      "fingerprint: sha256:abcdef0123456789"
+                    ],
+                    "permissions": [
+                      "tools_allowed: read_file, write_file",
+                      "tools_denied: exec_shell",
+                      "data_classes: all"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Passport not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/passport/{id}/verify": {
+      "get": {
+        "tags": [
+          "Passport"
+        ],
+        "summary": "Verify passport validity",
+        "operationId": "passportVerify",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PassportId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PassportVerifyResult"
+                },
+                "example": {
+                  "valid": true,
+                  "reason": "valid",
+                  "passport": {
+                    "headers": {
+                      "v": "1.1",
+                      "kind": "passport",
+                      "id": "ap_a1b2c3d4",
+                      "status": "active"
+                    },
+                    "sections": {
+                      "identity": [
+                        "name: my-agent"
+                      ],
+                      "permissions": [
+                        "tools_allowed: *"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/passport/{id}/revoke": {
+      "post": {
+        "tags": [
+          "Passport"
+        ],
+        "summary": "Revoke a passport",
+        "operationId": "passportRevoke",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PassportId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revocation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevokeResult"
+                },
+                "example": {
+                  "revoked": true,
+                  "agent_id": "ap_a1b2c3d4"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/passports": {
+      "get": {
+        "tags": [
+          "Passport"
+        ],
+        "summary": "List all passports",
+        "operationId": "passportList",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "revoked",
+                "all"
+              ],
+              "default": "all"
+            },
+            "description": "Filter passports by status"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of passports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PassportSummary"
+                  }
+                },
+                "example": [
+                  {
+                    "agent_id": "ap_a1b2c3d4",
+                    "name": "my-agent",
+                    "status": "active",
+                    "issued": "2026-01-01",
+                    "expires": "2026-04-01",
+                    "path": ".crumb-passports/ap_a1b2c3d4.crumb"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/policy/set": {
+      "post": {
+        "tags": [
+          "Policy"
+        ],
+        "summary": "Set tool policy for an agent",
+        "operationId": "policySet",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicySetInput"
+              },
+              "example": {
+                "agent_name": "my-agent",
+                "tools_allowed": [
+                  "read_file",
+                  "write_file"
+                ],
+                "tools_denied": [
+                  "exec_shell"
+                ],
+                "data_classes": [
+                  "public",
+                  "internal"
+                ],
+                "max_actions_per_session": 500
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Policy saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Policy"
+                },
+                "example": {
+                  "agent_name": "my-agent",
+                  "tools_allowed": [
+                    "read_file",
+                    "write_file"
+                  ],
+                  "tools_denied": [
+                    "exec_shell"
+                  ],
+                  "data_classes": [
+                    "public",
+                    "internal"
+                  ],
+                  "max_actions_per_session": 500,
+                  "updated": "2026-01-15T10:30:00+00:00"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/policy/check": {
+      "post": {
+        "tags": [
+          "Policy"
+        ],
+        "summary": "Check if an agent is allowed to use a tool",
+        "operationId": "policyCheck",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PolicyCheckInput"
+              },
+              "example": {
+                "agent_id": "ap_a1b2c3d4",
+                "tool": "read_file"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Policy check result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolicyCheckResult"
+                },
+                "example": {
+                  "allowed": true,
+                  "reason": "policy allows",
+                  "tool": "read_file",
+                  "agent_id": "ap_a1b2c3d4"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/credential/issue": {
+      "post": {
+        "tags": [
+          "Credentials"
+        ],
+        "summary": "Issue a short-lived tool credential",
+        "operationId": "credentialIssue",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialIssueInput"
+              },
+              "example": {
+                "agent_id": "ap_a1b2c3d4",
+                "tool": "read_file",
+                "ttl_seconds": 300
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Issued credential",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Credential"
+                },
+                "example": {
+                  "token": "a3f8c1d0e9b7...",
+                  "agent_id": "ap_a1b2c3d4",
+                  "tool": "read_file",
+                  "issued": "2026-01-15T10:30:00+00:00",
+                  "expires": "2026-01-15T10:35:00+00:00",
+                  "ttl": 300
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Permission denied (invalid passport or policy violation)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/credential/validate": {
+      "post": {
+        "tags": [
+          "Credentials"
+        ],
+        "summary": "Validate a tool credential",
+        "operationId": "credentialValidate",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CredentialValidateInput"
+              },
+              "example": {
+                "token": "a3f8c1d0e9b7...",
+                "agent_id": "ap_a1b2c3d4",
+                "tool": "read_file"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Validation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CredentialValidateResult"
+                },
+                "example": {
+                  "valid": true,
+                  "agent_id": "ap_a1b2c3d4",
+                  "tool": "read_file",
+                  "expires": "2026-01-15T10:35:00+00:00"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audit/start": {
+      "post": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Start an audit session",
+        "operationId": "auditStart",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditStartInput"
+              },
+              "example": {
+                "agent_id": "ap_a1b2c3d4",
+                "goal": "Refactor authentication module"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Session started",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditStartResult"
+                },
+                "example": {
+                  "session_id": "as_e5f6a7b8"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audit/log": {
+      "post": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Log an action in an audit session",
+        "operationId": "auditLog",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditLogInput"
+              },
+              "example": {
+                "session_id": "as_e5f6a7b8",
+                "tool": "read_file",
+                "detail": "Read config.yaml",
+                "allowed": true,
+                "reason": "policy allows"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Action logged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessResponse"
+                },
+                "example": {
+                  "ok": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audit/end": {
+      "post": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "End an audit session",
+        "operationId": "auditEnd",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AuditEndInput"
+              },
+              "example": {
+                "session_id": "as_e5f6a7b8",
+                "status": "completed"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session ended, returns rendered audit crumb",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEndResult"
+                },
+                "example": {
+                  "session_id": "as_e5f6a7b8",
+                  "crumb": "BEGIN CRUMB\nv=1.1\nkind=audit\n..."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audit/export": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Export audit evidence",
+        "operationId": "auditExport",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by agent ID",
+            "example": "ap_a1b2c3d4"
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "description": "Only include audits since this date (YYYY-MM-DD)",
+            "example": "2026-01-01"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "crumb",
+                "json",
+                "csv"
+              ],
+              "default": "crumb"
+            },
+            "description": "Output format"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Exported audit data",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditExportResult"
+                },
+                "example": {
+                  "format": "json",
+                  "data": "[{\"headers\": {...}, \"sections\": {...}}]"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/audit/feed": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Get a live feed of recent audit actions",
+        "operationId": "auditFeed",
+        "parameters": [
+          {
+            "name": "agent_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Filter by agent ID",
+            "example": "ap_a1b2c3d4"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of formatted action lines",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "example": [
+                  "[ap_a1b2c3d4/as_e5f6a7b8] [2026-01-15T10:31:00+00:00] ALLOW read_file: Read config.yaml"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "Audit"
+        ],
+        "summary": "Health check",
+        "operationId": "healthCheck",
+        "responses": {
+          "200": {
+            "description": "Service health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "status": "ok",
+                  "version": "0.2.0"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "PassportId": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Agent passport ID (e.g. ap_a1b2c3d4)",
+        "example": "ap_a1b2c3d4"
+      }
+    },
+    "schemas": {
+      "CrumbTextInput": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Raw .crumb formatted text"
+          }
+        }
+      },
+      "ValidationResult": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Error message if validation failed, null otherwise"
+          }
+        }
+      },
+      "ParsedCrumb": {
+        "type": "object",
+        "properties": {
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Key-value header pairs from the crumb"
+          },
+          "sections": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Named sections with their line content"
+          }
+        }
+      },
+      "CrumbRenderInput": {
+        "type": "object",
+        "required": [
+          "headers",
+          "sections"
+        ],
+        "properties": {
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Key-value header pairs"
+          },
+          "sections": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "description": "Named sections with their line content"
+          }
+        }
+      },
+      "RenderResult": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Rendered .crumb text"
+          }
+        }
+      },
+      "PassportRegisterInput": {
+        "type": "object",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Agent name"
+          },
+          "framework": {
+            "type": "string",
+            "default": "unknown",
+            "description": "Agent framework (e.g. langchain, autogen)"
+          },
+          "owner": {
+            "type": "string",
+            "default": "",
+            "description": "Owner identifier"
+          },
+          "tools_allowed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of allowed tool patterns"
+          },
+          "tools_denied": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "List of denied tool patterns"
+          },
+          "ttl_days": {
+            "type": "integer",
+            "default": 90,
+            "description": "Passport time-to-live in days"
+          }
+        }
+      },
+      "PassportRegisterResult": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "description": "Generated agent passport ID"
+          },
+          "name": {
+            "type": "string",
+            "description": "Agent name"
+          },
+          "passport_path": {
+            "type": "string",
+            "description": "File path where the passport crumb was stored"
+          }
+        }
+      },
+      "PassportVerifyResult": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Explanation (e.g. \"valid\", \"passport expired\", \"passport revoked\")"
+          },
+          "passport": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ParsedCrumb"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Parsed passport data, or null if not found"
+          }
+        }
+      },
+      "RevokeResult": {
+        "type": "object",
+        "properties": {
+          "revoked": {
+            "type": "boolean"
+          },
+          "agent_id": {
+            "type": "string"
+          }
+        }
+      },
+      "PassportSummary": {
+        "type": "object",
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "revoked",
+              "unknown"
+            ]
+          },
+          "issued": {
+            "type": "string",
+            "format": "date"
+          },
+          "expires": {
+            "type": "string",
+            "format": "date"
+          },
+          "path": {
+            "type": "string"
+          }
+        }
+      },
+      "PolicySetInput": {
+        "type": "object",
+        "required": [
+          "agent_name"
+        ],
+        "properties": {
+          "agent_name": {
+            "type": "string"
+          },
+          "tools_allowed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tools_denied": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "data_classes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "max_actions_per_session": {
+            "type": "integer",
+            "default": 1000
+          }
+        }
+      },
+      "Policy": {
+        "type": "object",
+        "properties": {
+          "agent_name": {
+            "type": "string"
+          },
+          "tools_allowed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tools_denied": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "data_classes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "max_actions_per_session": {
+            "type": "integer"
+          },
+          "updated": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "PolicyCheckInput": {
+        "type": "object",
+        "required": [
+          "agent_id",
+          "tool"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string",
+            "description": "Agent ID or name"
+          },
+          "tool": {
+            "type": "string",
+            "description": "Tool name to check"
+          }
+        }
+      },
+      "PolicyCheckResult": {
+        "type": "object",
+        "properties": {
+          "allowed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "agent_id": {
+            "type": "string"
+          }
+        }
+      },
+      "CredentialIssueInput": {
+        "type": "object",
+        "required": [
+          "agent_id",
+          "tool"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "ttl_seconds": {
+            "type": "integer",
+            "default": 300,
+            "description": "Token time-to-live in seconds"
+          }
+        }
+      },
+      "Credential": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "HMAC-based credential token"
+          },
+          "agent_id": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "issued": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "ttl": {
+            "type": "integer",
+            "description": "TTL in seconds"
+          }
+        }
+      },
+      "CredentialValidateInput": {
+        "type": "object",
+        "required": [
+          "token",
+          "agent_id",
+          "tool"
+        ],
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "agent_id": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          }
+        }
+      },
+      "CredentialValidateResult": {
+        "type": "object",
+        "properties": {
+          "valid": {
+            "type": "boolean"
+          },
+          "agent_id": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "expires": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AuditStartInput": {
+        "type": "object",
+        "required": [
+          "agent_id",
+          "goal"
+        ],
+        "properties": {
+          "agent_id": {
+            "type": "string"
+          },
+          "goal": {
+            "type": "string"
+          }
+        }
+      },
+      "AuditStartResult": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "description": "Generated audit session ID (e.g. as_e5f6a7b8)"
+          }
+        }
+      },
+      "AuditLogInput": {
+        "type": "object",
+        "required": [
+          "session_id",
+          "tool",
+          "detail",
+          "allowed"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "allowed": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "default": ""
+          }
+        }
+      },
+      "AuditEndInput": {
+        "type": "object",
+        "required": [
+          "session_id"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "default": "completed",
+            "description": "Final session status (e.g. completed, aborted, error)"
+          }
+        }
+      },
+      "AuditEndResult": {
+        "type": "object",
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "crumb": {
+            "type": "string",
+            "description": "Rendered audit crumb text"
+          }
+        }
+      },
+      "AuditExportResult": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "enum": [
+              "crumb",
+              "json",
+              "csv"
+            ]
+          },
+          "data": {
+            "type": "string",
+            "description": "Exported audit data in the requested format"
+          }
+        }
+      },
+      "SuccessResponse": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "description": "Error message"
+          }
+        }
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
