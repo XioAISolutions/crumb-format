@@ -36,8 +36,8 @@ jobs:
         with:
           python-version: ${{ inputs.python-version || '3.11' }}
 
-      - name: Install crumb-format
-        run: pip install crumb-format
+      - name: Install crumb-format from this checkout
+        run: pip install .
 
       - name: Find and bench .crumb files
         id: bench

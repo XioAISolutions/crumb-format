@@ -46,7 +46,7 @@ permissions:
 
 jobs:
   bench:
-    uses: XioAISolutions/crumb-format/.github/workflows/bench-pr.yml@main
+    uses: ./.github/workflows/bench-pr.yml
     # Uncomment and adjust inputs as needed:
     # with:
     #   search-path: "."         # directory to search for .crumb files
@@ -81,8 +81,8 @@ jobs:
 #         with:
 #           python-version: "3.11"
 #
-#       - name: Install crumb-format
-#         run: pip install crumb-format
+#       - name: Install crumb-format from this checkout
+#         run: pip install .
 #
 #       - name: Find and bench .crumb files
 #         id: bench

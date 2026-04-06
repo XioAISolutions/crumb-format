@@ -1190,6 +1190,16 @@ def cmd_compress(args: argparse.Namespace) -> None:
     compact_headers = {k: v for k, v in headers.items() if k in keep_headers}
 
     output = render_crumb(compact_headers, sections)
+
+    # Stage 3 (optional): MeTalk caveman compression
+    metalk_stats = None
+    if getattr(args, 'metalk', False):
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from cli.metalk import encode as metalk_encode, compression_stats as metalk_cs
+        pre_mt = output
+        output = metalk_encode(output, level=getattr(args, 'metalk_level', 2))
+        metalk_stats = metalk_cs(pre_mt, output)
+
     output_tokens = estimate_tokens(output)
     ratio = ((original_tokens - output_tokens) / original_tokens * 100) if original_tokens > 0 else 0
 
@@ -1199,6 +1209,8 @@ def cmd_compress(args: argparse.Namespace) -> None:
         print(f"TurboQuant compression on {args.file}:")
         print(f"  Stage 1 (semantic dedup):  {stats['stage1_removed']} entries merged")
         print(f"  Stage 2 (signal pruning):  {stats['stage2_removed']} low-signal entries dropped")
+        if metalk_stats:
+            print(f"  Stage 3 (MeTalk):          {metalk_stats['pct_saved']}% additional reduction")
         print(f"  Result: {original_tokens} → {output_tokens} tokens ({ratio:.0f}% reduction)")
         multiplier = original_tokens / max(output_tokens, 1)
         print(f"  Compression ratio: {multiplier:.1f}x")
@@ -2370,6 +2382,38 @@ def cmd_handoff(args: argparse.Namespace) -> None:
         print('\n---\nCopy the above and paste into your AI tool', file=sys.stderr)
 
 
+def cmd_metalk(args: argparse.Namespace) -> None:
+    """Encode or decode a crumb using MeTalk caveman compression."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from cli.metalk import encode, decode, compression_stats
+
+    text = read_text(args.file)
+
+    if args.decode:
+        result = decode(text)
+        if args.output and args.output != '-':
+            write_text(args.output, result)
+            print('MeTalk decoded.', file=sys.stderr)
+        else:
+            print(result)
+    else:
+        level = args.level
+        result = encode(text, level=level)
+        stats = compression_stats(text, result)
+        if args.output and args.output != '-':
+            write_text(args.output, result)
+            print(f"MeTalk (level {level}): "
+                  f"{stats['original_tokens']}→{stats['encoded_tokens']} tokens "
+                  f"({stats['pct_saved']}% saved, {stats['ratio']}x)",
+                  file=sys.stderr)
+        else:
+            print(result)
+            print(f"\n--- MeTalk (level {level}): "
+                  f"{stats['original_tokens']}→{stats['encoded_tokens']} tokens "
+                  f"({stats['pct_saved']}% saved, {stats['ratio']}x) ---",
+                  file=sys.stderr)
+
+
 # ── argument parser ──────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
@@ -2557,6 +2601,10 @@ def build_parser() -> argparse.ArgumentParser:
     compress_cmd.add_argument('-o', '--output', default='-', help='Output path (default: stdout).')
     compress_cmd.add_argument('--target', type=float, default=0.5,
                               help='Target retention ratio 0.0-1.0 (default: 0.5 = keep top 50%%).')
+    compress_cmd.add_argument('--metalk', action='store_true',
+                              help='Apply MeTalk caveman compression as Stage 3.')
+    compress_cmd.add_argument('--metalk-level', type=int, choices=[1, 2, 3], default=2,
+                              help='MeTalk level (default: 2).')
     compress_cmd.set_defaults(func=cmd_compress)
 
     # bench
@@ -2574,6 +2622,14 @@ def build_parser() -> argparse.ArgumentParser:
     handoff_cmd.add_argument('--target', choices=['claude', 'cursor', 'chatgpt', 'gemini'],
                              help='Target AI tool (optional).')
     handoff_cmd.set_defaults(func=cmd_handoff)
+
+    mt_cmd = sub.add_parser('metalk', help='MeTalk caveman compression — reduce tokens for AI-to-AI communication.')
+    mt_cmd.add_argument('file', help='.crumb file to encode/decode.')
+    mt_cmd.add_argument('--level', type=int, choices=[1, 2, 3], default=2,
+                        help='1=dict only (lossless), 2=dict+grammar strip, 3=aggressive (default: 2).')
+    mt_cmd.add_argument('--decode', action='store_true', help='Decode MeTalk back to full form.')
+    mt_cmd.add_argument('-o', '--output', default='-', help='Output path.')
+    mt_cmd.set_defaults(func=cmd_metalk)
 
     return parser
 
