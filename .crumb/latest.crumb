@@ -1,0 +1,16 @@
+--- task: feat: add OpenCrumb bread-banner patch artifact
+source: github.pr
+pr: #5
+generated: 2026-04-06T22:33:37Z
+---
+
+[goal]
+This PR packages the OpenClaw-style terminal branding you asked for, adapted for CRUMB with bread emoji branding.
+
+[context]
+Changed files in this PR:
+- patches/opencrumb-banner/README.md
+- patches/opencrumb-banner/crumb_cli.py
+
+[constraints]
+Review checklist: tests pass, no breaking changes, follows project conventions
