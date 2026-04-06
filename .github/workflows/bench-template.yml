@@ -46,7 +46,7 @@ permissions:
 
 jobs:
   bench:
-    uses: XioAISolutions/crumb-format/.github/workflows/bench-pr.yml@main
+    uses: ./.github/workflows/bench-pr.yml
     # Uncomment and adjust inputs as needed:
     # with:
     #   search-path: "."         # directory to search for .crumb files
