@@ -1,7 +1,7 @@
---- task: feat: ship MeTalk and PyPI-ready crumb-format 0.2.0
+--- task: feat: add crumb REST API for cross-AI access
 source: github.pr
-pr: #3
-generated: 2026-04-06T17:58:39Z
+pr: #4
+generated: 2026-04-06T18:00:27Z
 ---
 
 [goal]
@@ -9,16 +9,10 @@ generated: 2026-04-06T17:58:39Z
 
 [context]
 Changed files in this PR:
-- .crumb/latest.crumb
-- .github/workflows/auto-crumb-pr.yml
-- .github/workflows/auto-crumb-template.yml
-- .github/workflows/bench-pr.yml
-- .github/workflows/bench-template.yml
-- README.md
-- cli/crumb.py
-- cli/metalk.py
-- pyproject.toml
-- tests/test_metalk.py
+- api/README.md
+- api/openapi.json
+- api/openapi.yaml
+- api/server.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
