@@ -94,6 +94,22 @@ Works in ChatGPT custom instructions, Claude Projects, Cursor rules, or any AI w
 pip install crumb-format
 ```
 
+## New in 0.2.0: MeTalk
+
+MeTalk is the caveman-compression layer for CRUMBs. It shrinks handoff text
+before you paste it into the next AI.
+
+```bash
+# default level 2
+crumb metalk examples/task-bug-fix.crumb
+
+# aggressive mode
+crumb metalk examples/task-bug-fix.crumb --level 3
+
+# add MeTalk as Stage 3 after TurboQuant compression
+crumb compress examples/task-bug-fix.crumb --metalk --metalk-level 2
+```
+
 ## Quick start
 
 ```bash
@@ -112,9 +128,12 @@ crumb search "auth JWT" --dir ./crumbs/
 
 # seed all your AI tools at once
 crumb init --all
+
+# compress a crumb for cross-AI handoff
+crumb metalk examples/task-bug-fix.crumb --level 2
 ```
 
-Full command reference: `crumb --help` (22 commands including export, import, templates, todos, watch mode, and more).
+Full command reference: `crumb --help` (23 commands including MeTalk compression, export, import, templates, todos, watch mode, and more).
 
 ## Integrations
 
@@ -140,7 +159,8 @@ repos:
 - [`SPEC.md`](SPEC.md) -- the format specification
 - [`DREAMING.md`](DREAMING.md) -- how memory consolidation works
 - [`examples/`](examples/) -- ready-to-paste `.crumb` files
-- [`cli/crumb.py`](cli/crumb.py) -- full CLI (22 commands)
+- [`cli/crumb.py`](cli/crumb.py) -- full CLI (23 commands)
+- [`cli/metalk.py`](cli/metalk.py) -- MeTalk caveman compression layer
 - [`validators/`](validators/) -- Python and Node reference validators
 - [`docs/HANDOFF_PATTERNS.md`](docs/HANDOFF_PATTERNS.md) -- practical handoff patterns
 
