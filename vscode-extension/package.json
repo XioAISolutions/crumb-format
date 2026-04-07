@@ -71,7 +71,7 @@
     "snippets": [
       {
         "language": "crumb",
-        "path": "./snippets/crumb.json"
+        "path": "./snippets/crumb.code-snippets"
       }
     ]
   },

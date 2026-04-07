@@ -1,0 +1,97 @@
+{
+  "CRUMB Task": {
+    "scope": "crumb",
+    "prefix": "!crumb-task",
+    "body": [
+      "BEGIN CRUMB",
+      "v=1.1",
+      "kind=task",
+      "title=${1:Task title}",
+      "source=${2:human}",
+      "---",
+      "[goal]",
+      "${3:What needs to happen next}",
+      "",
+      "[context]",
+      "${4:Key background, files, progress, and decisions}",
+      "",
+      "[constraints]",
+      "${5:Requirements, guardrails, and things that must not change}",
+      "END CRUMB"
+    ],
+    "description": "Insert a CRUMB v1.1 task handoff block"
+  },
+  "CRUMB Memory": {
+    "scope": "crumb",
+    "prefix": "!crumb-mem",
+    "body": [
+      "BEGIN CRUMB",
+      "v=1.1",
+      "kind=mem",
+      "title=${1:Memory title}",
+      "source=${2:human}",
+      "---",
+      "[consolidated]",
+      "- ${3:Stable fact, decision, or preference to retain}",
+      "- ${4:Another important memory item}",
+      "END CRUMB"
+    ],
+    "description": "Insert a CRUMB v1.1 memory block"
+  },
+  "CRUMB Map": {
+    "scope": "crumb",
+    "prefix": "!crumb-map",
+    "body": [
+      "BEGIN CRUMB",
+      "v=1.1",
+      "kind=map",
+      "title=${1:Project map}",
+      "source=${2:human}",
+      "project=${3:project-name}",
+      "---",
+      "[project]",
+      "${4:High-level description of the project or subsystem}",
+      "",
+      "[modules]",
+      "- ${5:path/to/module}: ${6:What it does}",
+      "- ${7:path/to/another-module}: ${8:Why it matters}",
+      "END CRUMB"
+    ],
+    "description": "Insert a CRUMB v1.1 project map block"
+  },
+  "CRUMB Log": {
+    "scope": "crumb",
+    "prefix": "!crumb-log",
+    "body": [
+      "BEGIN CRUMB",
+      "v=1.1",
+      "kind=log",
+      "title=${1:Session log}",
+      "source=${2:human}",
+      "---",
+      "[entries]",
+      "- [${CURRENT_YEAR}-${CURRENT_MONTH}-${CURRENT_DATE} ${CURRENT_HOUR}:${CURRENT_MINUTE}] USER: ${3:What was requested or observed}",
+      "- [${CURRENT_YEAR}-${CURRENT_MONTH}-${CURRENT_DATE} ${CURRENT_HOUR}:${CURRENT_MINUTE}] ASSISTANT: ${4:What was done, suggested, or decided}",
+      "END CRUMB"
+    ],
+    "description": "Insert a CRUMB v1.1 session log block"
+  },
+  "CRUMB Todo": {
+    "scope": "crumb",
+    "prefix": "!crumb-todo",
+    "body": [
+      "BEGIN CRUMB",
+      "v=1.1",
+      "kind=todo",
+      "title=${1:Todo list}",
+      "source=${2:human}",
+      "---",
+      "[items]",
+      "- [ ] ${3:First action item}",
+      "- [ ] ${4:Second action item}",
+      "- [x] ${5:Already completed item}",
+      "END CRUMB"
+    ],
+    "description": "Insert a CRUMB v1.1 todo block"
+  }
+}

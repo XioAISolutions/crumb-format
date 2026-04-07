@@ -26,11 +26,11 @@ Open the Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) and type "CRUMB":
 
 In any `.crumb` file, type one of these prefixes and press `Tab`:
 
-- `task` — Full task handoff template
-- `mem` — Memory crumb template
-- `map` — Project map template
-- `log` — Session log template
-- `todo` — Todo list template
+- `!crumb-task` — `kind=task` handoff with `[goal]`, `[context]`, and `[constraints]`
+- `!crumb-mem` — `kind=mem` block with `[consolidated]`
+- `!crumb-map` — `kind=map` block with `[project]` and `[modules]`
+- `!crumb-log` — `kind=log` block with timestamped `[entries]`
+- `!crumb-todo` — `kind=todo` block with `[items]`
 
 ## Installation
 
@@ -62,5 +62,5 @@ The extension automatically associates `.crumb` files with the CRUMB language mo
 ## Screenshots
 
 - **Syntax Highlighting**: CRUMB markers (`BEGIN CRUMB` / `END CRUMB`) appear as keywords, section headers (`[goal]`, `[context]`) as headings, and key=value pairs are color-coded.
-- **Snippets in Action**: Type `task` and press Tab to expand a full task handoff template with tab stops for each field.
+- **Snippets in Action**: Type `!crumb-task` and press Tab to expand a CRUMB v1.1 task handoff template with tab stops for each field.
 - **Command Palette**: All CRUMB commands grouped under the "CRUMB:" prefix for easy discovery.

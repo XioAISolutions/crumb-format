@@ -4,6 +4,7 @@
 import argparse
 import datetime
 import difflib
+import fnmatch
 import glob
 import json
 import os
@@ -17,6 +18,14 @@ from collections import Counter
 from pathlib import Path
 from textwrap import dedent
 from typing import Dict, List
+
+from local_ai import (
+    DEFAULT_OLLAMA_MODEL,
+    LocalAIError,
+    ensure_ollama_available,
+    extract_crumb_block,
+    generate_text,
+)
 
 
 REQUIRED_HEADERS = ["v", "kind", "source"]
@@ -258,7 +267,7 @@ TEMPLATES = {
 PLACEHOLDERS = {
     "task": {
         "goal": "<what needs to happen next>",
-        "context": "<key facts, decisions, and current state>",
+        "context": "<relevant facts, files, or current state>",
         "constraints": "<what must not change>",
     },
     "mem": {
@@ -276,8 +285,334 @@ PLACEHOLDERS = {
     },
 }
 
+COMMON_IGNORED_NAMES = {
+    ".git",
+    ".hg",
+    ".svn",
+    "__pycache__",
+    "node_modules",
+    "venv",
+    ".venv",
+    "env",
+    ".tox",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".idea",
+    ".vscode",
+    "dist",
+    "build",
+}
+COMMON_IGNORED_SUFFIXES = {".pyc", ".pyo", ".DS_Store"}
+
+
+def _git_completed(args: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        ["git", *args],
+        cwd=str(cwd) if cwd else None,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _git_repo_root(path: Path) -> Path | None:
+    result = _git_completed(["rev-parse", "--show-toplevel"], cwd=path)
+    if result.returncode != 0:
+        return None
+    root = result.stdout.strip()
+    return Path(root).resolve() if root else None
+
+
+def _load_gitignore_patterns(root: Path) -> list[str]:
+    gitignore = root / ".gitignore"
+    if not gitignore.exists():
+        return []
+    patterns = []
+    for raw in gitignore.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith("!"):
+            continue
+        patterns.append(line)
+    return patterns
+
+
+def _matches_gitignore_pattern(relative_path: str, pattern: str, is_dir: bool) -> bool:
+    rel = relative_path.replace("\\", "/")
+    normalized = pattern.rstrip("/")
+    if not normalized:
+        return False
+    dir_only = pattern.endswith("/")
+    if dir_only and not is_dir:
+        return False
+    if "/" in normalized:
+        candidate = normalized.lstrip("/")
+        return fnmatch.fnmatch(rel, candidate) or rel.startswith(candidate + "/")
+    parts = [part for part in rel.split("/") if part]
+    return any(fnmatch.fnmatch(part, normalized) for part in parts)
+
+
+def _is_ignored_path(
+    path: Path,
+    root: Path,
+    repo_root: Path | None,
+    gitignore_patterns: list[str],
+    cache: dict[str, bool],
+) -> bool:
+    key = str(path.resolve())
+    if key in cache:
+        return cache[key]
+
+    if path.name in COMMON_IGNORED_NAMES or any(path.name.endswith(suffix) for suffix in COMMON_IGNORED_SUFFIXES):
+        cache[key] = True
+        return True
+
+    relative_to_root = path.resolve().relative_to(root.resolve()).as_posix()
+    for pattern in gitignore_patterns:
+        if _matches_gitignore_pattern(relative_to_root, pattern, path.is_dir()):
+            cache[key] = True
+            return True
+
+    if repo_root is not None:
+        try:
+            repo_relative = path.resolve().relative_to(repo_root.resolve()).as_posix()
+        except ValueError:
+            repo_relative = path.name
+        result = _git_completed(["check-ignore", repo_relative], cwd=repo_root)
+        if result.returncode == 0:
+            cache[key] = True
+            return True
+
+    cache[key] = False
+    return False
+
+
+def _build_repo_tree(root: Path) -> list[str]:
+    root = root.resolve()
+    repo_root = _git_repo_root(root)
+    gitignore_patterns = _load_gitignore_patterns(root)
+    ignore_cache: dict[str, bool] = {}
+    lines = [f"- {root.name}/"]
+
+    for current_root, dirs, files in os.walk(root, topdown=True):
+        current_path = Path(current_root).resolve()
+        depth = len(current_path.relative_to(root).parts)
+        indent = "  " * depth
+
+        visible_dirs = []
+        for dirname in sorted(dirs):
+            candidate = current_path / dirname
+            if not _is_ignored_path(candidate, root, repo_root, gitignore_patterns, ignore_cache):
+                visible_dirs.append(dirname)
+        dirs[:] = visible_dirs
+
+        for dirname in dirs:
+            lines.append(f"{indent}- {dirname}/")
+
+        for filename in sorted(files):
+            candidate = current_path / filename
+            if _is_ignored_path(candidate, root, repo_root, gitignore_patterns, ignore_cache):
+                continue
+            lines.append(f"{indent}- {filename}")
+
+    return lines
+
+
+def _task_from_diff_crumb(args: argparse.Namespace) -> str:
+    repo_check = _git_completed(["rev-parse", "--is-inside-work-tree"])
+    if repo_check.returncode != 0:
+        raise ValueError("--from-diff requires running inside a git repository.")
+
+    diff_result = _git_completed(["diff", "HEAD"])
+    if diff_result.returncode != 0:
+        detail = diff_result.stderr.strip() or diff_result.stdout.strip() or "git diff HEAD failed"
+        raise ValueError(f"Could not read git diff HEAD: {detail}")
+
+    diff_text = diff_result.stdout.rstrip()
+    context_lines: list[str] = []
+    if args.context:
+        context_lines.extend(f"- {item}" for item in args.context)
+        context_lines.append("")
+    if diff_text:
+        context_lines.extend(diff_text.splitlines())
+    else:
+        context_lines.append("- No working tree changes detected from git diff HEAD.")
+
+    constraint_lines = [f"- {item}" for item in (args.constraints or [])]
+    if not constraint_lines:
+        constraint_lines = ["- Review the diff in [context] before applying follow-up changes."]
+
+    headers = {
+        "v": "1.1",
+        "kind": "task",
+        "title": args.title or "Task from git diff",
+        "source": args.source or "git.diff",
+    }
+    sections = {
+        "goal": [args.goal or "Continue the current repository changes captured in [context]."],
+        "context": context_lines,
+        "constraints": constraint_lines,
+    }
+    return render_crumb(headers, sections)
+
+
+def _map_from_dir_crumb(args: argparse.Namespace) -> str:
+    root = Path(args.map_dir or ".").resolve()
+    if not root.exists() or not root.is_dir():
+        raise ValueError(f"Directory not found: {root}")
+
+    headers = {
+        "v": "1.1",
+        "kind": "map",
+        "title": args.title or f"Repository map for {root.name}",
+        "source": args.source or "os.walk",
+        "project": args.project or root.name,
+    }
+    sections = {
+        "project": [args.description or f"Directory map generated from {root}"],
+        "modules": _build_repo_tree(root),
+    }
+    return render_crumb(headers, sections)
+
+
+def _local_new_prompt(args: argparse.Namespace) -> str:
+    kind = args.kind
+    title = args.title or ""
+    source = args.source or "local.ollama"
+
+    requested = [
+        f"kind={kind}",
+        f"title={title}",
+        f"source={source}",
+    ]
+
+    if kind == "task":
+        requested.append(f"goal={args.goal or PLACEHOLDERS['task']['goal']}")
+        requested.append(
+            "context_items="
+            + (" | ".join(args.context) if args.context else PLACEHOLDERS["task"]["context"])
+        )
+        requested.append(
+            "constraint_items="
+            + (" | ".join(args.constraints) if args.constraints else PLACEHOLDERS["task"]["constraints"])
+        )
+    elif kind == "mem":
+        requested.append(
+            "entries=" + (" | ".join(args.entries) if args.entries else PLACEHOLDERS["mem"]["consolidated"])
+        )
+    elif kind == "map":
+        requested.append(f"project={args.project or ''}")
+        requested.append(f"project_description={args.description or PLACEHOLDERS['map']['project_desc']}")
+        requested.append(
+            "modules=" + (" | ".join(args.modules) if args.modules else PLACEHOLDERS["map"]["modules"])
+        )
+    elif kind == "log":
+        requested.append(
+            "entries=" + (" | ".join(args.entries) if args.entries else PLACEHOLDERS["log"]["entries"])
+        )
+    elif kind == "todo":
+        requested.append(
+            "tasks=" + (" | ".join(args.entries) if args.entries else PLACEHOLDERS["todo"]["tasks"])
+        )
+
+    details = "\n".join(requested)
+    return dedent(
+        f"""\
+        You are generating a CRUMB v1.1 document.
+        Return only one CRUMB block with no explanation.
+        The output must start with BEGIN CRUMB and end with END CRUMB.
+        Use exactly the CRUMB v1.1 text format with a header separator line of ---.
+        Ensure the result parses as a valid CRUMB.
+        Keep the requested kind and required sections exactly correct.
+
+        Requested content:
+        {details}
+        """
+    )
+
+
+def _local_compress_prompt(text: str, parsed: Dict[str, object], target_ratio: float) -> str:
+    headers = parsed["headers"]
+    kind = headers["kind"]
+    required_sections = ", ".join(f"[{name}]" for name in REQUIRED_SECTIONS[kind])
+    return dedent(
+        f"""\
+        Rewrite the following CRUMB into a shorter CRUMB v1.1 document.
+        Return only one CRUMB block with no explanation.
+        The output must start with BEGIN CRUMB and end with END CRUMB.
+        Preserve kind={kind} and keep the title if present.
+        Keep all required sections for kind={kind}: {required_sections}.
+        Keep the meaning, decisions, and constraints, but compress redundant wording.
+        Target approximately {target_ratio:.0%} of the original detail while staying valid.
+        The result must parse as CRUMB v1.1.
+
+        Input CRUMB:
+        {text}
+        """
+    )
+
+
+def _run_local_new(args: argparse.Namespace) -> str:
+    model = args.ollama_model or DEFAULT_OLLAMA_MODEL
+    ensure_ollama_available(model=model)
+    response = generate_text(_local_new_prompt(args), model=model)
+    crumb = extract_crumb_block(response)
+    parsed = parse_crumb(crumb)
+    if parsed["headers"].get("kind") != args.kind:
+        raise LocalAIError(
+            f"Ollama returned kind={parsed['headers'].get('kind')} but kind={args.kind} was requested."
+        )
+    return crumb if crumb.endswith("\n") else crumb + "\n"
+
+
+def _run_local_compress(args: argparse.Namespace, text: str, parsed: Dict[str, object]) -> str:
+    model = args.ollama_model or DEFAULT_OLLAMA_MODEL
+    ensure_ollama_available(model=model)
+    response = generate_text(_local_compress_prompt(text, parsed, args.target), model=model)
+    crumb = extract_crumb_block(response)
+    compressed = crumb if crumb.endswith("\n") else crumb + "\n"
+    reparsed = parse_crumb(compressed)
+    if reparsed["headers"].get("kind") != parsed["headers"].get("kind"):
+        raise LocalAIError(
+            "Ollama changed the CRUMB kind during compression, which is not allowed."
+        )
+    return compressed
+
 
 def cmd_new(args: argparse.Namespace) -> None:
+    kind = args.kind
+
+    if getattr(args, 'from_diff', False):
+        if kind != 'task':
+            print("Error: --from-diff is only supported with `crumb new task`.", file=sys.stderr)
+            sys.exit(1)
+        try:
+            crumb = _task_from_diff_crumb(args)
+        except ValueError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
+        write_text(args.output, crumb)
+        return
+
+    if getattr(args, 'map_dir', None):
+        if kind != 'map':
+            print("Error: --dir is only supported with `crumb new map`.", file=sys.stderr)
+            sys.exit(1)
+        try:
+            crumb = _map_from_dir_crumb(args)
+        except ValueError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
+        write_text(args.output, crumb)
+        return
+
+    if getattr(args, 'ollama', False) or getattr(args, 'use_local', False):
+        try:
+            crumb = _run_local_new(args)
+        except LocalAIError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
+        write_text(args.output, crumb)
+        return
+
     kind = args.kind
     title = args.title or ""
     source = args.source or ""
@@ -320,6 +655,7 @@ def cmd_new(args: argparse.Namespace) -> None:
 
     crumb = TEMPLATES[kind].format(**values)
     write_text(args.output, crumb)
+
 
 
 # ── from-chat ────────────────────────────────────────────────────────
@@ -1158,6 +1494,16 @@ def cmd_compress(args: argparse.Namespace) -> None:
     """
     text = read_text(args.file)
     parsed = parse_crumb(text)
+
+    if getattr(args, 'ollama', False) or getattr(args, 'use_local', False):
+        try:
+            output = _run_local_compress(args, text, parsed)
+        except LocalAIError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
+        write_text(args.output, output)
+        return
+
     headers = parsed['headers']
     sections = parsed['sections']
     kind = headers['kind']
@@ -2429,6 +2775,14 @@ def build_parser() -> argparse.ArgumentParser:
     new.add_argument('--title', '-t', help='Title for the crumb.')
     new.add_argument('--source', '-s', help='Source label (e.g. claude.chat, cursor.agent).')
     new.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
+    new.add_argument('--ollama', '--use-local', dest='ollama', action='store_true',
+                     help='Generate the CRUMB with a local Ollama model instead of deterministic templates.')
+    new.add_argument('--ollama-model', default=DEFAULT_OLLAMA_MODEL,
+                     help=f'Local Ollama model to use (default: {DEFAULT_OLLAMA_MODEL}).')
+    new.add_argument('--from-diff', action='store_true',
+                     help='For kind=task, populate [context] from `git diff HEAD`.')
+    new.add_argument('--dir', dest='map_dir',
+                     help='For kind=map, generate a directory tree from this path into [modules].')
     # task-specific
     new.add_argument('--goal', help='Goal text (task only).')
     new.add_argument('--context', nargs='*', help='Context items (task only).')
@@ -2605,6 +2959,10 @@ def build_parser() -> argparse.ArgumentParser:
                               help='Apply MeTalk caveman compression as Stage 3.')
     compress_cmd.add_argument('--metalk-level', type=int, choices=[1, 2, 3], default=2,
                               help='MeTalk level (default: 2).')
+    compress_cmd.add_argument('--ollama', '--use-local', dest='ollama', action='store_true',
+                              help='Compress with a local Ollama model instead of deterministic pruning.')
+    compress_cmd.add_argument('--ollama-model', default=DEFAULT_OLLAMA_MODEL,
+                              help=f'Local Ollama model to use (default: {DEFAULT_OLLAMA_MODEL}).')
     compress_cmd.set_defaults(func=cmd_compress)
 
     # bench

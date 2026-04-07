@@ -1,6 +1,8 @@
 """Tests for cli/crumb.py — parsing, validation, CLI commands, and edge cases."""
 
+import json
 import os
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -196,6 +198,42 @@ class TestCmdNew:
         assert "kind=task" in output
         assert "Do something" in output
 
+    def test_new_task_with_ollama(self, monkeypatch, capsys):
+        generated = """BEGIN CRUMB
+v=1.1
+kind=task
+title=Local task
+source=local.ollama
+---
+[goal]
+Do something locally
+
+[context]
+- Local context
+
+[constraints]
+- Stay valid
+END CRUMB
+"""
+        monkeypatch.setattr(crumb, "ensure_ollama_available", lambda model=None: None)
+        monkeypatch.setattr(crumb, "generate_text", lambda prompt, model=None: generated)
+        crumb.main(["new", "task", "--ollama", "--title", "Local task", "--goal", "Do something locally"])
+        output = capsys.readouterr().out
+        assert "BEGIN CRUMB" in output
+        assert "kind=task" in output
+        assert "Do something locally" in output
+
+    def test_new_task_with_ollama_fails_gracefully(self, monkeypatch, capsys):
+        monkeypatch.setattr(
+            crumb,
+            "ensure_ollama_available",
+            lambda model=None: (_ for _ in ()).throw(crumb.LocalAIError("Start Ollama first")),
+        )
+        with pytest.raises(SystemExit) as exc:
+            crumb.main(["new", "task", "--ollama", "--goal", "Do something locally"])
+        assert exc.value.code == 1
+        assert "Start Ollama first" in capsys.readouterr().err
+
     def test_new_mem(self, capsys):
         crumb.main(["new", "mem", "--title", "Prefs", "--source", "test", "--entries", "TypeScript", "No ORMs"])
         output = capsys.readouterr().out
@@ -209,6 +247,55 @@ class TestCmdNew:
         assert "kind=map" in output
         assert "project=myapp" in output
         assert "- src/" in output
+
+    def test_new_task_from_diff(self, tmp_path, monkeypatch, capsys):
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        monkeypatch.chdir(repo)
+        subprocess.run(["git", "init"], check=True, capture_output=True, text=True)
+        subprocess.run(["git", "config", "user.name", "Test User"], check=True, capture_output=True, text=True)
+        subprocess.run(["git", "config", "user.email", "test@example.com"], check=True, capture_output=True, text=True)
+        (repo / "app.py").write_text("print('hello')\n", encoding="utf-8")
+        subprocess.run(["git", "add", "app.py"], check=True, capture_output=True, text=True)
+        subprocess.run(["git", "commit", "-m", "initial"], check=True, capture_output=True, text=True)
+        (repo / "app.py").write_text("print('hello world')\n", encoding="utf-8")
+
+        crumb.main(["new", "task", "--from-diff", "--title", "Diff task"])
+        output = capsys.readouterr().out
+        parsed = crumb.parse_crumb(output)
+        context = "\n".join(parsed["sections"]["context"])
+        assert parsed["headers"]["kind"] == "task"
+        assert "diff --git" in context
+        assert "+print('hello world')" in context
+
+    def test_new_map_from_dir_respects_gitignore(self, tmp_path, capsys):
+        root = tmp_path / "project"
+        root.mkdir()
+        (root / ".gitignore").write_text("node_modules/\nvenv/\n*.log\n", encoding="utf-8")
+        (root / "src").mkdir()
+        (root / "src" / "main.py").write_text("print('ok')\n", encoding="utf-8")
+        (root / "node_modules").mkdir()
+        (root / "node_modules" / "left-pad.js").write_text("module.exports = {};\n", encoding="utf-8")
+        (root / "venv").mkdir()
+        (root / "venv" / "pyvenv.cfg").write_text("home=/usr/bin\n", encoding="utf-8")
+        (root / "debug.log").write_text("ignore me\n", encoding="utf-8")
+
+        crumb.main(["new", "map", "--dir", str(root), "--title", "Repo map"])
+        output = capsys.readouterr().out
+        parsed = crumb.parse_crumb(output)
+        modules = "\n".join(parsed["sections"]["modules"])
+        assert parsed["headers"]["kind"] == "map"
+        assert "src/" in modules
+        assert "main.py" in modules
+        assert "node_modules" not in modules
+        assert "venv" not in modules
+        assert "debug.log" not in modules
+
+    def test_new_task_from_diff_rejects_other_kinds(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            crumb.main(["new", "mem", "--from-diff"])
+        assert exc.value.code == 1
+        assert "only supported with `crumb new task`" in capsys.readouterr().err
 
 
 # ── cmd_validate ─────────────────────────────────────────────────────
@@ -452,6 +539,48 @@ class TestScoreEntry:
 
 
 # ── cmd_compact ──────────────────────────────────────────────────────
+
+class TestCmdCompress:
+    def test_compress_with_ollama(self, tmp_path, monkeypatch, capsys):
+        source = tmp_path / "input.crumb"
+        source.write_text(VALID_TASK)
+        generated = """BEGIN CRUMB
+v=1.1
+kind=task
+title=Fix login bug
+source=cursor.agent
+---
+[goal]
+Fix the redirect loop.
+
+[context]
+- JWT auth
+
+[constraints]
+- Keep login UI
+END CRUMB
+"""
+        monkeypatch.setattr(crumb, "ensure_ollama_available", lambda model=None: None)
+        monkeypatch.setattr(crumb, "generate_text", lambda prompt, model=None: generated)
+        crumb.main(["compress", str(source), "--ollama"])
+        output = capsys.readouterr().out
+        parsed = crumb.parse_crumb(output)
+        assert parsed["headers"]["kind"] == "task"
+        assert "goal" in parsed["sections"]
+
+    def test_compress_with_ollama_fails_gracefully(self, tmp_path, monkeypatch, capsys):
+        source = tmp_path / "input.crumb"
+        source.write_text(VALID_TASK)
+        monkeypatch.setattr(
+            crumb,
+            "ensure_ollama_available",
+            lambda model=None: (_ for _ in ()).throw(crumb.LocalAIError("Start Ollama first")),
+        )
+        with pytest.raises(SystemExit) as exc:
+            crumb.main(["compress", str(source), "--ollama"])
+        assert exc.value.code == 1
+        assert "Start Ollama first" in capsys.readouterr().err
+
 
 class TestCmdCompact:
     def test_compact_strips_optional_headers(self, tmp_path, capsys):
@@ -1047,19 +1176,89 @@ class TestTemplates:
 
 EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
 CRUMBS_DIR = Path(__file__).resolve().parent.parent / "crumbs"
-
-
+PROMPTS_DIR = Path(__file__).resolve().parent.parent / "prompts"
+BROWSER_EXTENSION_DIR = Path(__file__).resolve().parent.parent / "browser-extension"
+VSCODE_EXTENSION_DIR = Path(__file__).resolve().parent.parent / "vscode-extension"
 @pytest.mark.parametrize("example", sorted(EXAMPLES_DIR.glob("*.crumb")))
 def test_example_validates(example):
     text = example.read_text(encoding="utf-8")
     result = crumb.parse_crumb(text)
     assert "headers" in result
     assert "sections" in result
-
-
 @pytest.mark.parametrize("crumb_file", sorted(CRUMBS_DIR.glob("*.crumb")))
 def test_dogfood_crumb_validates(crumb_file):
     text = crumb_file.read_text(encoding="utf-8")
     result = crumb.parse_crumb(text)
     assert "headers" in result
     assert "sections" in result
+
+
+class TestPromptAssets:
+    @pytest.mark.parametrize(
+        "filename,target,source_value",
+        [
+            ("chatgpt_custom_instructions.md", "ChatGPT", "source=chatgpt"),
+            ("claude_projects.md", "Claude", "source=claude.project"),
+            ("cursor_rules.md", "Cursor", "source=cursor.rules"),
+        ],
+    )
+    def test_prompt_file_contains_zero_install_instruction(self, filename, target, source_value):
+        path = PROMPTS_DIR / filename
+        assert path.exists()
+        text = path.read_text(encoding="utf-8")
+        assert f"/crumb" in text
+        assert "BEGIN CRUMB" in text
+        assert "END CRUMB" in text
+        assert "[goal]" in text
+        assert "[context]" in text
+        assert "[constraints]" in text
+        assert source_value in text
+        assert target in text
+
+
+class TestBrowserExtensionAssets:
+    def test_manifest_targets_supported_ai_sites(self):
+        manifest = json.loads((BROWSER_EXTENSION_DIR / "manifest.json").read_text(encoding="utf-8"))
+        expected_sites = {
+            "https://chatgpt.com/*",
+            "https://chat.openai.com/*",
+            "https://claude.ai/*",
+            "https://gemini.google.com/*",
+        }
+        assert expected_sites.issubset(set(manifest["host_permissions"]))
+        matches = set(manifest["content_scripts"][0]["matches"])
+        assert expected_sites.issubset(matches)
+
+    def test_content_script_includes_copy_button_and_log_crumb_generation(self):
+        text = (BROWSER_EXTENSION_DIR / "content.js").read_text(encoding="utf-8")
+        assert "Copy as CRUMB" in text
+        assert "kind=log" in text
+        assert "copyRecentChatAsCrumb" in text
+        assert "chatgpt" in text
+        assert "claude" in text
+        assert "gemini" in text
+
+
+class TestVSCodeSnippetAssets:
+    def test_package_points_to_v1_snippet_file(self):
+        package_json = json.loads((VSCODE_EXTENSION_DIR / "package.json").read_text(encoding="utf-8"))
+        snippets = package_json["contributes"]["snippets"]
+        assert any(item["path"] == "./snippets/crumb.code-snippets" for item in snippets)
+
+    def test_vscode_snippet_file_covers_all_crumb_kinds(self):
+        snippets = json.loads((VSCODE_EXTENSION_DIR / "snippets" / "crumb.code-snippets").read_text(encoding="utf-8"))
+        required_prefixes = {
+            "!crumb-task",
+            "!crumb-mem",
+            "!crumb-map",
+            "!crumb-log",
+            "!crumb-todo",
+        }
+        found_prefixes = {snippet["prefix"] for snippet in snippets.values()}
+        assert required_prefixes == found_prefixes
+        for snippet in snippets.values():
+            body = "\n".join(snippet["body"])
+            assert "BEGIN CRUMB" in body
+            assert "v=1.1" in body
+            assert "END CRUMB" in body
+

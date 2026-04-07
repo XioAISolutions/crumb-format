@@ -1,277 +1,494 @@
-// Listen for messages from the background service worker
+const BUTTON_ID = "crumb-copy-button";
+const TOAST_ID = "crumb-toast";
+const MAX_VISIBLE_MESSAGES = 4;
+
+const PLATFORM_CONFIG = {
+  chatgpt: {
+    label: "ChatGPT",
+    source: "browser.chatgpt",
+    hosts: ["chatgpt.com", "chat.openai.com"],
+    containerSelectors: ["main", "[data-testid='conversation-turns']", "#__next main"],
+    messageSelectors: [
+      { selector: "[data-message-author-role='user']", role: "user" },
+      { selector: "[data-message-author-role='assistant']", role: "assistant" },
+      { selector: "article[data-testid^='conversation-turn-']", role: "unknown" }
+    ]
+  },
+  claude: {
+    label: "Claude",
+    source: "browser.claude",
+    hosts: ["claude.ai"],
+    containerSelectors: ["main", "[data-testid='chat-container']", "section[aria-label='Artifacts']"],
+    messageSelectors: [
+      { selector: "[data-testid='user-message']", role: "user" },
+      { selector: "[data-testid='assistant-message']", role: "assistant" },
+      { selector: "[data-testid*='message']", role: "unknown" }
+    ]
+  },
+  gemini: {
+    label: "Gemini",
+    source: "browser.gemini",
+    hosts: ["gemini.google.com"],
+    containerSelectors: ["main", "chat-app", "mat-sidenav-content"],
+    messageSelectors: [
+      { selector: "user-query", role: "user" },
+      { selector: "model-response", role: "assistant" },
+      { selector: "[data-test-id='user-query']", role: "user" },
+      { selector: "[data-test-id='model-response']", role: "assistant" }
+    ]
+  }
+};
+
+let injectTimer = null;
+let observing = false;
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "parse-crumb") {
-    const crumb = parseToCrumb(message.text);
-    sendResponse({ crumb });
-  } else if (message.action === "copy-to-clipboard") {
-    copyToClipboard(message.text);
+    try {
+      sendResponse({ crumb: parseSelectionToCrumb(message.text || "") });
+    } catch (error) {
+      sendResponse({ error: String(error.message || error) });
+    }
+    return true;
   }
-  return true; // keep channel open for async response
+
+  if (message.action === "copy-to-clipboard") {
+    copyToClipboard(message.text || "")
+      .then(() => sendResponse({ ok: true }))
+      .catch((error) => sendResponse({ ok: false, error: String(error.message || error) }));
+    return true;
+  }
+
+  if (message.action === "copy-recent-chat") {
+    copyRecentChatAsCrumb()
+      .then((crumb) => sendResponse({ ok: true, crumb }))
+      .catch((error) => sendResponse({ ok: false, error: String(error.message || error) }));
+    return true;
+  }
+
+  return false;
 });
 
-/**
- * Parse raw selected text into a structured CRUMB format.
- */
-function parseToCrumb(text) {
-  const codeBlocks = extractCodeBlocks(text);
-  const decisions = extractDecisions(text);
-  const actionItems = extractActionItems(text);
-  const goal = inferGoal(text);
-  const context = buildContext(text, codeBlocks, decisions);
-  const constraints = inferConstraints(text);
+initialize();
 
-  let crumb = `---\nformat: crumb\nversion: 1.0\n---\n\n`;
-
-  // [goal]
-  crumb += `[goal]\n${goal}\n\n`;
-
-  // [context]
-  crumb += `[context]\n${context}\n\n`;
-
-  // [constraints]
-  if (constraints.length > 0) {
-    crumb += `[constraints]\n`;
-    constraints.forEach((c) => {
-      crumb += `- ${c}\n`;
-    });
-    crumb += `\n`;
+function initialize() {
+  if (!getPlatformConfig()) {
+    return;
   }
-
-  // [decisions]
-  if (decisions.length > 0) {
-    crumb += `[decisions]\n`;
-    decisions.forEach((d) => {
-      crumb += `- ${d}\n`;
-    });
-    crumb += `\n`;
-  }
-
-  // [action_items]
-  if (actionItems.length > 0) {
-    crumb += `[action_items]\n`;
-    actionItems.forEach((item) => {
-      crumb += `- [ ] ${item}\n`;
-    });
-    crumb += `\n`;
-  }
-
-  // [code_snippets]
-  if (codeBlocks.length > 0) {
-    crumb += `[code_snippets]\n`;
-    codeBlocks.forEach((block, i) => {
-      crumb += `\`\`\`${block.lang}\n${block.code}\n\`\`\`\n`;
-      if (i < codeBlocks.length - 1) crumb += `\n`;
-    });
-    crumb += `\n`;
-  }
-
-  return crumb.trimEnd() + "\n";
+  scheduleButtonInjection(0);
+  startObservers();
 }
 
-/**
- * Extract fenced code blocks (``` ... ```)
- */
-function extractCodeBlocks(text) {
-  const blocks = [];
-  const regex = /```(\w*)\n?([\s\S]*?)```/g;
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    blocks.push({
-      lang: match[1] || "",
-      code: match[2].trim()
-    });
-  }
-  return blocks;
+function getPlatformConfig() {
+  const hostname = window.location.hostname;
+  return Object.values(PLATFORM_CONFIG).find((config) =>
+    config.hosts.some((host) => hostname === host || hostname.endsWith(`.${host}`))
+  ) || null;
 }
 
-/**
- * Extract decision statements from the text.
- */
-function extractDecisions(text) {
-  const patterns = [
-    /(?:decided to|going with|let's use|we'll use|choosing|opted for|settled on)\s+(.+?)(?:\.|$)/gim
+function startObservers() {
+  if (observing) {
+    return;
+  }
+  observing = true;
+
+  const observer = new MutationObserver(() => scheduleButtonInjection(250));
+  observer.observe(document.documentElement || document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  window.addEventListener("popstate", () => scheduleButtonInjection(250));
+  window.addEventListener("hashchange", () => scheduleButtonInjection(250));
+}
+
+function scheduleButtonInjection(delayMs) {
+  clearTimeout(injectTimer);
+  injectTimer = setTimeout(() => {
+    injectCopyButton();
+  }, delayMs);
+}
+
+function injectCopyButton() {
+  if (document.getElementById(BUTTON_ID)) {
+    return;
+  }
+
+  const platform = getPlatformConfig();
+  if (!platform || !findChatContainer(platform)) {
+    return;
+  }
+
+  const button = document.createElement("button");
+  button.id = BUTTON_ID;
+  button.type = "button";
+  button.textContent = "Copy as CRUMB";
+  button.setAttribute("aria-label", "Copy recent chat as CRUMB");
+
+  Object.assign(button.style, {
+    position: "fixed",
+    right: "20px",
+    bottom: "20px",
+    zIndex: "2147483647",
+    padding: "10px 14px",
+    borderRadius: "999px",
+    border: "1px solid rgba(255,255,255,0.12)",
+    background: "linear-gradient(135deg, #f97316, #fb923c)",
+    color: "#111827",
+    fontSize: "13px",
+    fontWeight: "700",
+    fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    boxShadow: "0 10px 24px rgba(0,0,0,0.22)",
+    cursor: "pointer"
+  });
+
+  button.addEventListener("mouseenter", () => {
+    button.style.transform = "translateY(-1px)";
+  });
+  button.addEventListener("mouseleave", () => {
+    button.style.transform = "translateY(0)";
+  });
+
+  button.addEventListener("click", async () => {
+    const originalLabel = button.textContent;
+    button.disabled = true;
+    button.textContent = "Copying…";
+    button.style.opacity = "0.85";
+
+    try {
+      await copyRecentChatAsCrumb();
+    } catch (error) {
+      showToast(error.message || "Could not create CRUMB.", true);
+    } finally {
+      button.disabled = false;
+      button.textContent = originalLabel;
+      button.style.opacity = "1";
+    }
+  });
+
+  document.body.appendChild(button);
+}
+
+function findChatContainer(platform) {
+  for (const selector of platform.containerSelectors) {
+    const node = document.querySelector(selector);
+    if (node && isVisible(node)) {
+      return node;
+    }
+  }
+  return null;
+}
+
+async function copyRecentChatAsCrumb() {
+  const crumb = buildLogCrumbFromVisibleMessages();
+  await copyToClipboard(crumb);
+  showToast("Copied as CRUMB.");
+  return crumb;
+}
+
+function buildLogCrumbFromVisibleMessages() {
+  const platform = getPlatformConfig();
+  if (!platform) {
+    throw new Error("This page is not a supported AI chat surface.");
+  }
+
+  const messages = collectRecentVisibleMessages(platform, MAX_VISIBLE_MESSAGES);
+  if (messages.length === 0) {
+    throw new Error("No recent visible chat messages were found.");
+  }
+
+  const createdAt = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+  const title = sanitizeHeaderValue(`Recent handoff from ${platform.label}`);
+  const lines = [
+    "BEGIN CRUMB",
+    "v=1.1",
+    "kind=log",
+    `title=${title}`,
+    `source=${platform.source}`,
+    "url=https://github.com/XioAISolutions/crumb-format",
+    "---",
+    "[entries]"
   ];
-  const decisions = [];
-  const seen = new Set();
 
-  for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(text)) !== null) {
-      const decision = match[0].trim().replace(/\.$/, "");
-      const key = decision.toLowerCase();
-      if (!seen.has(key)) {
-        seen.add(key);
-        decisions.push(capitalizeFirst(decision));
+  for (const item of messages) {
+    const role = item.role === "assistant" ? "ASSISTANT" : "USER";
+    const text = truncateText(item.text, 1600).replace(/\n+/g, " ");
+    lines.push(`- [${createdAt}] ${role}: ${text}`);
+  }
+
+  lines.push("END CRUMB", "");
+  return lines.join("\n");
+}
+
+function collectRecentVisibleMessages(platform, limit) {
+  const seenNodes = new Set();
+  const collected = [];
+
+  for (const descriptor of platform.messageSelectors) {
+    const nodes = document.querySelectorAll(descriptor.selector);
+    for (const node of nodes) {
+      if (seenNodes.has(node) || !isVisible(node)) {
+        continue;
       }
+      const text = extractText(node);
+      if (!text) {
+        continue;
+      }
+      seenNodes.add(node);
+      collected.push({
+        node,
+        role: descriptor.role === "unknown" ? inferRole(node) : descriptor.role,
+        text
+      });
     }
   }
-  return decisions;
+
+  if (collected.length === 0) {
+    const fallbackNodes = document.querySelectorAll("main article, main [role='listitem'], main section, main div");
+    for (const node of fallbackNodes) {
+      if (seenNodes.has(node) || !isVisible(node)) {
+        continue;
+      }
+      const text = extractText(node);
+      if (!text || text.length < 20) {
+        continue;
+      }
+      seenNodes.add(node);
+      collected.push({ node, role: inferRole(node), text });
+    }
+  }
+
+  const deduped = [];
+  const seenKeys = new Set();
+  for (const item of collected) {
+    const key = `${item.role}::${item.text}`;
+    if (seenKeys.has(key)) {
+      continue;
+    }
+    seenKeys.add(key);
+    deduped.push(item);
+  }
+
+  const trimmed = deduped.slice(-limit);
+  return trimmed.map((item) => ({
+    role: item.role === "assistant" ? "assistant" : "user",
+    text: item.text
+  }));
 }
 
-/**
- * Extract action items (TODOs, next steps, etc.)
- */
-function extractActionItems(text) {
-  const patterns = [
-    /(?:TODO|FIXME|HACK)[\s:]+(.+?)(?:\n|$)/gi,
-    /(?:next step|need to|needs to|should|must)[\s:]+(.+?)(?:\.|;|\n|$)/gim,
-    /(?:fix|implement|add|create|update|refactor|write|build|set up|configure)\s+(.+?)(?:\.|;|\n|$)/gim
+function inferRole(node) {
+  const attrRole = node.getAttribute("data-message-author-role");
+  if (attrRole === "assistant" || attrRole === "user") {
+    return attrRole;
+  }
+
+  const testId = (node.getAttribute("data-testid") || "").toLowerCase();
+  if (testId.includes("assistant") || testId.includes("model")) {
+    return "assistant";
+  }
+  if (testId.includes("user") || testId.includes("human")) {
+    return "user";
+  }
+
+  const tagName = node.tagName.toLowerCase();
+  if (tagName === "model-response") {
+    return "assistant";
+  }
+  if (tagName === "user-query") {
+    return "user";
+  }
+
+  const className = String(node.className || "").toLowerCase();
+  if (className.includes("assistant") || className.includes("markdown") || className.includes("model")) {
+    return "assistant";
+  }
+  if (className.includes("user") || className.includes("human")) {
+    return "user";
+  }
+
+  return "assistant";
+}
+
+function parseSelectionToCrumb(text) {
+  const cleaned = normalizeText(text);
+  const goal = inferGoal(cleaned);
+  const contextItems = buildContextItems(cleaned);
+  const constraintItems = inferConstraints(cleaned);
+
+  const lines = [
+    "BEGIN CRUMB",
+    "v=1.1",
+    "kind=task",
+    "title=Selection handoff",
+    "source=browser.selection",
+    "url=https://github.com/XioAISolutions/crumb-format",
+    "---",
+    "[goal]",
+    goal,
+    "",
+    "[context]"
   ];
+
+  contextItems.forEach((item) => lines.push(`- ${item}`));
+  lines.push("", "[constraints]");
+
+  if (constraintItems.length === 0) {
+    lines.push("- Preserve the intent and details from the selected text.");
+  } else {
+    constraintItems.forEach((item) => lines.push(`- ${item}`));
+  }
+
+  lines.push("END CRUMB", "");
+  return lines.join("\n");
+}
+
+function buildContextItems(text) {
   const items = [];
-  const seen = new Set();
+  const lines = text
+    .split(/\n+/)
+    .map((line) => normalizeText(line))
+    .filter(Boolean);
 
-  // Specific TODO/FIXME patterns get full match
-  let match;
-  const todoPattern = /(?:TODO|FIXME|HACK)[\s:]+(.+?)(?:\n|$)/gi;
-  while ((match = todoPattern.exec(text)) !== null) {
-    const item = match[1].trim();
-    const key = item.toLowerCase();
-    if (!seen.has(key) && item.length > 3) {
-      seen.add(key);
-      items.push(capitalizeFirst(item));
+  for (const line of lines) {
+    if (line.length < 8) {
+      continue;
+    }
+    items.push(truncateText(line, 220));
+    if (items.length >= 6) {
+      break;
     }
   }
 
-  // "next step" / "need to" patterns
-  const needPattern = /(?:next step|need to|needs to)[\s:]+(.+?)(?:\.|;|\n|$)/gim;
-  while ((match = needPattern.exec(text)) !== null) {
-    const item = match[1].trim();
-    const key = item.toLowerCase();
-    if (!seen.has(key) && item.length > 3) {
-      seen.add(key);
-      items.push(capitalizeFirst(item));
-    }
+  if (items.length === 0) {
+    items.push("Selected excerpt from an AI conversation.");
   }
-
   return items;
 }
 
-/**
- * Infer a goal from the text — uses the first meaningful sentence.
- */
 function inferGoal(text) {
-  // Strip code blocks for goal inference
-  const cleaned = text.replace(/```[\s\S]*?```/g, "").trim();
-  const sentences = cleaned.split(/[.\n]/).filter((s) => s.trim().length > 10);
+  const sentences = text.split(/[.!?\n]/).map((part) => normalizeText(part)).filter((part) => part.length > 12);
   if (sentences.length > 0) {
-    return capitalizeFirst(sentences[0].trim());
+    return truncateText(sentences[0], 180);
   }
-  return "Complete the task described in the conversation";
+  return "Continue the work described in the selected conversation excerpt.";
 }
 
-/**
- * Build context from the text, code, and decisions.
- */
-function buildContext(text, codeBlocks, decisions) {
-  const parts = [];
-
-  // Summarize conversation length
-  const wordCount = text.split(/\s+/).length;
-  parts.push(`Extracted from conversation (~${wordCount} words).`);
-
-  if (codeBlocks.length > 0) {
-    const langs = [...new Set(codeBlocks.map((b) => b.lang).filter(Boolean))];
-    if (langs.length > 0) {
-      parts.push(`Code languages: ${langs.join(", ")}.`);
-    }
-    parts.push(`${codeBlocks.length} code snippet(s) included.`);
-  }
-
-  if (decisions.length > 0) {
-    parts.push(`${decisions.length} decision(s) noted.`);
-  }
-
-  return parts.join(" ");
-}
-
-/**
- * Infer constraints from the text.
- */
 function inferConstraints(text) {
-  const constraints = [];
-  const patterns = [
-    /(?:must not|cannot|don't|do not|should not|shouldn't|avoid)\s+(.+?)(?:\.|;|\n|$)/gim,
-    /(?:constraint|requirement|limitation)[\s:]+(.+?)(?:\.|;|\n|$)/gim
-  ];
+  const matches = [];
   const seen = new Set();
+  const patterns = [
+    /(?:must not|cannot|don't|do not|avoid|should not|shouldn't)\s+(.+?)(?:[.;\n]|$)/gim,
+    /(?:constraint|requirement|limitation)[\s:]+(.+?)(?:[.;\n]|$)/gim
+  ];
 
   for (const pattern of patterns) {
     let match;
     while ((match = pattern.exec(text)) !== null) {
-      const constraint = match[0].trim().replace(/\.$/, "");
-      const key = constraint.toLowerCase();
-      if (!seen.has(key) && constraint.length > 5) {
-        seen.add(key);
-        constraints.push(capitalizeFirst(constraint));
+      const value = normalizeText(match[1] || match[0]);
+      const key = value.toLowerCase();
+      if (!value || seen.has(key)) {
+        continue;
       }
+      seen.add(key);
+      matches.push(truncateText(value, 180));
     }
   }
-  return constraints;
+
+  return matches.slice(0, 4);
 }
 
-function capitalizeFirst(str) {
-  if (!str) return str;
-  return str.charAt(0).toUpperCase() + str.slice(1);
+function extractText(node) {
+  const text = normalizeText(node.innerText || node.textContent || "");
+  if (!text) {
+    return "";
+  }
+  return truncateText(text, 1600);
 }
 
-/**
- * Copy text to clipboard and show toast notification.
- */
-function copyToClipboard(text) {
-  navigator.clipboard.writeText(text).then(
-    () => showToast(),
-    (err) => {
-      // Fallback: textarea copy
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.style.position = "fixed";
-      ta.style.left = "-9999px";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-      showToast();
-    }
-  );
+function normalizeText(text) {
+  return String(text || "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
 }
 
-/**
- * Show a small toast notification with orange accent.
- */
-function showToast() {
-  const existing = document.getElementById("crumb-toast");
-  if (existing) existing.remove();
+function sanitizeHeaderValue(value) {
+  return String(value || "handoff").replace(/[\r\n]+/g, " ").trim();
+}
+
+function truncateText(text, limit) {
+  if (text.length <= limit) {
+    return text;
+  }
+  return `${text.slice(0, limit - 1).trimEnd()}…`;
+}
+
+function isVisible(node) {
+  if (!node || !(node instanceof Element)) {
+    return false;
+  }
+  const style = window.getComputedStyle(node);
+  if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") {
+    return false;
+  }
+  const rect = node.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+async function copyToClipboard(text) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  document.execCommand("copy");
+  textarea.remove();
+}
+
+function showToast(message, isError = false) {
+  const existing = document.getElementById(TOAST_ID);
+  if (existing) {
+    existing.remove();
+  }
 
   const toast = document.createElement("div");
-  toast.id = "crumb-toast";
-  toast.textContent = "Crumb copied to clipboard!";
+  toast.id = TOAST_ID;
+  toast.textContent = message;
+
   Object.assign(toast.style, {
     position: "fixed",
-    bottom: "24px",
-    right: "24px",
-    background: "#1e1e1e",
-    color: "#fff",
-    padding: "12px 20px",
-    borderRadius: "8px",
-    borderLeft: "4px solid #f97316",
-    fontFamily: "'Segoe UI', system-ui, sans-serif",
-    fontSize: "14px",
+    right: "20px",
+    bottom: "72px",
     zIndex: "2147483647",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-    transition: "opacity 0.3s ease",
-    opacity: "0"
+    background: isError ? "#7f1d1d" : "#111827",
+    color: "#ffffff",
+    borderLeft: `4px solid ${isError ? "#ef4444" : "#f97316"}`,
+    borderRadius: "10px",
+    padding: "12px 16px",
+    maxWidth: "320px",
+    boxShadow: "0 10px 24px rgba(0,0,0,0.28)",
+    fontSize: "13px",
+    fontFamily: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+    opacity: "0",
+    transition: "opacity 0.2s ease"
   });
 
   document.body.appendChild(toast);
-
-  // Fade in
   requestAnimationFrame(() => {
     toast.style.opacity = "1";
   });
 
-  // Fade out and remove after 2.5s
   setTimeout(() => {
     toast.style.opacity = "0";
-    setTimeout(() => toast.remove(), 300);
-  }, 2500);
+    setTimeout(() => toast.remove(), 220);
+  }, 2200);
 }

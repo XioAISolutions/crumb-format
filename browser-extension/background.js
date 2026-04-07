@@ -1,16 +1,23 @@
-// Create context menu item on install
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({
     id: "crumb-it",
-    title: "Crumb it",
-    contexts: ["selection"]
+    title: "Copy as CRUMB",
+    contexts: ["selection", "page"],
+    documentUrlPatterns: [
+      "https://chatgpt.com/*",
+      "https://chat.openai.com/*",
+      "https://claude.ai/*",
+      "https://gemini.google.com/*"
+    ]
   });
 });
 
-// Handle context menu click
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === "crumb-it" && info.selectionText) {
-    // Send selected text to content script for parsing
+  if (!tab || !tab.id || info.menuItemId !== "crumb-it") {
+    return;
+  }
+
+  if (info.selectionText && info.selectionText.trim()) {
     chrome.tabs.sendMessage(
       tab.id,
       {
@@ -19,11 +26,11 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       },
       (response) => {
         if (chrome.runtime.lastError) {
-          console.error("Crumb error:", chrome.runtime.lastError.message);
+          console.error("CRUMB parse error:", chrome.runtime.lastError.message);
           return;
         }
+
         if (response && response.crumb) {
-          // Copy the crumb to clipboard via the content script
           chrome.tabs.sendMessage(tab.id, {
             action: "copy-to-clipboard",
             text: response.crumb
@@ -31,5 +38,16 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         }
       }
     );
+    return;
   }
+
+  chrome.tabs.sendMessage(tab.id, { action: "copy-recent-chat" }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.error("CRUMB capture error:", chrome.runtime.lastError.message);
+      return;
+    }
+    if (response && response.error) {
+      console.error("CRUMB capture error:", response.error);
+    }
+  });
 });
