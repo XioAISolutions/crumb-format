@@ -11,6 +11,7 @@ import re
 import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from importlib.metadata import PackageNotFoundError, distribution, version
 from pathlib import Path
@@ -57,12 +58,12 @@ def print_wrapper_commands() -> None:
     print("Extra commands:")
     print("  crumb version          Show installed version")
     print("  crumb update --check   Check for a newer release")
-    print("  crumb update           Upgrade the installed package")
+    print("  crumb update           Upgrade the installed package or repo checkout")
     print()
 
 
 def _fallback_version_key(raw: str):
-    parts = re.findall(r"\d+|[A-Za-z]+", raw)
+    parts = re.findall(r"\\d+|[A-Za-z]+", raw)
     normalized = []
     for part in parts:
         normalized.append(int(part) if part.isdigit() else part.lower())
@@ -76,6 +77,50 @@ def is_newer_version(latest: str, current: str) -> bool:
         return Version(latest) > Version(current)
     except Exception:
         return _fallback_version_key(latest) > _fallback_version_key(current)
+
+
+def _git_run(args: list[str], cwd: Path | None = None, check: bool = False) -> str:
+    completed = subprocess.run(
+        ["git", *args],
+        cwd=str(cwd) if cwd else None,
+        capture_output=True,
+        text=True,
+    )
+    if check and completed.returncode != 0:
+        raise subprocess.CalledProcessError(
+            completed.returncode,
+            completed.args,
+            output=completed.stdout,
+            stderr=completed.stderr,
+        )
+    return completed.stdout.strip()
+
+
+def get_editable_repo_root() -> Path | None:
+    try:
+        dist = distribution(PACKAGE_NAME)
+        direct_url = dist.read_text("direct_url.json")
+        if not direct_url:
+            return None
+        payload = json.loads(direct_url)
+        if not payload.get("dir_info", {}).get("editable"):
+            return None
+        raw_url = payload.get("url")
+        if not raw_url:
+            return None
+        parsed = urllib.parse.urlparse(raw_url)
+        if parsed.scheme != "file":
+            return None
+        path = urllib.request.url2pathname(parsed.path)
+        if os.name == "nt" and re.match(r"^/[A-Za-z]:", path):
+            path = path[1:]
+        return Path(path).resolve()
+    except Exception:
+        return None
+
+
+def is_editable_install() -> bool:
+    return get_editable_repo_root() is not None
 
 
 def get_latest_version(timeout: float = 2.5) -> str | None:
@@ -92,16 +137,15 @@ def get_latest_version(timeout: float = 2.5) -> str | None:
         return None
 
 
-def is_editable_install() -> bool:
+def get_editable_update_status(repo_root: Path) -> tuple[str | None, int | None]:
     try:
-        dist = distribution(PACKAGE_NAME)
-        direct_url = dist.read_text("direct_url.json")
-        if not direct_url:
-            return False
-        payload = json.loads(direct_url)
-        return bool(payload.get("dir_info", {}).get("editable"))
+        _git_run(["fetch", "--quiet"], cwd=repo_root, check=True)
+        upstream = _git_run(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], cwd=repo_root, check=True)
+        behind_raw = _git_run(["rev-list", "--count", "HEAD..@{u}"], cwd=repo_root, check=True)
+        behind = int(behind_raw or "0")
+        return upstream, behind
     except Exception:
-        return False
+        return None, None
 
 
 def load_update_cache() -> dict:
@@ -130,13 +174,35 @@ def maybe_notify_update(argv: list[str]) -> None:
     cache = load_update_cache()
     now = int(__import__("time").time())
     last_checked = int(cache.get("last_checked", 0) or 0)
-    latest = cache.get("latest_version")
 
+    repo_root = get_editable_repo_root()
+    if repo_root:
+        upstream = cache.get("upstream")
+        behind = cache.get("behind")
+        if now - last_checked >= UPDATE_CHECK_INTERVAL_SECONDS or behind is None:
+            upstream, behind = get_editable_update_status(repo_root)
+            save_update_cache(
+                {
+                    "last_checked": now,
+                    "mode": "editable",
+                    "upstream": upstream,
+                    "behind": behind,
+                }
+            )
+        if upstream and isinstance(behind, int) and behind > 0:
+            print(
+                f"{BREAD} Repo update available: behind {upstream} by {behind} commit(s)  (run: crumb update)",
+                file=sys.stderr,
+            )
+        return
+
+    latest = cache.get("latest_version")
     if now - last_checked >= UPDATE_CHECK_INTERVAL_SECONDS or not latest:
         latest = get_latest_version()
         save_update_cache(
             {
                 "last_checked": now,
+                "mode": "pypi",
                 "latest_version": latest,
             }
         )
@@ -162,12 +228,12 @@ def build_update_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--check",
         action="store_true",
-        help="Only check whether a newer release is available.",
+        help="Only check whether a newer release or repo update is available.",
     )
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Allow pip upgrade even when this is an editable install.",
+        help="For editable installs, force a PyPI upgrade instead of updating the repo checkout.",
     )
     parser.add_argument(
         "--yes",
@@ -177,9 +243,42 @@ def build_update_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def run_editable_update(repo_root: Path) -> int:
+    print(f"Editable install detected at: {repo_root}")
+    try:
+        subprocess.check_call(["git", "-C", str(repo_root), "pull", "--ff-only"])
+    except subprocess.CalledProcessError as exc:
+        print(f"git pull failed with exit code {exc.returncode}.", file=sys.stderr)
+        return exc.returncode or 1
+
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "-e", str(repo_root)])
+    except subprocess.CalledProcessError as exc:
+        print(f"Editable reinstall failed with exit code {exc.returncode}.", file=sys.stderr)
+        return exc.returncode or 1
+
+    print("Repo update complete.")
+    return 0
+
+
 def cmd_update(argv: list[str]) -> int:
     parser = build_update_parser()
     args = parser.parse_args(argv)
+
+    repo_root = get_editable_repo_root()
+    if repo_root and not args.force:
+        if args.check:
+            upstream, behind = get_editable_update_status(repo_root)
+            if upstream is None or behind is None:
+                print("Could not determine remote repo update status.")
+                print(f"Repo path: {repo_root}")
+                return 1
+            if behind > 0:
+                print(f"Repo update available: behind {upstream} by {behind} commit(s)")
+            else:
+                print(f"Repo checkout is up to date with {upstream}")
+            return 0
+        return run_editable_update(repo_root)
 
     current = get_cli_version()
     latest = get_latest_version()
@@ -196,16 +295,6 @@ def cmd_update(argv: list[str]) -> int:
             print(f"Update available: {current} → {latest}")
         else:
             print(f"Already up to date: {current}")
-        return 0
-
-    if is_editable_install() and not args.force:
-        print("Editable install detected.")
-        print("Run:")
-        print("  git pull")
-        print("  pip install -e .")
-        print("Or run:")
-        print("  crumb update --force")
-        print("to replace the editable install with the published package.")
         return 0
 
     command = [
