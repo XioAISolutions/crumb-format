@@ -1,7 +1,7 @@
 --- task: feat: expand CRUMB into a protocol-grade context workflow
 source: github.pr
 pr: #7
-generated: 2026-04-08T19:12:51Z
+generated: 2026-04-08T19:15:21Z
 ---
 
 [goal]
@@ -12,6 +12,7 @@ generated: 2026-04-08T19:12:51Z
 
 [context]
 Changed files in this PR:
+- .crumb/latest.crumb
 - .github/workflows/validate-examples.yml
 - README.md
 - SPEC.md
