@@ -1,0 +1,15 @@
+BEGIN CRUMB
+v=1.1
+kind=mem
+title=MemPalace export: auth migration
+source=mempalace.bridge
+id=mempalace-auth-migration
+project=work
+tags=bridge, mempalace
+url=https://github.com/XioAISolutions/crumb-format/blob/main/SPEC.md
+extensions=bridge.mempalace.export.v1
+---
+[consolidated]
+- Auth migration moved refresh logic into middleware.ts.
+- Old session cookies still need to validate for one release.
+END CRUMB

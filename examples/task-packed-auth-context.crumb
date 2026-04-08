@@ -1,0 +1,35 @@
+BEGIN CRUMB
+v=1.1
+kind=task
+title=Packed auth redirect handoff
+source=crumb.pack
+id=crumb-pack-auth-redirect
+project=web-app
+tags=pack, auth, refresh
+url=https://github.com/XioAISolutions/crumb-format/blob/main/SPEC.md
+extensions=crumb.pack.v1
+max_total_tokens=1800
+max_index_tokens=900
+x-crumb-pack.strategy=hybrid
+---
+[goal]
+Fix the auth redirect loop that only appears after a hard refresh.
+
+[context]
+- Working tree changes: src/auth.ts, src/middleware.ts, tests/auth-refresh.spec.ts
+- JWT cookie auth is already in place.
+- Redirect loop appears only on full page refresh.
+- Relevant module: src/middleware.ts
+- Relevant module: tests/auth-refresh.spec.ts
+- Open task: Add auth regression test
+
+[constraints]
+- Preserve existing cookie names.
+- Keep the login UI unchanged.
+- Keep the packed handoff within the declared budget.
+
+[sources]
+- task-bug-fix.crumb
+- mem-user-preferences.crumb
+- map-repo-onboarding.crumb
+END CRUMB

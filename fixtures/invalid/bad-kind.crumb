@@ -1,0 +1,9 @@
+BEGIN CRUMB
+v=1.1
+kind=recipe
+title=Unsupported
+source=test
+---
+[goal]
+Unknown kind.
+END CRUMB

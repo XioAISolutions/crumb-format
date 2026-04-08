@@ -2,7 +2,7 @@
 
 **Status:** Draft  
 **Category:** AI handoff format  
-**Goal:** A tiny, human-readable file format for portable AI context handoffs between tools.
+**Goal:** A tiny, human-readable protocol for portable AI context handoffs between tools and memory systems.
 
 ---
 
@@ -74,6 +74,7 @@ Allowed `kind` values:
 - `dream_sessions`
 - `max_index_tokens`
 - `max_total_tokens`
+- `extensions`
 
 ### 3.3 Optional fields
 
@@ -82,6 +83,11 @@ Allowed `kind` values:
 - `env`
 - `tags`
 - `url` — link to the CRUMB spec or project; helps recipients understand the format
+
+Namespaced extension headers are also allowed, for example:
+
+- `x-crumb-pack.strategy`
+- `ext.acme.priority`
 
 ---
 
@@ -169,3 +175,26 @@ The canonical form of `.crumb` is plain text. Binary transports such as `.crumb.
 ## 8. Compatibility
 
 Parsers SHOULD ignore unknown headers and sections. Writers SHOULD add new sections rather than changing the meaning of old ones and bump `v` for breaking changes.
+
+### 8.1 Extension model
+
+CRUMB preserves `v=1.1` compatibility by treating extensions as additive metadata.
+
+Rules:
+
+- unknown headers MUST NOT break parsing
+- unknown sections MUST NOT break parsing
+- `extensions=` SHOULD contain namespaced identifiers such as `crumb.pack.v1`
+- custom extension headers SHOULD be namespaced (for example `x-crumb-pack.strategy=hybrid`)
+- extensions MUST preserve human readability
+
+Examples:
+
+```text
+id=crumb-pack-abc123
+tags=pack, auth
+extensions=crumb.pack.v1, bridge.mempalace.export.v1
+max_total_tokens=1800
+max_index_tokens=900
+x-crumb-pack.strategy=hybrid
+```

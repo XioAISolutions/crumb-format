@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "crumb-format"
 version = "0.2.0"
-description = "The copy-paste AI handoff format."
+description = "Open context interchange protocol for AI workflows."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [{ name = "XIO AI Solutions" }]
-keywords = ["ai", "handoff", "llm", "context", "prompt-engineering"]
+keywords = ["ai", "context", "protocol", "handoff", "mcp", "llm"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",

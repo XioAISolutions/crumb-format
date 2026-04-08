@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import pathlib
 import sys
+import glob
 from typing import Dict, List
 
 REQUIRED_HEADERS = ["v", "kind", "source"]
@@ -10,6 +11,8 @@ REQUIRED_SECTIONS = {
     "task": ["goal", "context", "constraints"],
     "mem": ["consolidated"],
     "map": ["project", "modules"],
+    "log": ["entries"],
+    "todo": ["tasks"],
 }
 
 class ValidationError(Exception):
@@ -70,7 +73,18 @@ if __name__ == "__main__":
         print("usage: validate.py <file> [<file> ...]", file=sys.stderr)
         sys.exit(2)
     exit_code = 0
+    paths: list[str] = []
     for arg in sys.argv[1:]:
+        if any(ch in arg for ch in "*?[]"):
+            matches = sorted(glob.glob(arg))
+            paths.extend(matches or [arg])
+            continue
+        candidate = pathlib.Path(arg)
+        if candidate.is_dir():
+            paths.extend(str(path) for path in sorted(candidate.rglob("*.crumb")))
+            continue
+        paths.append(arg)
+    for arg in paths:
         path = pathlib.Path(arg)
         try:
             parsed = parse_crumb(path.read_text(encoding="utf-8"))
