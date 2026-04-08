@@ -5,6 +5,66 @@ const state = {
   toastTimer: null,
 };
 
+const DEMO_PRESETS = {
+  "launch-task": {
+    mode: "task",
+    title: "Resolve launch redirect blocker",
+    source: "cursor.thread",
+    inputText: [
+      "user: We still have a launch blocker in auth.",
+      "assistant: The redirect loop happens after refresh when the cookie lands after middleware runs.",
+      "user: Keep the existing cookie names and do not touch the login screen.",
+      "assistant: Update middleware.ts, stabilize the refresh path, and add a regression check in tests/auth.spec.ts before shipping.",
+    ].join("\n"),
+  },
+  "founder-memory": {
+    mode: "mem",
+    title: "Founder operating preferences",
+    source: "meeting.notes",
+    inputText: [
+      "Prefers direct technical answers with no fluff.",
+      "Always optimize for something that ships this week, not theoretical architecture.",
+      "Keep the existing CLI stable.",
+      "Avoid platform lock-in and preserve reuse across tools.",
+      "Important: screenshots and demos need to look premium.",
+    ].join("\n"),
+  },
+  "repo-map": {
+    mode: "map",
+    title: "CRUMB Studio launch surface",
+    source: "repo.summary",
+    inputText: [
+      "Desktop app shell lives in studio/app.py and talks to the existing Python engine.",
+      "The transformation layer is in studio/engine.py.",
+      "The visual split-pane lives in studio/static/index.html, studio/static/app.css, and studio/static/app.js.",
+      "Packaging uses studio/packaging/build_studio.py and should emit release-ready desktop artifacts.",
+    ].join("\n"),
+  },
+  "ops-log": {
+    mode: "log",
+    title: "Launch readiness sync",
+    source: "slack.thread",
+    inputText: [
+      "09:05 Design polish landed for the split-pane layout.",
+      "09:14 Packaged app smoke test failed because the frozen bundle could not import crumb.",
+      "09:28 Fixed the bridge to import from cli.crumb and rebuilt the app.",
+      "09:41 macOS bundle smoke test passed from dist/CRUMB-Studio.app.",
+      "09:52 Next step is Windows packaging automation.",
+    ].join("\n"),
+  },
+  "exec-todo": {
+    mode: "todo",
+    title: "Next launch actions",
+    source: "planning.doc",
+    inputText: [
+      "Need to polish the desktop UI for screenshots.",
+      "Add release automation for macOS and Windows.",
+      "Push the branch and open a PR.",
+      "Record a short demo and attach the packaged builds.",
+    ].join("\n"),
+  },
+};
+
 const elements = {
   mode: document.getElementById("modeSelect"),
   title: document.getElementById("titleInput"),
@@ -26,12 +86,17 @@ const elements = {
   historyList: document.getElementById("historyList"),
   modeBadge: document.getElementById("modeBadge"),
   errorBanner: document.getElementById("errorBanner"),
+  resultStrip: document.getElementById("resultStrip"),
+  resultFlow: document.getElementById("resultFlow"),
+  resultShape: document.getElementById("resultShape"),
+  resultTargets: document.getElementById("resultTargets"),
   toast: document.getElementById("toast"),
   statusValue: document.getElementById("statusValue"),
   inputStat: document.getElementById("inputStat"),
   outputStat: document.getElementById("outputStat"),
   ratioStat: document.getElementById("ratioStat"),
   actionNote: document.getElementById("actionNote"),
+  presetCards: Array.from(document.querySelectorAll("[data-preset]")),
 };
 
 const previewBridge = {
@@ -114,7 +179,7 @@ function showToast(message, isError = false) {
 
 function setBusy(isBusy) {
   elements.runButton.disabled = isBusy;
-  elements.runButton.textContent = isBusy ? "Generating…" : "Run / Generate";
+  elements.runButton.textContent = isBusy ? "Generating CRUMB…" : "Generate CRUMB";
 }
 
 function escapeHtml(value) {
@@ -173,15 +238,20 @@ function applyResult(result) {
   elements.modeBadge.textContent = result.mode;
   elements.title.value = result.title || "";
   elements.source.value = result.source || "";
+  const stats = result.stats || {};
   elements.outputPreview.innerHTML = formatCrumb(result.outputText);
   elements.outputPreview.classList.remove("hidden");
   elements.outputEmpty.classList.add("hidden");
+  elements.resultStrip.classList.remove("hidden");
   elements.copyButton.disabled = false;
   elements.saveButton.disabled = false;
   elements.exportButton.disabled = false;
   elements.statusValue.textContent = "Generated";
   elements.actionNote.textContent = `Ready to paste or save · ${result.mode} output`;
-  renderStats(result.stats);
+  elements.resultFlow.textContent = `${result.mode.toUpperCase()} · ${result.source || "crumb.studio"}`;
+  elements.resultShape.textContent = `${stats.input_lines || 0} raw lines → ${stats.output_lines || 0} structured`;
+  elements.resultTargets.textContent = "Claude · ChatGPT · Cursor · Codex";
+  renderStats(stats);
 }
 
 function clearError() {
@@ -200,12 +270,33 @@ function clearResult() {
   elements.outputPreview.innerHTML = "";
   elements.outputPreview.classList.add("hidden");
   elements.outputEmpty.classList.remove("hidden");
+  elements.resultStrip.classList.add("hidden");
   elements.copyButton.disabled = true;
   elements.saveButton.disabled = true;
   elements.exportButton.disabled = true;
   elements.statusValue.textContent = "Ready";
   elements.actionNote.textContent = "Designed for fast screenshots, demos, and copy-paste handoffs.";
   renderStats(null);
+}
+
+async function loadPreset(presetKey, autoRun = true) {
+  const preset = DEMO_PRESETS[presetKey];
+  if (!preset) return;
+
+  elements.presetCards.forEach((card) => {
+    card.classList.toggle("active", card.dataset.preset === presetKey);
+  });
+  elements.mode.value = preset.mode;
+  elements.title.value = preset.title;
+  elements.source.value = preset.source;
+  elements.input.value = preset.inputText;
+  clearError();
+
+  if (autoRun) {
+    await runGeneration();
+  } else {
+    clearResult();
+  }
 }
 
 function renderHistory(items) {
@@ -349,6 +440,12 @@ function wireEvents() {
   elements.historyButton.addEventListener("click", () => toggleHistory(true));
   elements.closeHistoryButton.addEventListener("click", () => toggleHistory(false));
   elements.clearHistoryButton.addEventListener("click", clearHistory);
+  elements.presetCards.forEach((card) => {
+    card.addEventListener("click", async () => {
+      await loadPreset(card.dataset.preset, true);
+      showToast(`${card.querySelector("strong")?.textContent || "Demo"} loaded.`);
+    });
+  });
   elements.exportButton.addEventListener("click", () => {
     elements.exportMenu.classList.toggle("hidden");
   });
@@ -365,6 +462,13 @@ function wireEvents() {
       elements.exportMenu.classList.add("hidden");
     }
   });
+
+  document.addEventListener("keydown", async (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      event.preventDefault();
+      await runGeneration();
+    }
+  });
 }
 
 async function bootstrap() {
@@ -376,6 +480,9 @@ async function bootstrap() {
     if (!window.pywebview || !window.pywebview.api) {
       elements.statusValue.textContent = "Preview mode";
       elements.actionNote.textContent = "Bridge unavailable in the browser preview. Run via crumb studio for the real engine.";
+    }
+    if (!elements.input.value.trim()) {
+      await loadPreset("launch-task", !window.pywebview || !window.pywebview.api);
     }
   }
 }

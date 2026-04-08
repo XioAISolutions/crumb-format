@@ -29,19 +29,73 @@
             <option value="todo">todo</option>
           </select>
         </label>
-        <button id="runButton" class="button button-primary">Run / Generate</button>
+        <button id="runButton" class="button button-primary">Generate CRUMB</button>
       </div>
     </header>
 
     <section class="meta-strip">
-      <label class="field">
-        <span>Title</span>
-        <input id="titleInput" type="text" placeholder="Auto-derived from your input">
-      </label>
-      <label class="field">
-        <span>Source</span>
-        <input id="sourceInput" type="text" value="crumb.studio">
-      </label>
+      <section class="studio-band">
+        <div class="studio-band-copy">
+          <p class="eyebrow">Desktop transformation lab</p>
+          <h2>From thread sludge to portable context.</h2>
+          <p class="studio-band-subcopy">Load a demo preset or paste your own issue thread, meeting notes, repo summary, or chat transcript. Studio turns the raw material into a clean CRUMB artifact you can reuse anywhere.</p>
+          <div class="workflow-rail">
+            <span>Paste raw context</span>
+            <span>Choose mode</span>
+            <span>Ship reusable CRUMB</span>
+          </div>
+        </div>
+
+        <div class="studio-band-controls">
+          <div class="field-row">
+            <label class="field">
+              <span>Title</span>
+              <input id="titleInput" type="text" placeholder="Auto-derived from your input">
+            </label>
+            <label class="field">
+              <span>Source</span>
+              <input id="sourceInput" type="text" value="crumb.studio">
+            </label>
+          </div>
+
+          <div class="preset-strip-header">
+            <div>
+              <p class="pane-eyebrow">One-click demos</p>
+              <p class="preset-strip-copy">Built for screenshots, live demos, and fast first-run clarity.</p>
+            </div>
+            <span class="shortcut-hint">Cmd/Ctrl + Enter to run</span>
+          </div>
+
+          <div class="preset-strip">
+            <button class="preset-card" data-preset="launch-task">
+              <span class="preset-mode">task</span>
+              <strong>Launch blocker</strong>
+              <p>Bug thread into a shippable handoff.</p>
+            </button>
+            <button class="preset-card" data-preset="founder-memory">
+              <span class="preset-mode">mem</span>
+              <strong>Founder memory</strong>
+              <p>Capture durable preferences and decisions.</p>
+            </button>
+            <button class="preset-card" data-preset="repo-map">
+              <span class="preset-mode">map</span>
+              <strong>Repo map</strong>
+              <p>Turn scattered notes into a project overview.</p>
+            </button>
+            <button class="preset-card" data-preset="ops-log">
+              <span class="preset-mode">log</span>
+              <strong>Ops log</strong>
+              <p>Convert status chatter into a clean session record.</p>
+            </button>
+            <button class="preset-card" data-preset="exec-todo">
+              <span class="preset-mode">todo</span>
+              <strong>Next actions</strong>
+              <p>Extract the next concrete tasks from messy context.</p>
+            </button>
+          </div>
+        </div>
+      </section>
+
       <div class="stats-strip" id="statsStrip">
         <div class="stat-card">
           <span class="stat-label">Status</span>
@@ -86,6 +140,21 @@
         </div>
 
         <div id="errorBanner" class="error-banner hidden"></div>
+
+        <div id="resultStrip" class="result-strip hidden">
+          <div class="result-chip">
+            <span class="result-label">Flow</span>
+            <strong id="resultFlow">Raw -> task</strong>
+          </div>
+          <div class="result-chip">
+            <span class="result-label">Shape</span>
+            <strong id="resultShape">0 lines -> 0 lines</strong>
+          </div>
+          <div class="result-chip">
+            <span class="result-label">Ready for</span>
+            <strong id="resultTargets">Claude · ChatGPT · Cursor · Codex</strong>
+          </div>
+        </div>
 
         <div id="outputEmptyState" class="empty-state">
           <strong>Nothing generated yet.</strong>
@@ -134,4 +203,3 @@
   <script src="./app.js"></script>
 </body>
 </html>
-
