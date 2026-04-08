@@ -1,18 +1,52 @@
---- task: feat: add crumb REST API for cross-AI access
+--- task: feat: expand CRUMB into a protocol-grade context workflow
 source: github.pr
-pr: #4
-generated: 2026-04-06T18:00:27Z
+pr: #7
+generated: 2026-04-08T19:12:51Z
 ---
 
 [goal]
-## What changed
+## Summary
+- add protocol-grade context pack, bridge, and lint commands without breaking CRUMB v1.1
+- add extension helpers, conformance fixtures, validator updates, and MCP wiring
+- reposition docs around CRUMB as an open context interchange standard and improve pack shaping for implement/debug/review flows
 
 [context]
 Changed files in this PR:
-- api/README.md
-- api/openapi.json
-- api/openapi.yaml
-- api/server.py
+- .github/workflows/validate-examples.yml
+- README.md
+- SPEC.md
+- cli/bridge.py
+- cli/crumb.py
+- cli/extensions.py
+- cli/linting.py
+- cli/pack.py
+- docs/BRIDGES.md
+- docs/COMPATIBILITY.md
+- docs/PACKS.md
+- docs/PROTOCOL.md
+- docs/SECURITY.md
+- examples/README.md
+- examples/mem-mempalace-auth-migration.crumb
+- examples/task-packed-auth-context.crumb
+- fixtures/extensions/mempalace-export.crumb
+- fixtures/extensions/mempalace-export.expected.json
+- fixtures/extensions/task-packed.crumb
+- fixtures/extensions/task-packed.expected.json
+- fixtures/invalid/bad-kind.crumb
+- fixtures/invalid/bad-kind.expected.txt
+- fixtures/invalid/missing-source.crumb
+- fixtures/invalid/missing-source.expected.txt
+- fixtures/valid/log-basic.crumb
+- fixtures/valid/log-basic.expected.json
+- fixtures/valid/mem-basic.crumb
+- fixtures/valid/mem-basic.expected.json
+- fixtures/valid/task-basic.crumb
+- fixtures/valid/task-basic.expected.json
+- mcp/server.py
+- pyproject.toml
+- tests/test_protocol_features.py
+- validators/validate.js
+- validators/validate.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
