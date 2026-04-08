@@ -19,13 +19,22 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Dict, List
 
-from local_ai import (
-    DEFAULT_OLLAMA_MODEL,
-    LocalAIError,
-    ensure_ollama_available,
-    extract_crumb_block,
-    generate_text,
-)
+try:
+    from local_ai import (
+        DEFAULT_OLLAMA_MODEL,
+        LocalAIError,
+        ensure_ollama_available,
+        extract_crumb_block,
+        generate_text,
+    )
+except ModuleNotFoundError:  # pragma: no cover - used when imported as cli.crumb
+    from cli.local_ai import (
+        DEFAULT_OLLAMA_MODEL,
+        LocalAIError,
+        ensure_ollama_available,
+        extract_crumb_block,
+        generate_text,
+    )
 
 
 REQUIRED_HEADERS = ["v", "kind", "source"]
@@ -2760,6 +2769,21 @@ def cmd_metalk(args: argparse.Namespace) -> None:
                   file=sys.stderr)
 
 
+def cmd_studio(args: argparse.Namespace) -> None:
+    """Launch the CRUMB Studio desktop app."""
+    from studio.app import main as studio_main
+
+    studio_argv: list[str] = []
+    if args.debug:
+        studio_argv.append("--debug")
+    if args.smoke_test:
+        studio_argv.append("--smoke-test")
+
+    exit_code = studio_main(studio_argv)
+    if exit_code:
+        raise SystemExit(exit_code)
+
+
 # ── argument parser ──────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
@@ -2988,6 +3012,11 @@ def build_parser() -> argparse.ArgumentParser:
     mt_cmd.add_argument('--decode', action='store_true', help='Decode MeTalk back to full form.')
     mt_cmd.add_argument('-o', '--output', default='-', help='Output path.')
     mt_cmd.set_defaults(func=cmd_metalk)
+
+    studio_cmd = sub.add_parser('studio', help='Launch the CRUMB Studio desktop app.')
+    studio_cmd.add_argument('--debug', action='store_true', help='Enable the desktop webview debug mode.')
+    studio_cmd.add_argument('--smoke-test', action='store_true', help='Run the Studio engine smoke test and exit.')
+    studio_cmd.set_defaults(func=cmd_studio)
 
     return parser
 

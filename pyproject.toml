@@ -24,10 +24,20 @@ Repository = "https://github.com/XioAISolutions/crumb-format"
 
 [project.scripts]
 crumb = "crumb_cli:main"
+crumb-studio = "studio.app:main"
+
+[project.optional-dependencies]
+studio = [
+    "platformdirs>=4.3",
+    "pywebview>=5.3",
+]
 
 [tool.setuptools]
 py-modules = ["crumb_cli"]
-packages = ["cli"]
+packages = ["cli", "studio"]
+
+[tool.setuptools.package-data]
+studio = ["static/*.html", "static/*.css", "static/*.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

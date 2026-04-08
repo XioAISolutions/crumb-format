@@ -98,6 +98,13 @@ CRUMB can now be installed with either `pip` or Homebrew.
 pip install crumb-format
 ```
 
+To run the cross-platform desktop app locally, install the optional Studio dependencies too:
+
+```bash
+pip install "crumb-format[studio]"
+crumb studio
+```
+
 ### Homebrew
 
 The repository now includes a tap-ready Homebrew formula at [`Formula/crumb.rb`](Formula/crumb.rb).
@@ -187,6 +194,32 @@ crumb metalk examples/task-bug-fix.crumb --level 3
 crumb compress examples/task-bug-fix.crumb --metalk --metalk-level 2
 ```
 
+## CRUMB Studio desktop app
+
+CRUMB Studio is the visual desktop shell for the existing Python engine.
+
+- paste messy context into the left pane
+- get structured CRUMB output on the right
+- switch between `task`, `mem`, `map`, `log`, and `todo`
+- load one-click demo presets for launch blockers, memory capture, repo maps, ops logs, and next-action extraction
+- copy, save, export, and reload recent outputs
+
+Run it locally:
+
+```bash
+pip install -e ".[studio]"
+crumb studio
+```
+
+Smoke-test the bridge without opening a desktop window:
+
+```bash
+crumb studio --smoke-test
+```
+
+Build and architecture notes live in [`docs/CRUMB_STUDIO.md`](docs/CRUMB_STUDIO.md).
+GitHub Actions desktop packaging for macOS and Windows lives in [`.github/workflows/build-studio.yml`](.github/workflows/build-studio.yml).
+
 ## Quick start
 
 ```bash
@@ -210,7 +243,7 @@ crumb init --all
 crumb metalk examples/task-bug-fix.crumb --level 2
 ```
 
-Full command reference: `crumb --help` (23 commands including MeTalk compression, export, import, templates, todos, watch mode, and more).
+Full command reference: `crumb --help` (24 commands including Studio, MeTalk compression, export, import, templates, todos, watch mode, and more).
 
 ## Integrations
 
@@ -251,8 +284,9 @@ repos:
 - [`prompts/`](prompts/) -- zero-install instruction files for ChatGPT, Claude Projects, and Cursor
 - [`Formula/`](Formula/) -- tap-ready Homebrew formula source for `brew install crumb`
 - [`docs/HOMEBREW.md`](docs/HOMEBREW.md) -- Homebrew tap, installation, and release maintenance guide
-- [`cli/crumb.py`](cli/crumb.py) -- full CLI (23 commands)
+- [`cli/crumb.py`](cli/crumb.py) -- full CLI (24 commands)
 - [`cli/local_ai.py`](cli/local_ai.py) -- local Ollama generation helpers
+- [`docs/CRUMB_STUDIO.md`](docs/CRUMB_STUDIO.md) -- desktop app run/build guide and roadmap
 - [`browser-extension/`](browser-extension/) -- one-click browser handoff capture for AI chat UIs
 - [`vscode-extension/`](vscode-extension/) -- syntax highlighting, commands, and CRUMB v1.1 snippets
 - [`cli/metalk.py`](cli/metalk.py) -- MeTalk caveman compression layer
