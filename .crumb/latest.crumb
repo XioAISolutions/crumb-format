@@ -1,7 +1,7 @@
 --- task: [codex] build CRUMB Studio desktop MVP
 source: github.pr
 pr: #6
-generated: 2026-04-08T17:24:42Z
+generated: 2026-04-08T18:09:58Z
 ---
 
 [goal]
@@ -12,6 +12,7 @@ generated: 2026-04-08T17:24:42Z
 
 [context]
 Changed files in this PR:
+- .crumb/latest.crumb
 - .github/workflows/build-studio.yml
 - .gitignore
 - README.md
