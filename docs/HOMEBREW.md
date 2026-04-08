@@ -48,7 +48,7 @@ This approach is aligned with Homebrew's guidance for Python CLI applications.
 
 ## Current source URL
 
-The current formula uses the published PyPI source distribution for `crumb-format` `0.2.0`. That gives the formula an immutable source archive and stable checksum.
+The checked-in formula currently points at the latest published PyPI source distribution available when the file was last updated. After each new release, update the `url` and `sha256` to match the new PyPI sdist before syncing the tap.
 
 ## How to publish the tap
 
@@ -62,15 +62,13 @@ Then copy or sync `Formula/crumb.rb` into that repository and commit it there. U
 
 ## How to update the formula for a new release
 
-CRUMB now includes an automation workflow at `.github/workflows/update-homebrew-tap.yml`. After you configure a repository secret named `HOMEBREW_TAP_TOKEN` with permission to push to `XioAISolutions/homebrew-tap`, the workflow can update the tap automatically on each published release or by manual dispatch.
-
 When cutting a new CRUMB release, the intended flow is:
 
 1. Publish the new package version to PyPI.
-2. Let the automation workflow wait for the new sdist to appear on PyPI.
-3. Let the workflow update `Formula/crumb.rb` in the tap repository with the new `url` and `sha256`.
-4. Review the action run and confirm the tap repository received the update commit.
-5. If automation is unavailable, update `Formula/crumb.rb` manually and push the change to `XioAISolutions/homebrew-tap`.
+2. Compute the new sdist checksum from the published artifact.
+3. Update `Formula/crumb.rb` in the tap repository with the new `url` and `sha256`.
+4. Push the tap update to `XioAISolutions/homebrew-tap`.
+5. If you later add tap automation, keep this manual flow as the fallback path.
 
 ## Caveat
 

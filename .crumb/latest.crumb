@@ -1,53 +1,25 @@
---- task: feat: expand CRUMB into a protocol-grade context workflow
+--- task: chore: prepare 0.3.0 release metadata
 source: github.pr
-pr: #7
-generated: 2026-04-08T19:15:21Z
+pr: #8
+generated: 2026-04-08T20:03:36Z
 ---
 
 [goal]
 ## Summary
-- add protocol-grade context pack, bridge, and lint commands without breaking CRUMB v1.1
-- add extension helpers, conformance fixtures, validator updates, and MCP wiring
-- reposition docs around CRUMB as an open context interchange standard and improve pack shaping for implement/debug/review flows
+- bump packaged version surfaces from 0.2.0 to 0.3.0
+- add a real 0.3.0 release note and top-level changelog
+- remove the stale 0.2.1 draft and fix Homebrew docs that referenced a missing automation workflow
 
 [context]
 Changed files in this PR:
-- .crumb/latest.crumb
-- .github/workflows/validate-examples.yml
-- README.md
-- SPEC.md
-- cli/bridge.py
-- cli/crumb.py
-- cli/extensions.py
-- cli/linting.py
-- cli/pack.py
-- docs/BRIDGES.md
-- docs/COMPATIBILITY.md
-- docs/PACKS.md
-- docs/PROTOCOL.md
-- docs/SECURITY.md
-- examples/README.md
-- examples/mem-mempalace-auth-migration.crumb
-- examples/task-packed-auth-context.crumb
-- fixtures/extensions/mempalace-export.crumb
-- fixtures/extensions/mempalace-export.expected.json
-- fixtures/extensions/task-packed.crumb
-- fixtures/extensions/task-packed.expected.json
-- fixtures/invalid/bad-kind.crumb
-- fixtures/invalid/bad-kind.expected.txt
-- fixtures/invalid/missing-source.crumb
-- fixtures/invalid/missing-source.expected.txt
-- fixtures/valid/log-basic.crumb
-- fixtures/valid/log-basic.expected.json
-- fixtures/valid/mem-basic.crumb
-- fixtures/valid/mem-basic.expected.json
-- fixtures/valid/task-basic.crumb
-- fixtures/valid/task-basic.expected.json
+- CHANGELOG.md
+- RELEASE_NOTES_0.2.1_DRAFT.md
+- RELEASE_NOTES_0.3.0.md
+- api/openapi.json
+- api/openapi.yaml
+- docs/HOMEBREW.md
 - mcp/server.py
 - pyproject.toml
-- tests/test_protocol_features.py
-- validators/validate.js
-- validators/validate.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
