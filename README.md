@@ -102,11 +102,18 @@ pip install crumb-format
 
 The repository now includes a tap-ready Homebrew formula at [`Formula/crumb.rb`](Formula/crumb.rb).
 
-Once the public tap is published, the shortest practical install flow will be:
+If `brew` is not installed yet, install Homebrew first from the official site at [brew.sh](https://brew.sh/), then install CRUMB with:
 
 ```bash
 brew tap XioAISolutions/tap
 brew install crumb
+```
+
+After installation, verify the CLI is available:
+
+```bash
+crumb --help
+crumb validate examples/task_rebuild_auth.crumb
 ```
 
 Advanced users can also install directly from a checked-out formula file:
@@ -117,7 +124,7 @@ cd crumb-format
 brew install --build-from-source ./Formula/crumb.rb
 ```
 
-See [`docs/HOMEBREW.md`](docs/HOMEBREW.md) for the tap layout, release-update process, and formula maintenance notes.
+The Homebrew tap can now be updated automatically on release via `.github/workflows/update-homebrew-tap.yml` once the `HOMEBREW_TAP_TOKEN` repository secret is configured. See [`docs/HOMEBREW.md`](docs/HOMEBREW.md) for the tap layout, prerequisite notes, verification steps, and release-update workflow.
 
 ## Local and zero-install workflows
 

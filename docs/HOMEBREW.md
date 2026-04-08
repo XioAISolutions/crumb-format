@@ -4,11 +4,20 @@ CRUMB now includes a maintained tap-ready Homebrew formula source file in [`Form
 
 ## Recommended user install flow
 
-Once the tap exists publicly, the shortest practical install flow should be:
+If Homebrew itself is not installed yet, install it first from the official site at [brew.sh](https://brew.sh/).
+
+Once Homebrew is available, the shortest practical install flow is:
 
 ```bash
 brew tap XioAISolutions/tap
 brew install crumb
+```
+
+After installation, verify the packaged CLI is working:
+
+```bash
+crumb --help
+crumb validate examples/task_rebuild_auth.crumb
 ```
 
 In many cases users may also be able to install directly with the fully qualified tap path:
@@ -53,14 +62,15 @@ Then copy or sync `Formula/crumb.rb` into that repository and commit it there. U
 
 ## How to update the formula for a new release
 
-When cutting a new CRUMB release:
+CRUMB now includes an automation workflow at `.github/workflows/update-homebrew-tap.yml`. After you configure a repository secret named `HOMEBREW_TAP_TOKEN` with permission to push to `XioAISolutions/homebrew-tap`, the workflow can update the tap automatically on each published release or by manual dispatch.
+
+When cutting a new CRUMB release, the intended flow is:
 
 1. Publish the new package version to PyPI.
-2. Obtain the new sdist URL and SHA256.
-3. Update `url` and `sha256` in `Formula/crumb.rb`.
-4. If needed, update the Python dependency version to match current Homebrew support.
-5. Commit the updated formula into the tap repository.
-6. Create the release tag in the main CRUMB repository.
+2. Let the automation workflow wait for the new sdist to appear on PyPI.
+3. Let the workflow update `Formula/crumb.rb` in the tap repository with the new `url` and `sha256`.
+4. Review the action run and confirm the tap repository received the update commit.
+5. If automation is unavailable, update `Formula/crumb.rb` manually and push the change to `XioAISolutions/homebrew-tap`.
 
 ## Caveat
 
