@@ -313,6 +313,35 @@ END CRUMB
 
 
 class TestLintCommand:
+    def test_lint_accepts_namespaced_pack_headers_under_strict_mode(self, tmp_path):
+        crumbs_dir = tmp_path / "crumbs"
+        crumbs_dir.mkdir()
+        (crumbs_dir / "task-auth.crumb").write_text(TASK_CRUMB, encoding="utf-8")
+        (crumbs_dir / "mem-auth.crumb").write_text(MEM_CRUMB, encoding="utf-8")
+        (crumbs_dir / "map-auth.crumb").write_text(MAP_CRUMB, encoding="utf-8")
+
+        packed = tmp_path / "handoff.crumb"
+        crumb.main(
+            [
+                "pack",
+                "--dir",
+                str(crumbs_dir),
+                "--query",
+                "auth redirect refresh",
+                "--kind",
+                "task",
+                "--mode",
+                "review",
+                "--max-total-tokens",
+                "1800",
+                "-o",
+                str(packed),
+            ]
+        )
+        with pytest.raises(SystemExit) as exc:
+            crumb.main(["lint", str(packed), "--secrets", "--strict"])
+        assert exc.value.code == 0
+
     def test_lint_flags_secrets_with_strict_exit(self, tmp_path, capsys):
         suspect = tmp_path / "handoff.crumb"
         suspect.write_text(

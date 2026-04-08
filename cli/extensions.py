@@ -30,7 +30,7 @@ CORE_OPTIONAL_HEADERS = {
 KNOWN_HEADERS = {"v", "kind", "source"} | CORE_OPTIONAL_HEADERS
 HEADER_KEY_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 EXTENSION_NAME_PATTERN = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+){1,}$")
-NAMESPACED_HEADER_PATTERN = re.compile(r"^(?:x-[a-z0-9][a-z0-9-]*|ext\.[a-z0-9][a-z0-9._-]*)$")
+NAMESPACED_HEADER_PATTERN = re.compile(r"^(?:x-[a-z0-9][a-z0-9._-]*|ext\.[a-z0-9][a-z0-9._-]*)$")
 
 
 def parse_extensions(value: str | None) -> list[str]:
