@@ -85,6 +85,25 @@ python studio/packaging/build_studio.py
 
 This produces a packaged desktop build under `dist/CRUMB-Studio/` on macOS/Linux or the platform equivalent on Windows.
 
+Create a zipped artifact for sharing:
+
+```bash
+python studio/packaging/archive_build.py
+```
+
+That writes a downloadable archive into `dist-artifacts/`.
+
+## CI Packaging
+
+GitHub Actions packaging lives in [build-studio.yml](../.github/workflows/build-studio.yml).
+
+The workflow:
+
+- runs the CLI and Studio smoke paths
+- packages desktop builds on macOS and Windows
+- smoke-tests the built artifact itself
+- uploads zipped desktop artifacts for PRs, pushes, and releases
+
 ## MVP Scope
 
 The current desktop MVP supports:

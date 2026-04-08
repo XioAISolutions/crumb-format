@@ -201,6 +201,7 @@ CRUMB Studio is the visual desktop shell for the existing Python engine.
 - paste messy context into the left pane
 - get structured CRUMB output on the right
 - switch between `task`, `mem`, `map`, `log`, and `todo`
+- load one-click demo presets for launch blockers, memory capture, repo maps, ops logs, and next-action extraction
 - copy, save, export, and reload recent outputs
 
 Run it locally:
@@ -217,6 +218,7 @@ crumb studio --smoke-test
 ```
 
 Build and architecture notes live in [`docs/CRUMB_STUDIO.md`](docs/CRUMB_STUDIO.md).
+GitHub Actions desktop packaging for macOS and Windows lives in [`.github/workflows/build-studio.yml`](.github/workflows/build-studio.yml).
 
 ## Quick start
 
