@@ -936,7 +936,15 @@ def cmd_from_git(args: argparse.Namespace) -> None:
 
 def cmd_validate(args: argparse.Namespace) -> None:
     errors = 0
-    for path in args.files:
+    expanded: list[str] = []
+    for pattern in args.files:
+        matches = sorted(glob.glob(pattern))
+        if matches:
+            expanded.extend(matches)
+        else:
+            expanded.append(pattern)
+
+    for path in expanded:
         try:
             text = Path(path).read_text(encoding='utf-8')
             parsed = parse_crumb(text)
@@ -1384,7 +1392,7 @@ def cmd_merge(args: argparse.Namespace) -> None:
 # viable form — required headers, required sections, nothing else.
 
 OPTIONAL_HEADERS = {'title', 'dream_pass', 'dream_sessions', 'max_index_tokens',
-                    'max_total_tokens', 'id', 'project', 'env', 'tags', 'url'}
+                    'max_total_tokens', 'id', 'project', 'env', 'tags', 'url', 'extensions'}
 
 
 def cmd_compact(args: argparse.Namespace) -> None:
@@ -2760,6 +2768,49 @@ def cmd_metalk(args: argparse.Namespace) -> None:
                   file=sys.stderr)
 
 
+def cmd_pack(args: argparse.Namespace) -> None:
+    import pack
+
+    try:
+        pack.run_pack(args)
+    except LocalAIError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_bridge_export(args: argparse.Namespace) -> None:
+    import bridge
+
+    try:
+        bridge.run_bridge_export(args)
+    except RuntimeError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_bridge_import(args: argparse.Namespace) -> None:
+    import bridge
+
+    try:
+        bridge.run_bridge_import(args)
+    except RuntimeError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_lint(args: argparse.Namespace) -> None:
+    import linting
+
+    try:
+        linting.run_lint(args)
+    except FileNotFoundError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(2)
+
+
 # ── argument parser ──────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
@@ -2848,12 +2899,75 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument('--limit', '-n', type=int, help='Max results to show.')
     search.set_defaults(func=cmd_search)
 
+    # pack
+    pack_cmd = sub.add_parser('pack', help='Assemble a deterministic CRUMB context pack from a directory of crumbs.')
+    pack_cmd.add_argument('--dir', required=True, help='Directory containing source .crumb files.')
+    pack_cmd.add_argument('--query', required=True, help='Query describing the handoff you want to build.')
+    pack_cmd.add_argument('--project', help='Optional project filter/header to apply while selecting crumbs.')
+    pack_cmd.add_argument('--kind', required=True, choices=['task', 'mem', 'map'],
+                          help='Output kind for the packed CRUMB.')
+    pack_cmd.add_argument('--mode', choices=['implement', 'debug', 'review'], default='implement',
+                          help='Pack shaping mode: implement (default), debug, or review.')
+    pack_cmd.add_argument('--max-total-tokens', type=int, required=True,
+                          help='Estimated token budget for the final packed CRUMB.')
+    pack_cmd.add_argument('--strategy', choices=['keyword', 'ranked', 'recent', 'hybrid'], default='hybrid',
+                          help='Ranking strategy for selecting and merging context (default: hybrid).')
+    pack_cmd.add_argument('--title', help='Optional title override for the packed CRUMB.')
+    pack_cmd.add_argument('--ollama', '--use-local', dest='ollama', action='store_true',
+                          help='Optionally run a final local-model compression pass with Ollama.')
+    pack_cmd.add_argument('--ollama-model', default=DEFAULT_OLLAMA_MODEL,
+                          help=f'Local Ollama model to use when --ollama is set (default: {DEFAULT_OLLAMA_MODEL}).')
+    pack_cmd.add_argument('--output', '-o', required=True, help='Output .crumb file path.')
+    pack_cmd.set_defaults(func=cmd_pack)
+
     # merge
     merge = sub.add_parser('merge', help='Merge multiple mem crumbs into one.')
     merge.add_argument('files', nargs='+', help='Mem .crumb files to merge.')
     merge.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
     merge.add_argument('--title', '-t', help='Title for the merged crumb.')
     merge.set_defaults(func=cmd_merge)
+
+    # bridge
+    bridge_cmd = sub.add_parser('bridge', help='Import/export CRUMBs through adapter backends such as MemPalace.')
+    bridge_sub = bridge_cmd.add_subparsers(dest='bridge_backend', required=True)
+
+    bridge_mempalace = bridge_sub.add_parser('mempalace', help='MemPalace bridge adapter.')
+    mempalace_sub = bridge_mempalace.add_subparsers(dest='bridge_action', required=True)
+
+    bridge_export = mempalace_sub.add_parser('export', help='Export MemPalace context as one or more CRUMBs.')
+    bridge_export.add_argument('--query', help='Search query to run against MemPalace.')
+    bridge_export.add_argument('--input', help='Saved MemPalace export text or - for stdin.')
+    bridge_export.add_argument('--wing', help='Optional MemPalace wing filter.')
+    bridge_export.add_argument('--room', help='Optional room filter applied to retrieved lines.')
+    bridge_export.add_argument('--entity', help='Optional entity filter applied to retrieved lines.')
+    bridge_export.add_argument('--hall', help='Optional MemPalace hall filter when using the CLI backend.')
+    bridge_export.add_argument('--project', help='Optional project header override.')
+    bridge_export.add_argument('--title', help='Optional title override.')
+    bridge_export.add_argument('--as', dest='as_kind', required=True, choices=['task', 'mem', 'log'],
+                               help='Output CRUMB kind to emit.')
+    bridge_export.add_argument('--output', '-o', required=True,
+                               help='Output file path or directory for generated .crumb files.')
+    bridge_export.set_defaults(func=cmd_bridge_export, backend='mempalace')
+
+    bridge_import = mempalace_sub.add_parser('import', help='Convert .crumb files into a MemPalace-compatible adapter bundle.')
+    bridge_import.add_argument('files', nargs='+', help='One or more .crumb files to convert.')
+    bridge_import.add_argument('--wing', help='Target MemPalace wing (default: default).')
+    bridge_import.add_argument('--room', help='Optional room override.')
+    bridge_import.add_argument('--entity', help='Optional entity override.')
+    bridge_import.add_argument('--output', '-o', required=True,
+                               help='Output JSON file path or directory for the adapter bundle.')
+    bridge_import.set_defaults(func=cmd_bridge_import, backend='mempalace')
+
+    # lint
+    lint_cmd = sub.add_parser('lint', help='Lint CRUMBs for secrets, oversized raw logs, suspicious headers, and budget issues.')
+    lint_cmd.add_argument('files', nargs='+', help='One or more .crumb files to lint.')
+    lint_cmd.add_argument('--secrets', action='store_true', help='Enable secret detection checks.')
+    lint_cmd.add_argument('--redact', action='store_true', help='Redact obvious credentials in-place unless --output is set.')
+    lint_cmd.add_argument('--max-size', type=int,
+                          help='Warn when estimated total or raw section tokens exceed this value.')
+    lint_cmd.add_argument('--strict', action='store_true', help='Return a non-zero exit code for warnings.')
+    lint_cmd.add_argument('--output', help='Optional output file or directory for redacted content.')
+    lint_cmd.set_defaults(func=cmd_lint)
 
     # compact
     compact = sub.add_parser('compact', help='Strip a crumb to minimum viable form.')

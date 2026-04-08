@@ -1,0 +1,37 @@
+{
+  "headers": {
+    "v": "1.1",
+    "kind": "task",
+    "title": "Packed auth handoff",
+    "source": "crumb.pack",
+    "id": "crumb-pack-abc123",
+    "project": "web-app",
+    "tags": "pack, auth",
+    "url": "https://github.com/XioAISolutions/crumb-format/blob/main/SPEC.md",
+    "extensions": "crumb.pack.v1, bridge.mempalace.export.v1",
+    "max_total_tokens": "1800",
+    "max_index_tokens": "900",
+    "x-crumb-pack.strategy": "hybrid"
+  },
+  "sections": {
+    "goal": [
+      "Resolve the auth redirect refresh failure.",
+      ""
+    ],
+    "context": [
+      "- Working tree changes: src/auth.ts, middleware.ts",
+      "- Relevant module: src/auth.ts",
+      "- JWT cookie auth",
+      ""
+    ],
+    "constraints": [
+      "- Preserve existing cookie names",
+      "- Keep the packed handoff under budget",
+      ""
+    ],
+    "sources": [
+      "- task-basic.crumb",
+      "- mem-basic.crumb"
+    ]
+  }
+}
