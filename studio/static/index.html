@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CRUMB Studio</title>
+  <link rel="stylesheet" href="./app.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand-block">
+        <div class="brand-mark">C</div>
+        <div class="brand-copy">
+          <p class="eyebrow">Cross-platform desktop MVP</p>
+          <h1>CRUMB Studio</h1>
+          <p class="subcopy">Paste messy context in, get structured reusable context out.</p>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <label class="field field-compact">
+          <span>Mode</span>
+          <select id="modeSelect">
+            <option value="task">task</option>
+            <option value="mem">mem</option>
+            <option value="map">map</option>
+            <option value="log">log</option>
+            <option value="todo">todo</option>
+          </select>
+        </label>
+        <button id="runButton" class="button button-primary">Run / Generate</button>
+      </div>
+    </header>
+
+    <section class="meta-strip">
+      <label class="field">
+        <span>Title</span>
+        <input id="titleInput" type="text" placeholder="Auto-derived from your input">
+      </label>
+      <label class="field">
+        <span>Source</span>
+        <input id="sourceInput" type="text" value="crumb.studio">
+      </label>
+      <div class="stats-strip" id="statsStrip">
+        <div class="stat-card">
+          <span class="stat-label">Status</span>
+          <strong id="statusValue">Ready</strong>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Input</span>
+          <strong id="inputStat">0 chars</strong>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Output</span>
+          <strong id="outputStat">0 chars</strong>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Ratio</span>
+          <strong id="ratioStat">-</strong>
+        </div>
+      </div>
+    </section>
+
+    <main class="workspace">
+      <section class="pane pane-input">
+        <div class="pane-header">
+          <div>
+            <p class="pane-eyebrow">Before</p>
+            <h2>Raw input</h2>
+            <p class="pane-copy">Paste chat logs, notes, meeting transcripts, issue threads, or repo summaries.</p>
+          </div>
+          <button id="clearInputButton" class="button button-subtle">Clear input</button>
+        </div>
+        <textarea id="inputEditor" placeholder="Paste a messy context block here. CRUMB Studio will extract the high-signal structure into a reusable handoff."></textarea>
+      </section>
+
+      <section class="pane pane-output">
+        <div class="pane-header">
+          <div>
+            <p class="pane-eyebrow">After</p>
+            <h2>Structured output</h2>
+            <p class="pane-copy">Ready to paste into Claude, ChatGPT, Cursor, Codex, or another workflow.</p>
+          </div>
+          <span id="modeBadge" class="mode-badge">task</span>
+        </div>
+
+        <div id="errorBanner" class="error-banner hidden"></div>
+
+        <div id="outputEmptyState" class="empty-state">
+          <strong>Nothing generated yet.</strong>
+          <p>Run the transformer to turn unstructured context into a clean CRUMB artifact.</p>
+        </div>
+
+        <div id="outputPreview" class="output-preview hidden"></div>
+      </section>
+    </main>
+
+    <footer class="action-bar">
+      <div class="action-group">
+        <button id="copyButton" class="button button-secondary" disabled>Copy Output</button>
+        <button id="saveButton" class="button button-secondary" disabled>Save File</button>
+        <div class="export-wrap">
+          <button id="exportButton" class="button button-secondary" disabled>Export</button>
+          <div id="exportMenu" class="export-menu hidden">
+            <button data-export-format="plain">Plain text</button>
+            <button data-export-format="markdown">Markdown</button>
+            <button data-export-format="json">JSON</button>
+          </div>
+        </div>
+        <button id="clearButton" class="button button-secondary">Clear</button>
+        <button id="historyButton" class="button button-secondary">History</button>
+      </div>
+      <div class="action-note" id="actionNote">Designed for fast screenshots, demos, and copy-paste handoffs.</div>
+    </footer>
+  </div>
+
+  <aside id="historyDrawer" class="history-drawer hidden">
+    <div class="history-header">
+      <div>
+        <p class="pane-eyebrow">Recent outputs</p>
+        <h3>History</h3>
+      </div>
+      <div class="history-actions">
+        <button id="clearHistoryButton" class="button button-subtle">Clear history</button>
+        <button id="closeHistoryButton" class="button button-subtle">Close</button>
+      </div>
+    </div>
+    <div id="historyList" class="history-list"></div>
+  </aside>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
+
