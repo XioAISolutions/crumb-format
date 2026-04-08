@@ -1,4 +1,4 @@
-class CrumbFormat < Formula
+class Crumb < Formula
   include Language::Python::Virtualenv
 
   desc "Copy-paste AI handoff format"

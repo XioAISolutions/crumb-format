@@ -1,22 +1,20 @@
 # Homebrew installation
 
-CRUMB now includes a maintained Homebrew formula source file in [`Formula/crumb-format.rb`](../Formula/crumb-format.rb). The intended distribution model is a standard third-party Homebrew tap backed by GitHub.
+CRUMB now includes a maintained tap-ready Homebrew formula source file in [`Formula/crumb.rb`](../Formula/crumb.rb). The intended distribution model is a standard third-party Homebrew tap backed by GitHub.
 
 ## Recommended user install flow
 
-Once the tap exists publicly, users should be able to install CRUMB directly with:
-
-```bash
-brew install XioAISolutions/tap/crumb-format
-```
-
-Homebrew will automatically tap the repository during installation.
-
-If users prefer to add the tap explicitly first, they can run:
+Once the tap exists publicly, the shortest practical install flow should be:
 
 ```bash
 brew tap XioAISolutions/tap
-brew install crumb-format
+brew install crumb
+```
+
+In many cases users may also be able to install directly with the fully qualified tap path:
+
+```bash
+brew install XioAISolutions/tap/crumb
 ```
 
 ## Repository layout
@@ -25,7 +23,7 @@ Homebrew recommends placing custom formulae in a `Formula/` subdirectory inside 
 
 ```text
 Formula/
-  crumb-format.rb
+  crumb.rb
 ```
 
 ## Formula strategy
@@ -51,7 +49,7 @@ The cleanest setup is a separate public repository named something like:
 XioAISolutions/homebrew-tap
 ```
 
-Then copy or sync `Formula/crumb-format.rb` into that repository and commit it there. Users will then be able to install with the short tap syntax.
+Then copy or sync `Formula/crumb.rb` into that repository and commit it there. Users will then be able to install with the short tap syntax.
 
 ## How to update the formula for a new release
 
@@ -59,11 +57,11 @@ When cutting a new CRUMB release:
 
 1. Publish the new package version to PyPI.
 2. Obtain the new sdist URL and SHA256.
-3. Update `url` and `sha256` in `Formula/crumb-format.rb`.
+3. Update `url` and `sha256` in `Formula/crumb.rb`.
 4. If needed, update the Python dependency version to match current Homebrew support.
 5. Commit the updated formula into the tap repository.
 6. Create the release tag in the main CRUMB repository.
 
 ## Caveat
 
-This repository can hold the formula definition and documentation, but end users will get the smoothest Homebrew experience only after the formula is published in a proper tap repository. Until then, advanced users can still install from a checked-out formula file manually.
+This repository can hold the formula definition and documentation, but end users will get the smoothest `brew install crumb` experience only after the formula is published in a proper tap repository and installed after `brew tap XioAISolutions/tap`. Until then, advanced users can still install from a checked-out formula file manually.

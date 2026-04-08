@@ -100,20 +100,21 @@ pip install crumb-format
 
 ### Homebrew
 
-The repository now includes a maintained Homebrew formula at [`Formula/crumb-format.rb`](Formula/crumb-format.rb).
+The repository now includes a tap-ready Homebrew formula at [`Formula/crumb.rb`](Formula/crumb.rb).
 
-Once the public tap is published, the intended install flow is:
+Once the public tap is published, the shortest practical install flow will be:
 
 ```bash
-brew install XioAISolutions/tap/crumb-format
+brew tap XioAISolutions/tap
+brew install crumb
 ```
 
-Until that tap is published, advanced users can still install from a checked-out formula file:
+Advanced users can also install directly from a checked-out formula file:
 
 ```bash
 git clone https://github.com/XioAISolutions/crumb-format.git
 cd crumb-format
-brew install --build-from-source ./Formula/crumb-format.rb
+brew install --build-from-source ./Formula/crumb.rb
 ```
 
 See [`docs/HOMEBREW.md`](docs/HOMEBREW.md) for the tap layout, release-update process, and formula maintenance notes.
@@ -241,7 +242,7 @@ repos:
 - [`DREAMING.md`](DREAMING.md) -- how memory consolidation works
 - [`examples/`](examples/) -- ready-to-paste `.crumb` files
 - [`prompts/`](prompts/) -- zero-install instruction files for ChatGPT, Claude Projects, and Cursor
-- [`Formula/`](Formula/) -- Homebrew formula source for tap-based installation
+- [`Formula/`](Formula/) -- tap-ready Homebrew formula source for `brew install crumb`
 - [`docs/HOMEBREW.md`](docs/HOMEBREW.md) -- Homebrew tap, installation, and release maintenance guide
 - [`cli/crumb.py`](cli/crumb.py) -- full CLI (23 commands)
 - [`cli/local_ai.py`](cli/local_ai.py) -- local Ollama generation helpers
