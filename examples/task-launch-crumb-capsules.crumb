@@ -1,0 +1,20 @@
+BEGIN CRUMB
+v=1.1
+kind=task
+title=Launch CRUMB Capsules
+source=xioai.product
+project=crumb-format
+---
+[goal]
+Ship the first shareable capsule layer for CRUMB so handoffs become visible, previewable, and resumable.
+
+[context]
+- CRUMB already supports structured handoffs, search, dreaming, sharing, and MeTalk compression.
+- A capsule should preserve the CRUMB payload while generating a clean preview card and a compressed resume payload.
+- The first version should target ChatGPT, Claude, Cursor, and Gemini without locking to any single vendor.
+
+[constraints]
+- Keep CRUMB v1.1 intact.
+- Do not require a hosted backend.
+- Keep the output easy to screenshot, share, and copy-paste.
+END CRUMB
