@@ -1,0 +1,49 @@
+--- a/cli/crumb.py
++++ b/cli/crumb.py
+@@ -2811,6 +2811,16 @@
+         sys.exit(2)
+ 
+ 
++def cmd_agent(args: argparse.Namespace) -> None:
++    from . import agent
++
++    try:
++        agent.cmd_agent(args)
++    except (RuntimeError, ValueError, FileNotFoundError) as exc:
++        print(f"Error: {exc}", file=sys.stderr)
++        sys.exit(1)
++
++
+ # ── argument parser ──────────────────────────────────────────────────
+ 
+ def build_parser() -> argparse.ArgumentParser:
+@@ -3095,6 +3105,29 @@
+                              help='Target AI tool (optional).')
+     handoff_cmd.set_defaults(func=cmd_handoff)
+ 
++    # agent
++    agent_cmd = sub.add_parser('agent', help='Run or evaluate a CRUMB-native local agent experiment.')
++    agent_sub = agent_cmd.add_subparsers(dest='agent_action', required=True)
++
++    agent_template = agent_sub.add_parser('template', help='Print a starter agent experiment JSON file.')
++    agent_template.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
++    agent_template.set_defaults(func=cmd_agent)
++
++    agent_run = agent_sub.add_parser('run', help='Run an agent experiment from a JSON config.')
++    agent_run.add_argument('--config', '-c', required=True, help='Path to agent experiment JSON.')
++    agent_run.add_argument('--output-dir', '-o', help='Directory to write run artifacts (default: .runs).')
++    agent_run.add_argument('--backend', choices=['echo', 'command'], help='Override backend kind declared in the config.')
++    agent_run.set_defaults(func=cmd_agent)
++
++    agent_eval = agent_sub.add_parser('eval', help='Evaluate a result file against a config or inline checks.')
++    agent_eval.add_argument('file', help='Result text file to score.')
++    agent_eval.add_argument('--config', '-c', help='Optional experiment JSON to reuse evaluation settings.')
++    agent_eval.add_argument('--required-terms', nargs='*', default=[], help='Inline required terms when --config is omitted.')
++    agent_eval.add_argument('--banned-terms', nargs='*', default=[], help='Inline banned terms when --config is omitted.')
++    agent_eval.add_argument('--min-chars', type=int, default=0, help='Minimum accepted output size when --config is omitted.')
++    agent_eval.add_argument('--max-chars', type=int, default=100000, help='Maximum accepted output size when --config is omitted.')
++    agent_eval.set_defaults(func=cmd_agent)
++
+     mt_cmd = sub.add_parser('metalk', help='MeTalk caveman compression — reduce tokens for AI-to-AI communication.')
+     mt_cmd.add_argument('file', help='.crumb file to encode/decode.')
+     mt_cmd.add_argument('--level', type=int, choices=[1, 2, 3], default=2,
