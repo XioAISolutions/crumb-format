@@ -1,0 +1,39 @@
+{
+  "title": "Implement auth refresh fix",
+  "goal": "Fix the auth redirect loop that happens after a hard refresh.",
+  "context": [
+    "App uses JWT cookie auth.",
+    "Redirect loop only happens on a full page refresh.",
+    "Middleware reads auth state before cookie parsing stabilizes."
+  ],
+  "constraints": [
+    "Do not change the login UI.",
+    "Preserve existing cookie names.",
+    "Add a regression check before merging."
+  ],
+  "agent": {
+    "name": "crumb-agent",
+    "model": "local",
+    "mode": "implement",
+    "max_total_tokens": 1800,
+    "telemetry_opt_in": false
+  },
+  "backend": {
+    "kind": "echo",
+    "command": [],
+    "cwd": ".",
+    "env": {}
+  },
+  "evaluation": {
+    "required_terms": ["auth", "cookie", "test"],
+    "banned_terms": ["ignore safety", "disable guardrails"],
+    "min_chars": 80,
+    "max_chars": 5000
+  },
+  "metadata": {
+    "project": "web-app",
+    "source": "crumb.agent",
+    "tags": ["agent", "experiment"]
+  },
+  "seed": 7
+}
