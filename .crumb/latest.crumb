@@ -1,18 +1,17 @@
---- task: feat: add crumb REST API for cross-AI access
+--- task: Add safe agent implant scaffold and CLI hook patch
 source: github.pr
-pr: #4
-generated: 2026-04-06T18:00:27Z
+pr: #10
+generated: 2026-04-11T14:39:04Z
 ---
 
 [goal]
-## What changed
+This PR uploads the safe CRUMB-native agent implant discussed in chat.
 
 [context]
 Changed files in this PR:
-- api/README.md
-- api/openapi.json
-- api/openapi.yaml
-- api/server.py
+- cli/agent.py
+- examples/agent_experiment.json
+- patches/cli_crumb_agent.patch
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
