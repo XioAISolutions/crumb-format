@@ -98,7 +98,7 @@ jobs:
             const fs = require('fs');
             const table = fs.readFileSync('/tmp/bench-table.md', 'utf8');
 
-            const body = `## CRUMB Bench Results\n\n${table}\n\n*Powered by [crumb-format](https://github.com/XioAISolutions/crumb-format) — TurboQuant-inspired context compression*`;
+            const body = `## CRUMB Bench Results\n\n${table}\n\n*Powered by [crumb-format](https://github.com/XioAISolutions/crumb-format) — two-stage context compression*`;
 
             // Determine the PR number. For workflow_call the context may differ.
             const prNumber = context.payload.pull_request?.number;

@@ -149,7 +149,7 @@ def extract_keywords(text: str) -> set:
 
 
 def score_entry(entry: str, all_entries: list, entry_keywords: dict) -> float:
-    """Score an entry by information density (TurboQuant-inspired signal ranking).
+    """Score an entry by information density (signal ranking).
 
     Higher score = more unique information = higher priority to keep.
     Factors: keyword uniqueness across all entries, entry specificity (length),
@@ -736,7 +736,7 @@ def cmd_dream(args: argparse.Namespace) -> None:
             seen.add(norm)
             merged.append(entry)
 
-    # Prune to budget using signal scoring (TurboQuant-inspired)
+    # Prune to budget using signal scoring
     # Instead of dropping from the end, score entries by information density
     # and drop lowest-signal entries first
     budget = int(headers.get('max_index_tokens', '0'))
@@ -1047,7 +1047,7 @@ def cmd_merge(args: argparse.Namespace) -> None:
 
 # ── compact ──────────────────────────────────────────────────────────
 
-# TurboQuant-inspired: eliminate overhead. Strip a crumb to its minimum
+# Eliminate overhead. Strip a crumb to its minimum
 # viable form — required headers, required sections, nothing else.
 
 OPTIONAL_HEADERS = {'title', 'dream_pass', 'dream_sessions', 'max_index_tokens',
@@ -1091,13 +1091,12 @@ def cmd_compact(args: argparse.Namespace) -> None:
         print(f"Compacted {args.file}: {original_tokens} → {compact_tokens} tokens ({reduction:.0f}% reduction)")
 
 
-# ── compress (TurboQuant-inspired) ──────────────────────────────────
+# ── compress ────────────────────────────────────────────────────────
 
 def _semantic_dedup(entries: list) -> list:
     """Stage 1: Semantic deduplication — merge near-duplicate entries.
 
-    Like PolarQuant converting to polar coordinates for efficient representation,
-    this normalizes entries and merges those with high similarity.
+    Normalizes entries and merges those with high similarity.
     """
     if not entries:
         return []
@@ -1127,9 +1126,8 @@ def _semantic_dedup(entries: list) -> list:
 def _signal_prune(entries: list, target_ratio: float = 0.5) -> tuple:
     """Stage 2: Signal-scored pruning — keep high-signal, drop low-signal.
 
-    Like QJL reducing residual error to single bits, this reduces each entry
-    to a keep/drop decision based on information density scoring.
-    Returns (kept_entries, pruned_count).
+    Reduces each entry to a keep/drop decision based on information density
+    scoring. Returns (kept_entries, pruned_count).
     """
     if not entries or target_ratio >= 1.0:
         return entries, 0
@@ -1152,12 +1150,12 @@ def _signal_prune(entries: list, target_ratio: float = 0.5) -> tuple:
 
 
 def cmd_compress(args: argparse.Namespace) -> None:
-    """Two-stage TurboQuant-inspired context compression.
+    """Two-stage context compression.
 
-    Stage 1 (PolarQuant-like): Semantic deduplication — normalize and merge
-    near-duplicate entries across all sections.
-    Stage 2 (QJL-like): Signal-scored pruning — score entries by information
-    density and drop lowest-signal entries to hit target ratio.
+    Stage 1: Semantic deduplication — normalize and merge near-duplicate
+    entries across all sections.
+    Stage 2: Signal-scored pruning — score entries by information density
+    and drop lowest-signal entries to hit target ratio.
     """
     text = read_text(args.file)
     parsed = parse_crumb(text)
@@ -1209,7 +1207,7 @@ def cmd_compress(args: argparse.Namespace) -> None:
     write_text(args.output, output)
 
     if args.output != '-':
-        print(f"TurboQuant compression on {args.file}:")
+        print(f"CRUMB compression on {args.file}:")
         print(f"  Stage 1 (semantic dedup):  {stats['stage1_removed']} entries merged")
         print(f"  Stage 2 (signal pruning):  {stats['stage2_removed']} low-signal entries dropped")
         if metalk_stats:
@@ -4440,7 +4438,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # share
     # compress
-    compress_cmd = sub.add_parser('compress', help='TurboQuant-inspired two-stage context compression.')
+    compress_cmd = sub.add_parser('compress', help='Two-stage context compression (dedup + signal pruning).')
     compress_cmd.add_argument('file', help='.crumb file to compress.')
     compress_cmd.add_argument('-o', '--output', default='-', help='Output path (default: stdout).')
     compress_cmd.add_argument('--target', type=float, default=0.5,
