@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="13">
+  <!-- Terminal window frame -->
+  <defs>
+    <linearGradient id="title" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a3a3c"/>
+      <stop offset="1" stop-color="#2c2c2e"/>
+    </linearGradient>
+  </defs>
+  <rect x="10" y="10" width="880" height="600" rx="10" ry="10" fill="#1e1e20" stroke="#000" stroke-opacity="0.4"/>
+  <rect x="10" y="10" width="880" height="28" rx="10" ry="10" fill="url(#title)"/>
+  <rect x="10" y="28" width="880" height="10" fill="url(#title)"/>
+  <!-- Traffic lights -->
+  <circle cx="28" cy="24" r="6" fill="#ff5f57"/>
+  <circle cx="48" cy="24" r="6" fill="#febc2e"/>
+  <circle cx="68" cy="24" r="6" fill="#28c840"/>
+  <text x="450" y="28" fill="#c7c7c9" text-anchor="middle" font-size="12">crumb-format — ~/crumb-format</text>
+
+  <!-- Terminal content -->
+  <g transform="translate(30, 62)" fill="#e6e6e6">
+    <text x="0" y="0" fill="#f6a524">CRUMB 0.2.0 — AI handoff with bread crumbs</text>
+
+    <!-- ASCII CRUMB art -->
+    <g fill="#e6e6e6" font-size="12" font-weight="bold">
+      <text x="0" y="28" xml:space="preserve">  ██████╗ ██████╗  ██╗   ██╗ ███╗   ███╗ ██████╗ </text>
+      <text x="0" y="44" xml:space="preserve"> ██╔════╝ ██╔══██╗ ██║   ██║ ████╗ ████║ ██╔══██╗</text>
+      <text x="0" y="60" xml:space="preserve"> ██║      ██████╔╝ ██║   ██║ ██╔████╔██║ ██████╔╝</text>
+      <text x="0" y="76" xml:space="preserve"> ██║      ██╔══██╗ ██║   ██║ ██║╚██╔╝██║ ██╔══██╗</text>
+      <text x="0" y="92" xml:space="preserve"> ╚██████╗ ██║  ██║ ╚██████╔╝ ██║ ╚═╝ ██║ ██████╔╝</text>
+      <text x="0" y="108" xml:space="preserve">  ╚═════╝ ╚═╝  ╚═╝  ╚═════╝  ╚═╝     ╚═╝ ╚═════╝ </text>
+    </g>
+
+    <text x="280" y="68" fill="#f6a524" font-size="14">🍞  the copy-paste AI handoff format  🍞</text>
+
+    <!-- Command table -->
+    <text x="0" y="144" fill="#8ab4f8">$</text>
+    <text x="18" y="144" fill="#e6e6e6">crumb --help</text>
+
+    <g fill="#9ca3af" font-size="12">
+      <text x="0" y="168">usage: crumb [-h] {new, from-chat, from-git, validate, inspect, append, dream,</text>
+      <text x="0" y="184">              search, merge, compact, diff, init, log, todo-*, watch, export,</text>
+      <text x="0" y="200">              import, hooks, template, compress, bench, share, handoff,</text>
+      <text x="0" y="216">              passport, policy, audit, scan, comply, dashboard, bridge,</text>
+      <text x="0" y="232">              webhook, metalk} ...</text>
+    </g>
+
+    <g font-size="12">
+      <text x="0" y="260" fill="#6ee7b7">new</text>
+      <text x="160" y="260" fill="#d1d5db">Create a new .crumb file.</text>
+
+      <text x="0" y="278" fill="#6ee7b7">from-chat</text>
+      <text x="160" y="278" fill="#d1d5db">Convert a chat log into a task or mem crumb.</text>
+
+      <text x="0" y="296" fill="#6ee7b7">from-git</text>
+      <text x="160" y="296" fill="#d1d5db">Generate a task crumb from recent git activity.</text>
+
+      <text x="0" y="314" fill="#6ee7b7">validate / inspect</text>
+      <text x="160" y="314" fill="#d1d5db">Parse, display, and validate .crumb files.</text>
+
+      <text x="0" y="332" fill="#6ee7b7">append / dream</text>
+      <text x="160" y="332" fill="#d1d5db">Append observations, consolidate memory.</text>
+
+      <text x="0" y="350" fill="#6ee7b7">search / merge / diff</text>
+      <text x="160" y="350" fill="#d1d5db">TF-IDF search, merge mems, compare crumbs.</text>
+
+      <text x="0" y="368" fill="#6ee7b7">compress / bench / metalk</text>
+      <text x="160" y="368" fill="#d1d5db">Token compression + caveman mode (40%+ savings).</text>
+
+      <text x="0" y="386" fill="#6ee7b7">passport / policy / audit</text>
+      <text x="160" y="386" fill="#d1d5db">AgentAuth — identity, governance, kill switch.</text>
+
+      <text x="0" y="404" fill="#6ee7b7">scan / comply / dashboard</text>
+      <text x="160" y="404" fill="#d1d5db">Shadow-AI scan, compliance reports, HTML dash.</text>
+
+      <text x="0" y="422" fill="#6ee7b7">bridge / webhook / share</text>
+      <text x="160" y="422" fill="#d1d5db">Cross-format bridge, events, gist sharing.</text>
+
+      <text x="0" y="440" fill="#6ee7b7">init / handoff / template</text>
+      <text x="160" y="440" fill="#d1d5db">Seed tools, clipboard handoff, templates.</text>
+    </g>
+
+    <!-- Prompt examples -->
+    <text x="0" y="476" fill="#8ab4f8">$</text>
+    <text x="18" y="476" fill="#e6e6e6">crumb from-git --recent 24h | crumb metalk --level 2 | pbcopy</text>
+
+    <text x="0" y="500" fill="#9ca3af" font-size="12">MeTalk: 127 → 68 tokens (46.5% saved, 1.87x ratio) ✓ copied to clipboard</text>
+
+    <text x="0" y="526" fill="#8ab4f8">$</text>
+    <text x="18" y="526" fill="#e6e6e6">crumb passport register claude-prod --owner alice --tools-allowed "read_*"</text>
+
+    <text x="0" y="550" fill="#9ca3af" font-size="12">✓ Passport issued: ap_8f3a21c9  ·  policy set  ·  audit ready</text>
+  </g>
+</svg>

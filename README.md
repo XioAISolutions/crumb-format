@@ -2,11 +2,15 @@
 
 The copy-paste AI handoff format.
 
+![CRUMB CLI overview](docs/assets/crumb-banner.svg)
+
 ---
 
 Ever been deep into a task with one AI, then need to switch to another? You either paste an enormous chat log and hope it picks up the thread, or you start over and re-explain everything from scratch.
 
 CRUMB is a third option. It's a small, structured text block you copy-paste between AI tools. The next AI gets exactly what it needs to continue your work -- the goal, the context, and the constraints -- without the noise.
+
+> **v0.2.0** — now with MeTalk token compression, REST API + A2A bridge for cross-AI interop, AgentAuth identity & governance, shadow-AI scanner, and 35+ CLI commands. `pip install crumb-format`.
 
 ## Try it right now
 
@@ -114,7 +118,50 @@ crumb search "auth JWT" --dir ./crumbs/
 crumb init --all
 ```
 
-Full command reference: `crumb --help` (25+ commands including export, import, templates, todos, watch mode, and more).
+Full command reference: `crumb --help` (35+ commands including export, import, templates, todos, watch mode, compression, agent governance, and more).
+
+## MeTalk — Caveman Compression for AI-to-AI
+
+AI-to-AI messages don't need polished English. MeTalk strips articles, abbreviates tech terms, and shortens verbose phrasing so you can pack more context into the same token budget.
+
+```bash
+# Default level 2 (dict + grammar strip, ~40% savings)
+crumb metalk task.crumb
+
+# Lossless dictionary substitution only (round-trippable)
+crumb metalk task.crumb --level 1
+
+# Aggressive condensing (~50-60% savings)
+crumb metalk task.crumb --level 3
+
+# Chain with compress for maximum density
+crumb compress task.crumb --metalk
+```
+
+Output shows live stats: `MeTalk: 127 → 68 tokens (46.5% saved, 1.87x ratio)`.
+
+## Cross-AI Interop
+
+CRUMB speaks every major AI protocol so your context travels freely between tools.
+
+```bash
+# REST API (OpenAPI 3.1) — run as a service
+python -m api.server                       # see api/README.md
+
+# Agent-to-Agent (A2A) bridge — Google's A2A spec
+python -m a2a.server                       # see a2a/README.md
+
+# Convert CRUMB <-> other formats
+crumb bridge list                          # supported formats
+crumb bridge export task.crumb --to openai-threads
+crumb bridge import chat.json --from langchain-memory
+
+# Event webhooks for agent activity
+crumb webhook add https://hooks.example.com/agent-events
+crumb webhook test https://hooks.example.com/agent-events
+```
+
+Formats supported via `bridge`: `openai-threads`, `langchain-memory`, `crewai-task`, `autogen`, `claude-project`.
 
 ## AgentAuth — Agent Identity & Governance
 
@@ -188,10 +235,14 @@ repos:
 - [`SPEC.md`](SPEC.md) -- the format specification
 - [`DREAMING.md`](DREAMING.md) -- how memory consolidation works
 - [`examples/`](examples/) -- ready-to-paste `.crumb` files
-- [`cli/crumb.py`](cli/crumb.py) -- full CLI (25+ commands)
-- [`agentauth/`](agentauth/) -- AgentAuth SDK (passport, policy, credentials, audit)
+- [`cli/crumb.py`](cli/crumb.py) -- full CLI (35+ commands)
+- [`cli/metalk.py`](cli/metalk.py) -- MeTalk caveman compression module
+- [`agentauth/`](agentauth/) -- AgentAuth SDK (passport, policy, credentials, audit, webhooks)
 - [`mcp/`](mcp/) -- MCP servers for CRUMB and AgentAuth
+- [`api/`](api/) -- REST API server with OpenAPI 3.1 spec
+- [`a2a/`](a2a/) -- Google A2A protocol bridge (agent card, task handler, server)
 - [`validators/`](validators/) -- Python and Node reference validators
+- [`tests/`](tests/) -- 200+ tests covering the full surface area
 - [`docs/HANDOFF_PATTERNS.md`](docs/HANDOFF_PATTERNS.md) -- practical handoff patterns
 
 ## License
