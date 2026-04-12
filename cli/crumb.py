@@ -28,6 +28,7 @@ REQUIRED_SECTIONS = {
     "todo": ["tasks"],
     "passport": ["identity", "permissions"],
     "audit": ["goal", "actions", "verdict"],
+    "wake": ["identity"],
 }
 
 
@@ -4141,6 +4142,115 @@ def cmd_webhook(args: argparse.Namespace) -> None:
             sys.exit(1)
 
 
+# ── Palace / Classify / Wake ─────────────────────────────────────────
+
+def cmd_palace(args: argparse.Namespace) -> None:
+    """Hierarchical spatial memory: wings / halls / rooms / tunnels."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from cli import palace
+
+    action = args.palace_action
+
+    if action == 'init':
+        target = Path(args.path or '.').resolve()
+        root = palace.init_palace(target)
+        print(f'Palace initialized at {root}')
+        return
+
+    root = palace.find_palace(Path(args.path or '.') if hasattr(args, 'path') and args.path else None)
+    if root is None:
+        print('error: no .crumb-palace found. Run `crumb palace init` first.', file=sys.stderr)
+        sys.exit(1)
+
+    if action == 'add':
+        hall = args.hall
+        if not hall:
+            from cli.classify import classify
+            hall = classify(args.text)
+        path = palace.add_observation(root, args.wing, hall, args.room, args.text)
+        palace.rebuild_index(root)
+        relpath = path.relative_to(root.parent)
+        print(f'Filed in {relpath} (hall={hall})')
+
+    elif action == 'list':
+        rooms = palace.list_rooms(root, wing=getattr(args, 'wing', None),
+                                  hall=getattr(args, 'hall', None))
+        if not rooms:
+            print('(no rooms yet)')
+            return
+        for wing, hall, room, _ in rooms:
+            print(f'{wing}/{hall}/{room}')
+
+    elif action == 'search':
+        results = palace.palace_search(root, args.query,
+                                       wing=getattr(args, 'wing', None),
+                                       hall=getattr(args, 'hall', None))
+        if not results:
+            print('no matches')
+            sys.exit(1)
+        for wing, hall, room, _, hits in results:
+            print(f'{hits:3}x  {wing}/{hall}/{room}')
+
+    elif action == 'tunnel':
+        path = palace.rebuild_tunnels(root)
+        print(f'Tunnels rebuilt → {path}')
+
+    elif action == 'stats':
+        stats = palace.palace_stats(root)
+        print(f'Wings:  {stats["wings"]}')
+        print(f'Rooms:  {stats["rooms"]}')
+        print('By hall:')
+        for h, c in stats['by_hall'].items():
+            print(f'  {h:14} {c}')
+
+
+def cmd_classify(args: argparse.Namespace) -> None:
+    """Rule-based memory hall classifier."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from cli.classify import classify, classify_batch, explain
+
+    if args.text:
+        if getattr(args, 'explain', False):
+            info = explain(args.text)
+            print(f'hall: {info["hall"]}')
+            print(f'scores: {info["scores"]}')
+            for h, pats in info['matched_patterns'].items():
+                if pats:
+                    print(f'  {h}: {pats}')
+        else:
+            print(classify(args.text))
+    elif args.file:
+        text = Path(args.file).read_text(encoding='utf-8')
+        for hall, line in classify_batch(text.splitlines()):
+            print(f'{hall:14} {line}')
+    else:
+        print('error: provide --text or --file', file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_wake(args: argparse.Namespace) -> None:
+    """Emit a session wake-up crumb from the palace."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from cli.palace import find_palace, build_wake_crumb
+
+    root = find_palace(Path(args.path) if args.path else None)
+    if root is None:
+        print('error: no .crumb-palace found. Run `crumb palace init` first.', file=sys.stderr)
+        sys.exit(1)
+
+    wake_text = build_wake_crumb(root, max_facts=args.max_facts)
+
+    if args.metalk:
+        from cli.metalk import encode
+        wake_text = encode(wake_text, level=args.metalk_level)
+
+    if args.output and args.output != '-':
+        write_text(args.output, wake_text)
+        print(f'Wake crumb written to {args.output}', file=sys.stderr)
+    else:
+        print(wake_text, end='')
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog='crumb',
@@ -4475,6 +4585,56 @@ def build_parser() -> argparse.ArgumentParser:
     mt_cmd.add_argument('--decode', action='store_true', help='Decode MeTalk back to full form.')
     mt_cmd.add_argument('-o', '--output', default='-', help='Output path.')
     mt_cmd.set_defaults(func=cmd_metalk)
+
+    # --- Palace ---
+    pal_cmd = sub.add_parser('palace', help='Hierarchical spatial memory: wings / halls / rooms / tunnels.')
+    pal_sub = pal_cmd.add_subparsers(dest='palace_action', required=True)
+
+    pal_init = pal_sub.add_parser('init', help='Initialize a .crumb-palace in the current directory.')
+    pal_init.add_argument('--path', help='Parent directory (default: cwd).')
+
+    pal_add = pal_sub.add_parser('add', help='File an observation into a room (creates room if missing).')
+    pal_add.add_argument('text', help='Observation text.')
+    pal_add.add_argument('--wing', required=True, help='Wing name (person/project/topic).')
+    pal_add.add_argument('--room', required=True, help='Room name (specific topic).')
+    pal_add.add_argument('--hall', choices=['facts', 'events', 'discoveries', 'preferences', 'advice'],
+                         help='Hall (auto-classified via `crumb classify` if omitted).')
+    pal_add.add_argument('--path', help='Start directory for palace lookup.')
+
+    pal_list = pal_sub.add_parser('list', help='List rooms.')
+    pal_list.add_argument('--wing', help='Filter by wing.')
+    pal_list.add_argument('--hall', choices=['facts', 'events', 'discoveries', 'preferences', 'advice'])
+    pal_list.add_argument('--path', help='Start directory.')
+
+    pal_search = pal_sub.add_parser('search', help='Substring search across room bodies.')
+    pal_search.add_argument('query', help='Search query.')
+    pal_search.add_argument('--wing', help='Restrict to one wing.')
+    pal_search.add_argument('--hall', choices=['facts', 'events', 'discoveries', 'preferences', 'advice'])
+    pal_search.add_argument('--path', help='Start directory.')
+
+    pal_tunnel = pal_sub.add_parser('tunnel', help='Rebuild cross-wing tunnel index.')
+    pal_tunnel.add_argument('--path', help='Start directory.')
+
+    pal_stats = pal_sub.add_parser('stats', help='Show palace statistics.')
+    pal_stats.add_argument('--path', help='Start directory.')
+
+    pal_cmd.set_defaults(func=cmd_palace)
+
+    # --- Classify ---
+    cls_cmd = sub.add_parser('classify', help='Rule-based memory hall classifier.')
+    cls_cmd.add_argument('--text', help='Text to classify.')
+    cls_cmd.add_argument('--file', help='File of lines to classify (one per line).')
+    cls_cmd.add_argument('--explain', action='store_true', help='Show matched patterns and scores.')
+    cls_cmd.set_defaults(func=cmd_classify)
+
+    # --- Wake ---
+    wake_cmd = sub.add_parser('wake', help='Emit a session wake-up crumb from the palace.')
+    wake_cmd.add_argument('--path', help='Start directory for palace lookup.')
+    wake_cmd.add_argument('-o', '--output', default='-', help='Output file or - for stdout.')
+    wake_cmd.add_argument('--max-facts', type=int, default=8, help='Max facts to include (default: 8).')
+    wake_cmd.add_argument('--metalk', action='store_true', help='Pipe output through MeTalk compression.')
+    wake_cmd.add_argument('--metalk-level', type=int, choices=[1, 2, 3], default=2)
+    wake_cmd.set_defaults(func=cmd_wake)
 
     return parser
 

@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 620" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="13">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 650" font-family="ui-monospace, 'SF Mono', Menlo, Consolas, monospace" font-size="13">
   <!-- Terminal window frame -->
   <defs>
     <linearGradient id="title" x1="0" y1="0" x2="0" y2="1">
@@ -6,7 +6,7 @@
       <stop offset="1" stop-color="#2c2c2e"/>
     </linearGradient>
   </defs>
-  <rect x="10" y="10" width="880" height="600" rx="10" ry="10" fill="#1e1e20" stroke="#000" stroke-opacity="0.4"/>
+  <rect x="10" y="10" width="880" height="630" rx="10" ry="10" fill="#1e1e20" stroke="#000" stroke-opacity="0.4"/>
   <rect x="10" y="10" width="880" height="28" rx="10" ry="10" fill="url(#title)"/>
   <rect x="10" y="28" width="880" height="10" fill="url(#title)"/>
   <!-- Traffic lights -->
@@ -40,7 +40,7 @@
       <text x="0" y="184">              search, merge, compact, diff, init, log, todo-*, watch, export,</text>
       <text x="0" y="200">              import, hooks, template, compress, bench, share, handoff,</text>
       <text x="0" y="216">              passport, policy, audit, scan, comply, dashboard, bridge,</text>
-      <text x="0" y="232">              webhook, metalk} ...</text>
+      <text x="0" y="232">              webhook, metalk, palace, classify, wake} ...</text>
     </g>
 
     <g font-size="12">
@@ -71,22 +71,25 @@
       <text x="0" y="404" fill="#6ee7b7">scan / comply / dashboard</text>
       <text x="160" y="404" fill="#d1d5db">Shadow-AI scan, compliance reports, HTML dash.</text>
 
-      <text x="0" y="422" fill="#6ee7b7">bridge / webhook / share</text>
-      <text x="160" y="422" fill="#d1d5db">Cross-format bridge, events, gist sharing.</text>
+      <text x="0" y="422" fill="#6ee7b7">palace / classify / wake</text>
+      <text x="160" y="422" fill="#d1d5db">Spatial memory — wings, halls, rooms, tunnels.</text>
 
-      <text x="0" y="440" fill="#6ee7b7">init / handoff / template</text>
-      <text x="160" y="440" fill="#d1d5db">Seed tools, clipboard handoff, templates.</text>
+      <text x="0" y="440" fill="#6ee7b7">bridge / webhook / share</text>
+      <text x="160" y="440" fill="#d1d5db">Cross-format bridge, events, gist sharing.</text>
+
+      <text x="0" y="458" fill="#6ee7b7">init / handoff / template</text>
+      <text x="160" y="458" fill="#d1d5db">Seed tools, clipboard handoff, templates.</text>
     </g>
 
     <!-- Prompt examples -->
-    <text x="0" y="476" fill="#8ab4f8">$</text>
-    <text x="18" y="476" fill="#e6e6e6">crumb from-git --recent 24h | crumb metalk --level 2 | pbcopy</text>
+    <text x="0" y="494" fill="#8ab4f8">$</text>
+    <text x="18" y="494" fill="#e6e6e6">crumb palace add "decided to use Postgres" --wing orion --room db-choice</text>
 
-    <text x="0" y="500" fill="#9ca3af" font-size="12">MeTalk: 127 → 68 tokens (46.5% saved, 1.87x ratio) ✓ copied to clipboard</text>
+    <text x="0" y="514" fill="#9ca3af" font-size="12">Filed in .crumb-palace/wings/orion/facts/db-choice.crumb (hall=facts)</text>
 
-    <text x="0" y="526" fill="#8ab4f8">$</text>
-    <text x="18" y="526" fill="#e6e6e6">crumb passport register claude-prod --owner alice --tools-allowed "read_*"</text>
+    <text x="0" y="540" fill="#8ab4f8">$</text>
+    <text x="18" y="540" fill="#e6e6e6">crumb wake --metalk</text>
 
-    <text x="0" y="550" fill="#9ca3af" font-size="12">✓ Passport issued: ap_8f3a21c9  ·  policy set  ·  audit ready</text>
+    <text x="0" y="560" fill="#9ca3af" font-size="12">BC / k=wake / [id] wings:3, rooms:12 / [facts] 8 top decisions / [rooms] index</text>
   </g>
 </svg>

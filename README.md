@@ -10,7 +10,7 @@ Ever been deep into a task with one AI, then need to switch to another? You eith
 
 CRUMB is a third option. It's a small, structured text block you copy-paste between AI tools. The next AI gets exactly what it needs to continue your work -- the goal, the context, and the constraints -- without the noise.
 
-> **v0.2.0** — now with MeTalk token compression, REST API + A2A bridge for cross-AI interop, AgentAuth identity & governance, shadow-AI scanner, and 35+ CLI commands. `pip install crumb-format`.
+> **v0.2.0** — 38 CLI commands. Palace spatial memory, MeTalk compression, REST API + A2A bridge, AgentAuth identity & governance, shadow-AI scanner. `pip install crumb-format`.
 
 ## Try it right now
 
@@ -118,7 +118,43 @@ crumb search "auth JWT" --dir ./crumbs/
 crumb init --all
 ```
 
-Full command reference: `crumb --help` (35+ commands including export, import, templates, todos, watch mode, compression, agent governance, and more).
+Full command reference: `crumb --help` (38 commands including export, import, templates, todos, watch mode, compression, agent governance, and more).
+
+## Palace — Spatial Memory That Stays With You
+
+AI conversations disappear when the session ends. Palace gives you a persistent, hierarchical memory that any AI can read — organized by **wings** (people/projects), **halls** (facts/events/discoveries/preferences/advice), and **rooms** (specific topics). No database, no cloud — just a directory of `.crumb` files that are grep-able, git-able, and diff-able.
+
+```bash
+# Initialize a palace
+crumb palace init
+
+# File observations (hall auto-classified if omitted)
+crumb palace add "decided to use Postgres" --wing orion --room db-choice
+crumb palace add "shipped v0.1 yesterday"  --wing orion --room launch
+crumb palace add "prefers concise commits" --wing nova  --room style
+
+# List, search, and cross-reference
+crumb palace list --wing orion
+crumb palace search "postgres"
+crumb palace tunnel                  # find cross-wing links
+crumb palace stats
+
+# Wake-up: one-shot context for a new session (~170 tokens)
+crumb wake                           # identity + top facts + room index
+crumb wake --metalk                  # compressed for token density
+```
+
+Auto-classification puts each observation in the right hall without you specifying it — "decided X" → `facts`, "shipped X" → `events`, "prefers X" → `preferences`. Use `crumb classify --text "..."` to test it standalone.
+
+```
+.crumb-palace/wings/
+  orion/
+    facts/db-choice.crumb           # kind=mem
+    events/launch.crumb
+  nova/
+    preferences/style.crumb
+    facts/db-choice.crumb           # ← same room name → tunnel detected
+```
 
 ## MeTalk — Caveman Compression for AI-to-AI
 
@@ -235,14 +271,16 @@ repos:
 - [`SPEC.md`](SPEC.md) -- the format specification
 - [`DREAMING.md`](DREAMING.md) -- how memory consolidation works
 - [`examples/`](examples/) -- ready-to-paste `.crumb` files
-- [`cli/crumb.py`](cli/crumb.py) -- full CLI (35+ commands)
+- [`cli/crumb.py`](cli/crumb.py) -- full CLI (38 commands)
+- [`cli/palace.py`](cli/palace.py) -- Palace spatial memory (wings/halls/rooms/tunnels)
+- [`cli/classify.py`](cli/classify.py) -- rule-based hall classifier
 - [`cli/metalk.py`](cli/metalk.py) -- MeTalk caveman compression module
 - [`agentauth/`](agentauth/) -- AgentAuth SDK (passport, policy, credentials, audit, webhooks)
 - [`mcp/`](mcp/) -- MCP servers for CRUMB and AgentAuth
 - [`api/`](api/) -- REST API server with OpenAPI 3.1 spec
 - [`a2a/`](a2a/) -- Google A2A protocol bridge (agent card, task handler, server)
 - [`validators/`](validators/) -- Python and Node reference validators
-- [`tests/`](tests/) -- 200+ tests covering the full surface area
+- [`tests/`](tests/) -- 261 tests covering the full surface area
 - [`docs/HANDOFF_PATTERNS.md`](docs/HANDOFF_PATTERNS.md) -- practical handoff patterns
 
 ## License
