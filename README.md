@@ -10,7 +10,7 @@ Ever been deep into a task with one AI, then need to switch to another? You eith
 
 CRUMB is a third option. It's a small, structured text block you copy-paste between AI tools. The next AI gets exactly what it needs to continue your work -- the goal, the context, and the constraints -- without the noise.
 
-> **v0.2.0** — 40 CLI commands. Palace spatial memory, MeTalk compression, REST API + A2A bridge, AgentAuth identity & governance, shadow-AI scanner. `pip install crumb-format`.
+> **v0.2.0** — 41 CLI commands. Palace spatial memory, MeTalk compression, REST API + A2A bridge, AgentAuth identity & governance, shadow-AI scanner. `pip install crumb-format`.
 
 ## Try it right now
 
@@ -118,7 +118,7 @@ crumb search "auth JWT" --dir ./crumbs/
 crumb init --all
 ```
 
-Full command reference: `crumb --help` (40 commands including export, import, templates, todos, watch mode, compression, agent governance, and more). See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for a 5-minute walkthrough.
+Full command reference: `crumb --help` (41 commands including export, import, templates, todos, watch mode, compression, agent governance, and more). See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for a 5-minute walkthrough.
 
 ## Palace — Spatial Memory That Stays With You
 
@@ -155,6 +155,42 @@ Auto-classification puts each observation in the right hall without you specifyi
     preferences/style.crumb
     facts/db-choice.crumb           # ← same room name → tunnel detected
 ```
+
+## Reflect — Self-Learning Gap Detection
+
+A filing cabinet stores what you put in it. A second brain tells you what's *missing*. `crumb reflect` analyzes your palace and identifies knowledge gaps, stale rooms, and imbalances — then suggests exactly what to add next.
+
+```bash
+# Health check — scored 0-100 with actionable suggestions
+crumb reflect
+
+# Output as a crumb for AI consumption
+crumb reflect -f crumb
+
+# Include gap awareness in session wake-ups
+crumb wake --reflect
+
+# Generate a structured wiki from palace contents
+crumb palace wiki
+```
+
+Example output:
+```
+Palace Health: 76/100 (Grade: C)
+Wings: 2  Rooms: 6
+Hall coverage: advice=1, discoveries=1, events=1, facts=2, preferences=1
+
+Found 3 gap(s):
+
+   !! [MEDIUM] Wing team has only 1 room(s). Sparse knowledge.
+      -> Add more observations: crumb palace add "..." --wing team --room <topic>
+    ! [LOW] Wing team is missing hall 'preferences' (present in other wings).
+      -> Add to fill the gap: crumb palace add "..." --wing team --hall preferences --room <topic>
+    ! [LOW] Wing team has no discoveries — nothing learned or realized.
+      -> Capture learnings: crumb palace add "realized ..." --wing team --room <insight>
+```
+
+Gap types: empty halls, thin wings, stale rooms (configurable threshold), missing cross-wing halls, undocumented preferences, no discoveries.
 
 ## MeTalk — Caveman Compression for AI-to-AI
 
@@ -272,7 +308,8 @@ repos:
 - [`DREAMING.md`](DREAMING.md) -- how memory consolidation works
 - [`docs/QUICKSTART.md`](docs/QUICKSTART.md) -- 5-minute daily workflow guide
 - [`examples/`](examples/) -- ready-to-paste `.crumb` files (task, mem, map, log, todo, wake)
-- [`cli/crumb.py`](cli/crumb.py) -- full CLI (40 commands)
+- [`cli/crumb.py`](cli/crumb.py) -- full CLI (41 commands)
+- [`cli/reflect.py`](cli/reflect.py) -- self-learning gap detection and knowledge health scoring
 - [`cli/palace.py`](cli/palace.py) -- Palace spatial memory (wings/halls/rooms/tunnels)
 - [`cli/classify.py`](cli/classify.py) -- rule-based hall classifier
 - [`cli/metalk.py`](cli/metalk.py) -- MeTalk caveman compression module
@@ -281,7 +318,7 @@ repos:
 - [`api/`](api/) -- REST API server with OpenAPI 3.1 spec
 - [`a2a/`](a2a/) -- Google A2A protocol bridge (agent card, task handler, server)
 - [`validators/`](validators/) -- Python and Node reference validators
-- [`tests/`](tests/) -- 261 tests covering the full surface area
+- [`tests/`](tests/) -- 291 tests covering the full surface area
 - [`docs/HANDOFF_PATTERNS.md`](docs/HANDOFF_PATTERNS.md) -- practical handoff patterns
 
 ## License
