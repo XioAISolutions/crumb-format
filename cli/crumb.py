@@ -2624,6 +2624,252 @@ def cmd_handoff(args: argparse.Namespace) -> None:
         print('\n---\nCopy the above and paste into your AI tool', file=sys.stderr)
 
 
+def _paste_from_clipboard() -> str | None:
+    """Read text from clipboard using platform-appropriate tool."""
+    system = platform.system()
+    cmds = []
+    if system == 'Darwin':
+        cmds = [['pbpaste']]
+    elif system == 'Linux':
+        if 'microsoft' in platform.uname().release.lower():
+            cmds = [['powershell.exe', '-c', 'Get-Clipboard']]
+        else:
+            cmds = [['xclip', '-selection', 'clipboard', '-o'],
+                    ['xsel', '--clipboard', '--output']]
+    elif system == 'Windows':
+        cmds = [['powershell.exe', '-c', 'Get-Clipboard']]
+
+    for cmd in cmds:
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            if proc.returncode == 0:
+                return proc.stdout
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            continue
+    return None
+
+
+def cmd_receive(args: argparse.Namespace) -> None:
+    """Receive a crumb: read from clipboard or stdin, validate, optionally file to palace."""
+    # Get text from clipboard, file, or stdin
+    if args.file and args.file != '-':
+        text = Path(args.file).read_text(encoding='utf-8')
+        source_label = args.file
+    else:
+        pasted = _paste_from_clipboard()
+        if pasted and 'BEGIN CRUMB' in pasted:
+            text = pasted
+            source_label = 'clipboard'
+        else:
+            print('Reading from stdin (paste crumb, then Ctrl+D)...', file=sys.stderr)
+            text = sys.stdin.read()
+            source_label = 'stdin'
+
+    # Validate
+    try:
+        parsed = parse_crumb(text)
+    except ValueError as e:
+        print(f'Invalid crumb from {source_label}: {e}', file=sys.stderr)
+        sys.exit(1)
+
+    headers = parsed['headers']
+    kind = headers['kind']
+    title = headers.get('title', '(untitled)')
+    print(f'Received: kind={kind}  title={title}  from={source_label}')
+
+    # Save to file if requested
+    if args.output and args.output != '-':
+        write_text(args.output, text)
+        print(f'Saved to {args.output}')
+
+    # Auto-file to palace if requested
+    if args.palace:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from cli.palace import find_palace, add_observation, rebuild_index
+        from cli.classify import classify
+
+        root = find_palace(Path('.'))
+        if root is None:
+            print('No palace found — skipping palace filing. Run `crumb palace init` first.',
+                  file=sys.stderr)
+        else:
+            wing = args.wing or headers.get('source', 'incoming').split('.')[0]
+            room_name = headers.get('title', 'received').lower().replace(' ', '-')[:40]
+
+            # Gather text from key sections
+            bullets = []
+            for section_name in ('goal', 'consolidated', 'context'):
+                for line in parsed['sections'].get(section_name, []):
+                    stripped = line.strip()
+                    if stripped and stripped.startswith('-'):
+                        bullets.append(stripped.lstrip('- ').strip())
+                    elif stripped:
+                        bullets.append(stripped)
+
+            if not bullets:
+                bullets = [f'Received {kind} crumb: {title}']
+
+            hall = args.hall or classify(' '.join(bullets[:3]))
+
+            for bullet in bullets[:10]:
+                add_observation(root, wing, hall, room_name, bullet)
+            rebuild_index(root)
+            print(f'Filed {len(bullets[:10])} observations → {wing}/{hall}/{room_name}')
+
+    # Show summary
+    sections = parsed['sections']
+    for name, body in sections.items():
+        content_lines = [l for l in body if l.strip()]
+        print(f'  [{name}] {len(content_lines)} lines')
+
+
+def cmd_context(args: argparse.Namespace) -> None:
+    """Generate a crumb from the current project state — git, palace, and todo crumbs."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+    context_lines = []
+    constraint_lines = []
+
+    # --- Git state ---
+    git_available = subprocess.run(
+        ['git', 'rev-parse', '--is-inside-work-tree'],
+        capture_output=True, text=True,
+    ).returncode == 0
+
+    if git_available:
+        branch = _git_run('branch', '--show-current') or 'HEAD'
+        context_lines.append(f'- Branch: {branch}')
+
+        # Status summary
+        status = _git_run('status', '--porcelain')
+        if status:
+            status_lines = [l for l in status.splitlines() if l.strip()]
+            modified = sum(1 for l in status_lines if l.startswith(' M') or l.startswith('M'))
+            added = sum(1 for l in status_lines if l.startswith('A') or l.startswith('??'))
+            context_lines.append(f'- Working tree: {modified} modified, {added} untracked')
+        else:
+            context_lines.append('- Working tree: clean')
+
+        # Recent commits
+        recent = _git_run('log', '--oneline', f'-{args.commits}')
+        if recent:
+            context_lines.append(f'- Recent commits:')
+            for line in recent.splitlines()[:args.commits]:
+                if line.strip():
+                    context_lines.append(f'  - {line.strip()}')
+
+        # Uncommitted diff summary
+        diff_stat = _git_run('diff', '--stat')
+        if diff_stat:
+            summary_line = diff_stat.strip().splitlines()[-1] if diff_stat.strip() else ''
+            if summary_line:
+                context_lines.append(f'- Uncommitted changes: {summary_line.strip()}')
+
+        # Check for WIP signals
+        last_msg = _git_run('log', '-1', '--format=%s') or ''
+        if any(kw in last_msg.lower() for kw in ('wip', 'fixme', 'todo', 'broken')):
+            constraint_lines.append('- Latest commit may be incomplete (WIP detected)')
+
+    # --- Palace facts ---
+    from cli.palace import find_palace, list_rooms
+
+    palace_root = find_palace(Path('.'))
+    if palace_root:
+        rooms = list_rooms(palace_root, hall='facts')
+        if rooms:
+            context_lines.append('- Key facts from palace:')
+            fact_count = 0
+            for w, h, r, p in rooms:
+                if fact_count >= args.max_facts:
+                    break
+                try:
+                    body = p.read_text()
+                except OSError:
+                    continue
+                in_section = False
+                for line in body.splitlines():
+                    s = line.strip()
+                    if s == '[consolidated]':
+                        in_section = True
+                        continue
+                    if s.startswith('[') and s.endswith(']'):
+                        in_section = False
+                        continue
+                    if in_section and s.startswith('-') and fact_count < args.max_facts:
+                        context_lines.append(f'  - {w}/{r}: {s.lstrip("- ").strip()}')
+                        fact_count += 1
+
+    # --- Todo crumbs in current dir ---
+    todo_files = list(Path('.').glob('*.crumb'))
+    open_todos = []
+    for tf in todo_files:
+        try:
+            parsed = parse_crumb(tf.read_text())
+        except (ValueError, OSError):
+            continue
+        if parsed['headers'].get('kind') != 'todo':
+            continue
+        for line in parsed['sections'].get('tasks', []):
+            s = line.strip()
+            if s.startswith('- [ ]'):
+                open_todos.append(s[5:].strip())
+
+    if open_todos:
+        context_lines.append(f'- Open TODOs ({len(open_todos)}):')
+        for t in open_todos[:5]:
+            context_lines.append(f'  - {t}')
+        if len(open_todos) > 5:
+            context_lines.append(f'  - ... and {len(open_todos) - 5} more')
+
+    # --- Build the goal ---
+    if args.goal:
+        goal = args.goal
+    elif git_available:
+        latest = _git_run('log', '-1', '--format=%s') or ''
+        branch = _git_run('branch', '--show-current') or ''
+        if branch and branch not in ('main', 'master', 'HEAD'):
+            goal = f'Continue work on {branch}'
+        elif latest:
+            goal = f'Continue from: {latest}'
+        else:
+            goal = 'Continue work on this project'
+    else:
+        goal = 'Continue work on this project'
+
+    title = args.title or goal[:80]
+
+    if not constraint_lines:
+        constraint_lines.append('- Review context before continuing')
+
+    crumb_text = render_crumb(
+        headers={
+            'v': '1.1',
+            'kind': 'task',
+            'title': title,
+            'source': args.source or 'crumb.context',
+        },
+        sections={
+            'goal': [goal],
+            'context': context_lines or ['- No project context available'],
+            'constraints': constraint_lines,
+        },
+    )
+
+    # Optional MeTalk compression
+    if args.metalk:
+        from cli.metalk import encode
+        crumb_text = encode(crumb_text, level=args.metalk_level)
+
+    if args.clipboard:
+        if _copy_to_clipboard(crumb_text):
+            print('Context crumb copied to clipboard!', file=sys.stderr)
+        else:
+            print(crumb_text)
+            print('\n---\nCopy the above and paste into your next AI tool', file=sys.stderr)
+    else:
+        write_text(args.output, crumb_text)
+
+
 # ── Agent Passport commands ──────────────────────────────────────────
 
 
@@ -4254,6 +4500,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog='crumb',
         description='Create, validate, inspect, and manage .crumb handoff files.',
     )
+    parser.add_argument('--version', action='version', version='crumb 0.2.0')
     sub = parser.add_subparsers(dest='command', required=True)
 
     # new
@@ -4464,6 +4711,30 @@ def build_parser() -> argparse.ArgumentParser:
     handoff_cmd.add_argument('--target', choices=['claude', 'cursor', 'chatgpt', 'gemini'],
                              help='Target AI tool (optional).')
     handoff_cmd.set_defaults(func=cmd_handoff)
+
+    # --- Receive ---
+    receive_cmd = sub.add_parser('receive', help='Receive a crumb from clipboard/file/stdin, validate, optionally file to palace.')
+    receive_cmd.add_argument('--file', help='Read crumb from this file instead of clipboard.')
+    receive_cmd.add_argument('-o', '--output', default=None, help='Save received crumb to file.')
+    receive_cmd.add_argument('--palace', action='store_true', help='Auto-file observations into the palace.')
+    receive_cmd.add_argument('--wing', help='Palace wing (default: derived from source header).')
+    receive_cmd.add_argument('--hall', choices=['facts', 'events', 'discoveries', 'preferences', 'advice'],
+                             help='Palace hall (default: auto-classified).')
+    receive_cmd.set_defaults(func=cmd_receive)
+
+    # --- Context ---
+    context_cmd = sub.add_parser('context', help='Generate a task crumb from current project state (git, palace, todos).')
+    context_cmd.add_argument('--commits', type=int, default=5, help='Number of recent commits to include (default: 5).')
+    context_cmd.add_argument('--goal', help='Override the auto-detected goal.')
+    context_cmd.add_argument('--title', help='Override the auto-generated title.')
+    context_cmd.add_argument('--source', help='Override source label (default: crumb.context).')
+    context_cmd.add_argument('-o', '--output', default='-', help='Output file or - for stdout.')
+    context_cmd.add_argument('--metalk', action='store_true', help='Apply MeTalk compression.')
+    context_cmd.add_argument('--metalk-level', type=int, choices=[1, 2, 3], default=2,
+                             help='MeTalk level (default: 2).')
+    context_cmd.add_argument('--clipboard', action='store_true', help='Copy result to clipboard instead of printing.')
+    context_cmd.add_argument('--max-facts', type=int, default=8, help='Max palace facts to include (default: 8).')
+    context_cmd.set_defaults(func=cmd_context)
 
     # --- Agent Passport ---
     passport_cmd = sub.add_parser('passport', help='Agent identity management.')

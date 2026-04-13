@@ -10,7 +10,7 @@ Ever been deep into a task with one AI, then need to switch to another? You eith
 
 CRUMB is a third option. It's a small, structured text block you copy-paste between AI tools. The next AI gets exactly what it needs to continue your work -- the goal, the context, and the constraints -- without the noise.
 
-> **v0.2.0** — 38 CLI commands. Palace spatial memory, MeTalk compression, REST API + A2A bridge, AgentAuth identity & governance, shadow-AI scanner. `pip install crumb-format`.
+> **v0.2.0** — 40 CLI commands. Palace spatial memory, MeTalk compression, REST API + A2A bridge, AgentAuth identity & governance, shadow-AI scanner. `pip install crumb-format`.
 
 ## Try it right now
 
@@ -118,7 +118,7 @@ crumb search "auth JWT" --dir ./crumbs/
 crumb init --all
 ```
 
-Full command reference: `crumb --help` (38 commands including export, import, templates, todos, watch mode, compression, agent governance, and more).
+Full command reference: `crumb --help` (40 commands including export, import, templates, todos, watch mode, compression, agent governance, and more). See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for a 5-minute walkthrough.
 
 ## Palace — Spatial Memory That Stays With You
 
@@ -270,8 +270,9 @@ repos:
 
 - [`SPEC.md`](SPEC.md) -- the format specification
 - [`DREAMING.md`](DREAMING.md) -- how memory consolidation works
-- [`examples/`](examples/) -- ready-to-paste `.crumb` files
-- [`cli/crumb.py`](cli/crumb.py) -- full CLI (38 commands)
+- [`docs/QUICKSTART.md`](docs/QUICKSTART.md) -- 5-minute daily workflow guide
+- [`examples/`](examples/) -- ready-to-paste `.crumb` files (task, mem, map, log, todo, wake)
+- [`cli/crumb.py`](cli/crumb.py) -- full CLI (40 commands)
 - [`cli/palace.py`](cli/palace.py) -- Palace spatial memory (wings/halls/rooms/tunnels)
 - [`cli/classify.py`](cli/classify.py) -- rule-based hall classifier
 - [`cli/metalk.py`](cli/metalk.py) -- MeTalk caveman compression module

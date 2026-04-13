@@ -1,0 +1,25 @@
+BEGIN CRUMB
+v=1.1
+kind=wake
+title=Session wake-up
+source=crumb.palace
+---
+[identity]
+- Wing: orion (primary developer)
+- Working on: web-app backend and CLI tooling
+- Style: direct, concise, prefers working code over theory
+
+[facts]
+- Database: PostgreSQL 16 with pgvector extension
+- Auth: JWT cookies with 15-minute access tokens
+- Deployment: Kubernetes on AWS EKS, 3 replicas
+- CI: GitHub Actions, tests must pass before merge
+- API style: REST with OpenAPI 3.1 spec
+
+[rooms]
+- orion/facts/db-choice — PostgreSQL selection rationale
+- orion/facts/auth-design — JWT cookie architecture
+- orion/events/v2-launch — v2.0 shipped 2025-05-15
+- orion/preferences/style — coding and communication preferences
+- orion/discoveries/pgvector — vector search performance findings
+END CRUMB

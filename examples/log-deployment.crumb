@@ -1,0 +1,17 @@
+BEGIN CRUMB
+v=1.1
+kind=log
+title=Production deployment log
+source=ops.deploy
+project=web-app
+---
+[entries]
+- 2025-06-01T09:00:00Z — Started deploy pipeline for v2.4.1
+- 2025-06-01T09:03:22Z — Docker image built: web-app:2.4.1-sha-a3f8c1
+- 2025-06-01T09:05:10Z — Rolling update started (3 replicas)
+- 2025-06-01T09:06:45Z — Replica 1/3 healthy
+- 2025-06-01T09:08:12Z — Replica 2/3 healthy
+- 2025-06-01T09:09:30Z — Replica 3/3 healthy — rollout complete
+- 2025-06-01T09:10:00Z — Smoke tests passed (auth, search, checkout)
+- 2025-06-01T09:12:00Z — DNS cutover to new pods confirmed
+END CRUMB

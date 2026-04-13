@@ -1,0 +1,15 @@
+BEGIN CRUMB
+v=1.1
+kind=todo
+title=Sprint 14 tasks
+source=team.planning
+project=web-app
+---
+[tasks]
+- [x] Set up CI pipeline for staging
+- [x] Migrate user table to new schema
+- [ ] Add rate limiting to public API endpoints
+- [ ] Write integration tests for payment flow
+- [ ] Update API docs for v2 endpoints
+- [ ] Fix timezone bug in scheduling module
+END CRUMB
