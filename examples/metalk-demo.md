@@ -150,11 +150,11 @@ Receiving AI tools should call `crumb metalk --decode` first to restore dictiona
 
 ---
 
-## Related: Caveman Claude
+## Two-layer token efficiency
 
-The ["Caveman Claude" system prompt](mem-caveman-prompt.crumb) is a close philosophical cousin. Both are brevity-as-compression techniques, but they operate at different layers:
+MeTalk compresses one layer of the token stack — the crumb payload on the wire. There's a second, complementary layer: the AI's generated output itself. Both are about stripping ceremony and letting signal travel denser.
 
-- **Caveman Claude** — changes the *model's output* by rewriting the system prompt. Reported ~61% output-token savings on dev tasks. Good for interactive sessions and agentic loops.
-- **MeTalk** — compresses the *crumb payload itself* before it moves between tools. Lossless at Level 1, meaning-preserving at Level 2/3. Good for handoffs and long-term storage.
+- **Output-layer compression** — shape how the model *writes* (tell it to drop articles, filler, preambles, and sign-offs). See [`mem-terse-output.crumb`](mem-terse-output.crumb) for a loadable preference crumb.
+- **Wire-layer compression (MeTalk)** — shape how the crumb *travels* between tools. Lossless at Level 1, meaning-preserving at Level 2/3.
 
-The two compose: use Caveman at the session level, MeTalk at the handoff level.
+The two compose. Use a terse-output preference at the session level; use MeTalk at the handoff level.

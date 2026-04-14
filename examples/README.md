@@ -12,7 +12,7 @@ Copy, edit, and paste these into any AI tool — they're all valid v1.1 crumbs.
 
 ### `kind=mem` — durable preferences and knowledge
 - [`mem-user-preferences.crumb`](mem-user-preferences.crumb) — user or project preferences that survive sessions
-- [`mem-caveman-prompt.crumb`](mem-caveman-prompt.crumb) — distilled "Caveman Claude" prompt-efficiency thread, turned from a 10k-token viral post into <400 tokens of portable memory
+- [`mem-terse-output.crumb`](mem-terse-output.crumb) — preference crumb for token-efficient AI output (no preambles, filler, or sign-offs); pairs with MeTalk wire compression
 
 ### `kind=map` — codebase overview
 - [`map-repo-onboarding.crumb`](map-repo-onboarding.crumb) — compact repo structure and invariants
