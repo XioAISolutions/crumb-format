@@ -58,10 +58,34 @@ function parseCrumb(text) {
   return { headers, sections };
 }
 
+function expandArgs(args) {
+  const paths = [];
+  for (const arg of args) {
+    if (fs.existsSync(arg) && fs.statSync(arg).isDirectory()) {
+      const stack = [arg];
+      while (stack.length) {
+        const current = stack.pop();
+        for (const entry of fs.readdirSync(current)) {
+          const full = `${current}/${entry}`;
+          const stat = fs.statSync(full);
+          if (stat.isDirectory()) {
+            stack.push(full);
+          } else if (full.endsWith('.crumb')) {
+            paths.push(full);
+          }
+        }
+      }
+    } else {
+      paths.push(arg);
+    }
+  }
+  return paths;
+}
+
 function main() {
-  const paths = process.argv.slice(2);
+  const paths = expandArgs(process.argv.slice(2));
   if (!paths.length) {
-    console.error('usage: validate.js <file> [<file> ...]');
+    console.error('usage: validate.js <file|dir> [...]');
     process.exit(2);
   }
   let exitCode = 0;
