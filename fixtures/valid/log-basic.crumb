@@ -1,0 +1,10 @@
+BEGIN CRUMB
+v=1.1
+kind=log
+title=Migration evidence
+source=cli
+---
+[entries]
+- [2026-04-08T15:00:00Z] Ran the auth migration dry run.
+- [2026-04-08T15:02:00Z] Confirmed old cookies still validate.
+END CRUMB

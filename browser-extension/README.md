@@ -1,6 +1,6 @@
 # CRUMB Browser Extension
 
-A Chrome extension that lets you right-click any AI chat conversation and generate a structured CRUMB handoff document, copied straight to your clipboard.
+A Chrome extension that adds a one-click **Copy as CRUMB** handoff flow to supported AI chat interfaces and can also convert selected text into a portable CRUMB block.
 
 ## Installation
 
@@ -12,26 +12,45 @@ A Chrome extension that lets you right-click any AI chat conversation and genera
 
 ## Usage
 
-1. Select text in any AI chat (ChatGPT, Claude, etc.)
-2. Right-click the selection
-3. Click **Crumb it**
-4. The structured CRUMB handoff is copied to your clipboard
-5. Paste it into your next AI session, a document, or a ticket
+The extension now supports two capture paths.
+
+### One-click chat capture
+
+1. Open a supported chat in ChatGPT, Claude, or Gemini.
+2. Click the floating **Copy as CRUMB** button.
+3. The extension scrapes the most recent visible user and assistant exchanges.
+4. A `kind=log` CRUMB v1.1 block is generated locally and copied to your clipboard.
+5. Paste it into your next AI session, a document, or a ticket.
+
+### Selection-based capture
+
+1. Select text in a supported AI chat page.
+2. Right-click the selection.
+3. Click **Copy as CRUMB**.
+4. The selected text is converted into a `kind=task` CRUMB and copied to your clipboard.
+
+## Supported sites
+
+- `https://chatgpt.com/*`
+- `https://chat.openai.com/*`
+- `https://claude.ai/*`
+- `https://gemini.google.com/*`
 
 ## What it extracts
 
+For one-click chat capture, the extension builds a compact `kind=log` handoff from the latest visible exchanges on the page.
+
+For selection-based capture, it extracts:
+
 - **Goal** — inferred from the first meaningful sentence
-- **Context** — conversation summary with language and snippet counts
-- **Constraints** — "must not", "cannot", "avoid", etc.
-- **Decisions** — "decided to", "going with", "let's use", etc.
-- **Action items** — TODO, FIXME, "next step", "need to", etc.
-- **Code snippets** — all fenced code blocks with language tags
+- **Context** — the most relevant lines from the selected excerpt
+- **Constraints** — phrases such as "must not", "cannot", and "avoid"
 
 ## Permissions
 
-- `contextMenus` — adds the "Crumb it" right-click menu item
+- `contextMenus` — adds the **Copy as CRUMB** right-click menu item
 - `clipboardWrite` — copies the generated crumb to your clipboard
-- `activeTab` — reads the selected text on the current page
+- `activeTab` — allows page-level capture from the current supported chat tab
 
 ## Icon
 
