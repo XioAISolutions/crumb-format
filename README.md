@@ -10,7 +10,7 @@ Ever been deep into a task with one AI, then need to switch to another? You eith
 
 CRUMB is a third option. It's a small, structured text block you copy-paste between AI tools. The next AI gets exactly what it needs to continue your work -- the goal, the context, and the constraints -- without the noise.
 
-> **v0.2.0** — 41 CLI commands. Palace spatial memory, MeTalk compression, REST API + A2A bridge, AgentAuth identity & governance, shadow-AI scanner. `pip install crumb-format`.
+> **v0.3.0** — Protocol-grade release. Deterministic `crumb pack`, MemPalace bridge adapter, `crumb lint` safety scanner, extension model, golden fixtures. All v0.2 features (Palace, Reflect, MeTalk, REST/A2A, AgentAuth, shadow-AI scanner, 41+ CLI commands) included. `pip install crumb-format`.
 
 ## Try it right now
 

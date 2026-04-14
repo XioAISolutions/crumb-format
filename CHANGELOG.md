@@ -1,5 +1,56 @@
 # Changelog
 
+## v0.3.0
+
+Protocol-grade release. CRUMB 0.3.0 turns the project from a useful handoff tool into a protocol-grade context workflow while keeping CRUMB file compatibility at `v=1.1`. The 0.3 track (deterministic packs, adapter bridges, safety linting, golden fixtures, extension model) is now merged into the main line alongside v0.2's Palace, Reflect, Wake, AgentAuth, and MeTalk surfaces.
+
+### New Features
+
+**Deterministic Context Packs**
+- `crumb pack` builds a task/mem/map CRUMB from a directory of crumbs under a token budget
+- Four ranking strategies: keyword, ranked (TF-IDF), recent, hybrid (default)
+- Output shaping via `--mode implement|debug|review` — context sections shaped for the task you're handing off
+- Optional `--ollama` final compression pass using a local model
+- Git-aware context pickup: diff summaries, repo tree, recent files
+
+**Bridge Adapter Surface**
+- `crumb bridge mempalace export` — pull context from MemPalace (or saved export) into a new CRUMB
+- `crumb bridge mempalace import` — convert CRUMB files into a MemPalace-ready adapter bundle
+- Peer of the existing format bridges (`bridge export --to openai-threads`, etc.) — both coexist under the same subcommand
+- Adapter abstract base class (`BridgeAdapter`) for future backends
+
+**Safety Linting**
+- `crumb lint` scans CRUMBs for credentials (OpenAI, GitHub, AWS, Slack, JWT, bearer, generic) with regex-based patterns
+- `--redact` rewrites matches to `[REDACTED:label]` in-place or to `--output`
+- `--max-size` warnings for oversized raw logs and overall CRUMBs
+- Budget checks against `max_total_tokens` / `max_index_tokens` headers
+- Namespaced header validation; `--strict` exits non-zero on any warning
+
+**Extension Model**
+- Documented optional headers: `id`, `url`, `tags`, `extensions`, `max_total_tokens`, `max_index_tokens`
+- Namespaced extension names (`x-*`, `ext.*`, reverse-dns) with warnings in `crumb lint` for non-namespaced use
+- `append_extension()` helper for programmatic extension declaration
+
+**Golden Fixture Suite**
+- `fixtures/valid/`, `fixtures/invalid/`, `fixtures/extensions/` with expected JSON / expected error files
+- Python and Node validators (`validators/validate.py`, `validators/validate.js`) now walk directories and expand globs
+- CI exercises the full fixture suite on every push and PR
+- Enables third-party CRUMB implementations to verify conformance
+
+### Improvements
+
+- `crumb validate <dir>` and `crumb validate '*.crumb'` now work (glob + directory expansion)
+- Git-aware helpers (`_git_repo_root`, `_build_repo_tree`, `.gitignore` handling) available to the scanner surface
+- Two new MCP tools: `crumb_pack`, `crumb_lint` (tool list grows from 20 to 22)
+- SPEC.md adds §8.1 documenting the extension model
+- `log`, `todo`, and `wake` kinds now recognized by both reference validators
+
+### Stats
+
+- 323 tests passing (up from 291 in v0.2.0)
+- 8 new modules: `cli/pack.py`, `cli/linting.py`, `cli/extensions.py`, `cli/local_ai.py`, `cli/mempalace_bridge.py`, plus fixture helpers
+- Package layout unchanged: cli, agentauth, mcp, api, a2a
+
 ## v0.2.0
 
 Major expansion: CRUMB grows from a simple handoff format into a full AI knowledge system with 41 CLI commands, persistent spatial memory, self-learning gap detection, agent governance, and cross-tool interoperability.
