@@ -19,6 +19,19 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Dict, List
 
+from cli.errors import (
+    BadVersionError,
+    EmptySectionError,
+    InvalidHeaderLineError,
+    MissingEndMarkerError,
+    MissingHeaderError,
+    MissingMarkerError,
+    MissingSectionError,
+    MissingSeparatorError,
+    OrphanBodyError,
+    UnknownKindError,
+)
+
 
 REQUIRED_HEADERS = ["v", "kind", "source"]
 REQUIRED_SECTIONS = {
@@ -57,29 +70,29 @@ def parse_crumb(text: str) -> Dict[str, object]:
     while lines and not lines[-1].strip():
         lines.pop()
     if not lines or lines[0] != "BEGIN CRUMB":
-        raise ValueError("missing BEGIN CRUMB marker")
+        raise MissingMarkerError("missing BEGIN CRUMB marker")
     if lines[-1] != "END CRUMB":
-        raise ValueError("missing END CRUMB marker")
+        raise MissingEndMarkerError("missing END CRUMB marker")
     try:
         sep_index = lines.index("---")
     except ValueError:
-        raise ValueError("missing header separator ---")
+        raise MissingSeparatorError("missing header separator ---")
     headers: Dict[str, str] = {}
     for line in lines[1:sep_index]:
         if not line.strip():
             continue
         if "=" not in line:
-            raise ValueError(f"invalid header line: {line!r}")
+            raise InvalidHeaderLineError(f"invalid header line: {line!r}")
         key, value = line.split("=", 1)
         headers[key.strip()] = value.strip()
     for key in REQUIRED_HEADERS:
         if key not in headers:
-            raise ValueError(f"missing required header: {key}")
+            raise MissingHeaderError(f"missing required header: {key}")
     if headers["v"] != "1.1":
-        raise ValueError(f"unsupported version: {headers['v']}")
+        raise BadVersionError(f"unsupported version: {headers['v']}")
     kind = headers["kind"]
     if kind not in REQUIRED_SECTIONS:
-        raise ValueError(f"unknown kind: {kind}")
+        raise UnknownKindError(f"unknown kind: {kind}")
     sections: Dict[str, List[str]] = {}
     current_section: str | None = None
     for line in lines[sep_index + 1 : -1]:
@@ -90,14 +103,16 @@ def parse_crumb(text: str) -> Dict[str, object]:
             continue
         if current_section is None:
             if stripped:
-                raise ValueError("body content found before first section")
+                raise OrphanBodyError("body content found before first section")
             continue
         sections[current_section].append(line)
     for section in REQUIRED_SECTIONS[kind]:
         if section not in sections:
-            raise ValueError(f"missing required section for kind={kind}: [{section}]")
+            raise MissingSectionError(
+                f"missing required section for kind={kind}: [{section}]"
+            )
         if not any(item.strip() for item in sections[section]):
-            raise ValueError(f"section [{section}] is empty")
+            raise EmptySectionError(f"section [{section}] is empty")
     return {"headers": headers, "sections": sections}
 
 
@@ -4801,7 +4816,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog='crumb',
         description='Create, validate, inspect, and manage .crumb handoff files.',
     )
-    parser.add_argument('--version', action='version', version='crumb 0.6.0')
+    parser.add_argument('--version', action='version', version='crumb 0.7.0')
     sub = parser.add_subparsers(dest='command', required=True)
 
     # new

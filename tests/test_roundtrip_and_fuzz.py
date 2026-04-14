@@ -128,31 +128,34 @@ def test_envelope_with_random_body_does_not_crash(text):
 _safe_value_chars = string.ascii_letters + string.digits + " _-./:"
 
 
+# Post-filter strings so that ``.strip()`` yields a non-empty string —
+# purely-whitespace values would produce an empty section body, which the
+# parser rightly rejects but the rest of this strategy is trying to avoid.
+_nonblank = st.text(alphabet=_safe_value_chars, min_size=1, max_size=80).filter(
+    lambda s: bool(s.strip())
+)
+_nonblank_short = st.text(alphabet=_safe_value_chars, min_size=1, max_size=40).filter(
+    lambda s: bool(s.strip())
+)
+
+
 @st.composite
 def _valid_task_crumb(draw):
-    title = draw(st.text(alphabet=_safe_value_chars, min_size=1, max_size=40))
-    source = draw(st.text(alphabet=string.ascii_lowercase + ".", min_size=1, max_size=20))
-    goal = draw(st.text(alphabet=_safe_value_chars, min_size=1, max_size=80))
-    ctx_lines = draw(
-        st.lists(
-            st.text(alphabet=_safe_value_chars, min_size=1, max_size=40),
-            min_size=1,
-            max_size=5,
+    title = draw(_nonblank_short)
+    source = draw(
+        st.text(alphabet=string.ascii_lowercase + ".", min_size=1, max_size=20).filter(
+            lambda s: bool(s.strip())
         )
     )
-    constr_lines = draw(
-        st.lists(
-            st.text(alphabet=_safe_value_chars, min_size=1, max_size=40),
-            min_size=1,
-            max_size=5,
-        )
-    )
+    goal = draw(_nonblank)
+    ctx_lines = draw(st.lists(_nonblank_short, min_size=1, max_size=5))
+    constr_lines = draw(st.lists(_nonblank_short, min_size=1, max_size=5))
     body = (
         f"BEGIN CRUMB\n"
         f"v=1.1\n"
         f"kind=task\n"
         f"title={title.strip()}\n"
-        f"source={source.strip() or 'src'}\n"
+        f"source={source.strip()}\n"
         f"---\n"
         f"[goal]\n{goal.strip()}\n\n"
         f"[context]\n" + "\n".join(f"- {l.strip()}" for l in ctx_lines) + "\n\n"

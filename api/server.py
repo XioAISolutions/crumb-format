@@ -28,7 +28,7 @@ from agentauth.policy import ToolPolicy  # noqa: E402
 from agentauth.credentials import CredentialBroker  # noqa: E402
 from agentauth.audit import AuditLogger  # noqa: E402
 
-VERSION = "0.6.0"
+VERSION = "0.7.0"
 
 # ---------------------------------------------------------------------------
 # Shared instances (created once at startup)

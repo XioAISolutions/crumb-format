@@ -307,6 +307,7 @@ repos:
 - [`SPEC.md`](SPEC.md) -- the format specification
 - [`DREAMING.md`](DREAMING.md) -- how memory consolidation works
 - [`docs/QUICKSTART.md`](docs/QUICKSTART.md) -- 5-minute daily workflow guide
+- [`docs/CLI.md`](docs/CLI.md) -- full auto-generated reference for all 41 `crumb` subcommands
 - [`docs/AGENT_HANDOFFS.md`](docs/AGENT_HANDOFFS.md) -- multi-agent handoff pattern catalogue (pipeline, supervisor, debate, long-running)
 - [`examples/`](examples/) -- ready-to-paste `.crumb` files, plus [`orchestration/`](examples/orchestration/) and [`debate/`](examples/debate/) multi-agent walkthroughs
 - [`cli/crumb.py`](cli/crumb.py) -- full CLI (41 commands)
@@ -319,8 +320,9 @@ repos:
 - [`mcp/`](mcp/) -- MCP servers for CRUMB and AgentAuth
 - [`api/`](api/) -- REST API server with OpenAPI 3.1 spec
 - [`a2a/`](a2a/) -- Google A2A protocol bridge (agent card, task handler, server)
+- [`schemas/crumb.schema.json`](schemas/crumb.schema.json) -- JSON Schema for the parsed-document shape returned by `parse_crumb()`
 - [`validators/`](validators/) -- Python and Node reference validators
-- [`tests/`](tests/) -- 291 tests covering the full surface area
+- [`tests/`](tests/) -- 436 tests covering the full surface area
 - [`docs/HANDOFF_PATTERNS.md`](docs/HANDOFF_PATTERNS.md) -- practical handoff patterns
 
 ## License

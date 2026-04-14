@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://crumb-format.dev/schemas/crumb.schema.json",
+  "title": "CRUMB v=1.1 parsed document",
+  "description": "JSON shape returned by the reference parser `parse_crumb(text)` for a valid v=1.1 CRUMB document. This schema describes the parsed in-memory representation — NOT the on-disk text format, which is specified by the ABNF grammar in SPEC.md §2.1. The two are complementary: parse a valid text document → you get an object matching this schema; serialize an object matching this schema via render_crumb() → you get a valid text document.\n\nStable contract for the v=1.x line. New optional headers and sections may be added in minor releases; the required set is frozen until v=2.0.",
+  "type": "object",
+  "required": ["headers", "sections"],
+  "additionalProperties": false,
+  "properties": {
+    "headers": {
+      "type": "object",
+      "description": "Key-value pairs from the header zone (lines above the `---` separator). All values are strings — downstream consumers are responsible for coercing numeric or list-shaped headers. Unknown headers SHOULD be preserved and MAY be ignored by consumers.",
+      "required": ["v", "kind", "source"],
+      "additionalProperties": {
+        "type": "string"
+      },
+      "properties": {
+        "v": {
+          "type": "string",
+          "description": "Format version. Parsers that conform to this schema MUST accept `1.1` and MAY accept other `1.x` versions per the stability policy in SPEC.md §9.",
+          "enum": ["1.1"]
+        },
+        "kind": {
+          "type": "string",
+          "description": "Document kind. One of the six frozen kinds in v=1.x.",
+          "enum": ["task", "mem", "map", "log", "todo", "wake"]
+        },
+        "source": {
+          "type": "string",
+          "description": "Origin of this crumb — free-form agent identifier, conventionally `tool.role` (e.g. `claude.assistant`, `cursor.agent`, `human.notes`).",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable one-line summary."
+        },
+        "project": {
+          "type": "string",
+          "description": "Project or codebase this crumb relates to."
+        },
+        "id": {
+          "type": "string",
+          "description": "Stable identifier. Conventionally a short slug; uniqueness scope is up to the emitter."
+        },
+        "url": {
+          "type": "string",
+          "description": "Optional link to source material (e.g. issue tracker, PR, design doc).",
+          "format": "uri"
+        },
+        "tags": {
+          "type": "string",
+          "description": "Comma-separated free-form tags. Parsers pass the raw string through; consumers split on commas."
+        },
+        "extensions": {
+          "type": "string",
+          "description": "Comma-separated list of namespaced extension identifiers (e.g. `ext.<ns>.<name>.v1`) declared to be in use by this document. See SPEC.md §8.1."
+        },
+        "max_total_tokens": {
+          "type": "string",
+          "description": "Optional hint: max token budget for this crumb when packed into a downstream context window."
+        },
+        "max_index_tokens": {
+          "type": "string",
+          "description": "Optional hint: max token budget for any index/retrieval summary derived from this crumb."
+        }
+      },
+      "patternProperties": {
+        "^ext\\.[a-z0-9][a-z0-9._-]*\\.[a-z0-9][a-z0-9._-]*(\\.v[0-9]+)?$": {
+          "type": "string",
+          "description": "Namespaced extension header. Pattern: `ext.<namespace>.<name>[.v<N>]`."
+        },
+        "^x-[a-z0-9][a-z0-9._-]*$": {
+          "type": "string",
+          "description": "Short-form extension header. Pattern: `x-<name>`."
+        }
+      }
+    },
+    "sections": {
+      "type": "object",
+      "description": "Named body sections keyed by lowercased section name (e.g. `goal`, `context`, `constraints`). Each value is an array of strings, one per raw line in the rendered output. Trailing blank lines within a section are preserved by the parser and stripped by the renderer — consumers that need a single string per section should `'\\n'.join(lines).rstrip()`.",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "$defs": {
+    "kindRequirements": {
+      "description": "Documentation-only: which sections are required for each kind. Enforced by `parse_crumb()` via `EmptySectionError` / `MissingSectionError`, not by this JSON Schema (which intentionally accepts any section name to stay additive across the v=1.x line).",
+      "_required_sections_by_kind": {
+        "task": ["goal", "context", "constraints"],
+        "mem":  ["consolidated"],
+        "map":  ["project", "modules"],
+        "log":  ["entries"],
+        "todo": ["tasks"],
+        "wake": ["identity"]
+      }
+    }
+  }
+}

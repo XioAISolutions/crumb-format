@@ -49,12 +49,27 @@ Adding new subcommands or new optional flags is a **minor** release. Renaming or
 The following modules are stable public API:
 
 - `cli.crumb` — the `parse_crumb`, `render_crumb`, and `validate_crumb` functions (signatures, return shapes).
+- `cli.errors` *(added 0.7.0)* — `CrumbError` base class and its ten subclasses (`MissingMarkerError`, `MissingEndMarkerError`, `MissingSeparatorError`, `InvalidHeaderLineError`, `MissingHeaderError`, `BadVersionError`, `UnknownKindError`, `OrphanBodyError`, `MissingSectionError`, `EmptySectionError`). All subclass `ValueError` for backwards compatibility.
 - `cli.extensions` — `SPEC_URL`, `append_extension`, `parse_extensions`.
 - `cli.metalk` — `encode`, `decode`, `compression_stats`.
 - `cli.handoff` — `emit_task`, `emit_mem`, `walk_chain`, `validate_chain`, `new_id`, `ChainError`.
 - `agentauth` — `AgentPassport`, `ToolPolicy`, `CredentialBroker`, `protect`.
 
 Internal helpers (anything prefixed `_`) and submodules not listed above are not part of the public API.
+
+#### 2.2.1 Parser error codes (added 0.7.0)
+
+The string constants exported from `cli.errors` are part of the stable surface — third-party tooling may compare `exc.code` against them:
+
+- `E_MISSING_MARKER`, `E_MISSING_END_MARKER`, `E_MISSING_SEPARATOR`
+- `E_INVALID_HEADER_LINE`, `E_MISSING_HEADER`, `E_BAD_VERSION`, `E_UNKNOWN_KIND`
+- `E_ORPHAN_BODY`, `E_MISSING_SECTION`, `E_EMPTY_SECTION`
+
+New error codes may be added in minor releases. Existing codes are not renamed or reused before a major bump. The exception *message strings* raised by `parse_crumb()` are also frozen for the 0.x line — they appear in CLI output, fixture `.expected.txt` files, and downstream log messages.
+
+#### 2.2.2 Parsed-shape JSON Schema (added 0.7.0)
+
+`schemas/crumb.schema.json` is a formal Draft 2020-12 contract for the dict returned by `parse_crumb()`. It complements the text-format ABNF in `SPEC.md` §2.1. New optional headers/sections may be added in minor releases; the required set is frozen until `v=2.0`.
 
 ### 2.3 MCP server
 
