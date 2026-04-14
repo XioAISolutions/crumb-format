@@ -32,6 +32,12 @@ Copy, edit, and paste these into any AI tool — they're all valid v1.1 crumbs.
 - [`lifecycle-demo.md`](lifecycle-demo.md) — full append → dream → diff lifecycle for a mem crumb
 - [`metalk-demo.md`](metalk-demo.md) — before/after token compression at each MeTalk level
 
+## Multi-agent patterns
+
+- [`orchestration/`](orchestration/) — worked 3-agent RAG pipeline (ingest → retrieve → cite) with every handoff crumb inline
+- [`debate/`](debate/) — three models debate the same question, a reducer preserves the disagreement
+- See [`docs/AGENT_HANDOFFS.md`](../docs/AGENT_HANDOFFS.md) for the full pattern catalogue
+
 ## Best practice
 
 Start with the smallest crumb that still lets the next AI act confidently.

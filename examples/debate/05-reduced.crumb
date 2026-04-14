@@ -1,0 +1,48 @@
+BEGIN CRUMB
+v=1.1
+kind=mem
+title=Reduced answer: payment webhook retry policy
+source=debate.reducer
+id=debate-2026-04-14-005
+project=checkout-service
+tags=debate, reduced, audit
+extensions=ext.debate.question.v1, ext.debate.answers.v1
+ext.debate.question=debate-2026-04-14-001
+ext.debate.answers=debate-2026-04-14-002,debate-2026-04-14-003,debate-2026-04-14-004
+---
+[consolidated]
+# Where the responders agree
+
+- All three assume receiver-side idempotency keyed on the Stripe event id, and a dedup store.
+- All three recommend a dead-letter path for 4xx hard failures (except retriable ones like 409).
+- All three cite Stripe's 72-hour delivery window as the implicit retry envelope.
+- None recommend naive infinite retry.
+
+# Where the responders disagree
+
+1. **Where retries live.**
+   - Claude: in the handler, exponential backoff with full jitter, 6 attempts, ~10 min.
+   - GPT: two-tier — fast in-process, then a retry queue, 4-hour budget.
+   - Gemini: not in the handler at all — enqueue immediately, retries are a consumer-queue policy.
+
+2. **Operational model.**
+   - Claude + GPT treat retries as a per-request state machine the handler owns.
+   - Gemini treats the queue itself as the retry mechanism and the handler as a forwarder.
+
+3. **Time budget.**
+   - Claude: ~10 minutes, citing that dead-letter alerts should fire within 60 seconds regardless.
+   - GPT: 4 hours, citing Stripe's own envelope.
+   - Gemini: defers to the queue's policy (variable).
+
+# Synthesis
+
+The Gemini position dominates on operational grounds for this volume and this team: 50 webhooks/s with horizontal scaling makes in-process retry state a liability, and Kafka is already in the stack. Keep the webhook handler dumb (validate signature, enqueue, ack) and move retry complexity to the consumer.
+
+Borrow from Claude: dead-lettered events MUST surface to an operator queue within 60 seconds. Do not hide them in a 4-hour silent retry.
+
+Borrow from GPT: the in-process fast-retry tier is still useful — but in the consumer, not the handler. First attempt + 3 fast retries on the consumer side before punting to a delayed retry topic.
+
+# Residual risk
+
+None of the responders covered signature-validation failures distinctly from 4xx. Treat signature-invalid as a poison pill (dead-letter immediately, page security), not a retriable failure. This should be captured in a follow-up kind=task crumb to the security reviewer.
+END CRUMB

@@ -1,5 +1,38 @@
 # Changelog
 
+## v0.6.0
+
+Multi-agent handoff layer. CRUMB 0.6.0 ships the missing glue for using `.crumb` as an inter-agent protocol: worked orchestration and debate examples, a pattern catalogue covering four canonical shapes, and a Python helper module so downstream projects don't have to build crumb strings by hand. No file-format changes \u2014 everything in 0.6 is additive on top of the frozen `v=1.1` spec.
+
+### New Features
+
+**Worked multi-agent examples**
+- `examples/orchestration/` \u2014 fully-worked 3-agent RAG pipeline (ingest \u2192 retrieve \u2192 cite) with all 5 handoff crumbs inline. Demonstrates the upstream-pointer convention (`ext.<project>.upstream=<id>`) and an end-to-end provenance chain (`ext.<project>.chain=`)
+- `examples/debate/` \u2014 three models (Claude / GPT / Gemini) debate the same architecture question, with a reducer crumb that preserves their disagreement instead of averaging it away. Pins protocol rules for responders and reducer
+
+**Agent handoff pattern catalogue**
+- `docs/AGENT_HANDOFFS.md` \u2014 replaces the 41-line stub with four canonical patterns: linear pipeline, supervisor/worker (fan-out/fan-in), debate/reducer, long-running state. Plus a section on nesting patterns
+- Documents the namespaced upstream-pointer convention so any downstream project can adopt CRUMB as an agent protocol with zero spec changes
+
+**Python handoff helpers (`cli/handoff.py`)**
+- `emit_task(title, goal, context, constraints, source, upstream=..., namespace=...)` \u2014 builds a fully-rendered `kind=task` crumb with the upstream pointer wired in
+- `emit_mem(title, consolidated, source, upstream=..., chain=..., namespace=...)` \u2014 same for `kind=mem` outputs, with optional chain roster
+- `walk_chain(crumbs_by_id, leaf_id, namespace=...)` \u2014 reconstructs the full upstream chain root-first, detects cycles and missing nodes
+- `validate_chain(..., expected_final_kind=...)` \u2014 enforces that non-root crumbs declare the `ext.<ns>.upstream.v1` extension and that the leaf has the right kind
+- `new_id()` \u2014 short unique id generator
+- `ChainError` \u2014 raised for cycle, missing node, or missing extension declaration
+
+### Improvements
+
+- 391 tests passing (up from 375 in v0.5.0): +16 handoff helper tests covering emit, walk, validate, cycle detection, namespace isolation
+- `docs/STABILITY.md` lists `cli.handoff` as a stable 0.6.0 public API surface
+- `README.md` "What's in this repo" section updated to reference the new pattern doc and helper module
+- `examples/README.md` links the two new multi-agent walkthroughs
+
+### No breaking changes
+
+Every CLI command, MCP tool, REST endpoint, Python API, and `.crumb` file accepted by 0.5 is still accepted by 0.6. The handoff helpers are additive \u2014 they compose existing `parse_crumb` / `render_crumb` calls.
+
 ## v0.5.0
 
 Conformance and safety release. CRUMB 0.5.0 triples the fixture suite, adds property-based parser fuzzing for the threat-model T2 mitigation, pins dev-tool versions for reproducible builds, and declares `[dev]` / `[test]` extras for one-line install. No file-format changes — every `v=1.1` document that worked under 0.4 still works.

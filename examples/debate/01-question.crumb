@@ -1,0 +1,25 @@
+BEGIN CRUMB
+v=1.1
+kind=task
+title=Debate: retry policy for payment webhooks
+source=architect.human
+id=debate-2026-04-14-001
+project=checkout-service
+tags=debate, architecture
+---
+[goal]
+Three models answer the same question, each from a kind=mem crumb. A reducer then consolidates.
+
+Question: "What retry policy should we use for failed payment-provider webhooks? We see roughly 1% transient failures and 0.1% hard failures. Latency sensitivity is medium."
+
+[context]
+- Payment provider: Stripe
+- Current state: no retries, failures dead-letter immediately
+- Volume: ~50 webhooks/second at peak
+- Downstream: writes to Postgres, emits domain events on Kafka
+
+[constraints]
+- Each responder MUST emit a kind=mem crumb with title "Answer: <model>" and the same id prefix `debate-2026-04-14-`
+- Each responder MUST cite at least one piece of industry guidance or prior art
+- The reducer MUST preserve genuine disagreement, not paper over it
+END CRUMB

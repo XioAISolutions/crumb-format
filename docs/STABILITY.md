@@ -51,6 +51,7 @@ The following modules are stable public API:
 - `cli.crumb` — the `parse_crumb`, `render_crumb`, and `validate_crumb` functions (signatures, return shapes).
 - `cli.extensions` — `SPEC_URL`, `append_extension`, `parse_extensions`.
 - `cli.metalk` — `encode`, `decode`, `compression_stats`.
+- `cli.handoff` — `emit_task`, `emit_mem`, `walk_chain`, `validate_chain`, `new_id`, `ChainError`.
 - `agentauth` — `AgentPassport`, `ToolPolicy`, `CredentialBroker`, `protect`.
 
 Internal helpers (anything prefixed `_`) and submodules not listed above are not part of the public API.

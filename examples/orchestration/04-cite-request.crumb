@@ -1,0 +1,26 @@
+BEGIN CRUMB
+v=1.1
+kind=task
+title=Draft cited answer for GDPR Art. 33
+source=compliance-ai.retrieve
+id=orch-2026-04-14-004
+project=compliance-ai
+tags=orchestration, cite
+extensions=ext.compliance-ai.upstream.v1
+ext.compliance-ai.upstream=orch-2026-04-14-003
+---
+[goal]
+Compose a concise, citation-linked answer to the user's question using only the retrieved chunks in upstream crumb orch-2026-04-14-003.
+
+[context]
+- Upstream chain: ingest (001) -> retrieve-request (002) -> retrieve-result (003)
+- User's original question: "What are the notification requirements under GDPR Article 33?"
+- 8 chunks available; all are from verifiable sources (GDPR regulation, EDPB guidelines, ICO guidance)
+
+[constraints]
+- Every sentence in the answer MUST end with an inline citation of the form [filename p.NN]
+- Do not introduce facts that are not present in the retrieved chunks
+- Do not paraphrase a chunk in a way that changes its legal meaning
+- Keep the answer under 300 words
+- Emit the final result as a kind=mem crumb for the audit trail
+END CRUMB

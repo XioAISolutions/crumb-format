@@ -307,8 +307,10 @@ repos:
 - [`SPEC.md`](SPEC.md) -- the format specification
 - [`DREAMING.md`](DREAMING.md) -- how memory consolidation works
 - [`docs/QUICKSTART.md`](docs/QUICKSTART.md) -- 5-minute daily workflow guide
-- [`examples/`](examples/) -- ready-to-paste `.crumb` files (task, mem, map, log, todo, wake)
+- [`docs/AGENT_HANDOFFS.md`](docs/AGENT_HANDOFFS.md) -- multi-agent handoff pattern catalogue (pipeline, supervisor, debate, long-running)
+- [`examples/`](examples/) -- ready-to-paste `.crumb` files, plus [`orchestration/`](examples/orchestration/) and [`debate/`](examples/debate/) multi-agent walkthroughs
 - [`cli/crumb.py`](cli/crumb.py) -- full CLI (41 commands)
+- [`cli/handoff.py`](cli/handoff.py) -- Python helpers for multi-agent pipelines (`emit_task`, `emit_mem`, `walk_chain`, `validate_chain`)
 - [`cli/reflect.py`](cli/reflect.py) -- self-learning gap detection and knowledge health scoring
 - [`cli/palace.py`](cli/palace.py) -- Palace spatial memory (wings/halls/rooms/tunnels)
 - [`cli/classify.py`](cli/classify.py) -- rule-based hall classifier

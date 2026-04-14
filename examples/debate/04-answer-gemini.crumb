@@ -1,0 +1,27 @@
+BEGIN CRUMB
+v=1.1
+kind=mem
+title=Answer: gemini-2.5-pro
+source=debate.responder.google
+id=debate-2026-04-14-004
+project=checkout-service
+tags=debate, answer
+extensions=ext.debate.question.v1
+ext.debate.question=debate-2026-04-14-001
+---
+[consolidated]
+Retries are the wrong primary lever — the right answer is idempotent consumer + durable queue + bounded retries. Pick a queue, not a retry algorithm.
+
+Reasoning:
+- Sam Newman, "Building Microservices" (2nd ed., ch. 11): in-process retries on a crashed node lose the event. The durable queue is the real correctness boundary.
+- At 50/s peak and 1% transient, the pain point isn't retry cost, it's the operational complexity of in-process backoff state machines across horizontally-scaled workers.
+- Stripe's event delivery window is 72 hours — the consumer just needs to ack when the work is durably stored.
+
+Specifics:
+- Receive webhook -> validate signature -> immediately enqueue raw event to Kafka (or SQS/PubSub) -> ack Stripe.
+- The work happens downstream of the queue. The queue is the source of truth for retries.
+- Consumer: at-least-once semantics, idempotency key = Stripe event id, dedup table in Postgres with 30-day TTL.
+- Retry: consumer's queue policy (e.g., Kafka retry topics with 1s/10s/1m/1h delays; 4 attempts then DLQ).
+
+Disagreement with both prior answers: in-process retries in the webhook handler leak state on pod restart and couple your availability to Stripe's. Move retries to the queue layer. At your volume, this is strictly simpler.
+END CRUMB

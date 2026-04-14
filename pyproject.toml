@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crumb-format"
-version = "0.5.0"
-description = "The copy-paste AI handoff format — v=1.1 spec frozen with formal ABNF, 20 conformance fixtures, property-based parser fuzzing, pinned dev constraints, threat model, and tooling stability policy. Includes MeTalk compression, pack/lint/mempalace bridges, REST/A2A bridges, and AgentAuth identity, governance, and audit."
+version = "0.6.0"
+description = "The copy-paste AI handoff format — v=1.1 spec frozen with formal ABNF, 20 conformance fixtures, property-based parser fuzzing, threat model, tooling stability policy, and a multi-agent handoff layer (orchestration + debate + Python helpers). Includes MeTalk compression, pack/lint/mempalace bridges, REST/A2A bridges, and AgentAuth identity, governance, and audit."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"

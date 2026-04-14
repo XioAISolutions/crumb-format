@@ -1,0 +1,21 @@
+BEGIN CRUMB
+v=1.1
+kind=mem
+title=Answer: GDPR Art. 33 notification requirements
+source=compliance-ai.cite
+id=orch-2026-04-14-005
+project=compliance-ai
+tags=orchestration, answer, audit
+extensions=ext.compliance-ai.upstream.v1, ext.compliance-ai.chain.v1
+ext.compliance-ai.upstream=orch-2026-04-14-004
+ext.compliance-ai.chain=orch-2026-04-14-001,orch-2026-04-14-002,orch-2026-04-14-003,orch-2026-04-14-004
+---
+[consolidated]
+Under GDPR Article 33, a controller must notify the competent supervisory authority of a personal data breach without undue delay and, where feasible, within 72 hours of becoming aware of it [gdpr-regulation-2016-679.pdf p.52]. The 72-hour window begins when the controller has a reasonable degree of certainty that a breach has occurred [edpb-guidelines-9-2022.pdf p.14]. If notification is made later than 72 hours, it must be accompanied by a reasoned explanation for the delay [gdpr-regulation-2016-679.pdf p.52].
+
+Where the controller cannot provide all required information within the window, the notification may be made in phases [edpb-guidelines-9-2022.pdf p.21]. The notification itself must at minimum describe the nature of the breach, the categories and approximate number of data subjects affected, and the measures proposed or taken to address it [gdpr-regulation-2016-679.pdf p.53].
+
+Processors operate on a different timeline: a processor must notify its controller without undue delay after becoming aware of a breach, but the processor does not notify the supervisory authority directly [gdpr-regulation-2016-679.pdf p.53].
+
+Regardless of whether notification is triggered, the controller must maintain an internal record of every personal data breach, including the facts, effects, and remedial actions [gdpr-regulation-2016-679.pdf p.54]. Supervisory authorities expect a documented internal procedure for detection and escalation [ico-breach-guidance-2024.pdf p.8].
+END CRUMB

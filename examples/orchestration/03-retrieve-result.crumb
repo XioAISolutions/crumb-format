@@ -1,0 +1,21 @@
+BEGIN CRUMB
+v=1.1
+kind=mem
+title=Top 8 chunks for GDPR Art. 33
+source=compliance-ai.retrieve
+id=orch-2026-04-14-003
+project=compliance-ai
+tags=orchestration, retrieve-result
+extensions=ext.compliance-ai.upstream.v1
+ext.compliance-ai.upstream=orch-2026-04-14-002
+---
+[consolidated]
+- gdpr-regulation-2016-679.pdf | p.52 | offset=812 | "In the case of a personal data breach, the controller shall without undue delay and, where feasible, not later than 72 hours after having become aware of it, notify the personal data breach to the supervisory authority..."
+- gdpr-regulation-2016-679.pdf | p.52 | offset=1130 | "Where the notification to the supervisory authority is not made within 72 hours, it shall be accompanied by reasons for the delay."
+- gdpr-regulation-2016-679.pdf | p.53 | offset=240 | "The processor shall notify the controller without undue delay after becoming aware of a personal data breach."
+- gdpr-regulation-2016-679.pdf | p.53 | offset=760 | "The notification referred to in paragraph 1 shall at least: (a) describe the nature of the personal data breach..."
+- edpb-guidelines-9-2022.pdf | p.14 | offset=420 | "The 72-hour window begins when the controller has a reasonable degree of certainty that a security incident has occurred which has led to personal data being compromised."
+- edpb-guidelines-9-2022.pdf | p.21 | offset=150 | "Where the controller cannot provide all the information within 72 hours, the notification may be provided in phases."
+- ico-breach-guidance-2024.pdf | p.8 | offset=330 | "Controllers should have a documented internal procedure for detecting and reporting personal data breaches..."
+- gdpr-regulation-2016-679.pdf | p.54 | offset=95 | "The controller shall document any personal data breaches, comprising the facts relating to the personal data breach..."
+END CRUMB

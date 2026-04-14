@@ -1,0 +1,27 @@
+BEGIN CRUMB
+v=1.1
+kind=mem
+title=Answer: claude-opus-4-6
+source=debate.responder.claude
+id=debate-2026-04-14-002
+project=checkout-service
+tags=debate, answer
+extensions=ext.debate.question.v1
+ext.debate.question=debate-2026-04-14-001
+---
+[consolidated]
+Use exponential backoff with full jitter, capped at 6 retries over roughly 10 minutes, and dead-letter anything that still fails.
+
+Reasoning:
+- AWS Architecture Blog, "Exponential Backoff and Jitter" (Brooker, 2015), shows full jitter minimizes thundering herd on a recovering dependency.
+- Stripe's own webhook documentation recommends retries with exponential backoff and an idempotency key on the receiver side.
+- At 50 webhooks/s and 1% transient, that is ~30,000 retry attempts per minute at steady state if everything contends — jitter matters.
+
+Specifics:
+- Base delay: 1s; cap: 300s; multiplier: 2.0; jitter: full (uniform(0, delay)).
+- Max attempts: 6. Total wall-clock budget: ~10 minutes.
+- Retry only on 5xx and network-level failures. 4xx dead-letters immediately.
+- Every retry attempt writes an entry to an append-only kind=log crumb for audit.
+
+Risk: at medium latency sensitivity, 10 minutes before dead-letter may be too long for some business flows. If you care about user-facing reconciliation, surface dead-lettered webhooks to an operator queue within 60 seconds, not 10 minutes.
+END CRUMB

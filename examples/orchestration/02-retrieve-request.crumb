@@ -1,0 +1,26 @@
+BEGIN CRUMB
+v=1.1
+kind=task
+title=Retrieve top chunks for GDPR Art. 33 question
+source=compliance-ai.ingest
+id=orch-2026-04-14-002
+project=compliance-ai
+tags=orchestration, retrieve
+extensions=ext.compliance-ai.upstream.v1
+ext.compliance-ai.upstream=orch-2026-04-14-001
+---
+[goal]
+Retrieve the top 8 source chunks from /corpus/regulations/ that cover GDPR Article 33 notification requirements.
+
+[context]
+- Upstream task: orch-2026-04-14-001 (Answer compliance question with citations)
+- Corpus: 12 PDFs, pre-chunked, already embedded in the local vector store
+- Embedding model: bge-small-en v1.5
+- User's raw question: "What are the notification requirements under GDPR Article 33?"
+
+[constraints]
+- Return at most 8 chunks, ranked by cosine similarity
+- Each chunk must include: document filename, page number, chunk offset, chunk text
+- Do not generate new text — retrieval only
+- Emit result as a kind=mem crumb for the cite agent to consume
+END CRUMB

@@ -1,0 +1,23 @@
+BEGIN CRUMB
+v=1.1
+kind=task
+title=Answer compliance question with citations
+source=user.web
+id=orch-2026-04-14-001
+project=compliance-ai
+tags=orchestration, ingest
+---
+[goal]
+Answer the user's question "What are the notification requirements under GDPR Article 33?" with a cited, source-grounded response.
+
+[context]
+- User is a compliance officer at a B2B SaaS company
+- Source corpus: 12 uploaded PDFs under /corpus/regulations/
+- Expected trust level: citations must be verifiable, no LLM-generated regulation numbers
+
+[constraints]
+- Every factual claim MUST link to a source chunk
+- If the corpus does not contain the answer, say so explicitly
+- Do not invent article numbers, section refs, or case citations
+- Final answer lands as a kind=mem crumb for the audit trail
+END CRUMB
