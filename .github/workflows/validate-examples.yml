@@ -18,11 +18,16 @@ jobs:
       - name: Install test dependencies
         run: pip install pytest
       - name: Validate with Python
-        run: python3 validators/validate.py examples/*.crumb
+        run: python3 validators/validate.py examples/*.crumb fixtures/valid fixtures/extensions
       - name: Validate with Node
         run: |
           for f in examples/*.crumb; do
             node validators/validate.js "$f"
           done
+          node validators/validate.js fixtures/valid fixtures/extensions
+      - name: Ensure invalid fixtures fail
+        run: |
+          python3 validators/validate.py fixtures/invalid && exit 1 || true
+          node validators/validate.js fixtures/invalid && exit 1 || true
       - name: Run tests
         run: python3 -m pytest tests/ -v
