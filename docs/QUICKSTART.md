@@ -134,6 +134,6 @@ crumb init --cursor-rules     # just .cursor/rules
 ## Full reference
 
 ```bash
-crumb --help        # 40 commands
+crumb --help        # 41 commands
 crumb <cmd> --help  # per-command help
 ```
