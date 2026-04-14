@@ -1258,6 +1258,13 @@ def cmd_bench(args: argparse.Namespace) -> None:
     compressed_tokens = estimate_tokens(compressed)
     max_ratio = tokens / max(compressed_tokens, 1)
 
+    # MeTalk stage 3 projection
+    from cli.metalk import encode as _mt_encode
+    metalked = _mt_encode(compressed, level=2)
+    metalked_tokens = estimate_tokens(metalked)
+    metalk_saved_pct = ((compressed_tokens - metalked_tokens) / max(compressed_tokens, 1)) * 100
+    full_ratio = tokens / max(metalked_tokens, 1)
+
     # Score components
     density_score = min(keyword_density * 5, 25)  # max 25
     compression_score = min(max_ratio * 5, 25)  # max 25
@@ -1288,6 +1295,7 @@ def cmd_bench(args: argparse.Namespace) -> None:
     print(f"  Max compression:   {max_ratio:.1f}x ({tokens} → {compressed_tokens} tokens)")
     print(f"  Dedup potential:   {original_entries} → {after_stage1} entries (stage 1)")
     print(f"  Prune potential:   {after_stage1} → {after_stage2} entries (stage 2)")
+    print(f"  MeTalk potential:  {full_ratio:.1f}x ({tokens} → {metalked_tokens} tokens, +{metalk_saved_pct:.0f}% over stage 2)")
     print(f"{'=' * 50}")
     print(f"  Density:           {density_score:.0f}/25")
     print(f"  Compressibility:   {compression_score:.0f}/25")
