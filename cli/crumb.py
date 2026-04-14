@@ -4,6 +4,7 @@
 import argparse
 import datetime
 import difflib
+import fnmatch
 import glob
 import json
 import os
@@ -603,7 +604,18 @@ def cmd_from_git(args: argparse.Namespace) -> None:
 
 def cmd_validate(args: argparse.Namespace) -> None:
     errors = 0
-    for path in args.files:
+    expanded: List[str] = []
+    for raw in args.files:
+        if any(ch in raw for ch in '*?[]'):
+            matches = sorted(glob.glob(raw))
+            expanded.extend(matches or [raw])
+            continue
+        candidate = Path(raw)
+        if candidate.is_dir():
+            expanded.extend(str(p) for p in sorted(candidate.rglob('*.crumb')))
+            continue
+        expanded.append(raw)
+    for path in expanded:
         try:
             text = Path(path).read_text(encoding='utf-8')
             parsed = parse_crumb(text)
@@ -789,6 +801,139 @@ def cmd_dream(args: argparse.Namespace) -> None:
             print(f"  Pruned {pruned} entries to fit budget ({budget} tokens)")
         print(f"  Compression: {original_tokens} → {output_tokens} tokens ({ratio:.0f}% reduction)")
         run_hook('post_dream', {'file': args.file, 'entries': str(len(merged))})
+
+
+# ── repo / gitignore helpers (used by pack and other scanners) ───────
+
+COMMON_IGNORED_NAMES = {
+    ".git",
+    ".hg",
+    ".svn",
+    "__pycache__",
+    "node_modules",
+    "venv",
+    ".venv",
+    "env",
+    ".tox",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".idea",
+    ".vscode",
+    "dist",
+    "build",
+}
+COMMON_IGNORED_SUFFIXES = {".pyc", ".pyo", ".DS_Store"}
+
+
+def _git_completed(args: list, cwd: Path | None = None) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        ["git", *args],
+        cwd=str(cwd) if cwd else None,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _git_repo_root(path: Path) -> Path | None:
+    result = _git_completed(["rev-parse", "--show-toplevel"], cwd=path)
+    if result.returncode != 0:
+        return None
+    root = result.stdout.strip()
+    return Path(root).resolve() if root else None
+
+
+def _load_gitignore_patterns(root: Path) -> list:
+    gitignore = root / ".gitignore"
+    if not gitignore.exists():
+        return []
+    patterns = []
+    for raw in gitignore.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or line.startswith("!"):
+            continue
+        patterns.append(line)
+    return patterns
+
+
+def _matches_gitignore_pattern(relative_path: str, pattern: str, is_dir: bool) -> bool:
+    rel = relative_path.replace("\\", "/")
+    normalized = pattern.rstrip("/")
+    if not normalized:
+        return False
+    dir_only = pattern.endswith("/")
+    if dir_only and not is_dir:
+        return False
+    if "/" in normalized:
+        candidate = normalized.lstrip("/")
+        return fnmatch.fnmatch(rel, candidate) or rel.startswith(candidate + "/")
+    parts = [part for part in rel.split("/") if part]
+    return any(fnmatch.fnmatch(part, normalized) for part in parts)
+
+
+def _is_ignored_path(
+    path: Path,
+    root: Path,
+    repo_root: Path | None,
+    gitignore_patterns: list,
+    cache: dict,
+) -> bool:
+    key = str(path.resolve())
+    if key in cache:
+        return cache[key]
+
+    if path.name in COMMON_IGNORED_NAMES or any(path.name.endswith(suffix) for suffix in COMMON_IGNORED_SUFFIXES):
+        cache[key] = True
+        return True
+
+    relative_to_root = path.resolve().relative_to(root.resolve()).as_posix()
+    for pattern in gitignore_patterns:
+        if _matches_gitignore_pattern(relative_to_root, pattern, path.is_dir()):
+            cache[key] = True
+            return True
+
+    if repo_root is not None:
+        try:
+            repo_relative = path.resolve().relative_to(repo_root.resolve()).as_posix()
+        except ValueError:
+            repo_relative = path.name
+        result = _git_completed(["check-ignore", repo_relative], cwd=repo_root)
+        if result.returncode == 0:
+            cache[key] = True
+            return True
+
+    cache[key] = False
+    return False
+
+
+def _build_repo_tree(root: Path) -> list:
+    root = root.resolve()
+    repo_root = _git_repo_root(root)
+    gitignore_patterns = _load_gitignore_patterns(root)
+    ignore_cache: dict = {}
+    lines = [f"- {root.name}/"]
+
+    for current_root, dirs, files in os.walk(root, topdown=True):
+        current_path = Path(current_root).resolve()
+        depth = len(current_path.relative_to(root).parts)
+        indent = "  " * depth
+
+        visible_dirs = []
+        for dirname in sorted(dirs):
+            candidate = current_path / dirname
+            if not _is_ignored_path(candidate, root, repo_root, gitignore_patterns, ignore_cache):
+                visible_dirs.append(dirname)
+        dirs[:] = visible_dirs
+
+        for dirname in dirs:
+            lines.append(f"{indent}- {dirname}/")
+
+        for filename in sorted(files):
+            candidate = current_path / filename
+            if _is_ignored_path(candidate, root, repo_root, gitignore_patterns, ignore_cache):
+                continue
+            lines.append(f"{indent}- {filename}")
+
+    return lines
 
 
 # ── search ───────────────────────────────────────────────────────────
@@ -4350,6 +4495,49 @@ def cmd_bridge(args: argparse.Namespace) -> None:
         for k in BRIDGE_IMPORTERS:
             print(f"  {k}")
 
+    elif action == 'mempalace':
+        from cli import mempalace_bridge
+        sub_action = getattr(args, 'bridge_action2', None) or getattr(args, 'mempalace_action', None)
+        try:
+            if sub_action == 'export':
+                mempalace_bridge.run_bridge_export(args)
+            elif sub_action == 'import':
+                mempalace_bridge.run_bridge_import(args)
+            else:
+                print(f"Unknown mempalace action: {sub_action}", file=sys.stderr)
+                sys.exit(1)
+        except RuntimeError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+
+# ── Pack / Lint commands ─────────────────────────────────────────────
+
+def cmd_pack(args: argparse.Namespace) -> None:
+    """Assemble a deterministic CRUMB context pack from a directory of crumbs."""
+    from cli import pack
+    from cli.local_ai import LocalAIError
+
+    try:
+        pack.run_pack(args)
+    except LocalAIError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+
+def cmd_lint(args: argparse.Namespace) -> None:
+    """Lint CRUMBs for secrets, oversized raw logs, suspicious headers, and budget issues."""
+    from cli import linting
+
+    try:
+        linting.run_lint(args)
+    except FileNotFoundError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(2)
+
 
 # ── Webhook commands ─────────────────────────────────────────────────
 
@@ -4942,6 +5130,66 @@ def build_parser() -> argparse.ArgumentParser:
     br_import.add_argument('-o', '--output', default='-', help='Output .crumb file.')
 
     br_list = bridge_sub.add_parser('list', help='List available bridge formats.')
+
+    # Mempalace adapter subtree (bridge mempalace {export,import})
+    br_mempalace = bridge_sub.add_parser('mempalace', help='MemPalace bridge adapter for CRUMB import/export.')
+    mp_sub = br_mempalace.add_subparsers(dest='mempalace_action', required=True)
+
+    mp_export = mp_sub.add_parser('export', help='Export MemPalace context as one or more CRUMBs.')
+    mp_export.add_argument('--query', help='Search query to run against MemPalace.')
+    mp_export.add_argument('--input', help='Saved MemPalace export text or - for stdin.')
+    mp_export.add_argument('--wing', help='Optional MemPalace wing filter.')
+    mp_export.add_argument('--room', help='Optional room filter applied to retrieved lines.')
+    mp_export.add_argument('--entity', help='Optional entity filter applied to retrieved lines.')
+    mp_export.add_argument('--hall', help='Optional MemPalace hall filter when using the CLI backend.')
+    mp_export.add_argument('--project', help='Optional project header override.')
+    mp_export.add_argument('--title', help='Optional title override.')
+    mp_export.add_argument('--as', dest='as_kind', required=True, choices=['task', 'mem', 'log'],
+                           help='Output CRUMB kind to emit.')
+    mp_export.add_argument('--output', '-o', required=True,
+                           help='Output file path or directory for generated .crumb files.')
+    mp_export.set_defaults(backend='mempalace')
+
+    mp_import = mp_sub.add_parser('import', help='Convert .crumb files into a MemPalace-compatible adapter bundle.')
+    mp_import.add_argument('files', nargs='+', help='One or more .crumb files to convert.')
+    mp_import.add_argument('--wing', help='Target MemPalace wing (default: default).')
+    mp_import.add_argument('--room', help='Optional room override.')
+    mp_import.add_argument('--entity', help='Optional entity override.')
+    mp_import.add_argument('--output', '-o', required=True,
+                           help='Output JSON file path or directory for the adapter bundle.')
+    mp_import.set_defaults(backend='mempalace')
+
+    # --- Pack ---
+    pack_cmd = sub.add_parser('pack', help='Assemble a deterministic CRUMB context pack from a directory of crumbs.')
+    pack_cmd.add_argument('--dir', required=True, help='Directory containing source .crumb files.')
+    pack_cmd.add_argument('--query', required=True, help='Query describing the handoff you want to build.')
+    pack_cmd.add_argument('--project', help='Optional project filter/header to apply while selecting crumbs.')
+    pack_cmd.add_argument('--kind', required=True, choices=['task', 'mem', 'map'],
+                          help='Output kind for the packed CRUMB.')
+    pack_cmd.add_argument('--mode', choices=['implement', 'debug', 'review'], default='implement',
+                          help='Pack shaping mode: implement (default), debug, or review.')
+    pack_cmd.add_argument('--max-total-tokens', type=int, required=True,
+                          help='Estimated token budget for the final packed CRUMB.')
+    pack_cmd.add_argument('--strategy', choices=['keyword', 'ranked', 'recent', 'hybrid'], default='hybrid',
+                          help='Ranking strategy for selecting and merging context (default: hybrid).')
+    pack_cmd.add_argument('--title', help='Optional title override for the packed CRUMB.')
+    pack_cmd.add_argument('--ollama', '--use-local', dest='ollama', action='store_true',
+                          help='Optionally run a final local-model compression pass with Ollama.')
+    pack_cmd.add_argument('--ollama-model', default='llama3.2:3b',
+                          help='Local Ollama model to use when --ollama is set (default: llama3.2:3b).')
+    pack_cmd.add_argument('--output', '-o', required=True, help='Output .crumb file path.')
+    pack_cmd.set_defaults(func=cmd_pack)
+
+    # --- Lint ---
+    lint_cmd = sub.add_parser('lint', help='Lint CRUMBs for secrets, oversized raw logs, suspicious headers, and budget issues.')
+    lint_cmd.add_argument('files', nargs='+', help='One or more .crumb files to lint.')
+    lint_cmd.add_argument('--secrets', action='store_true', help='Enable secret detection checks.')
+    lint_cmd.add_argument('--redact', action='store_true', help='Redact obvious credentials in-place unless --output is set.')
+    lint_cmd.add_argument('--max-size', type=int,
+                          help='Warn when estimated total or raw section tokens exceed this value.')
+    lint_cmd.add_argument('--strict', action='store_true', help='Return a non-zero exit code for warnings.')
+    lint_cmd.add_argument('--output', help='Optional output file or directory for redacted content.')
+    lint_cmd.set_defaults(func=cmd_lint)
 
     # --- Webhooks ---
     wh_cmd = sub.add_parser('webhook', help='Manage AgentAuth event webhooks.')
