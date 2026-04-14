@@ -147,3 +147,14 @@ That runs:
 | Producing a crumb for human review | skip MeTalk |
 
 Receiving AI tools should call `crumb metalk --decode` first to restore dictionary substitutions before parsing. Grammar-stripped output is intended to be read directly by LLMs, which tolerate missing articles without loss of meaning.
+
+---
+
+## Related: Caveman Claude
+
+The ["Caveman Claude" system prompt](mem-caveman-prompt.crumb) is a close philosophical cousin. Both are brevity-as-compression techniques, but they operate at different layers:
+
+- **Caveman Claude** — changes the *model's output* by rewriting the system prompt. Reported ~61% output-token savings on dev tasks. Good for interactive sessions and agentic loops.
+- **MeTalk** — compresses the *crumb payload itself* before it moves between tools. Lossless at Level 1, meaning-preserving at Level 2/3. Good for handoffs and long-term storage.
+
+The two compose: use Caveman at the session level, MeTalk at the handoff level.

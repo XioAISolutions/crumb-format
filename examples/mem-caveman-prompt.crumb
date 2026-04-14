@@ -1,0 +1,18 @@
+BEGIN CRUMB
+v=1.1
+kind=mem
+title=Caveman Claude — terse system prompt for 61% output token savings
+source=x.com/k1rallik/status/2043694049769455877
+project=ai-prompting-efficiency
+---
+[consolidated]
+- Claude's default politeness/pleasantries waste 65-75% of output tokens on ceremony (preambles, meta-commentary, sign-offs).
+- Single system prompt overrides this: "Respond like caveman. No articles, no filler, no pleasantries. Short. Direct. Grunt-level brevity. Code speaks for itself. If me ask for code - give code. No explain unless me ask. Errors = fix, not narrate."
+- 10 operational rules (no filler openers, execute-then-explain, no meta/tool announcements, no preamble/postamble, code self-documents, etc.).
+- Measured savings: 61% average output tokens across real dev tasks; full session savings 12-24% (still free money at scale).
+- Bonus: March 2026 arXiv paper (2604.00025) shows brevity constraints can improve accuracy up to 26% on some benchmarks by reversing RLHF verbosity reward.
+- When to use: production APIs, agentic loops, coding, CI/CD, senior-dev workflows.
+- When NOT to use: teaching/onboarding, user-facing output, complex reasoning where thinking aloud helps, legal/medical content.
+- Production-ready: github.com/JuliusBrussee/caveman (14k+ stars) + Claude Code / Cursor / Windsurf / Copilot plugins.
+- Direct parallel to CRUMB's own MeTalk compression layer — Caveman compresses the AI's *output* by changing its system prompt; MeTalk compresses the *crumb itself* at the message layer.
+END CRUMB
