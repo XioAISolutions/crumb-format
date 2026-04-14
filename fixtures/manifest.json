@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "manifest_version": "1.0",
+  "spec_version": "1.1",
+  "description": "CRUMB conformance fixture manifest. Implementations claiming v=1.1 conformance MUST pass every required fixture below. Tooling is expected to load this file, exercise each fixture, and compare against the declared expectation.",
+  "categories": {
+    "valid": "Inputs that MUST parse successfully and round-trip to the expected JSON.",
+    "invalid": "Inputs that MUST be rejected with a validation error matching the expected message.",
+    "extensions": "Inputs exercising namespaced extensions; parsers MUST accept them and ignore unknown headers/sections per SPEC §8.1."
+  },
+  "fixtures": [
+    {
+      "id": "valid.task-basic",
+      "category": "valid",
+      "kind": "task",
+      "input": "fixtures/valid/task-basic.crumb",
+      "expected": "fixtures/valid/task-basic.expected.json",
+      "required": true,
+      "notes": "Minimal task crumb with all three required sections."
+    },
+    {
+      "id": "valid.mem-basic",
+      "category": "valid",
+      "kind": "mem",
+      "input": "fixtures/valid/mem-basic.crumb",
+      "expected": "fixtures/valid/mem-basic.expected.json",
+      "required": true,
+      "notes": "Minimal mem crumb with [consolidated]."
+    },
+    {
+      "id": "valid.log-basic",
+      "category": "valid",
+      "kind": "log",
+      "input": "fixtures/valid/log-basic.crumb",
+      "expected": "fixtures/valid/log-basic.expected.json",
+      "required": true,
+      "notes": "Append-only log with [entries] in '- [ISO8601] text' form."
+    },
+    {
+      "id": "invalid.bad-kind",
+      "category": "invalid",
+      "kind": null,
+      "input": "fixtures/invalid/bad-kind.crumb",
+      "expected": "fixtures/invalid/bad-kind.expected.txt",
+      "required": true,
+      "notes": "kind= header value is not in the allowed set."
+    },
+    {
+      "id": "invalid.missing-source",
+      "category": "invalid",
+      "kind": "task",
+      "input": "fixtures/invalid/missing-source.crumb",
+      "expected": "fixtures/invalid/missing-source.expected.txt",
+      "required": true,
+      "notes": "Required header `source` absent."
+    },
+    {
+      "id": "extensions.task-packed",
+      "category": "extensions",
+      "kind": "task",
+      "input": "fixtures/extensions/task-packed.crumb",
+      "expected": "fixtures/extensions/task-packed.expected.json",
+      "required": true,
+      "extension": "crumb.pack.v1",
+      "notes": "Pack extension headers must be preserved verbatim and must not affect base parsing."
+    },
+    {
+      "id": "extensions.mempalace-export",
+      "category": "extensions",
+      "kind": "mem",
+      "input": "fixtures/extensions/mempalace-export.crumb",
+      "expected": "fixtures/extensions/mempalace-export.expected.json",
+      "required": true,
+      "extension": "bridge.mempalace.export.v1",
+      "notes": "Bridge export extension; namespaced headers must round-trip without modification."
+    }
+  ],
+  "conformance_levels": {
+    "core": {
+      "description": "MUST pass all `valid` and `invalid` fixtures with required=true.",
+      "fixtures": [
+        "valid.task-basic",
+        "valid.mem-basic",
+        "valid.log-basic",
+        "invalid.bad-kind",
+        "invalid.missing-source"
+      ]
+    },
+    "extensions": {
+      "description": "MUST pass all `core` fixtures plus every `extensions` fixture.",
+      "fixtures": [
+        "extensions.task-packed",
+        "extensions.mempalace-export"
+      ]
+    }
+  },
+  "expected_format": {
+    "valid": "JSON file containing the canonical parsed shape: { headers: {...}, sections: { name: [lines] } }",
+    "invalid": "Plain text file containing the substring of the validation error message that the implementation MUST produce.",
+    "extensions": "Same shape as `valid`; namespaced headers appear under `headers` verbatim."
+  },
+  "stability": "This manifest follows the rules in SPEC.md \u00a79 and docs/STABILITY.md. Fixture IDs are stable for the v=1.x line; new fixtures may be added in minor releases, none will be renamed or removed without a major bump."
+}

@@ -1,5 +1,42 @@
 # Changelog
 
+## v0.4.0
+
+Spec-freeze release. CRUMB 0.4.0 declares the `v=1.1` format **Stable**, ships a formal ABNF grammar, a conformance manifest for third-party implementations, an explicit threat model, and a tooling-stability policy. No file-format changes — every `v=1.1` document that worked under 0.3 still works.
+
+### New Features
+
+**Spec freeze**
+- `SPEC.md` status promoted from **Draft** to **Stable**
+- §2.1 grammar replaced with formal **ABNF (RFC 5234)**, plus seven explicit conformance notes (parsers MUST reject missing markers, MUST reject missing `---`, MUST reject duplicate header keys, SHOULD ignore unknown headers/sections, MUST emit lowercase keys, etc.)
+- New §9 **"Stability and versioning"** locks the `v=1.x` line: structure, key syntax, six kinds, and CRLF/LF equivalence are frozen for all minor versions
+- New §9.3 deprecation policy: at least one minor version of warning before removal; removals only at `v=2.0`
+
+**Tooling stability policy**
+- New `docs/STABILITY.md` documents the public surface for CLI, Python API, MCP, REST, A2A, and bridge formats
+- Two independent versioning surfaces declared: format (`v=` header) and tooling (`crumb-format` package)
+- Per-surface stability promises: stable subcommand names, stable JSON output, stable MCP tool names/schemas, stable OpenAPI contract
+
+**Conformance manifest**
+- New `fixtures/manifest.json` enumerates every fixture with id, kind, category, expected output, and conformance level
+- Two conformance levels declared: `core` (5 fixtures, all v=1.1 essentials) and `extensions` (adds 2 namespaced extensions)
+- Stable fixture IDs for the `v=1.x` line — additions allowed in minor releases, no renames or removals without a major bump
+
+**Threat model**
+- New `docs/THREAT_MODEL.md` enumerates 7 named threats (T1–T7): secret leakage, parser DoS, prompt injection, transit tampering, stolen passports, namespace squatting, supply-chain
+- Documents trust boundaries, in-scope assets, residual risks, and explicit out-of-scope threats
+- Reserves an optional `signature=` namespaced extension for future end-to-end integrity work
+
+### Improvements
+
+- `pyproject.toml` description updated to reflect spec-freeze posture
+- CLI version bumped to `crumb 0.4.0`
+- REST API `VERSION` constant bumped to `0.4.0`
+
+### No breaking changes
+
+Every CLI command, MCP tool, REST endpoint, and `.crumb` file accepted by 0.3 is still accepted by 0.4. `v=1.1` documents remain the canonical form.
+
 ## v0.3.0
 
 Protocol-grade release. CRUMB 0.3.0 turns the project from a useful handoff tool into a protocol-grade context workflow while keeping CRUMB file compatibility at `v=1.1`. The 0.3 track (deterministic packs, adapter bridges, safety linting, golden fixtures, extension model) is now merged into the main line alongside v0.2's Palace, Reflect, Wake, AgentAuth, and MeTalk surfaces.

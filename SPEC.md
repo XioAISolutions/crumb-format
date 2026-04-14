@@ -1,7 +1,7 @@
 # .crumb Specification (v1.1)
 
-**Status:** Draft  
-**Category:** AI handoff format  
+**Status:** Stable
+**Category:** AI handoff format
 **Goal:** A tiny, human-readable protocol for portable AI context handoffs between tools and memory systems.
 
 ---
@@ -29,24 +29,44 @@ A `.crumb` file has four parts:
 3. Body (section blocks)
 4. Closing marker: `END CRUMB`
 
-### 2.1 Grammar (informal)
+### 2.1 Grammar (ABNF)
 
-```text
-file        := "BEGIN CRUMB" NL header NL "---" NL sections? "END CRUMB" NL?
-header      := header_line*
-header_line := key "=" value NL
-key         := 1+ non-space, non-`=`
-value       := rest of line (trim trailing whitespace)
+The grammar below uses ABNF as defined in [RFC 5234](https://www.rfc-editor.org/rfc/rfc5234) with the core rules `ALPHA`, `DIGIT`, `HTAB`, `SP`, `VCHAR`, `WSP`. CRLF and LF line endings are both permitted; parsers MUST treat `CRLF` and `LF` as equivalent line terminators.
 
-sections    := section+
-section     := "[" section_name "]" NL section_body NL?
-section_name:= 1+ non-`]`
-section_body:= 0+ lines until next section or END CRUMB
+```abnf
+file          = begin-marker NL header-block NL separator NL [body] end-marker [NL]
 
-NL          := "\\n" or "\\r\\n"
+begin-marker  = "BEGIN CRUMB"
+end-marker    = "END CRUMB"
+separator     = "---"
+
+header-block  = *header-line
+header-line   = key "=" value NL
+key           = 1*key-char
+key-char      = ALPHA / DIGIT / "-" / "_" / "." / "x"   ; lowercase ASCII; "x-" and "ext." prefixes reserved for namespaced extensions
+value         = *VCHAR-or-SP                            ; trimmed of leading/trailing WSP
+
+body          = section *(blank-line / section)
+section       = section-header NL section-body
+section-header= "[" section-name "]"
+section-name  = 1*(ALPHA / DIGIT / "_" / "-")
+section-body  = *body-line
+body-line     = (1*VCHAR-or-SP / blank-line) NL
+
+blank-line    = *WSP NL
+NL            = CRLF / LF
+VCHAR-or-SP   = VCHAR / SP / HTAB
 ```
 
-Parsers SHOULD ignore unknown header keys and unknown section names.
+**Conformance notes:**
+
+- Parsers MUST reject files lacking either marker.
+- Parsers MUST reject files lacking the `---` separator.
+- Parsers MUST reject duplicate header keys (last-write-wins is a writer-side convention only).
+- Parsers SHOULD ignore unknown header keys and unknown section names.
+- Parsers SHOULD treat header keys case-sensitively as lowercase ASCII; producers MUST emit lowercase keys.
+- Whitespace inside a header value is preserved verbatim except for trim of leading/trailing whitespace.
+- A section with no `body-line` content is "empty"; whether emptiness is an error depends on whether the section is required for the kind (see §4).
 
 ---
 
@@ -212,3 +232,61 @@ max_total_tokens=1800
 max_index_tokens=900
 x-crumb-pack.strategy=hybrid
 ```
+
+---
+
+## 9. Stability and versioning
+
+The `v` header declares the format version a producer is targeting. CRUMB follows a loose semantic versioning scheme aligned with the protocol surface, not with any single tooling implementation.
+
+### 9.1 What is stable at `v=1.1`
+
+The following are **frozen** for the entire `v=1.x` line. Conforming parsers written against `v=1.1` MUST continue to parse all future `v=1.x` documents:
+
+- The four-part file structure (`BEGIN CRUMB`, header block, `---` separator, body, `END CRUMB`).
+- The `key=value` header syntax and the lowercase ASCII key character set defined in §2.1.
+- The `[section-name]` body syntax.
+- The required header set: `v`, `kind`, `source`.
+- The currently defined `kind` values (`task`, `mem`, `map`, `log`, `todo`, `wake`) and their required sections (§4).
+- The `CRLF`/`LF` line-terminator equivalence rule.
+- The "ignore unknown headers and sections" rule (§8).
+- The extension namespacing rules (§8.1).
+
+Producers and consumers MAY rely on these guarantees indefinitely within the `v=1.x` line.
+
+### 9.2 What may change inside `v=1.x`
+
+Minor versions (`v=1.2`, `v=1.3`, …) MAY:
+
+- introduce new optional headers (for example, a new advisory budget),
+- introduce new optional sections within existing kinds,
+- introduce new `kind` values,
+- add new conformance notes that further constrain previously underspecified behavior,
+- tighten security or extension guidance.
+
+Minor versions MUST NOT:
+
+- change the meaning of any existing header or section,
+- remove any required header or section,
+- change the file structure, line-terminator rules, or key character set,
+- repurpose any reserved namespace prefix (`x-`, `ext.`).
+
+A `v=1.x` document with `x > 1` SHOULD remain parseable by a `v=1.1` parser, with the new optional headers and sections being silently ignored per §8.
+
+### 9.3 Deprecation policy
+
+If a future minor version deprecates an existing optional feature:
+
+1. The feature MUST first be marked `Deprecated` in this specification for at least one minor version before any tooling stops emitting it.
+2. Parsers MUST continue to accept the deprecated feature for the remainder of the `v=1.x` line.
+3. Removal is only permitted at a major version bump (`v=2.0`).
+
+### 9.4 Breaking changes (`v=2.0` and beyond)
+
+A new major version (`v=2.0`) is reserved for changes that would break a `v=1.x` parser — for example, altering the file structure, redefining a `kind`, or introducing a non-text canonical form.
+
+Major version work happens in a separate specification document (`SPEC-2.md`) and is not delivered as a silent change to this file.
+
+### 9.5 Tooling vs. format versioning
+
+The `v=` header tracks the **format**, not the reference tooling. The `crumb-format` Python package, the MCP server tool names, and the REST/A2A endpoints have their own versioning surface, documented in `docs/STABILITY.md`. Implementations MUST NOT couple `v=` to their own release version.
