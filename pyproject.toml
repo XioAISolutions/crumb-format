@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crumb-format"
-version = "0.2.0"
-description = "The copy-paste AI handoff format — with MeTalk compression, REST/A2A bridges, and AgentAuth identity, governance, and audit."
+version = "0.3.0"
+description = "The copy-paste AI handoff format — with MeTalk compression, pack/lint/mempalace bridges, REST/A2A bridges, fixture conformance suite, and AgentAuth identity, governance, and audit."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
