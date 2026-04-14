@@ -1,0 +1,20 @@
+{
+  "headers": {
+    "v": "1.1",
+    "kind": "todo",
+    "title": "Prospective memory",
+    "source": "cli"
+  },
+  "sections": {
+    "tasks": [
+      "- [ ] Write conformance manifest",
+      "- [ ] Add round-trip tests",
+      "- [x] Bump version",
+      ""
+    ],
+    "archived": [
+      "- [x] Add formal ABNF",
+      "- [x] Declare v=1.1 stable"
+    ]
+  }
+}

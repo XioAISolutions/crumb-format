@@ -1,0 +1,27 @@
+{
+  "headers": {
+    "v": "1.1",
+    "kind": "mem",
+    "title": "Builder preferences",
+    "source": "human.notes",
+    "dream_pass": "3",
+    "dream_sessions": "12"
+  },
+  "sections": {
+    "consolidated": [
+      "- Prefers concise technical answers",
+      "- Wants copy-pasteable outputs",
+      "- Cares about launch speed over theoretical purity",
+      ""
+    ],
+    "raw": [
+      "- 2026-04-12: switched editor to neovim again",
+      "- 2026-04-13: dropped redux from the side project",
+      ""
+    ],
+    "dream": [
+      "- pass 3: merged \"wants concise\" duplicates",
+      "- pass 3: dropped two stale tooling notes"
+    ]
+  }
+}

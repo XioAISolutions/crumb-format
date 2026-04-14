@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "manifest_version": "1.0",
+  "manifest_version": "1.1",
   "spec_version": "1.1",
   "description": "CRUMB conformance fixture manifest. Implementations claiming v=1.1 conformance MUST pass every required fixture below. Tooling is expected to load this file, exercise each fixture, and compare against the declared expectation.",
   "categories": {
     "valid": "Inputs that MUST parse successfully and round-trip to the expected JSON.",
     "invalid": "Inputs that MUST be rejected with a validation error matching the expected message.",
-    "extensions": "Inputs exercising namespaced extensions; parsers MUST accept them and ignore unknown headers/sections per SPEC §8.1."
+    "extensions": "Inputs exercising namespaced extensions; parsers MUST accept them and ignore unknown headers/sections per SPEC \u00a78.1."
   },
   "fixtures": [
     {
@@ -19,6 +19,15 @@
       "notes": "Minimal task crumb with all three required sections."
     },
     {
+      "id": "valid.task-with-optional-headers",
+      "category": "valid",
+      "kind": "task",
+      "input": "fixtures/valid/task-with-optional-headers.crumb",
+      "expected": "fixtures/valid/task-with-optional-headers.expected.json",
+      "required": true,
+      "notes": "Task crumb exercising every optional header from SPEC \u00a73.3 (id, project, env, tags, url)."
+    },
+    {
       "id": "valid.mem-basic",
       "category": "valid",
       "kind": "mem",
@@ -26,6 +35,24 @@
       "expected": "fixtures/valid/mem-basic.expected.json",
       "required": true,
       "notes": "Minimal mem crumb with [consolidated]."
+    },
+    {
+      "id": "valid.mem-with-dream",
+      "category": "valid",
+      "kind": "mem",
+      "input": "fixtures/valid/mem-with-dream.crumb",
+      "expected": "fixtures/valid/mem-with-dream.expected.json",
+      "required": true,
+      "notes": "Mem crumb with [raw], [dream], dream_pass, and dream_sessions \u2014 exercises consolidation surface."
+    },
+    {
+      "id": "valid.map-basic",
+      "category": "valid",
+      "kind": "map",
+      "input": "fixtures/valid/map-basic.crumb",
+      "expected": "fixtures/valid/map-basic.expected.json",
+      "required": true,
+      "notes": "Minimal map crumb with [project] and [modules]."
     },
     {
       "id": "valid.log-basic",
@@ -37,13 +64,85 @@
       "notes": "Append-only log with [entries] in '- [ISO8601] text' form."
     },
     {
-      "id": "invalid.bad-kind",
+      "id": "valid.log-crlf",
+      "category": "valid",
+      "kind": "log",
+      "input": "fixtures/valid/log-crlf.crumb",
+      "expected": "fixtures/valid/log-crlf.expected.json",
+      "required": true,
+      "notes": "Log crumb encoded with CRLF line endings \u2014 parsers MUST treat CRLF/LF as equivalent (SPEC \u00a72.1)."
+    },
+    {
+      "id": "valid.todo-basic",
+      "category": "valid",
+      "kind": "todo",
+      "input": "fixtures/valid/todo-basic.crumb",
+      "expected": "fixtures/valid/todo-basic.expected.json",
+      "required": true,
+      "notes": "Todo crumb with mixed open '- [ ]' and done '- [x]' tasks."
+    },
+    {
+      "id": "valid.todo-with-archived",
+      "category": "valid",
+      "kind": "todo",
+      "input": "fixtures/valid/todo-with-archived.crumb",
+      "expected": "fixtures/valid/todo-with-archived.expected.json",
+      "required": true,
+      "notes": "Todo crumb with optional [archived] section as written by a dream pass."
+    },
+    {
+      "id": "valid.wake-basic",
+      "category": "valid",
+      "kind": "wake",
+      "input": "fixtures/valid/wake-basic.crumb",
+      "expected": "fixtures/valid/wake-basic.expected.json",
+      "required": true,
+      "notes": "Minimal wake crumb with [identity] \u2014 emitted by `crumb wake` for session bootstrap."
+    },
+    {
+      "id": "invalid.missing-begin",
       "category": "invalid",
       "kind": null,
-      "input": "fixtures/invalid/bad-kind.crumb",
-      "expected": "fixtures/invalid/bad-kind.expected.txt",
+      "input": "fixtures/invalid/missing-begin.crumb",
+      "expected": "fixtures/invalid/missing-begin.expected.txt",
       "required": true,
-      "notes": "kind= header value is not in the allowed set."
+      "notes": "Parsers MUST reject files lacking the BEGIN CRUMB marker (SPEC \u00a72.1)."
+    },
+    {
+      "id": "invalid.missing-end",
+      "category": "invalid",
+      "kind": null,
+      "input": "fixtures/invalid/missing-end.crumb",
+      "expected": "fixtures/invalid/missing-end.expected.txt",
+      "required": true,
+      "notes": "Parsers MUST reject files lacking the END CRUMB marker (SPEC \u00a72.1)."
+    },
+    {
+      "id": "invalid.missing-separator",
+      "category": "invalid",
+      "kind": null,
+      "input": "fixtures/invalid/missing-separator.crumb",
+      "expected": "fixtures/invalid/missing-separator.expected.txt",
+      "required": true,
+      "notes": "Parsers MUST reject files lacking the --- separator (SPEC \u00a72.1)."
+    },
+    {
+      "id": "invalid.missing-v",
+      "category": "invalid",
+      "kind": "task",
+      "input": "fixtures/invalid/missing-v.crumb",
+      "expected": "fixtures/invalid/missing-v.expected.txt",
+      "required": true,
+      "notes": "Required header `v` absent."
+    },
+    {
+      "id": "invalid.missing-kind",
+      "category": "invalid",
+      "kind": null,
+      "input": "fixtures/invalid/missing-kind.crumb",
+      "expected": "fixtures/invalid/missing-kind.expected.txt",
+      "required": true,
+      "notes": "Required header `kind` absent."
     },
     {
       "id": "invalid.missing-source",
@@ -53,6 +152,24 @@
       "expected": "fixtures/invalid/missing-source.expected.txt",
       "required": true,
       "notes": "Required header `source` absent."
+    },
+    {
+      "id": "invalid.bad-kind",
+      "category": "invalid",
+      "kind": null,
+      "input": "fixtures/invalid/bad-kind.crumb",
+      "expected": "fixtures/invalid/bad-kind.expected.txt",
+      "required": true,
+      "notes": "kind= header value is not in the allowed set."
+    },
+    {
+      "id": "invalid.missing-required-section",
+      "category": "invalid",
+      "kind": "task",
+      "input": "fixtures/invalid/missing-required-section.crumb",
+      "expected": "fixtures/invalid/missing-required-section.expected.txt",
+      "required": true,
+      "notes": "Task crumb missing the required [context] section per SPEC \u00a74.1."
     },
     {
       "id": "extensions.task-packed",
@@ -80,10 +197,23 @@
       "description": "MUST pass all `valid` and `invalid` fixtures with required=true.",
       "fixtures": [
         "valid.task-basic",
+        "valid.task-with-optional-headers",
         "valid.mem-basic",
+        "valid.mem-with-dream",
+        "valid.map-basic",
         "valid.log-basic",
+        "valid.log-crlf",
+        "valid.todo-basic",
+        "valid.todo-with-archived",
+        "valid.wake-basic",
+        "invalid.missing-begin",
+        "invalid.missing-end",
+        "invalid.missing-separator",
+        "invalid.missing-v",
+        "invalid.missing-kind",
+        "invalid.missing-source",
         "invalid.bad-kind",
-        "invalid.missing-source"
+        "invalid.missing-required-section"
       ]
     },
     "extensions": {

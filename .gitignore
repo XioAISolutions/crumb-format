@@ -13,3 +13,5 @@ node_modules/
 .venv/
 .env
 .crumb-auth/
+.hypothesis/
+.pytest_cache/

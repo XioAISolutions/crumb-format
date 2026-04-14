@@ -4801,7 +4801,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog='crumb',
         description='Create, validate, inspect, and manage .crumb handoff files.',
     )
-    parser.add_argument('--version', action='version', version='crumb 0.4.0')
+    parser.add_argument('--version', action='version', version='crumb 0.5.0')
     sub = parser.add_subparsers(dest='command', required=True)
 
     # new

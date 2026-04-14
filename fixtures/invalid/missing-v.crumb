@@ -1,0 +1,14 @@
+BEGIN CRUMB
+kind=task
+title=No version header
+source=cli
+---
+[goal]
+Header `v` missing.
+
+[context]
+- Parser MUST reject.
+
+[constraints]
+- Parser MUST reject.
+END CRUMB

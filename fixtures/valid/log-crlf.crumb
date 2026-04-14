@@ -1,0 +1,10 @@
+BEGIN CRUMB
+v=1.1
+kind=log
+title=CRLF transcript
+source=ops.cli
+---
+[entries]
+- [2026-04-14T09:00:00Z] kicked off deploy
+- [2026-04-14T09:05:00Z] smoke tests green
+END CRUMB

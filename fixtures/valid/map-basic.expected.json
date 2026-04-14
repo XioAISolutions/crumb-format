@@ -1,0 +1,19 @@
+{
+  "headers": {
+    "v": "1.1",
+    "kind": "map",
+    "title": "Repo overview",
+    "source": "cli"
+  },
+  "sections": {
+    "project": [
+      "name=crumb-format",
+      ""
+    ],
+    "modules": [
+      "- cli/",
+      "- mcp/",
+      "- api/"
+    ]
+  }
+}

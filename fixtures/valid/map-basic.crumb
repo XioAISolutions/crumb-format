@@ -1,0 +1,14 @@
+BEGIN CRUMB
+v=1.1
+kind=map
+title=Repo overview
+source=cli
+---
+[project]
+name=crumb-format
+
+[modules]
+- cli/
+- mcp/
+- api/
+END CRUMB

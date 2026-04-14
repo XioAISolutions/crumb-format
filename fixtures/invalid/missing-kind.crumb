@@ -1,0 +1,14 @@
+BEGIN CRUMB
+v=1.1
+title=No kind header
+source=cli
+---
+[goal]
+Header `kind` missing.
+
+[context]
+- Parser MUST reject.
+
+[constraints]
+- Parser MUST reject.
+END CRUMB

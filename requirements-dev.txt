@@ -1,0 +1,9 @@
+# Developer install for CRUMB.
+#
+# This pulls the editable package plus the [dev] extras, constrained to the
+# pinned set in constraints.txt for reproducible CI runs.
+#
+# Use:
+#     pip install -r requirements-dev.txt -c constraints.txt
+
+-e .[dev]

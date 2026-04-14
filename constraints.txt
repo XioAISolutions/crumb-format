@@ -1,0 +1,19 @@
+# CRUMB v0.5.0 constraints file — pinned versions for reproducible installs.
+#
+# Use:
+#     pip install -e ".[dev]" -c constraints.txt
+#
+# This file pins the exact versions of dev-only dependencies that the test
+# suite is known-good against. The runtime package itself (`crumb-format`)
+# has zero required dependencies — only the optional dev/test extras are
+# pinned here.
+#
+# To regenerate after a clean upgrade:
+#     pip install -e ".[dev]"
+#     pip freeze | grep -E "^(pytest|hypothesis|sortedcontainers|pluggy|iniconfig|packaging)" >> constraints.txt
+#
+# Pinned for the v0.5.0 release line:
+
+pytest==9.0.2
+hypothesis==6.151.14
+sortedcontainers==2.4.0

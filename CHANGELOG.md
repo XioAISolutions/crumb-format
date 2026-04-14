@@ -1,5 +1,42 @@
 # Changelog
 
+## v0.5.0
+
+Conformance and safety release. CRUMB 0.5.0 triples the fixture suite, adds property-based parser fuzzing for the threat-model T2 mitigation, pins dev-tool versions for reproducible builds, and declares `[dev]` / `[test]` extras for one-line install. No file-format changes — every `v=1.1` document that worked under 0.4 still works.
+
+### New Features
+
+**Conformance fixtures (7 \u2192 20)**
+- All six kinds now have at least one valid fixture: `task`, `mem`, `map`, `log`, `todo`, `wake`
+- New edge-case fixtures: `task-with-optional-headers` (every optional header exercised), `mem-with-dream` (dream-pass surface), `todo-with-archived` (optional [archived] section), `log-crlf` (CRLF line endings from SPEC \u00a72.1)
+- Six new invalid fixtures pin the MUST-reject rules: missing BEGIN, missing END, missing `---`, missing `v`, missing `kind`, missing required section
+- `fixtures/manifest.json` regenerated with 20 entries and updated conformance levels
+
+**Property-based testing**
+- New `tests/test_roundtrip_and_fuzz.py` with 39 tests
+- Round-trip properties: render is idempotent after one pass; parse is stable on rendered output; required headers survive a render round-trip
+- Hypothesis fuzz tests verify the parser is **total** \u2014 any input produces a dict or a `ValueError`, never a crash (T2 mitigation from `docs/THREAT_MODEL.md`)
+- Generator strategies: arbitrary printable text, well-formed envelopes with random bodies, structurally valid task crumbs with random headers/sections
+
+**Reproducible builds**
+- `pyproject.toml` declares `[test]` and `[dev]` optional-dependency groups with pinned version ranges for pytest and hypothesis
+- New `constraints.txt` pins exact transitive versions of dev dependencies
+- New `requirements-dev.txt` one-liner: `pip install -r requirements-dev.txt -c constraints.txt`
+
+### Improvements
+
+- 375 tests passing (up from 323 in v0.4.0): +13 fixture-suite parametrizations, +39 round-trip + fuzz tests
+- Parser stability contract now pinned by tests, not just prose
+- `crumb-format` runtime package still has zero required dependencies; pinning only affects the dev/test install
+
+### Release process notes
+
+- Homebrew formula (`Formula/crumb.rb`) remains pinned at the last PyPI release (0.2.0). Formula bumps happen post-PyPI-publish per `docs/HOMEBREW.md` \u00a7"How to update the formula for a new release" \u2014 this is a separate deployment step, not a source-tree change.
+
+### No breaking changes
+
+Every CLI command, MCP tool, REST endpoint, and `.crumb` file accepted by 0.4 is still accepted by 0.5. `v=1.1` documents remain the canonical form.
+
 ## v0.4.0
 
 Spec-freeze release. CRUMB 0.4.0 declares the `v=1.1` format **Stable**, ships a formal ABNF grammar, a conformance manifest for third-party implementations, an explicit threat model, and a tooling-stability policy. No file-format changes — every `v=1.1` document that worked under 0.3 still works.

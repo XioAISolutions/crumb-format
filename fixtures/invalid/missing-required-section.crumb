@@ -1,0 +1,12 @@
+BEGIN CRUMB
+v=1.1
+kind=task
+title=Task missing context
+source=cli
+---
+[goal]
+A task crumb missing the required [context] section.
+
+[constraints]
+- Parser MUST reject.
+END CRUMB
