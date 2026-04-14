@@ -117,6 +117,36 @@ TOOLS = [
         },
     },
     {
+        "name": "crumb_pack",
+        "description": "Build a deterministic task, mem, or map context pack from a directory of crumbs.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "dir": {"type": "string", "description": "Directory containing source .crumb files"},
+                "query": {"type": "string", "description": "Desired handoff query"},
+                "project": {"type": "string", "description": "Optional project filter"},
+                "kind": {"type": "string", "enum": ["task", "mem", "map"]},
+                "max_total_tokens": {"type": "integer", "description": "Estimated token budget"},
+                "strategy": {"type": "string", "enum": ["keyword", "ranked", "recent", "hybrid"]},
+            },
+            "required": ["dir", "query", "kind", "max_total_tokens"],
+        },
+    },
+    {
+        "name": "crumb_lint",
+        "description": "Lint CRUMBs for secrets, oversize logs, suspicious headers, and budget issues.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "files": {"type": "array", "items": {"type": "string"}},
+                "secrets": {"type": "boolean"},
+                "strict": {"type": "boolean"},
+                "max_size": {"type": "integer"},
+            },
+            "required": ["files"],
+        },
+    },
+    {
         "name": "crumb_export",
         "description": "Export a .crumb file to JSON, markdown, or clipboard-friendly format.",
         "inputSchema": {
@@ -365,6 +395,43 @@ def handle_tool_call(name, args):
             with redirect_stdout(stdout_buf):
                 crumb.main(cli_args)
             return stdout_buf.getvalue()
+
+        elif name == "crumb_pack":
+            cli_args = [
+                "pack",
+                "--dir",
+                args["dir"],
+                "--query",
+                args["query"],
+                "--kind",
+                args["kind"],
+                "--max-total-tokens",
+                str(args["max_total_tokens"]),
+                "-o",
+                "-",
+            ]
+            if args.get("project"):
+                cli_args.extend(["--project", args["project"]])
+            if args.get("strategy"):
+                cli_args.extend(["--strategy", args["strategy"]])
+            with redirect_stdout(stdout_buf):
+                crumb.main(cli_args)
+            return stdout_buf.getvalue()
+
+        elif name == "crumb_lint":
+            cli_args = ["lint"] + args["files"]
+            if args.get("secrets"):
+                cli_args.append("--secrets")
+            if args.get("strict"):
+                cli_args.append("--strict")
+            if args.get("max_size") is not None:
+                cli_args.extend(["--max-size", str(args["max_size"])])
+            with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+                try:
+                    crumb.main(cli_args)
+                except SystemExit:
+                    pass
+            return stdout_buf.getvalue() + stderr_buf.getvalue()
 
         elif name == "crumb_export":
             cli_args = ["export", args["file"], "-f", args["format"]]
