@@ -176,6 +176,112 @@ TOOLS = [
             "required": ["file", "entries"],
         },
     },
+    {
+        "name": "crumb_palace_add",
+        "description": "File an observation into Palace spatial memory (auto-classifies hall if omitted).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "Observation text"},
+                "wing": {"type": "string", "description": "Wing name (person/project/topic)"},
+                "room": {"type": "string", "description": "Room name (specific topic)"},
+                "hall": {"type": "string", "enum": ["facts", "events", "discoveries", "preferences", "advice"],
+                         "description": "Hall (auto-classified if omitted)"},
+            },
+            "required": ["text", "wing", "room"],
+        },
+    },
+    {
+        "name": "crumb_palace_list",
+        "description": "List rooms in the Palace, optionally filtered by wing and/or hall.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "wing": {"type": "string", "description": "Filter by wing name"},
+                "hall": {"type": "string", "enum": ["facts", "events", "discoveries", "preferences", "advice"]},
+            },
+        },
+    },
+    {
+        "name": "crumb_palace_search",
+        "description": "Search across Palace rooms by keyword.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search query"},
+                "wing": {"type": "string", "description": "Restrict to one wing"},
+            },
+            "required": ["query"],
+        },
+    },
+    {
+        "name": "crumb_palace_wiki",
+        "description": "Generate a structured knowledge index from Palace contents.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "crumb_reflect",
+        "description": "Analyze Palace health and identify knowledge gaps with actionable suggestions.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "format": {"type": "string", "enum": ["text", "crumb"], "description": "Output format (default: text)"},
+            },
+        },
+    },
+    {
+        "name": "crumb_wake",
+        "description": "Emit a session wake-up crumb from Palace — identity, top facts, and room index.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "max_facts": {"type": "integer", "description": "Max facts to include (default: 8)"},
+                "reflect": {"type": "boolean", "description": "Include top knowledge gaps"},
+                "metalk": {"type": "boolean", "description": "Apply MeTalk compression"},
+            },
+        },
+    },
+    {
+        "name": "crumb_context",
+        "description": "Generate a task crumb from current project state (git, palace facts, todos).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "goal": {"type": "string", "description": "Override the auto-detected goal"},
+                "title": {"type": "string", "description": "Override the auto-generated title"},
+                "commits": {"type": "integer", "description": "Number of recent commits (default: 5)"},
+                "metalk": {"type": "boolean", "description": "Apply MeTalk compression"},
+            },
+        },
+    },
+    {
+        "name": "crumb_metalk",
+        "description": "Apply MeTalk caveman compression to a crumb file (reduce tokens for AI-to-AI).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file": {"type": "string", "description": "Path to .crumb file"},
+                "level": {"type": "integer", "enum": [1, 2, 3],
+                          "description": "1=dict only, 2=dict+grammar, 3=aggressive (default: 2)"},
+                "decode": {"type": "boolean", "description": "Decode MeTalk back to full form"},
+            },
+            "required": ["file"],
+        },
+    },
+    {
+        "name": "crumb_classify",
+        "description": "Classify text into a Palace hall (facts/events/discoveries/preferences/advice).",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "Text to classify"},
+            },
+            "required": ["text"],
+        },
+    },
 ]
 
 
@@ -293,6 +399,101 @@ def handle_tool_call(name, args):
                 crumb.main(cli_args)
             return stdout_buf.getvalue()
 
+        elif name == "crumb_palace_add":
+            cli_args = ["palace", "add", args["text"],
+                        "--wing", args["wing"], "--room", args["room"]]
+            if args.get("hall"):
+                cli_args.extend(["--hall", args["hall"]])
+            with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+                try:
+                    crumb.main(cli_args)
+                except SystemExit:
+                    pass
+            return stdout_buf.getvalue() + stderr_buf.getvalue()
+
+        elif name == "crumb_palace_list":
+            cli_args = ["palace", "list"]
+            if args.get("wing"):
+                cli_args.extend(["--wing", args["wing"]])
+            if args.get("hall"):
+                cli_args.extend(["--hall", args["hall"]])
+            with redirect_stdout(stdout_buf):
+                crumb.main(cli_args)
+            return stdout_buf.getvalue()
+
+        elif name == "crumb_palace_search":
+            cli_args = ["palace", "search", args["query"]]
+            if args.get("wing"):
+                cli_args.extend(["--wing", args["wing"]])
+            with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+                try:
+                    crumb.main(cli_args)
+                except SystemExit:
+                    pass
+            return stdout_buf.getvalue() + stderr_buf.getvalue()
+
+        elif name == "crumb_palace_wiki":
+            cli_args = ["palace", "wiki"]
+            with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+                try:
+                    crumb.main(cli_args)
+                except SystemExit:
+                    pass
+            return stdout_buf.getvalue() + stderr_buf.getvalue()
+
+        elif name == "crumb_reflect":
+            cli_args = ["reflect"]
+            if args.get("format"):
+                cli_args.extend(["-f", args["format"]])
+            with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+                try:
+                    crumb.main(cli_args)
+                except SystemExit:
+                    pass
+            return stdout_buf.getvalue() + stderr_buf.getvalue()
+
+        elif name == "crumb_wake":
+            cli_args = ["wake"]
+            if args.get("max_facts"):
+                cli_args.extend(["--max-facts", str(args["max_facts"])])
+            if args.get("reflect"):
+                cli_args.append("--reflect")
+            if args.get("metalk"):
+                cli_args.append("--metalk")
+            with redirect_stdout(stdout_buf):
+                crumb.main(cli_args)
+            return stdout_buf.getvalue()
+
+        elif name == "crumb_context":
+            cli_args = ["context"]
+            if args.get("goal"):
+                cli_args.extend(["--goal", args["goal"]])
+            if args.get("title"):
+                cli_args.extend(["--title", args["title"]])
+            if args.get("commits"):
+                cli_args.extend(["--commits", str(args["commits"])])
+            if args.get("metalk"):
+                cli_args.append("--metalk")
+            with redirect_stdout(stdout_buf):
+                crumb.main(cli_args)
+            return stdout_buf.getvalue()
+
+        elif name == "crumb_metalk":
+            cli_args = ["metalk", args["file"]]
+            if args.get("level"):
+                cli_args.extend(["--level", str(args["level"])])
+            if args.get("decode"):
+                cli_args.append("--decode")
+            with redirect_stdout(stdout_buf):
+                crumb.main(cli_args)
+            return stdout_buf.getvalue()
+
+        elif name == "crumb_classify":
+            cli_args = ["classify", "--text", args["text"]]
+            with redirect_stdout(stdout_buf):
+                crumb.main(cli_args)
+            return stdout_buf.getvalue()
+
         else:
             return f"Unknown tool: {name}"
 
@@ -318,7 +519,7 @@ def main():
                 "capabilities": {"tools": {"listChanged": False}},
                 "serverInfo": {
                     "name": "crumb-format",
-                    "version": "0.1.0",
+                    "version": "0.2.0",
                 },
             })
 

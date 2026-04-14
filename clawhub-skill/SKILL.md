@@ -1,7 +1,7 @@
 ---
 name: crumb
-description: Create, manage, and search structured AI handoff files using the CRUMB format.
-version: 0.1.0
+description: Create, manage, and search structured AI handoff files using the CRUMB format. Includes Palace spatial memory, self-learning gap detection (reflect), session bootstrap (wake), and token compression (metalk).
+version: 0.2.0
 metadata:
   openclaw:
     requires:
@@ -58,22 +58,13 @@ crumb new map --title "Project map" --source "openclaw" \
 crumb new todo --title "Sprint tasks" --source "openclaw" \
   --entries "Fix auth" "Add tests" \
   -o tasks.crumb
-
-# Convert a chat log to a crumb (auto-extracts decisions and code blocks)
-crumb from-chat --input chat.txt --output handoff.crumb
-crumb from-chat --input chat.txt --kind mem --title "Decisions"
 ```
 
 ### Start from a template
 
 ```bash
 crumb template list
-crumb template use bug-fix -o fix.crumb
-crumb template use feature -o feature.crumb
-crumb template use code-review -o review.crumb
-crumb template use onboarding -o onboard.crumb
-crumb template use preferences -o prefs.crumb
-crumb template use migration -o migrate.crumb
+crumb template use <template-name> -o out.crumb
 ```
 
 ### Validate and inspect
@@ -101,6 +92,75 @@ crumb search "auth" --dir ./crumbs/ --method ranked   # TF-IDF scoring
 
 # Merge multiple mem crumbs
 crumb merge team/*.crumb --title "Team prefs" -o merged.crumb
+```
+
+### Palace (spatial memory)
+
+Persistent knowledge base organized as **wings → halls → rooms** (`.crumb` files on disk).
+
+```bash
+# Add a fact/event/discovery/preference/advice to the palace
+crumb palace add --wing project:myapp --hall facts --text "Uses JWT auth"
+crumb palace add --wing person:alice --hall preferences --text "Prefers TypeScript"
+
+# List wings / halls / rooms
+crumb palace list
+crumb palace list --wing project:myapp
+
+# Search across the palace
+crumb palace search "auth"
+crumb palace search "auth" --wing project:myapp
+
+# Render a wing as a wiki-style overview
+crumb palace wiki --wing project:myapp
+```
+
+### Reflect (self-learning gap detection)
+
+Scores palace health (0-100, grades A-F) and surfaces missing knowledge.
+
+```bash
+crumb reflect                      # human-readable report
+crumb reflect --crumb               # emit as a mem crumb
+crumb reflect --stale-days 60       # flag rooms older than N days
+```
+
+### Wake (session bootstrap)
+
+Generate an instant-context crumb for a new AI session from your palace.
+
+```bash
+crumb wake                          # emit wake crumb to stdout
+crumb wake --reflect                # include [gaps] section
+crumb wake -o wake.crumb
+```
+
+### Handoff / receive / context (cross-AI interop)
+
+```bash
+# Build a handoff from git commits + optional goal
+crumb context --commits 10 --goal "Ship auth fix" -o handoff.crumb
+crumb context --commits 5 --clipboard            # copy to clipboard
+crumb context --commits 5 --metalk --metalk-level 2   # compress
+
+# Wrap/unwrap for different AI tools
+crumb handoff task.crumb --target claude -o claude.md
+crumb handoff task.crumb --target cursor
+
+# Receive a crumb shared by another AI and stash it in the palace
+crumb receive --file incoming.crumb --palace --wing project:myapp --hall facts
+```
+
+### MeTalk (token compression)
+
+Caveman-style compression: dictionary substitution + grammar stripping.
+
+```bash
+crumb metalk task.crumb                # default level 2 (~40% savings)
+crumb metalk task.crumb --level 1      # lossless, reversible
+crumb metalk task.crumb --level 3      # aggressive (~50-60% savings)
+crumb metalk task.crumb --decode       # reverse Layer 1 substitutions
+crumb metalk task.crumb -o slim.crumb
 ```
 
 ### Todo workflow
@@ -145,7 +205,7 @@ crumb init --project myapp --description "REST API" --claude-md
 
 ## CRUMB format reference
 
-There are 5 kinds of crumb:
+There are 6 kinds of crumb:
 
 | Kind | Purpose | Required sections |
 |------|---------|-------------------|
@@ -154,13 +214,14 @@ There are 5 kinds of crumb:
 | `map` | Codebase overview | `[project]` `[modules]` |
 | `log` | Append-only session transcript | `[entries]` |
 | `todo` | Track work items | `[tasks]` |
+| `wake` | Session bootstrap from palace | `[identity]` |
 
 Every crumb has this structure:
 
 ```
 BEGIN CRUMB
 v=1.1
-kind=<task|mem|map|log|todo>
+kind=<task|mem|map|log|todo|wake>
 title=<short description>
 source=<tool that created it>
 ---

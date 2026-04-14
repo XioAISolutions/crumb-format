@@ -6,6 +6,9 @@ const REQUIRED_SECTIONS = {
   task: ['goal', 'context', 'constraints'],
   mem: ['consolidated'],
   map: ['project', 'modules'],
+  log: ['entries'],
+  todo: ['tasks'],
+  wake: ['identity'],
 };
 
 function parseCrumb(text) {

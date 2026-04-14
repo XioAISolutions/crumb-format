@@ -66,6 +66,7 @@ Allowed `kind` values:
 - `map`
 - `log`
 - `todo`
+- `wake`
 
 ### 3.2 Recommended fields
 
@@ -130,6 +131,19 @@ Required sections:
 
 Optional sections:
 - `[archived]` — completed tasks moved here by a dream pass
+
+### 4.6 `kind=wake`
+Session bootstrap crumb. Emitted by `crumb wake` to give a new AI session instant context from a Palace without requiring the user to re-explain.
+
+Required sections:
+- `[identity]` — who this palace belongs to, wing/room counts, summary stats
+
+Optional sections:
+- `[facts]` — top facts harvested from the palace's `facts` halls
+- `[rooms]` — per-wing index of halls and room counts
+- `[gaps]` — top knowledge gaps (when produced with `--reflect`)
+
+Wake crumbs are ephemeral — they are regenerated from palace contents on demand and are not consolidated or dream-processed.
 
 ---
 
