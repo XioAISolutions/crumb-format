@@ -1,31 +1,19 @@
---- task: CRUMB 0.4.0 — v1.2 wire format (standalone cannibalization)
+--- task: docs: refresh README banner and fix stale counts
 source: github.pr
-pr: #12
-generated: 2026-04-15T15:45:27Z
+pr: #13
+generated: 2026-04-15T17:11:11Z
 ---
 
 [goal]
-# CRUMB 0.4.0 — v1.2 wire format, standalone
+## Summary
 
 [context]
 Changed files in this PR:
 - .crumb/latest.crumb
-- CHANGELOG.md
-- CODEX_HANDOFF_0.4.0.crumb
+- .github/workflows/bench-pr.yml
+- .github/workflows/bench-template.yml
 - README.md
-- RELEASE_NOTES_0.4.0_DRAFT.md
-- SPEC.md
-- cli/crumb.py
-- docs/v1.2-fold-heuristic.md
-- docs/v1.2-ref-resolution.md
-- examples/v12-fold.crumb
-- examples/v12-handoff.crumb
-- examples/v12-refs.crumb
-- examples/v12-typed-content.crumb
-- pyproject.toml
-- tests/test_crumb.py
-- validators/validate.js
-- validators/validate.py
+- docs/assets/crumb-banner.svg
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
