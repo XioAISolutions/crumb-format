@@ -51,6 +51,18 @@ Recommendations are:
 
 ## CLI usage
 
+After installation, use the dedicated console script:
+
+```bash
+crumb-integrity \
+  --input "Should I walk or drive to the car wash if I need my car washed?" \
+  --action "answer user" \
+  --output "Drive, because the car must be at the car wash." \
+  --json
+```
+
+During development, the module entrypoint also works:
+
 ```bash
 python -m cli.agent_integrity \
   --input "Should I walk or drive to the car wash if I need my car washed?" \
