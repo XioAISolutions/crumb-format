@@ -10,7 +10,7 @@ Ever been deep into a task with one AI, then need to switch to another? You eith
 
 CRUMB is a third option. It's a small, structured text block you copy-paste between AI tools. The next AI gets exactly what it needs to continue your work -- the goal, the context, and the constraints -- without the noise.
 
-> **v0.3.0** — Protocol-grade release. Deterministic `crumb pack`, MemPalace bridge adapter, `crumb lint` safety scanner, extension model, golden fixtures. All v0.2 features (Palace, Reflect, MeTalk, REST/A2A, AgentAuth, shadow-AI scanner, 41+ CLI commands) included. `pip install crumb-format`.
+> **v0.4.0** — First wire-format bump. `v=1.2` adds four additive primitives: cross-crumb `refs`, foldable sections, a `[handoff]` block, and typed content annotations. v1.1 parsers accept v1.2 files unchanged. All v0.3.0 features (Palace, Reflect, MeTalk, `crumb pack`, `crumb lint`, MemPalace bridge, REST/A2A, AgentAuth, MCP servers, 41+ CLI commands) ship unchanged. Standalone — no bridge code to Weft/WeaveMind, LangGraph, n8n, or external orchestration runtimes. `pip install crumb-format`.
 
 ## Try it right now
 
@@ -68,13 +68,54 @@ Five kinds: `task` (what to do next), `mem` (long-term memory), `map` (repo over
 
 ## How it compares
 
-| | Paste raw chat | Start over | Use CRUMB |
-|---|---|---|---|
-| Context preserved | Partial, noisy | None | Structured |
-| Next AI acts immediately | Unlikely | No | Yes |
-| Works across all AI tools | Yes | Yes | Yes |
-| Token-efficient | No | Yes (lossy) | Yes |
-| Human-readable | Barely | N/A | Yes |
+|                           | Paste raw chat | Start over  | Use CRUMB  |
+| ------------------------- | -------------- | ----------- | ---------- |
+| Context preserved         | Partial, noisy | None        | Structured |
+| Next AI acts immediately  | Unlikely       | No          | Yes        |
+| Works across all AI tools | Yes            | Yes         | Yes        |
+| Token-efficient           | No             | Yes (lossy) | Yes        |
+| Human-readable            | Barely         | N/A         | Yes        |
+
+## v1.2 — handoffs that know about each other
+
+v0.4.0 bumps the format to `v=1.2`. Four additions, all optional, all purely additive. v1.1 parsers accept v1.2 files unchanged.
+
+**Cross-crumb refs** — a CRUMB can now point at other CRUMBs by id, so a task handoff can ride on top of a mem crumb (your style) and a map crumb (the repo layout) without restating them:
+
+```text
+v=1.2
+kind=task
+refs=mem-prefs-abc123, map-web-app-2026q2
+```
+
+**Foldable sections** — one section, two lengths. Consumers load `/summary` under token pressure and upgrade to `/full` when budget allows:
+
+```text
+[fold:context/summary]
+JWT middleware races the cookie parser on refresh.
+
+[fold:context/full]
+Full repro + stack trace + 40 lines of investigation...
+```
+
+**`[handoff]` primitive** — explicit "next AI do this" block, distinct from `[goal]`:
+
+```text
+[handoff]
+- to=any    do=reproduce the failing test in tests/test_auth.py
+- to=human  do=approve the fix before merge
+- [x] reproduced the bug on main@da5e312
+```
+
+**Typed content annotations** — tag a section as code, diff, json, or yaml so the next AI renders and parses it correctly:
+
+```text
+[context]
+@type: code/typescript
+export async function requireAuth(req) { ... }
+```
+
+See the [v1.2 examples](examples/) (`v12-refs.crumb`, `v12-fold.crumb`, `v12-handoff.crumb`, `v12-typed-content.crumb`), the full [SPEC](SPEC.md) for §§9-12, and two open design docs — [ref resolution](docs/v1.2-ref-resolution.md) and [fold heuristic](docs/v1.2-fold-heuristic.md) — where the consumer-side behavior is intentionally left for v1.3.
 
 ## Add "crumb it" to your AI
 
@@ -158,7 +199,7 @@ Auto-classification puts each observation in the right hall without you specifyi
 
 ## Reflect — Self-Learning Gap Detection
 
-A filing cabinet stores what you put in it. A second brain tells you what's *missing*. `crumb reflect` analyzes your palace and identifies knowledge gaps, stale rooms, and imbalances — then suggests exactly what to add next.
+A filing cabinet stores what you put in it. A second brain tells you what's _missing_. `crumb reflect` analyzes your palace and identifies knowledge gaps, stale rooms, and imbalances — then suggests exactly what to add next.
 
 ```bash
 # Health check — scored 0-100 with actionable suggestions
@@ -175,6 +216,7 @@ crumb palace wiki
 ```
 
 Example output:
+
 ```
 Palace Health: 76/100 (Grade: C)
 Wings: 2  Rooms: 6
@@ -282,6 +324,7 @@ def query_database(sql, _agentauth_credential=None):
 ## Integrations
 
 **MCP Server** -- native tool integration with Claude Desktop, Cursor, Claude Code:
+
 ```bash
 # CRUMB tools (create, validate, search, etc.)
 claude mcp add crumb python3 /path/to/crumb-format/mcp/server.py
@@ -289,9 +332,11 @@ claude mcp add crumb python3 /path/to/crumb-format/mcp/server.py
 # AgentAuth tools (passport, policy, audit — 13 tools)
 claude mcp add agentauth python3 /path/to/crumb-format/mcp/agentauth_server.py
 ```
+
 See [`mcp/README.md`](mcp/README.md) for setup.
 
 **Pre-commit hook** -- validate `.crumb` files on every commit:
+
 ```yaml
 repos:
   - repo: https://github.com/XioAISolutions/crumb-format

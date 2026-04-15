@@ -1,0 +1,28 @@
+BEGIN CRUMB
+v=1.2
+kind=task
+title=Port middleware to the new cookie API
+source=claude.code
+project=web-app
+---
+[goal]
+Replace the legacy getCookie() call in middleware/auth.ts with Next's async cookies() API.
+
+[context]
+@type: code/typescript
+// current (middleware/auth.ts:38-48)
+export async function requireAuth(req: NextRequest) {
+  const token = getCookie("at", req);         // sync, racy
+  if (!token) return NextResponse.redirect("/login");
+  const session = await verifyJWT(token);
+  if (!session) return NextResponse.redirect("/login");
+  return NextResponse.next();
+}
+
+[constraints]
+@type: text/markdown
+- Use `cookies()` from `next/headers` — the async, resolved variant.
+- Preserve the existing cookie name (`at`).
+- Keep the 302 redirect behavior on unauthenticated requests.
+- Add a unit test using `@edge-runtime/vm` that exercises the new path.
+END CRUMB

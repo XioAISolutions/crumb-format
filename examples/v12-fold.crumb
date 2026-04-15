@@ -1,0 +1,38 @@
+BEGIN CRUMB
+v=1.2
+kind=task
+title=Fix login redirect loop
+source=claude.code
+project=web-app
+---
+[goal]
+Fix the bug where authenticated users are redirected back to /login after a full page refresh.
+
+[fold:context/summary]
+JWT middleware reads auth state before cookie parsing is complete, triggering a redirect to /login even for already-authenticated users.
+
+[fold:context/full]
+Reproducer:
+1. Log in with valid credentials
+2. Full page refresh (Cmd+Shift+R)
+3. Observed: redirect to /login loop
+4. Expected: stays on the current page
+
+Root cause (preliminary):
+- middleware/auth.ts:42 runs `requireAuth()` synchronously
+- requireAuth reads cookies via `getCookie("at")` before Next's cookie parser finishes
+- On the first tick, the cookie is undefined, so `requireAuth` returns false
+- The redirect fires before the cookie parser resolves
+
+Stack observed:
+  at requireAuth (middleware/auth.ts:42)
+  at handler (app/[...]/page.tsx)
+  at NextServer.handleRequest
+
+Workaround tested: adding `await cookies()` before `requireAuth` clears the race but the cookie parser API contract says we should not await twice. Need a different entry point.
+
+[constraints]
+- Do not change the login UI
+- Preserve existing cookie names
+- Add a regression check before merging
+END CRUMB

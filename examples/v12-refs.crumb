@@ -1,0 +1,25 @@
+BEGIN CRUMB
+v=1.2
+kind=task
+title=Wire refresh token rotation
+source=cursor.agent
+project=web-app
+refs=mem-user-preferences, map-repo-onboarding
+---
+[goal]
+Rotate refresh tokens on every access-token refresh and invalidate the old one.
+
+[context]
+- Auth stack: JWT access token (15m), refresh token (30d)
+- Current behavior: refresh token is reused; no rotation
+- Security review flagged this for the Q2 audit
+
+[refs]
+- mem-user-preferences  role=style  why=caller prefers terse commits and TS over JS
+- map-repo-onboarding   role=terrain  note=see [modules].auth for file layout
+
+[constraints]
+- Do not change the cookie names
+- Must preserve existing session on server restart
+- Add a regression test before merging
+END CRUMB

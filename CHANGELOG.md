@@ -1,5 +1,35 @@
 # Changelog
 
+## v0.4.0
+
+First release to bump the wire format itself from `v=1.1` to `v=1.2`. All four additions are optional, purely additive, and a v1.1 parser accepts a v1.2 file by ignoring unknown headers and sections (per `SPEC.md §8`).
+
+### New Format Primitives
+
+- **Cross-crumb references** — optional `refs=` header and `[refs]` section let a CRUMB point at other CRUMBs by id, turning an isolated handoff into a navigable graph. Resolution scheme left open for v1.3; see `docs/v1.2-ref-resolution.md`.
+- **Foldable sections** — namespaced `[fold:NAME/summary]` + `[fold:NAME/full]` pairs carry short and long forms of a single logical section while preserving the flat grammar. A fold pair substitutes for the plain required section (fold-satisfies-required rule). Consumer selection heuristic left open for v1.3; see `docs/v1.2-fold-heuristic.md`.
+- **`[handoff]` primitive** — optional explicit "next AI do this" block with advisory `to`/`do`/`why`/`deadline`/`ref` keys, distinct from `[goal]`.
+- **Typed content annotations** — a section's first line MAY start with `@type: code/LANG` (or `diff/unified`, `json`, `yaml`, `toml`, `text/markdown`, `text/plain`) to tag content for consumers.
+
+### Parser & Validator Updates
+
+- `cli/crumb.py` accepts `v ∈ {1.1, 1.2}`, enforces the fold-satisfies-required rule, and validates v1.2 primitives as additive.
+- Reference validators `validators/validate.py` and `validators/validate.js` updated to match.
+- All v1.1 CRUMBs continue to validate unchanged.
+
+### Examples & Docs
+
+- `examples/v12-refs.crumb`, `v12-fold.crumb`, `v12-handoff.crumb`, `v12-typed-content.crumb` — one example per v1.2 feature.
+- `docs/v1.2-ref-resolution.md`, `docs/v1.2-fold-heuristic.md` — open design docs framing the two deferred decisions for v1.3.
+
+### Standalone Posture
+
+Explicit decision: no bridge code to Weft/WeaveMind, LangGraph, n8n, or external orchestration runtimes. CRUMB stays plain text that travels via copy-paste, git, and clipboard. Existing bridges (`openai-threads`, `langchain-memory`, `crewai-task`, `autogen`, `claude-project`, MemPalace) continue unchanged.
+
+### Unchanged from 0.3.0
+
+Palace, Reflect, MeTalk, Wake, AgentAuth (passport/policy/audit/webhooks), deterministic `crumb pack`, MemPalace bridge, `crumb lint`, REST/A2A bridges, MCP servers, golden fixture suite, 41+ CLI commands — all ship unchanged in 0.4.0.
+
 ## v0.3.0
 
 Protocol-grade release. CRUMB 0.3.0 turns the project from a useful handoff tool into a protocol-grade context workflow while keeping CRUMB file compatibility at `v=1.1`. The 0.3 track (deterministic packs, adapter bridges, safety linting, golden fixtures, extension model) is now merged into the main line alongside v0.2's Palace, Reflect, Wake, AgentAuth, and MeTalk surfaces.
@@ -7,6 +37,7 @@ Protocol-grade release. CRUMB 0.3.0 turns the project from a useful handoff tool
 ### New Features
 
 **Deterministic Context Packs**
+
 - `crumb pack` builds a task/mem/map CRUMB from a directory of crumbs under a token budget
 - Four ranking strategies: keyword, ranked (TF-IDF), recent, hybrid (default)
 - Output shaping via `--mode implement|debug|review` — context sections shaped for the task you're handing off
@@ -14,12 +45,14 @@ Protocol-grade release. CRUMB 0.3.0 turns the project from a useful handoff tool
 - Git-aware context pickup: diff summaries, repo tree, recent files
 
 **Bridge Adapter Surface**
+
 - `crumb bridge mempalace export` — pull context from MemPalace (or saved export) into a new CRUMB
 - `crumb bridge mempalace import` — convert CRUMB files into a MemPalace-ready adapter bundle
 - Peer of the existing format bridges (`bridge export --to openai-threads`, etc.) — both coexist under the same subcommand
 - Adapter abstract base class (`BridgeAdapter`) for future backends
 
 **Safety Linting**
+
 - `crumb lint` scans CRUMBs for credentials (OpenAI, GitHub, AWS, Slack, JWT, bearer, generic) with regex-based patterns
 - `--redact` rewrites matches to `[REDACTED:label]` in-place or to `--output`
 - `--max-size` warnings for oversized raw logs and overall CRUMBs
@@ -27,11 +60,13 @@ Protocol-grade release. CRUMB 0.3.0 turns the project from a useful handoff tool
 - Namespaced header validation; `--strict` exits non-zero on any warning
 
 **Extension Model**
+
 - Documented optional headers: `id`, `url`, `tags`, `extensions`, `max_total_tokens`, `max_index_tokens`
 - Namespaced extension names (`x-*`, `ext.*`, reverse-dns) with warnings in `crumb lint` for non-namespaced use
 - `append_extension()` helper for programmatic extension declaration
 
 **Golden Fixture Suite**
+
 - `fixtures/valid/`, `fixtures/invalid/`, `fixtures/extensions/` with expected JSON / expected error files
 - Python and Node validators (`validators/validate.py`, `validators/validate.js`) now walk directories and expand globs
 - CI exercises the full fixture suite on every push and PR
@@ -58,6 +93,7 @@ Major expansion: CRUMB grows from a simple handoff format into a full AI knowled
 ### New Features
 
 **Palace Spatial Memory**
+
 - Hierarchical knowledge base: wings (people/projects) > halls (facts/events/discoveries/preferences/advice) > rooms (topics)
 - Pure filesystem storage -- every room is a `.crumb` file, grep-able, git-able, diff-able
 - Auto-classification of observations into halls via rule-based keyword/regex patterns
@@ -65,6 +101,7 @@ Major expansion: CRUMB grows from a simple handoff format into a full AI knowled
 - Session wake-up crumbs (`crumb wake`) for instant AI context bootstrap (~170 tokens)
 
 **Self-Learning Gap Detection**
+
 - `crumb reflect` scores palace health 0-100 with letter grades
 - Detects 7 gap types: empty halls, thin wings, stale rooms, missing cross-wing halls, undocumented preferences, no discoveries, empty palace
 - Actionable suggestions with exact commands to fill each gap
@@ -72,6 +109,7 @@ Major expansion: CRUMB grows from a simple handoff format into a full AI knowled
 - `crumb wake --reflect` injects top knowledge gaps into session wake-ups
 
 **MeTalk Caveman Compression**
+
 - Three compression levels for AI-to-AI communication
 - Level 1: dictionary substitution (lossless, reversible)
 - Level 2: dict + grammar stripping (~40% token savings)
@@ -79,6 +117,7 @@ Major expansion: CRUMB grows from a simple handoff format into a full AI knowled
 - Chainable with existing two-stage compression (`crumb compress --metalk`)
 
 **AgentAuth -- Agent Identity & Governance**
+
 - Cryptographic agent passports with registration, inspection, revocation
 - Tool authorization policies with glob-pattern allow/deny rules
 - Credential broker for secure secret access
@@ -88,12 +127,14 @@ Major expansion: CRUMB grows from a simple handoff format into a full AI knowled
 - HTML dashboard for agent fleet overview
 
 **Cross-AI Interoperability**
+
 - REST API server (OpenAPI 3.1) with 15+ endpoints
 - Google A2A protocol bridge (agent card, task handler)
 - Format bridges: openai-threads, langchain-memory, crewai-task, autogen, claude-project
 - Event webhooks for agent activity monitoring
 
 **New CLI Commands**
+
 - `crumb receive` -- clipboard/file/stdin intake with validation and palace auto-filing
 - `crumb context` -- generate task crumbs from git state, palace facts, and open TODOs
 - `crumb metalk` -- MeTalk compression encode/decode
@@ -112,6 +153,7 @@ Major expansion: CRUMB grows from a simple handoff format into a full AI knowled
 - `crumb init --all` -- seed all AI tools at once (Claude, Cursor, Copilot, Gemini, etc.)
 
 **MCP Servers**
+
 - CRUMB MCP server for Claude Desktop/Cursor/Claude Code integration
 - AgentAuth MCP server with 13 tools for agent governance
 
