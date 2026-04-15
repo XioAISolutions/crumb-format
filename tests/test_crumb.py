@@ -188,6 +188,14 @@ class TestEstimateTokens:
 
 # ── cmd_new (via main) ───────────────────────────────────────────────
 
+class TestCliVersion:
+    def test_version_matches_release(self, capsys):
+        with pytest.raises(SystemExit) as exc:
+            crumb.main(["--version"])
+        assert exc.value.code == 0
+        assert capsys.readouterr().out.strip() == "crumb 0.4.0"
+
+
 class TestCmdNew:
     def test_new_task(self, capsys):
         crumb.main(["new", "task", "--title", "Test", "--source", "test", "--goal", "Do something"])

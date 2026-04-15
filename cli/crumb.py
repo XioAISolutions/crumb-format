@@ -31,6 +31,7 @@ REQUIRED_SECTIONS = {
     "audit": ["goal", "actions", "verdict"],
     "wake": ["identity"],
 }
+CLI_VERSION = "0.4.0"
 SUPPORTED_VERSIONS = {"1.1", "1.2"}
 FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
 
@@ -4863,7 +4864,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog='crumb',
         description='Create, validate, inspect, and manage .crumb handoff files.',
     )
-    parser.add_argument('--version', action='version', version='crumb 0.3.0')
+    parser.add_argument('--version', action='version', version=f'crumb {CLI_VERSION}')
     sub = parser.add_subparsers(dest='command', required=True)
 
     # new
