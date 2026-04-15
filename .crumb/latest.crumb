@@ -1,25 +1,18 @@
---- task: chore: prepare 0.3.0 release metadata
+--- task: Add agent integrity canary layer
 source: github.pr
-pr: #8
-generated: 2026-04-08T20:03:36Z
+pr: #11
+generated: 2026-04-15T03:43:10Z
 ---
 
 [goal]
 ## Summary
-- bump packaged version surfaces from 0.2.0 to 0.3.0
-- add a real 0.3.0 release note and top-level changelog
-- remove the stale 0.2.1 draft and fix Homebrew docs that referenced a missing automation workflow
 
 [context]
 Changed files in this PR:
-- CHANGELOG.md
-- RELEASE_NOTES_0.2.1_DRAFT.md
-- RELEASE_NOTES_0.3.0.md
-- api/openapi.json
-- api/openapi.yaml
-- docs/HOMEBREW.md
-- mcp/server.py
+- cli/agent_integrity.py
+- docs/AGENT_INTEGRITY.md
 - pyproject.toml
+- tests/test_agent_integrity.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
