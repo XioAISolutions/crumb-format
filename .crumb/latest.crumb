@@ -1,14 +1,15 @@
---- task: feat(spec): ship SPEC v1.2 with refs, folds, handoff, typed content (0.3.0)
+--- task: CRUMB 0.4.0 — v1.2 wire format (standalone cannibalization)
 source: github.pr
 pr: #12
-generated: 2026-04-15T15:33:26Z
+generated: 2026-04-15T15:45:27Z
 ---
 
 [goal]
-## Summary
+# CRUMB 0.4.0 — v1.2 wire format, standalone
 
 [context]
 Changed files in this PR:
+- .crumb/latest.crumb
 - CHANGELOG.md
 - CODEX_HANDOFF_0.4.0.crumb
 - README.md
@@ -22,6 +23,7 @@ Changed files in this PR:
 - examples/v12-refs.crumb
 - examples/v12-typed-content.crumb
 - pyproject.toml
+- tests/test_crumb.py
 - validators/validate.js
 - validators/validate.py
 
