@@ -10,7 +10,7 @@ Ever been deep into a task with one AI, then need to switch to another? You eith
 
 CRUMB is a third option. It's a small, structured text block you copy-paste between AI tools. The next AI gets exactly what it needs to continue your work -- the goal, the context, and the constraints -- without the noise.
 
-> **v0.4.0** — First wire-format bump. `v=1.2` adds four additive primitives: cross-crumb `refs`, foldable sections, a `[handoff]` block, and typed content annotations. v1.1 parsers accept v1.2 files unchanged. All v0.3.0 features (Palace, Reflect, MeTalk, `crumb pack`, `crumb lint`, MemPalace bridge, REST/A2A, AgentAuth, MCP servers, 41+ CLI commands) ship unchanged. Standalone — no bridge code to Weft/WeaveMind, LangGraph, n8n, or external orchestration runtimes. `pip install crumb-format`.
+> **v0.4.0** — First wire-format bump. `v=1.2` adds four additive primitives: cross-crumb `refs`, foldable sections, a `[handoff]` block, and typed content annotations. v1.1 parsers accept v1.2 files unchanged. All v0.3.0 features (Palace, Reflect, MeTalk, `crumb pack`, `crumb lint`, MemPalace bridge, REST/A2A, AgentAuth, MCP servers, 44 CLI commands) ship unchanged. Standalone — no bridge code to Weft/WeaveMind, LangGraph, n8n, or external orchestration runtimes. `pip install crumb-format`.
 
 ## Try it right now
 
@@ -64,7 +64,7 @@ END CRUMB
 
 Paste it at the start of any session. No more "I like concise answers, don't use emojis, prefer TypeScript..." every time.
 
-Five kinds: `task` (what to do next), `mem` (long-term memory), `map` (repo overview), `log` (session transcript), `todo` (work items).
+Six kinds: `task` (what to do next), `mem` (long-term memory), `map` (repo overview), `log` (session transcript), `todo` (work items), `wake` (session-start context).
 
 ## How it compares
 
@@ -128,7 +128,8 @@ For tasks: kind=task with [goal], [context], [constraints]
 For memory: kind=mem with [consolidated]
 For repos: kind=map with [project], [modules]
 
-Format: BEGIN CRUMB / v=1.1 / headers / --- / sections / END CRUMB
+Format: BEGIN CRUMB / v=1.2 / headers / --- / sections / END CRUMB
+(v=1.1 is also valid — parsers accept both.)
 ```
 
 Works in ChatGPT custom instructions, Claude Projects, Cursor rules, or any AI with system prompts.
@@ -159,7 +160,7 @@ crumb search "auth JWT" --dir ./crumbs/
 crumb init --all
 ```
 
-Full command reference: `crumb --help` (41 commands including export, import, templates, todos, watch mode, compression, agent governance, and more). See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for a 5-minute walkthrough.
+Full command reference: `crumb --help` (44 commands including export, import, templates, todos, watch mode, compression, agent governance, and more). See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for a 5-minute walkthrough.
 
 ## Palace — Spatial Memory That Stays With You
 
@@ -353,7 +354,7 @@ repos:
 - [`DREAMING.md`](DREAMING.md) -- how memory consolidation works
 - [`docs/QUICKSTART.md`](docs/QUICKSTART.md) -- 5-minute daily workflow guide
 - [`examples/`](examples/) -- ready-to-paste `.crumb` files (task, mem, map, log, todo, wake)
-- [`cli/crumb.py`](cli/crumb.py) -- full CLI (41 commands)
+- [`cli/crumb.py`](cli/crumb.py) -- full CLI (44 commands)
 - [`cli/reflect.py`](cli/reflect.py) -- self-learning gap detection and knowledge health scoring
 - [`cli/palace.py`](cli/palace.py) -- Palace spatial memory (wings/halls/rooms/tunnels)
 - [`cli/classify.py`](cli/classify.py) -- rule-based hall classifier
