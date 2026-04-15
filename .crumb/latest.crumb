@@ -1,7 +1,7 @@
 --- task: docs: refresh README banner and fix stale counts
 source: github.pr
 pr: #13
-generated: 2026-04-15T17:04:10Z
+generated: 2026-04-15T17:11:11Z
 ---
 
 [goal]
@@ -9,6 +9,9 @@ generated: 2026-04-15T17:04:10Z
 
 [context]
 Changed files in this PR:
+- .crumb/latest.crumb
+- .github/workflows/bench-pr.yml
+- .github/workflows/bench-template.yml
 - README.md
 - docs/assets/crumb-banner.svg
 
