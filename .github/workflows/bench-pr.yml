@@ -37,7 +37,19 @@ jobs:
           python-version: ${{ inputs.python-version || '3.11' }}
 
       - name: Install crumb-format
-        run: pip install crumb-format
+        # Prefer the checked-out source when this IS the crumb-format repo
+        # so PRs that bump the wire format (e.g. v=1.2) bench against the
+        # code in the PR rather than the last-published PyPI version.
+        # Other repos calling this workflow via workflow_call fall through
+        # to the PyPI install.
+        run: |
+          if [ -f pyproject.toml ] && grep -q '^name = "crumb-format"' pyproject.toml; then
+            echo "Installing crumb-format from checked-out source"
+            pip install .
+          else
+            echo "Installing crumb-format from PyPI"
+            pip install crumb-format
+          fi
 
       - name: Find and bench .crumb files
         id: bench
@@ -45,8 +57,10 @@ jobs:
         run: |
           SEARCH_PATH="${{ inputs.search-path || '.' }}"
 
-          # Find all .crumb files, excluding .git
-          mapfile -t CRUMB_FILES < <(find "$SEARCH_PATH" -name "*.crumb" -not -path "./.git/*" | sort)
+          # Find all .crumb files, excluding .git. -type f is important because
+          # some repos (this one included) keep a `.crumb/` state directory
+          # whose name matches `*.crumb` and would otherwise surface as a row.
+          mapfile -t CRUMB_FILES < <(find "$SEARCH_PATH" -type f -name "*.crumb" -not -path "./.git/*" | sort)
 
           if [ ${#CRUMB_FILES[@]} -eq 0 ]; then
             echo "No .crumb files found."
