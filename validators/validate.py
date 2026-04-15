@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import glob
 import pathlib
+import re
 import sys
 from typing import Dict, List
 
@@ -15,6 +16,8 @@ REQUIRED_SECTIONS = {
     "todo": ["tasks"],
     "wake": ["identity"],
 }
+SUPPORTED_VERSIONS = {"1.1", "1.2"}
+FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
 
 class ValidationError(Exception):
     pass
@@ -44,8 +47,8 @@ def parse_crumb(text: str) -> Dict[str, object]:
     for key in REQUIRED_HEADERS:
         if key not in headers:
             raise ValidationError(f"missing required header: {key}")
-    if headers["v"] != "1.1":
-        raise ValidationError("unsupported version")
+    if headers["v"] not in SUPPORTED_VERSIONS:
+        raise ValidationError(f"unsupported version: {headers['v']}")
     kind = headers["kind"]
     if kind not in REQUIRED_SECTIONS:
         raise ValidationError(f"unknown kind: {kind}")
@@ -63,11 +66,63 @@ def parse_crumb(text: str) -> Dict[str, object]:
             raise ValidationError("body content found before first section")
         sections[current_section].append(stripped)
     for section in REQUIRED_SECTIONS[kind]:
-        if section not in sections:
-            raise ValidationError(f"missing required section for kind={kind}: {section}")
-        if not any(item.strip() for item in sections[section]):
-            raise ValidationError(f"section is empty: {section}")
+        fold_summary = f"fold:{section}/summary"
+        fold_full = f"fold:{section}/full"
+        if section in sections:
+            if not any(item.strip() for item in sections[section]):
+                raise ValidationError(f"section is empty: {section}")
+        elif fold_summary in sections or fold_full in sections:
+            for variant in (fold_summary, fold_full):
+                if variant in sections and not any(
+                    item.strip() for item in sections[variant]
+                ):
+                    raise ValidationError(f"section is empty: {variant}")
+        else:
+            raise ValidationError(
+                f"missing required section for kind={kind}: {section} "
+                f"(or fold:{section}/summary + fold:{section}/full)"
+            )
+    _validate_v12_additive(headers, sections)
     return {"headers": headers, "sections": sections}
+
+
+def _validate_v12_additive(
+    headers: Dict[str, str], sections: Dict[str, List[str]]
+) -> None:
+    """Additive v1.2 checks. Never rejects v1.1 files."""
+    if "refs" in headers:
+        refs_value = headers["refs"].strip()
+        if not refs_value:
+            raise ValidationError("refs header must not be empty when present")
+        for ref in (r.strip() for r in refs_value.split(",")):
+            if not ref:
+                raise ValidationError("refs header contains an empty entry")
+    if "refs" in sections and not any(line.strip() for line in sections["refs"]):
+        raise ValidationError("[refs] section is empty; omit it instead")
+    if "handoff" in sections and not any(
+        line.strip() for line in sections["handoff"]
+    ):
+        raise ValidationError("[handoff] section is empty; omit it instead")
+    fold_pairs: Dict[str, set] = {}
+    for name in sections:
+        match = FOLD_SECTION_RE.match(name)
+        if not match:
+            continue
+        fold_name, variant = match.group(1), match.group(2)
+        fold_pairs.setdefault(fold_name, set()).add(variant)
+    for fold_name, variants in fold_pairs.items():
+        if "full" in variants and "summary" not in variants:
+            raise ValidationError(
+                f"fold:{fold_name} declares /full without a paired /summary"
+            )
+    for name, body in sections.items():
+        first = next((line for line in body if line.strip()), "")
+        if first.strip().startswith("@type:"):
+            type_value = first.strip().split(":", 1)[1].strip()
+            if not type_value:
+                raise ValidationError(
+                    f"@type annotation has empty value in [{name}]"
+                )
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

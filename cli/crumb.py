@@ -31,6 +31,9 @@ REQUIRED_SECTIONS = {
     "audit": ["goal", "actions", "verdict"],
     "wake": ["identity"],
 }
+CLI_VERSION = "0.4.0"
+SUPPORTED_VERSIONS = {"1.1", "1.2"}
+FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
 
 
 def read_text(path: str | None) -> str:
@@ -75,7 +78,7 @@ def parse_crumb(text: str) -> Dict[str, object]:
     for key in REQUIRED_HEADERS:
         if key not in headers:
             raise ValueError(f"missing required header: {key}")
-    if headers["v"] != "1.1":
+    if headers["v"] not in SUPPORTED_VERSIONS:
         raise ValueError(f"unsupported version: {headers['v']}")
     kind = headers["kind"]
     if kind not in REQUIRED_SECTIONS:
@@ -94,11 +97,71 @@ def parse_crumb(text: str) -> Dict[str, object]:
             continue
         sections[current_section].append(line)
     for section in REQUIRED_SECTIONS[kind]:
-        if section not in sections:
-            raise ValueError(f"missing required section for kind={kind}: [{section}]")
-        if not any(item.strip() for item in sections[section]):
-            raise ValueError(f"section [{section}] is empty")
+        fold_summary = f"fold:{section}/summary"
+        fold_full = f"fold:{section}/full"
+        if section in sections:
+            if not any(item.strip() for item in sections[section]):
+                raise ValueError(f"section [{section}] is empty")
+        elif fold_summary in sections or fold_full in sections:
+            for variant_name in (fold_summary, fold_full):
+                if variant_name in sections and not any(
+                    item.strip() for item in sections[variant_name]
+                ):
+                    raise ValueError(f"section [{variant_name}] is empty")
+        else:
+            raise ValueError(
+                f"missing required section for kind={kind}: [{section}] "
+                f"(or [fold:{section}/summary] + [fold:{section}/full])"
+            )
+
+    _validate_v12_additive(headers, sections)
+
     return {"headers": headers, "sections": sections}
+
+
+def _validate_v12_additive(
+    headers: Dict[str, str], sections: Dict[str, List[str]]
+) -> None:
+    """Additive v1.2 validation. Does not reject v1.1 files."""
+
+    if "refs" in headers:
+        refs_value = headers["refs"].strip()
+        if not refs_value:
+            raise ValueError("refs header must not be empty when present")
+        for ref in (r.strip() for r in refs_value.split(",")):
+            if not ref:
+                raise ValueError("refs header contains an empty entry")
+
+    if "refs" in sections and not any(line.strip() for line in sections["refs"]):
+        raise ValueError("[refs] section is empty; omit it instead")
+
+    if "handoff" in sections and not any(
+        line.strip() for line in sections["handoff"]
+    ):
+        raise ValueError("[handoff] section is empty; omit it instead")
+
+    fold_pairs: Dict[str, set] = {}
+    for section_name in sections:
+        match = FOLD_SECTION_RE.match(section_name)
+        if not match:
+            continue
+        fold_name, variant = match.group(1), match.group(2)
+        fold_pairs.setdefault(fold_name, set()).add(variant)
+
+    for fold_name, variants in fold_pairs.items():
+        if "full" in variants and "summary" not in variants:
+            raise ValueError(
+                f"fold:{fold_name} declares /full without a paired /summary"
+            )
+
+    for section_name, body in sections.items():
+        first_nonblank = next((line for line in body if line.strip()), "")
+        if first_nonblank.strip().startswith("@type:"):
+            content_type = first_nonblank.strip().split(":", 1)[1].strip()
+            if not content_type:
+                raise ValueError(
+                    f"@type annotation has empty value in [{section_name}]"
+                )
 
 
 def render_crumb(headers: Dict[str, str], sections: Dict[str, List[str]]) -> str:
@@ -4801,7 +4864,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog='crumb',
         description='Create, validate, inspect, and manage .crumb handoff files.',
     )
-    parser.add_argument('--version', action='version', version='crumb 0.3.0')
+    parser.add_argument('--version', action='version', version=f'crumb {CLI_VERSION}')
     sub = parser.add_subparsers(dest='command', required=True)
 
     # new

@@ -1,0 +1,26 @@
+BEGIN CRUMB
+v=1.2
+kind=task
+title=Diagnose and land auth race fix
+source=cursor.agent
+project=web-app
+refs=v12-fold
+---
+[goal]
+Close the login redirect loop bug described in the referenced crumb.
+
+[context]
+I've reproduced the bug locally and narrowed it to a race between requireAuth() and Next's cookie parser. Handing off the fix to the next agent.
+
+[constraints]
+- No UI changes
+- Preserve cookie names
+- Regression test required before merge
+
+[handoff]
+- to=any      do=read the paired crumb v12-fold for full repro and root cause
+- to=any      do=propose a fix that removes the race without awaiting the cookie parser twice
+- to=any      do=add a regression test that fails on current main and passes on your fix
+- to=human    do=approve the diff before merging
+- [x] reproduced the bug on main@da5e312
+END CRUMB

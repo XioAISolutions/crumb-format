@@ -1,0 +1,126 @@
+BEGIN CRUMB
+v=1.2
+kind=task
+title=Ship CRUMB 0.4.0 to PyPI
+source=claude.code
+project=crumb-format
+id=codex-handoff-0.4.0
+url=https://github.com/XioAISolutions/crumb-format
+refs=v12-refs, v12-fold, v12-handoff, v12-typed-content, RELEASE_NOTES_0.4.0_DRAFT
+extensions=crumb.handoff.v1
+x-crumb-handoff.from=claude.code
+x-crumb-handoff.to=codex.cli
+x-crumb-handoff.reason=pypi-credentials
+---
+[goal]
+Ship `crumb-format==0.4.0` to PyPI. Claude Code prepared the v1.2 format bump, examples, docs, release notes, and README updates on branch `claude/nifty-volhard`. Codex has PyPI credentials that Claude Code does not — final tag + build + upload is yours.
+
+[context]
+State of play when this crumb was written:
+
+- Branch: `claude/nifty-volhard` (based on `origin/main`)
+- Working dir: repo root (any worktree of crumb-format works)
+- Previous release: 0.3.0 (protocol-grade tooling, wire format frozen at v=1.1)
+- This release: 0.4.0 — first wire-format bump, v=1.1 → v=1.2
+- Wire-format changes are 100% additive and backward compatible; a v1.1 parser accepts a v1.2 file by ignoring unknown headers and sections.
+
+Four v1.2 primitives shipped in this release:
+1. Cross-crumb `refs=` header + optional `[refs]` section
+2. Foldable sections — `[fold:NAME/summary]` + `[fold:NAME/full]` with a fold-satisfies-required rule
+3. `[handoff]` primitive — explicit "next AI do this" block
+4. Typed content — `@type:` first-line annotation on any section
+
+This crumb itself dogfoods three of those primitives: `refs=` points at the four v1.2 example files and the draft release notes, `[handoff]` spells out every step below as a line the next agent should walk top-down, and the shell command section uses `@type: code/shell`.
+
+Everything Claude Code has already done, for confidence:
+- SPEC.md bumped to v1.2, §§9-12 appended (preserving §4.6 wake kind and §8.1 extension model)
+- cli/crumb.py parser accepts v ∈ {1.1, 1.2}, enforces fold-satisfies-required, validates v1.2 additively
+- validators/validate.py and validators/validate.js updated with the same logic
+- examples/v12-refs.crumb, v12-fold.crumb, v12-handoff.crumb, v12-typed-content.crumb created
+- docs/v1.2-ref-resolution.md and docs/v1.2-fold-heuristic.md — open design docs with TODO(author) blocks for v1.3
+- pyproject.toml bumped 0.3.0 → 0.4.0, description updated
+- CHANGELOG.md entry added at the top
+- README.md v0.3.0 banner replaced with v0.4.0 banner; new "v1.2 — handoffs that know about each other" section inserted before "Add 'crumb it' to your AI"
+- RELEASE_NOTES_0.4.0_DRAFT.md written at repo root
+
+What Claude Code could not do:
+- No PyPI credentials. `~/.pypirc` missing, `TWINE_USERNAME`/`TWINE_PASSWORD` unset, `twine` not installed.
+- No GitHub push for the final tag push (uncertain permissions; safer to let you drive).
+
+[constraints]
+- Do NOT change SPEC.md, example crumbs, validators, or RELEASE_NOTES_0.4.0_DRAFT.md unless a test fails — if that happens, fix the test or the code, not the doc, and flag it in the PR.
+- Do NOT amend existing commits. Create new commits if you need to fix anything.
+- Do NOT force-push main. Force-push-with-lease on the feature branch is fine.
+- Do NOT publish to PyPI until the full test suite and both reference validators pass cleanly on the v1.2 examples.
+- Preserve all v0.3.0 features (Palace, Reflect, MeTalk, AgentAuth, pack, lint, bridges, MCP). They should already be preserved — sanity-check with a quick smoke test.
+- Keep the release standalone. No bridge code to Weft/WeaveMind, LangGraph, or n8n. That was an explicit product decision.
+- If you find a semantic issue with any v1.2 primitive (e.g. fold-satisfies-required feels wrong, @type syntax conflicts with something), STOP and leave a comment on the PR instead of silently changing it.
+
+[handoff]
+- to=codex  do=rebase check — ensure `claude/nifty-volhard` is cleanly based on `origin/main` with no outstanding conflicts
+- to=codex  do=run `pytest -q` from repo root and confirm green
+- to=codex  do=run `python3 validators/validate.py examples/` and confirm every .crumb reports OK
+- to=codex  do=run `node validators/validate.js examples/` and confirm every .crumb reports OK
+- to=codex  do=verify `pyproject.toml` shows version = "0.4.0" and CHANGELOG.md has the v0.4.0 block at the top
+- to=codex  do=commit any Codex-side fixups as a new commit with a descriptive message
+- to=codex  do=push the branch: `git push origin claude/nifty-volhard`
+- to=codex  do=open/update the PR titled `CRUMB 0.4.0 — v1.2 wire format (standalone cannibalization)` using RELEASE_NOTES_0.4.0_DRAFT.md as the body, target branch main
+- to=human  do=approve and merge the PR (squash or merge-commit, your call)
+- to=codex  do=after merge, `git checkout main && git pull origin main`
+- to=codex  do=tag the release: `git tag -a v0.4.0 -m "CRUMB 0.4.0 — v1.2 wire format"`
+- to=codex  do=push the tag: `git push origin v0.4.0`
+- to=codex  do=build wheels: `python3 -m build` (install `build` first if missing: `pip install build`)
+- to=codex  do=smoke-test the built wheel in a throwaway venv: `pip install dist/crumb_format-0.4.0-py3-none-any.whl && crumb --help | grep 0.4.0` (or check `pip show crumb-format`)
+- to=codex  do=upload to PyPI: `twine upload dist/crumb_format-0.4.0*` (uses your `~/.pypirc` or `TWINE_USERNAME`/`TWINE_PASSWORD`)
+- to=codex  do=verify on PyPI: `pip install crumb-format==0.4.0` in a fresh venv and confirm the v1.2 examples validate
+- to=human  do=announce the release (discord/twitter/blog — your call)
+- [x] prepared v1.2 spec, parser, validators, examples, docs, release notes, CHANGELOG, README banner
+- [x] confirmed pytest + validators pass locally before handoff (see logs on the PR once pushed)
+- [x] confirmed no PyPI credentials available on the Claude Code side — reason for handoff
+
+[commands]
+@type: code/shell
+# Copy-paste runnable sequence. Run from repo root, review each step.
+
+# 0. Sanity
+git status
+git rev-parse --abbrev-ref HEAD   # should print: claude/nifty-volhard
+git log --oneline -5
+
+# 1. Verify tests + validators
+pytest -q
+python3 validators/validate.py examples/
+node validators/validate.js examples/
+
+# 2. Verify release artifacts
+grep -n 'version = "0.4.0"' pyproject.toml
+head -3 CHANGELOG.md
+head -3 RELEASE_NOTES_0.4.0_DRAFT.md
+
+# 3. Push branch and open/update PR
+git push origin claude/nifty-volhard
+gh pr view --json url,state  # or: gh pr create --title "CRUMB 0.4.0 — v1.2 wire format" --body-file RELEASE_NOTES_0.4.0_DRAFT.md
+
+# 4. After human merge approval
+git checkout main
+git pull origin main
+git tag -a v0.4.0 -m "CRUMB 0.4.0 — v1.2 wire format"
+git push origin v0.4.0
+
+# 5. Build + smoke test + publish
+pip install --upgrade build twine
+python3 -m build
+# smoke-test in a throwaway venv:
+python3 -m venv /tmp/crumb-smoke && /tmp/crumb-smoke/bin/pip install dist/crumb_format-0.4.0-py3-none-any.whl
+/tmp/crumb-smoke/bin/pip show crumb-format | head -3
+# publish:
+twine upload dist/crumb_format-0.4.0*
+# verify on PyPI from a fresh venv:
+python3 -m venv /tmp/crumb-verify && /tmp/crumb-verify/bin/pip install crumb-format==0.4.0
+
+[notes]
+- The two open design docs (docs/v1.2-ref-resolution.md, docs/v1.2-fold-heuristic.md) each end with a TODO(author) block. These are intentional for v1.3 — do not remove or try to resolve them in this release.
+- The WeaveMind/Weft analysis the user asked about earlier led to the "standalone cannibalization" decision: CRUMB takes useful ideas (typed content, ref graphs) as native format features, without building bridge code to Weft or any orchestration runtime.
+- This is the first release to bump the wire format. Future wire bumps should follow the same additive, backward-compatible shape: new optional primitives, fold-style namespacing, nothing that breaks a v1.1 parser silently.
+- The v1.2 examples/v12-handoff.crumb illustrates the exact [handoff] pattern this crumb uses — feel free to cite it if the PR body needs a standalone reference.
+END CRUMB

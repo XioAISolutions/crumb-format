@@ -1,25 +1,31 @@
---- task: chore: prepare 0.3.0 release metadata
+--- task: CRUMB 0.4.0 — v1.2 wire format (standalone cannibalization)
 source: github.pr
-pr: #8
-generated: 2026-04-08T20:03:36Z
+pr: #12
+generated: 2026-04-15T15:45:27Z
 ---
 
 [goal]
-## Summary
-- bump packaged version surfaces from 0.2.0 to 0.3.0
-- add a real 0.3.0 release note and top-level changelog
-- remove the stale 0.2.1 draft and fix Homebrew docs that referenced a missing automation workflow
+# CRUMB 0.4.0 — v1.2 wire format, standalone
 
 [context]
 Changed files in this PR:
+- .crumb/latest.crumb
 - CHANGELOG.md
-- RELEASE_NOTES_0.2.1_DRAFT.md
-- RELEASE_NOTES_0.3.0.md
-- api/openapi.json
-- api/openapi.yaml
-- docs/HOMEBREW.md
-- mcp/server.py
+- CODEX_HANDOFF_0.4.0.crumb
+- README.md
+- RELEASE_NOTES_0.4.0_DRAFT.md
+- SPEC.md
+- cli/crumb.py
+- docs/v1.2-fold-heuristic.md
+- docs/v1.2-ref-resolution.md
+- examples/v12-fold.crumb
+- examples/v12-handoff.crumb
+- examples/v12-refs.crumb
+- examples/v12-typed-content.crumb
 - pyproject.toml
+- tests/test_crumb.py
+- validators/validate.js
+- validators/validate.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
