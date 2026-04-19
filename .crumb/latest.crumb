@@ -1,31 +1,25 @@
---- task: CRUMB 0.4.0 — v1.2 wire format (standalone cannibalization)
+--- task: metalk: add vowel-strip L4/L5 with embedding-drift harness
 source: github.pr
-pr: #12
-generated: 2026-04-15T15:45:27Z
+pr: #15
+generated: 2026-04-19T17:03:28Z
 ---
 
 [goal]
-# CRUMB 0.4.0 — v1.2 wire format, standalone
+## Summary
 
 [context]
 Changed files in this PR:
-- .crumb/latest.crumb
 - CHANGELOG.md
-- CODEX_HANDOFF_0.4.0.crumb
 - README.md
-- RELEASE_NOTES_0.4.0_DRAFT.md
-- SPEC.md
 - cli/crumb.py
-- docs/v1.2-fold-heuristic.md
-- docs/v1.2-ref-resolution.md
-- examples/v12-fold.crumb
-- examples/v12-handoff.crumb
-- examples/v12-refs.crumb
-- examples/v12-typed-content.crumb
+- cli/metalk.py
+- cli/vowelstrip.py
+- docs/vowel-drift-benchmark.md
+- docs/vowel-drift.md
 - pyproject.toml
-- tests/test_crumb.py
-- validators/validate.js
-- validators/validate.py
+- scripts/measure_drift.py
+- tests/test_metalk.py
+- tests/test_vowelstrip.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
