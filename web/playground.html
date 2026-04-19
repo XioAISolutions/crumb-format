@@ -11,15 +11,16 @@
     --bg: #0f1117;
     --surface: #181a20;
     --surface2: #1e2028;
+    --surface3: #23262f;
     --border: #2a2d38;
     --text: #e4e4e7;
     --text-dim: #9294a0;
+    --text-mute: #6c6f7a;
     --accent: #f97316;
     --accent-dim: rgba(249, 115, 22, 0.12);
     --accent-hover: #fb923c;
     --good: #22c55e;
     --warn: #eab308;
-    --bad: #ef4444;
     --radius: 10px;
     --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
   }
@@ -35,11 +36,11 @@
 
   header {
     text-align: center;
-    padding: 2rem 1rem 1rem;
+    padding: 2rem 1rem 0.75rem;
   }
 
   header h1 {
-    font-size: 1.65rem;
+    font-size: 1.6rem;
     font-weight: 700;
     letter-spacing: -0.02em;
   }
@@ -48,7 +49,7 @@
 
   header p {
     color: var(--text-dim);
-    margin-top: 0.4rem;
+    margin-top: 0.35rem;
     font-size: 0.92rem;
   }
 
@@ -60,66 +61,180 @@
     padding: 0 1.25rem 2rem;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    gap: 0.85rem;
   }
 
-  .controls {
-    display: flex;
-    gap: 1.25rem;
-    align-items: center;
-    flex-wrap: wrap;
-    padding: 0.85rem 1rem;
+  /* ── Preset tabs ──────────────────────────────────────────── */
+
+  .presets {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.4rem;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
+    padding: 0.4rem;
   }
 
-  .control { display: flex; align-items: center; gap: 0.55rem; }
+  @media (max-width: 680px) {
+    .presets { grid-template-columns: repeat(2, 1fr); }
+  }
 
-  .control label {
-    font-size: 0.78rem;
+  .preset {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    padding: 0.55rem 0.55rem;
+    border-radius: 7px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    align-items: flex-start;
+    text-align: left;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    font: inherit;
+  }
+
+  .preset:hover:not(.active) { background: var(--surface2); color: var(--text); }
+
+  .preset.active {
+    background: var(--accent-dim);
+    color: var(--text);
+    border-color: var(--accent);
+  }
+
+  .preset .name {
+    font-size: 0.86rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+  .preset.active .name { color: var(--accent); }
+  .preset .sub {
+    font-size: 0.72rem;
+    color: var(--text-mute);
+    font-family: var(--mono);
+  }
+
+  /* ── Secondary strip (examples, advanced toggle) ─────────── */
+
+  .strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    font-size: 0.82rem;
+  }
+
+  .strip-left, .strip-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+
+  .linklike {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 0.35rem 0.5rem;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 0.82rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .linklike:hover { color: var(--text); background: var(--surface2); }
+
+  select.example-pick {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+    outline: none;
+    font-family: inherit;
+  }
+
+  select.example-pick:focus { border-color: var(--accent); }
+
+  .kbd {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-mute);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 0.08rem 0.35rem;
+    border-radius: 4px;
+  }
+
+  /* ── Advanced panel ──────────────────────────────────────── */
+
+  .advanced {
+    display: none;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.8rem 1rem;
+  }
+  .advanced.open { display: grid; }
+
+  @media (max-width: 680px) {
+    .advanced.open { grid-template-columns: 1fr; }
+  }
+
+  .knob { display: flex; flex-direction: column; gap: 0.25rem; }
+  .knob label {
+    font-size: 0.72rem;
     color: var(--text-dim);
     text-transform: uppercase;
     letter-spacing: 0.06em;
     font-weight: 600;
   }
-
-  input[type="number"], select {
+  .knob .hint { font-size: 0.72rem; color: var(--text-mute); }
+  .knob input, .knob select {
     background: var(--surface2);
     color: var(--text);
     border: 1px solid var(--border);
     border-radius: 6px;
     padding: 0.4rem 0.6rem;
-    font-size: 0.88rem;
+    font-size: 0.86rem;
+    font-family: var(--mono);
     outline: none;
-    font-family: var(--mono);
+    width: 100%;
   }
+  .knob input:focus, .knob select:focus { border-color: var(--accent); }
 
-  input[type="number"] { width: 5rem; }
+  /* ── Hero savings ────────────────────────────────────────── */
 
-  input[type="range"] {
-    accent-color: var(--accent);
-    width: 7rem;
+  .hero {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0;
+    min-height: 2.6rem;
+    transition: opacity 0.2s;
   }
-
-  .level-pill {
-    display: inline-block;
-    min-width: 1.5rem;
-    text-align: center;
-    background: var(--accent-dim);
+  .hero.empty { opacity: 0.3; }
+  .hero-value {
+    font-size: 2.1rem;
+    font-weight: 800;
     color: var(--accent);
-    padding: 0.15rem 0.55rem;
-    border-radius: 999px;
-    font-size: 0.78rem;
-    font-weight: 700;
     font-family: var(--mono);
+    letter-spacing: -0.02em;
+  }
+  .hero-label { color: var(--text-dim); font-size: 0.92rem; }
+  .hero-sub {
+    color: var(--text-mute);
+    font-size: 0.8rem;
+    font-family: var(--mono);
+    margin-left: 0.6rem;
   }
 
-  .level-help {
-    font-size: 0.78rem;
-    color: var(--text-dim);
-    font-family: var(--mono);
-  }
+  /* ── Panels ──────────────────────────────────────────────── */
 
   .panels {
     display: grid;
@@ -129,16 +244,11 @@
     min-height: 0;
   }
 
-  @media (max-width: 740px) {
+  @media (max-width: 760px) {
     .panels { grid-template-columns: 1fr; }
   }
 
-  .panel {
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
-    min-height: 0;
-  }
+  .panel { display: flex; flex-direction: column; gap: 0.45rem; min-height: 0; }
 
   .panel-head {
     display: flex;
@@ -162,14 +272,14 @@
 
   textarea {
     flex: 1;
-    min-height: 320px;
+    min-height: 300px;
     background: var(--surface);
     color: var(--text);
     border: 1px solid var(--border);
     border-radius: var(--radius);
     padding: 1rem;
     font-family: var(--mono);
-    font-size: 0.85rem;
+    font-size: 0.88rem;
     line-height: 1.55;
     resize: vertical;
     outline: none;
@@ -183,29 +293,30 @@
 
   .actions {
     display: flex;
-    gap: 0.55rem;
+    gap: 0.5rem;
     flex-wrap: wrap;
     margin-top: 0.4rem;
   }
 
-  button {
+  button.btn {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.5rem 1rem;
-    font-size: 0.85rem;
+    padding: 0.55rem 1.1rem;
+    font-size: 0.87rem;
     font-weight: 600;
     border: none;
     border-radius: 7px;
     cursor: pointer;
-    transition: background 0.15s, transform 0.1s;
+    transition: background 0.15s, transform 0.1s, color 0.15s;
   }
 
-  button:active { transform: scale(0.97); }
-  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.btn:active { transform: scale(0.97); }
+  button.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .btn-primary { background: var(--accent); color: #fff; }
   .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-primary.copied { background: var(--good); }
   .btn-secondary {
     background: var(--surface);
     color: var(--text);
@@ -213,24 +324,7 @@
   }
   .btn-secondary:hover:not(:disabled) { background: var(--surface2); }
 
-  .summary-bar {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 1rem;
-    align-items: center;
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 0.6rem 1rem;
-    font-family: var(--mono);
-    font-size: 0.85rem;
-  }
-
-  .stat { display: flex; gap: 0.4rem; align-items: baseline; }
-  .stat-label { color: var(--text-dim); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.06em; }
-  .stat-value { color: var(--text); font-weight: 700; }
-  .stat-value.accent { color: var(--accent); }
-  .stat-value.good { color: var(--good); }
+  /* ── Toast ───────────────────────────────────────────────── */
 
   .toast {
     position: fixed;
@@ -245,7 +339,7 @@
     font-weight: 600;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.25s, transform 0.25s;
+    transition: opacity 0.2s, transform 0.2s;
     z-index: 100;
   }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -267,68 +361,95 @@
     font-family: var(--mono);
     font-size: 0.85em;
   }
-
-  .level-info {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 0.55rem 0.9rem;
-    font-size: 0.82rem;
-    color: var(--text-dim);
-    line-height: 1.5;
-  }
-  .level-info b { color: var(--text); }
 </style>
 </head>
 <body>
 
 <header>
   <h1><span>crumb</span> playground</h1>
-  <p>Paste a prompt. Pick a compression level. Copy the slim version.</p>
+  <p>Paste a prompt. Pick a tradeoff. Copy the slim version.</p>
 </header>
 
 <main>
-  <div class="controls">
-    <div class="control">
-      <label for="level">Level</label>
-      <input type="range" id="level" min="1" max="5" value="2" step="1">
-      <span class="level-pill" id="level-pill">L2</span>
+  <div class="presets" role="tablist" aria-label="Compression preset">
+    <button class="preset" data-level="1" role="tab">
+      <span class="name">Safe</span>
+      <span class="sub">dict only · lossless</span>
+    </button>
+    <button class="preset active" data-level="2" role="tab">
+      <span class="name">Tighter</span>
+      <span class="sub">drop filler · default</span>
+    </button>
+    <button class="preset" data-level="3" role="tab">
+      <span class="name">Aggressive</span>
+      <span class="sub">condense bullets</span>
+    </button>
+    <button class="preset" data-level="4" role="tab">
+      <span class="name">Skeleton</span>
+      <span class="sub">strip vowels · lossy</span>
+    </button>
+    <button class="preset" data-level="5" role="tab">
+      <span class="name">Adaptive</span>
+      <span class="sub">embedding-guarded</span>
+    </button>
+  </div>
+
+  <div class="strip">
+    <div class="strip-left">
+      <label for="example" style="color: var(--text-dim); font-size: 0.82rem;">Load example</label>
+      <select id="example" class="example-pick">
+        <option value="">— choose —</option>
+        <option value="bug">Bug report</option>
+        <option value="system">System prompt</option>
+        <option value="long">Long instructions</option>
+        <option value="crumb">.crumb handoff</option>
+      </select>
     </div>
-    <div class="control">
-      <label for="vml">Min word</label>
+    <div class="strip-right">
+      <button id="btn-advanced" class="linklike" aria-expanded="false">⚙ Advanced</button>
+      <span class="kbd" title="Keyboard shortcut">⌘/Ctrl + Enter copies</span>
+    </div>
+  </div>
+
+  <div id="advanced" class="advanced">
+    <div class="knob">
+      <label for="vml">Min word length</label>
       <input type="number" id="vml" min="3" max="12" value="4">
+      <span class="hint">L4/L5 only strip words at or above this length.</span>
     </div>
-    <div class="control" id="threshold-control" style="display:none">
-      <label for="threshold">Sim ≥</label>
+    <div class="knob">
+      <label for="threshold">Adaptive threshold</label>
       <input type="number" id="threshold" min="0" max="1" step="0.05" value="0.85">
+      <span class="hint">L5 keeps the strip only if cosine sim ≥ this.</span>
     </div>
-    <div class="control">
-      <label for="mode">Mode</label>
+    <div class="knob">
+      <label for="mode">Input mode</label>
       <select id="mode">
-        <option value="auto" selected>auto</option>
+        <option value="auto" selected>auto-detect</option>
         <option value="plain">plain text</option>
         <option value="crumb">.crumb</option>
       </select>
+      <span class="hint">Auto treats BEGIN CRUMB blocks as structured.</span>
     </div>
-    <div class="level-help" id="level-help"></div>
   </div>
 
-  <div class="level-info" id="level-info"></div>
+  <div class="hero empty" id="hero">
+    <span class="hero-value" id="hero-value">—</span>
+    <span class="hero-label">tokens saved</span>
+    <span class="hero-sub" id="hero-sub"></span>
+  </div>
 
   <div class="panels">
     <div class="panel">
       <div class="panel-head">
-        <span>Input</span>
+        <span>Your prompt</span>
         <span class="panel-stats" id="input-stats">0 chars · ~0 tokens</span>
       </div>
-      <textarea id="input" placeholder="Paste your prompt, instructions, system message, or .crumb here.
+      <textarea id="input" placeholder="Paste your prompt, system message, instructions, or .crumb here.
 
-Example:
-  Please make sure to fix the authentication middleware in the application
-  configuration. The implementation should not change the existing user
-  interface, and we need to add a regression test before merging.
+Compression runs as you type. Pick a preset above to trade off compression vs fidelity — hover any preset for detail.
 
-Compression runs as you type."></textarea>
+Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea>
     </div>
     <div class="panel">
       <div class="panel-head">
@@ -337,22 +458,14 @@ Compression runs as you type."></textarea>
       </div>
       <textarea id="output" readonly placeholder="Compressed output appears here…"></textarea>
       <div class="actions">
-        <button class="btn-primary" id="btn-copy">
+        <button class="btn btn-primary" id="btn-copy">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          Copy compressed
+          <span id="btn-copy-text">Copy compressed</span>
         </button>
-        <button class="btn-secondary" id="btn-swap">↔ Swap into input</button>
-        <button class="btn-secondary" id="btn-clear">Clear</button>
+        <button class="btn btn-secondary" id="btn-reuse">Use as input</button>
+        <button class="btn btn-secondary" id="btn-clear">Clear</button>
       </div>
     </div>
-  </div>
-
-  <div class="summary-bar" id="summary" style="display:none">
-    <div class="stat"><span class="stat-label">Tokens</span><span class="stat-value" id="sum-tokens">—</span></div>
-    <div class="stat"><span class="stat-label">Saved</span><span class="stat-value good" id="sum-saved">—</span></div>
-    <div class="stat"><span class="stat-label">Ratio</span><span class="stat-value accent" id="sum-ratio">—</span></div>
-    <div class="stat"><span class="stat-label">Vowels kept</span><span class="stat-value" id="sum-vowels">—</span></div>
-    <div class="stat"><span class="stat-label">Mode</span><span class="stat-value" id="sum-mode">—</span></div>
   </div>
 </main>
 
@@ -367,26 +480,97 @@ Compression runs as you type."></textarea>
 (function () {
   "use strict";
 
-  var LEVEL_DESCRIPTIONS = {
-    1: "<b>L1 · dictionary</b> — lossless tech-term abbreviation. Round-trippable.",
-    2: "<b>L2 · grammar strip</b> — L1 + drop articles, filler, contractions, verbose phrases.",
-    3: "<b>L3 · aggressive</b> — L2 + condense bullets, collapse blank lines.",
-    4: "<b>L4 · skeleton</b> — L3 + interior vowel removal (`btfl dy`). Lossy.",
-    5: "<b>L5 · adaptive</b> — L4 with per-line embedding-drift guard. Needs the [embeddings] extra on the server."
+  var STORAGE_KEY = "crumb_playground_v1";
+
+  var EXAMPLES = {
+    bug: "Please help me fix a bug in the authentication middleware. The application is not properly validating the JSON Web Token when users refresh the page. The implementation should preserve the existing cookie names and we definitely need to add a regression test before merging.",
+    system: "You are a helpful assistant. Please make sure to respond in a concise and direct manner. Do not use unnecessary filler words. When referencing code, just use the function name. It is important to note that you should always be honest about uncertainty.",
+    long: "In order to complete this task, you will need to review the authentication implementation, understand the configuration, and then write comprehensive documentation. You should start by reading the existing specification. After that, please examine the infrastructure. Finally, you need to document all the integration points. Make sure to include information about the dependencies, the environment variables, and the deployment requirements.",
+    crumb: "BEGIN CRUMB\nv=1.1\nkind=task\ntitle=Fix login redirect bug\nsource=cursor.agent\nproject=web-app\n---\n[goal]\nFix the bug where authenticated users are redirected back to /login after refresh.\n\n[context]\n- App uses JWT cookie auth\n- Redirect loop happens only on full page refresh\n- Middleware reads auth state before cookie parsing is complete\n\n[constraints]\n- Do not change the login UI\n- Preserve existing cookie names\n- Add a regression check before merging\nEND CRUMB"
   };
 
   var $ = function (id) { return document.getElementById(id); };
   var input = $("input");
   var output = $("output");
-  var level = $("level");
-  var pill = $("level-pill");
-  var help = $("level-help");
-  var info = $("level-info");
-  var vml = $("vml");
-  var threshold = $("threshold");
-  var thresholdCtl = $("threshold-control");
-  var mode = $("mode");
-  var summary = $("summary");
+  var hero = $("hero");
+  var heroValue = $("hero-value");
+  var heroSub = $("hero-sub");
+
+  // ── State persistence ───────────────────────────────────────
+
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
+    catch (e) { return {}; }
+  }
+  function saveState(patch) {
+    var s = loadState();
+    Object.keys(patch).forEach(function (k) { s[k] = patch[k]; });
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch (e) {}
+  }
+
+  var state = loadState();
+  var currentLevel = state.level || 2;
+  var advancedOpen = !!state.advanced;
+
+  // ── Preset tabs ─────────────────────────────────────────────
+
+  function setLevel(lv) {
+    currentLevel = lv;
+    document.querySelectorAll(".preset").forEach(function (el) {
+      el.classList.toggle("active", parseInt(el.dataset.level, 10) === lv);
+    });
+    saveState({ level: lv });
+    scheduleCompress();
+  }
+
+  document.querySelectorAll(".preset").forEach(function (el) {
+    el.addEventListener("click", function () {
+      setLevel(parseInt(el.dataset.level, 10));
+    });
+  });
+
+  // Initialise tab from stored preference
+  if (currentLevel !== 2) setLevel(currentLevel);
+
+  // ── Advanced toggle ─────────────────────────────────────────
+
+  var advanced = $("advanced");
+  var advBtn = $("btn-advanced");
+
+  function setAdvanced(open) {
+    advancedOpen = open;
+    advanced.classList.toggle("open", open);
+    advBtn.setAttribute("aria-expanded", String(open));
+    advBtn.textContent = open ? "⚙ Hide advanced" : "⚙ Advanced";
+    saveState({ advanced: open });
+  }
+  advBtn.addEventListener("click", function () { setAdvanced(!advancedOpen); });
+  setAdvanced(advancedOpen);
+
+  // Restore advanced values from storage, if any
+  if (state.vml) $("vml").value = state.vml;
+  if (state.threshold) $("threshold").value = state.threshold;
+  if (state.mode) $("mode").value = state.mode;
+
+  ["vml", "threshold", "mode"].forEach(function (id) {
+    $(id).addEventListener("change", function () {
+      var patch = {}; patch[id] = $(id).value; saveState(patch);
+      scheduleCompress();
+    });
+  });
+
+  // ── Examples ────────────────────────────────────────────────
+
+  $("example").addEventListener("change", function () {
+    var key = this.value;
+    if (!key || !EXAMPLES[key]) return;
+    input.value = EXAMPLES[key];
+    updateInputStats();
+    scheduleCompress();
+    this.value = "";
+  });
+
+  // ── Toast ───────────────────────────────────────────────────
 
   function showToast(msg) {
     var t = $("toast");
@@ -395,17 +579,9 @@ Compression runs as you type."></textarea>
     setTimeout(function () { t.classList.remove("show"); }, 1800);
   }
 
-  function estimateTokens(text) {
-    return Math.max(1, Math.floor(text.length / 4));
-  }
+  // ── Stats & compression ─────────────────────────────────────
 
-  function updateLevelUI() {
-    var lv = parseInt(level.value, 10);
-    pill.textContent = "L" + lv;
-    info.innerHTML = LEVEL_DESCRIPTIONS[lv];
-    thresholdCtl.style.display = (lv === 5) ? "" : "none";
-    help.textContent = "";
-  }
+  function estimateTokens(text) { return Math.max(1, Math.floor(text.length / 4)); }
 
   function updateInputStats() {
     var t = input.value;
@@ -413,22 +589,21 @@ Compression runs as you type."></textarea>
       t.length + " chars · ~" + estimateTokens(t) + " tokens";
   }
 
-  function setSummary(stats) {
+  function setHero(stats) {
     if (!stats) {
-      summary.style.display = "none";
+      hero.classList.add("empty");
+      heroValue.textContent = "—";
+      heroSub.textContent = "";
       $("output-stats").textContent = "—";
       return;
     }
-    summary.style.display = "";
-    $("sum-tokens").textContent =
-      stats.original_tokens + " → " + stats.encoded_tokens;
-    $("sum-saved").textContent = stats.pct_saved + "%";
-    $("sum-ratio").textContent = stats.ratio + "×";
-    $("sum-vowels").textContent = (stats.vowel_retention_pct || 100) + "%";
-    $("sum-mode").textContent = "L" + stats.level + " / " + stats.mode;
+    hero.classList.remove("empty");
+    heroValue.textContent = stats.pct_saved + "%";
+    heroSub.textContent =
+      stats.original_tokens + "→" + stats.encoded_tokens + " tokens · " +
+      stats.ratio + "× · L" + stats.level + " " + stats.mode;
     $("output-stats").textContent =
-      stats.encoded_chars + " chars · ~" + stats.encoded_tokens + " tokens · " +
-      stats.pct_saved + "% saved";
+      stats.encoded_chars + " chars · ~" + stats.encoded_tokens + " tokens";
   }
 
   var inflight = null;
@@ -438,19 +613,16 @@ Compression runs as you type."></textarea>
     var text = input.value;
     if (!text.trim()) {
       output.value = "";
-      setSummary(null);
+      setHero(null);
       return;
     }
-    if (inflight) {
-      pending = true;
-      return;
-    }
+    if (inflight) { pending = true; return; }
     var payload = {
       text: text,
-      level: parseInt(level.value, 10),
-      vowel_min_length: parseInt(vml.value, 10) || 4,
-      adaptive_threshold: parseFloat(threshold.value) || 0.85,
-      mode: mode.value
+      level: currentLevel,
+      vowel_min_length: parseInt($("vml").value, 10) || 4,
+      adaptive_threshold: parseFloat($("threshold").value) || 0.85,
+      mode: $("mode").value
     };
     inflight = fetch("/metalk/compress", {
       method: "POST",
@@ -462,55 +634,61 @@ Compression runs as you type."></textarea>
       inflight = null;
       if (!res.ok) {
         output.value = "Error: " + (res.body.error || "unknown");
-        setSummary(null);
+        setHero(null);
         return;
       }
       output.value = res.body.encoded;
-      setSummary(res.body.stats);
+      setHero(res.body.stats);
     }).catch(function (err) {
       inflight = null;
       output.value = "Error: " + err.message +
         "\n\nIs the server running? Try: crumb playground";
-      setSummary(null);
+      setHero(null);
     }).finally(function () {
-      if (pending) {
-        pending = false;
-        compress();
-      }
+      if (pending) { pending = false; compress(); }
     });
   }
 
-  // Debounced live compression
   var debounceTimer = null;
   function scheduleCompress() {
     clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(compress, 250);
+    debounceTimer = setTimeout(compress, 220);
   }
 
   input.addEventListener("input", function () {
     updateInputStats();
     scheduleCompress();
   });
-  level.addEventListener("input", function () {
-    updateLevelUI();
-    scheduleCompress();
-  });
-  vml.addEventListener("change", scheduleCompress);
-  threshold.addEventListener("change", scheduleCompress);
-  mode.addEventListener("change", scheduleCompress);
 
-  $("btn-copy").addEventListener("click", function () {
+  // ── Copy button with transient "Copied" state ───────────────
+
+  var copyBtn = $("btn-copy");
+  var copyText = $("btn-copy-text");
+  var copyResetTimer = null;
+
+  function doCopy() {
     if (!output.value) { showToast("Nothing to copy"); return; }
-    navigator.clipboard.writeText(output.value).then(function () {
-      showToast("Copied to clipboard");
-    }, function () {
-      output.select();
-      document.execCommand("copy");
-      showToast("Copied to clipboard");
-    });
-  });
+    var done = function () {
+      copyBtn.classList.add("copied");
+      copyText.textContent = "✓ Copied!";
+      clearTimeout(copyResetTimer);
+      copyResetTimer = setTimeout(function () {
+        copyBtn.classList.remove("copied");
+        copyText.textContent = "Copy compressed";
+      }, 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(output.value).then(done, function () {
+        output.select(); document.execCommand("copy"); done();
+      });
+    } else {
+      output.select(); document.execCommand("copy"); done();
+    }
+  }
 
-  $("btn-swap").addEventListener("click", function () {
+  copyBtn.addEventListener("click", doCopy);
+
+  $("btn-reuse").addEventListener("click", function () {
     if (!output.value) return;
     input.value = output.value;
     updateInputStats();
@@ -521,11 +699,32 @@ Compression runs as you type."></textarea>
     input.value = "";
     output.value = "";
     updateInputStats();
-    setSummary(null);
+    setHero(null);
+    input.focus();
   });
 
-  // Initialise
-  updateLevelUI();
+  // ── Keyboard shortcuts ──────────────────────────────────────
+
+  document.addEventListener("keydown", function (e) {
+    var mod = e.metaKey || e.ctrlKey;
+    if (!mod) return;
+    if (e.key === "Enter") { e.preventDefault(); doCopy(); }
+    else if (e.key === "k" || e.key === "K") {
+      e.preventDefault();
+      input.value = "";
+      output.value = "";
+      updateInputStats();
+      setHero(null);
+      input.focus();
+    }
+    else if (e.key >= "1" && e.key <= "5") {
+      e.preventDefault();
+      setLevel(parseInt(e.key, 10));
+    }
+  });
+
+  // ── Init ────────────────────────────────────────────────────
+
   updateInputStats();
 })();
 </script>
