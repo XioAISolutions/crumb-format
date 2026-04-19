@@ -76,6 +76,20 @@ Five kinds: `task` (what to do next), `mem` (long-term memory), `map` (repo over
 | Token-efficient           | No             | Yes (lossy) | Yes        |
 | Human-readable            | Barely         | N/A         | Yes        |
 
+## Pick your entry point — no install required
+
+CRUMB is plain text, so you don't have to install anything to use it. Pick whichever surface matches where you already are:
+
+| You are...                                | Use this                                                                    | What you get                                                    |
+| ----------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Already in a chat (ChatGPT/Claude/Gemini) | Add the `crumb it` instruction below to your system prompt                  | The AI emits a valid `.crumb` on demand — zero tooling          |
+| Pasting a raw chat you saved somewhere    | Open [`web/index.html`](web/index.html) in a browser                        | Paste → get a spec-valid `v=1.2` crumb, copy or download        |
+| On a supported AI chat page in Chrome     | Load [`browser-extension/`](browser-extension/) as an unpacked extension    | One-click **Copy as CRUMB** button on ChatGPT, Claude, Gemini   |
+| Writing `.crumb` files by hand            | Install the [`vscode-extension/`](vscode-extension/)                        | Syntax highlighting + snippets for every kind                   |
+| Running the CLI / wiring into repos       | `pip install crumb-format` (see [Install](#install))                        | 41 commands: Palace, Reflect, MeTalk, validators, MCP, REST, A2A |
+
+All four paths emit the same `v=1.2` wire format — swap between them without re-learning anything. The web generator and browser extension are both pure-JS with no build step; the browser extension uses the current repo copy verbatim.
+
 ## v1.2 — handoffs that know about each other
 
 v0.4.0 bumps the format to `v=1.2`. Four additions, all optional, all purely additive. v1.1 parsers accept v1.2 files unchanged.

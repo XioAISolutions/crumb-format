@@ -1,31 +1,22 @@
---- task: CRUMB 0.4.0 — v1.2 wire format (standalone cannibalization)
+--- task: fix(web,ext): zero-install surfaces emit spec-valid v=1.2 CRUMB
 source: github.pr
-pr: #12
-generated: 2026-04-15T15:45:27Z
+pr: #14
+generated: 2026-04-19T04:10:13Z
 ---
 
 [goal]
-# CRUMB 0.4.0 — v1.2 wire format, standalone
+## Why
 
 [context]
 Changed files in this PR:
-- .crumb/latest.crumb
 - CHANGELOG.md
-- CODEX_HANDOFF_0.4.0.crumb
 - README.md
-- RELEASE_NOTES_0.4.0_DRAFT.md
-- SPEC.md
-- cli/crumb.py
-- docs/v1.2-fold-heuristic.md
-- docs/v1.2-ref-resolution.md
-- examples/v12-fold.crumb
-- examples/v12-handoff.crumb
-- examples/v12-refs.crumb
-- examples/v12-typed-content.crumb
-- pyproject.toml
-- tests/test_crumb.py
-- validators/validate.js
-- validators/validate.py
+- browser-extension/README.md
+- browser-extension/content.js
+- browser-extension/manifest.json
+- scripts/run_web_generator.js
+- tests/test_web_generator.py
+- web/index.html
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CRUMB — AI Handoff Format",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Injects a one-click Copy as CRUMB handoff button into major AI chat interfaces",
   "permissions": ["contextMenus", "clipboardWrite", "activeTab"],
   "host_permissions": [

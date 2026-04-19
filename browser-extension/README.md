@@ -19,7 +19,7 @@ The extension now supports two capture paths.
 1. Open a supported chat in ChatGPT, Claude, or Gemini.
 2. Click the floating **Copy as CRUMB** button.
 3. The extension scrapes the most recent visible user and assistant exchanges.
-4. A `kind=log` CRUMB v1.1 block is generated locally and copied to your clipboard.
+4. A `kind=log` CRUMB v1.2 block is generated locally and copied to your clipboard.
 5. Paste it into your next AI session, a document, or a ticket.
 
 ### Selection-based capture
@@ -45,6 +45,7 @@ For selection-based capture, it extracts:
 - **Goal** — inferred from the first meaningful sentence
 - **Context** — the most relevant lines from the selected excerpt
 - **Constraints** — phrases such as "must not", "cannot", and "avoid"
+- **Handoff** — `[handoff]` bullets (v1.2) inferred from TODO / should / need-to / implement / add phrases, so the next AI has an explicit action list
 
 ## Permissions
 
