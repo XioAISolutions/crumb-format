@@ -1,7 +1,7 @@
 --- task: metalk: add vowel-strip L4/L5 with embedding-drift harness
 source: github.pr
 pr: #15
-generated: 2026-04-19T17:12:42Z
+generated: 2026-04-19T20:23:24Z
 ---
 
 [goal]
