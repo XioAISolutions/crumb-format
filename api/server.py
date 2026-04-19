@@ -22,6 +22,12 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from cli.crumb import parse_crumb, render_crumb  # noqa: E402
+from cli.metalk import encode as metalk_encode, compression_stats as metalk_stats  # noqa: E402
+from cli.vowelstrip import (  # noqa: E402
+    drift_stats as vs_drift_stats,
+    encode_crumb as vs_encode_crumb,
+    strip_text as vs_strip_text,
+)
 from agentauth.store import PassportStore  # noqa: E402
 from agentauth.passport import AgentPassport  # noqa: E402
 from agentauth.policy import ToolPolicy  # noqa: E402
@@ -99,6 +105,86 @@ def crumb_render(_req, _match, _qs, body):
         return 200, {"text": text}
     except Exception as exc:
         return 400, {"error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# MeTalk / vowel-strip compression endpoint (powers the playground)
+# ---------------------------------------------------------------------------
+
+@route("POST", "/metalk/compress")
+def metalk_compress(_req, _match, _qs, body):
+    """Compress arbitrary text or a CRUMB through MeTalk levels 1-5.
+
+    Body:
+      text                 (str, required) — input text
+      level                (int 1-5, default 2) — MeTalk level
+      vowel_min_length     (int, default 4)   — L4-5 word length floor
+      adaptive_threshold   (float, default 0.85) — L5 sim floor
+      mode                 (str, default "auto") — "auto" | "crumb" | "plain"
+                            auto = detect by BEGIN CRUMB sentinel
+    """
+    text = body.get("text", "")
+    if not text:
+        return 400, {"error": "missing 'text' field"}
+    try:
+        level = int(body.get("level", 2))
+    except (TypeError, ValueError):
+        return 400, {"error": "'level' must be an integer 1-5"}
+    if level not in (1, 2, 3, 4, 5):
+        return 400, {"error": "'level' must be 1, 2, 3, 4, or 5"}
+
+    vml = int(body.get("vowel_min_length", 4) or 4)
+    threshold = float(body.get("adaptive_threshold", 0.85) or 0.85)
+    mode = body.get("mode", "auto")
+
+    is_crumb = (
+        mode == "crumb"
+        or (mode == "auto" and text.lstrip().startswith(("BEGIN CRUMB", "BC")))
+    )
+
+    try:
+        if is_crumb:
+            encoded = metalk_encode(
+                text, level=level,
+                vowel_min_length=vml, adaptive_threshold=threshold,
+            )
+        elif level >= 4:
+            # plain prose: skip the CRUMB-aware encoder, just vowel-strip
+            encoded = vs_strip_text(text, min_length=vml)
+        else:
+            # plain prose at L1-3: MeTalk's body transforms still help via
+            # encode_crumb's transform hook — but for true plain text we just
+            # apply the dictionary/grammar passes inline. Wrap as a synthetic
+            # crumb so the existing encoder works, then strip the wrapper.
+            wrapped = (
+                "BEGIN CRUMB\nv=1.1\nkind=mem\ntitle=playground\n---\n"
+                "[consolidated]\n" + text + "\nEND CRUMB\n"
+            )
+            mt = metalk_encode(wrapped, level=level)
+            # Pull just the body content back out
+            try:
+                _, after = mt.split("---\n", 1)
+                body_lines = after.rstrip().split("\n")
+                # drop section header line and trailing EC sentinel
+                cleaned = [
+                    ln for ln in body_lines
+                    if ln.strip() not in {"EC", "END CRUMB"}
+                    and not (ln.strip().startswith("[") and ln.strip().endswith("]"))
+                ]
+                encoded = "\n".join(cleaned).strip() + "\n"
+            except ValueError:
+                encoded = mt
+    except Exception as exc:
+        traceback.print_exc()
+        return 500, {"error": f"compression failed: {exc}"}
+
+    stats = metalk_stats(text, encoded)
+    drift = vs_drift_stats(text, encoded)
+    stats["vowels_removed"] = drift["vowels_removed"]
+    stats["vowel_retention_pct"] = drift["vowel_retention_pct"]
+    stats["level"] = level
+    stats["mode"] = "crumb" if is_crumb else "plain"
+    return 200, {"encoded": encoded, "stats": stats}
 
 
 # ---------------------------------------------------------------------------
@@ -298,6 +384,46 @@ def health(_req, _match, _qs, _body):
 
 
 # ---------------------------------------------------------------------------
+# Static file serving (web/ directory) — powers the playground UI
+# ---------------------------------------------------------------------------
+
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+_STATIC_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+    ".json": "application/json",
+}
+
+
+def _serve_static(handler, rel_path: str) -> bool:
+    """Serve a file from web/ if it exists. Returns True if handled."""
+    if not rel_path or rel_path == "/":
+        rel_path = "playground.html"
+    rel_path = rel_path.lstrip("/")
+    # Prevent directory traversal
+    safe = (WEB_DIR / rel_path).resolve()
+    try:
+        safe.relative_to(WEB_DIR.resolve())
+    except ValueError:
+        return False
+    if not safe.is_file():
+        return False
+    data = safe.read_bytes()
+    ctype = _STATIC_TYPES.get(safe.suffix.lower(), "application/octet-stream")
+    handler.send_response(200)
+    handler._add_cors_headers()
+    handler.send_header("Content-Type", ctype)
+    handler.send_header("Content-Length", str(len(data)))
+    handler.end_headers()
+    handler.wfile.write(data)
+    return True
+
+
+# ---------------------------------------------------------------------------
 # HTTP Request Handler
 # ---------------------------------------------------------------------------
 
@@ -360,6 +486,12 @@ class CrumbAPIHandler(BaseHTTPRequestHandler):
                 self._send_json(status_code, data)
                 return
 
+        # Fall through to static file serving for GETs (powers /playground.html
+        # and any sibling assets dropped under web/).
+        if method == "GET":
+            if _serve_static(self, path):
+                return
+
         self._send_json(404, {"error": f"not found: {method} {path}"})
 
     def _send_json(self, status_code: int, data):
@@ -380,6 +512,8 @@ ENDPOINT_LIST = [
     ("POST", "/crumb/validate", "Validate a crumb document"),
     ("POST", "/crumb/parse", "Parse crumb text to JSON"),
     ("POST", "/crumb/render", "Render JSON to crumb text"),
+    ("POST", "/metalk/compress", "Compress text via MeTalk levels 1-5"),
+    ("GET",  "/playground.html", "Browser-based prompt compression UI"),
     ("POST", "/passport/register", "Register a new agent passport"),
     ("GET",  "/passport/:id", "Inspect a passport"),
     ("GET",  "/passport/:id/verify", "Verify passport validity"),

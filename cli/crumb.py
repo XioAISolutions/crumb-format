@@ -2816,6 +2816,40 @@ def _copy_to_clipboard(text: str) -> bool:
     return False
 
 
+def cmd_playground(args: argparse.Namespace) -> None:
+    """Launch the local playground: REST API + browser-based compression UI."""
+    import threading
+    import time
+    import webbrowser
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from api.server import CrumbAPIHandler, print_banner
+    from http.server import HTTPServer
+
+    port = args.port
+    url = f"http://127.0.0.1:{port}/playground.html"
+
+    server = HTTPServer(("127.0.0.1", port), CrumbAPIHandler)
+    print_banner(port)
+    print(f"Playground UI: {url}\n", file=sys.stderr)
+
+    if not args.no_browser:
+        # Open browser shortly after server starts accepting connections.
+        def _open():
+            time.sleep(0.4)
+            try:
+                webbrowser.open(url)
+            except Exception:
+                pass
+        threading.Thread(target=_open, daemon=True).start()
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nShutting down playground.", file=sys.stderr)
+        server.server_close()
+
+
 def cmd_handoff(args: argparse.Namespace) -> None:
     """Copy a .crumb file to clipboard for pasting into an AI tool."""
     filepath = args.file
@@ -5127,6 +5161,16 @@ def build_parser() -> argparse.ArgumentParser:
     share_cmd = sub.add_parser('share', help='Share a .crumb file via GitHub Gist or data URI.')
     share_cmd.add_argument('file', help='.crumb file to share.')
     share_cmd.set_defaults(func=cmd_share)
+
+    # playground
+    pg_cmd = sub.add_parser('playground',
+                            help='Launch the browser-based prompt-compression UI '
+                                 '(MeTalk L1-5 + vowel-strip).')
+    pg_cmd.add_argument('--port', type=int, default=8420,
+                        help='Port to bind (default: 8420).')
+    pg_cmd.add_argument('--no-browser', action='store_true',
+                        help='Do not auto-open the system browser.')
+    pg_cmd.set_defaults(func=cmd_playground)
 
     # handoff
     handoff_cmd = sub.add_parser('handoff', help='Copy a .crumb to clipboard for pasting into an AI tool.')

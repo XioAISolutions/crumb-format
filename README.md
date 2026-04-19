@@ -274,6 +274,21 @@ crumb vowelstrip task.crumb --min-length 5       # only strip 5+ char words
 crumb vowelstrip task.crumb --adaptive           # embedding-aware
 ```
 
+### Playground — chat-box style prompt compressor
+
+Don't want to memorize flags? Run
+
+```bash
+crumb playground
+```
+
+which boots a local REST server and opens a browser-based chat-box UI:
+paste a prompt or `.crumb` on the left, slide between L1-L5, watch the
+compressed version (and savings) update live on the right, copy with one
+click. The same backend exposes `POST /metalk/compress` for programmatic
+use. Defaults to `http://127.0.0.1:8420/playground.html`; pass `--port`
+or `--no-browser` to override.
+
 ## Cross-AI Interop
 
 CRUMB speaks every major AI protocol so your context travels freely between tools.

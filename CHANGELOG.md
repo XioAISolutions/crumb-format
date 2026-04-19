@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Playground — chat-box style prompt compressor
+
+- **`crumb playground`** subcommand boots the existing stdlib API server and opens a browser-based UI (`web/playground.html`) for live MeTalk L1-L5 compression. Paste a prompt or `.crumb` on the left, slide the level, copy the result. Auto-detects whether input is a CRUMB or plain prose.
+- **`POST /metalk/compress`** endpoint added to `api/server.py` for programmatic use. Accepts `{text, level, vowel_min_length, adaptive_threshold, mode}`, returns `{encoded, stats}` with token counts, savings %, ratio, vowel retention, and detected mode.
+- **Static file serving** added to `api/server.py` for the `web/` directory (with directory-traversal protection). `GET /` serves the playground.
+
 ### MeTalk vowel-strip (Layers 4 & 5)
 
 - **Layer 4 — skeleton**: rule-based interior vowel removal added on top of the existing L1-L3 dictionary/grammar/condense pipeline (`cli/vowelstrip.py`). Skips section headers, header values, fenced code, v1.2 `@type: code/*` blocks, URLs, snake_case identifiers, file paths, contractions, all-caps acronyms, and a small `PROTECTED_WORDS` allowlist of confusable consonant skeletons.
