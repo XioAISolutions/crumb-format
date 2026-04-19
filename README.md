@@ -248,11 +248,31 @@ crumb metalk task.crumb --level 1
 # Aggressive condensing (~50-60% savings)
 crumb metalk task.crumb --level 3
 
+# Skeleton — interior vowel-strip on top of L3
+crumb metalk task.crumb --level 4
+
+# Adaptive — vowel-strip with embedding drift guard (needs [embeddings] extra)
+pip install crumb-format[embeddings]
+crumb metalk task.crumb --level 5 --adaptive-threshold 0.85
+
 # Chain with compress for maximum density
 crumb compress task.crumb --metalk
 ```
 
 Output shows live stats: `MeTalk: 127 → 68 tokens (46.5% saved, 1.87x ratio)`.
+
+Levels 4 and 5 add interior vowel-stripping (`btfl dy` ≈ "beautiful day").
+L4 is rule-based; L5 measures per-line embedding cosine drift and only
+keeps the strip if the line stays above a similarity threshold. See
+[`docs/vowel-drift.md`](docs/vowel-drift.md) for methodology and
+[`docs/vowel-drift-benchmark.md`](docs/vowel-drift-benchmark.md) for the
+bundled numbers. Standalone use:
+
+```bash
+crumb vowelstrip notes.txt --plain               # plain prose
+crumb vowelstrip task.crumb --min-length 5       # only strip 5+ char words
+crumb vowelstrip task.crumb --adaptive           # embedding-aware
+```
 
 ## Cross-AI Interop
 

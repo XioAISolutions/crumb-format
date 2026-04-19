@@ -1,9 +1,12 @@
 """MeTalk — caveman-style token compression for CRUMB.
 
-Two layers:
-  Layer 1 (lossless): dictionary word→abbreviation swaps
-  Layer 2 (lossy):    strip articles/filler, rewrite verbose phrases
-  Layer 3 (aggressive): all of above + sentence condensing
+Layers:
+  Layer 1 (lossless):    dictionary word→abbreviation swaps
+  Layer 2 (lossy):       strip articles/filler, rewrite verbose phrases
+  Layer 3 (aggressive):  + sentence condensing
+  Layer 4 (skeleton):    + interior vowel stripping (cli/vowelstrip)
+  Layer 5 (adaptive):    + embedding-aware vowel stripping (requires
+                         the [embeddings] extra; falls back to L4)
 
 Usage:
     from cli.metalk import encode, decode, compression_stats
@@ -261,12 +264,22 @@ def _condense_aggressive(text: str) -> str:
     return text
 
 
-def encode(text: str, level: int = 2) -> str:
+def encode(text: str, level: int = 2, *,
+           vowel_min_length: int = 4,
+           adaptive_threshold: float = 0.85) -> str:
     """Compress crumb text using MeTalk.
 
     Args:
         text: Full crumb text (BEGIN CRUMB ... END CRUMB)
-        level: 1=dict only (lossless), 2=dict+grammar (lossy), 3=aggressive
+        level: 1=dict only (lossless), 2=dict+grammar (lossy),
+               3=aggressive, 4=skeleton (vowel-strip),
+               5=adaptive (embedding-aware vowel-strip; needs the
+               [embeddings] extra, falls back to 4 if unavailable).
+        vowel_min_length: Min word length eligible for vowel stripping
+                          at levels 4-5. Default 4.
+        adaptive_threshold: Cosine similarity floor for level 5 — a
+                            line keeps its stripped form only if drift
+                            stays under this. Default 0.85.
 
     Returns:
         MeTalk-encoded crumb text with mt=N header injected.
@@ -342,15 +355,30 @@ def encode(text: str, level: int = 2) -> str:
     result_lines.extend(body_lines)
     result_lines.append(lines[-1])  # EC
 
-    return '\n'.join(result_lines) + '\n'
+    assembled = '\n'.join(result_lines) + '\n'
+
+    # Layers 4 and 5: vowel-strip pass over the body. Done last so that
+    # dictionary substitutions (Layer 1) have already canonicalized the
+    # most ambiguous tech terms before vowels are removed.
+    if level >= 4:
+        from cli.vowelstrip import encode_crumb as _vs_encode, adaptive_strip_text, strip_line
+        if level >= 5:
+            transform = lambda line: adaptive_strip_text(
+                line, threshold=adaptive_threshold, min_length=vowel_min_length
+            )
+        else:
+            transform = lambda line: strip_line(line, vowel_min_length)
+        assembled = _vs_encode(assembled, min_length=vowel_min_length, transform=transform)
+
+    return assembled
 
 
 def decode(text: str) -> str:
     """Decode MeTalk-encoded crumb. Reverses Layer 1 (dictionary) only.
 
-    Layer 2/3 changes are lossy and cannot be fully reversed.
-    Note: words that were already abbreviated in the original will be
-    expanded. This is expected — decode is best-effort for Level 1.
+    Layers 2-5 are lossy and cannot be fully reversed. Vowel-stripped
+    words from L4/L5 pass through unchanged (their consonant skeletons
+    don't match the dictionary). The `vs=` header is stripped on decode.
     """
     lines = text.strip().split('\n')
 
@@ -389,8 +417,8 @@ def decode(text: str) -> str:
     for i in range(1, sep_idx):
         line = lines[i]
         stripped = line.strip()
-        # Skip mt= header (remove it)
-        if stripped.startswith('mt='):
+        # Skip mt= and vs= MeTalk-internal headers (remove them)
+        if stripped.startswith('mt=') or stripped.startswith('vs='):
             continue
         if '=' in line:
             key, _, val = line.partition('=')

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### MeTalk vowel-strip (Layers 4 & 5)
+
+- **Layer 4 — skeleton**: rule-based interior vowel removal added on top of the existing L1-L3 dictionary/grammar/condense pipeline (`cli/vowelstrip.py`). Skips section headers, header values, fenced code, v1.2 `@type: code/*` blocks, URLs, snake_case identifiers, file paths, contractions, all-caps acronyms, and a small `PROTECTED_WORDS` allowlist of confusable consonant skeletons.
+- **Layer 5 — adaptive**: same strip, but per-line drift is measured against a sentence-transformers embedding and the strip is kept only if cosine similarity stays above `--adaptive-threshold` (default 0.85). Requires the optional `[embeddings]` extra; falls back to L4 with a warning when not installed.
+- **`crumb vowelstrip` subcommand**: standalone use against any `.crumb` or plain text file, with `--min-length`, `--adaptive`, `--threshold`, `--plain` flags.
+- **`crumb metalk --level 4` / `--level 5`** plus `--vowel-min-length` and `--adaptive-threshold` flags. The `compress`, `context`, and `wake` commands accept the new levels too.
+- **Drift measurement harness**: `scripts/measure_drift.py` ranks each MeTalk level against an `examples/` corpus using either char-4-gram lexical similarity (default, no deps) or `sentence-transformers` semantic similarity. `--md` emits a markdown report.
+- **Docs**: `docs/vowel-drift.md` methodology + tuning, `docs/vowel-drift-benchmark.md` bundled ngram benchmark across the 17 example crumbs.
+- **Wire format**: encoded crumbs carry a new `vs=N` header recording the min-length threshold; `decode()` strips both `mt=` and `vs=` headers.
+- **Optional dependency**: `pip install crumb-format[embeddings]` installs `sentence-transformers` for L5 and the semantic drift backend.
+
 ## v0.4.0
 
 First release to bump the wire format itself from `v=1.1` to `v=1.2`. All four additions are optional, purely additive, and a v1.1 parser accepts a v1.2 file by ignoring unknown headers and sections (per `SPEC.md §8`).

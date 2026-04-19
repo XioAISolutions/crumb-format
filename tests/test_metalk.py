@@ -107,11 +107,19 @@ class TestCompressionLevels:
         s3 = compression_stats(crumb, r3)
         assert s3["pct_saved"] >= s2["pct_saved"]
 
+    def test_level4_saves_more_than_level3(self):
+        crumb = open(EXAMPLES_DIR / "task-content-repurpose-handoff.crumb").read()
+        r3 = encode(crumb, level=3)
+        r4 = encode(crumb, level=4)
+        s3 = compression_stats(crumb, r3)
+        s4 = compression_stats(crumb, r4)
+        assert s4["encoded_chars"] <= s3["encoded_chars"]
+
 
 class TestMetalkHeader:
     def test_mt_header_injected(self):
         crumb = "BEGIN CRUMB\nv=1.1\nkind=task\ntitle=T\n---\n[goal]\n  X\nEND CRUMB\n"
-        for level in [1, 2, 3]:
+        for level in [1, 2, 3, 4, 5]:
             result = encode(crumb, level=level)
             assert f"mt={level}" in result
 

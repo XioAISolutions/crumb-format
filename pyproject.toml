@@ -20,6 +20,11 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 
+[project.optional-dependencies]
+embeddings = [
+    "sentence-transformers>=2.2",
+]
+
 [project.urls]
 Homepage = "https://github.com/XioAISolutions/crumb-format"
 Repository = "https://github.com/XioAISolutions/crumb-format"
