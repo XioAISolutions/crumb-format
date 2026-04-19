@@ -201,7 +201,7 @@ function buildLogCrumbFromVisibleMessages() {
   const title = sanitizeHeaderValue(`Recent handoff from ${platform.label}`);
   const lines = [
     "BEGIN CRUMB",
-    "v=1.1",
+    "v=1.2",
     "kind=log",
     `title=${title}`,
     `source=${platform.source}`,
@@ -314,10 +314,11 @@ function parseSelectionToCrumb(text) {
   const goal = inferGoal(cleaned);
   const contextItems = buildContextItems(cleaned);
   const constraintItems = inferConstraints(cleaned);
+  const handoffActions = inferHandoffActions(cleaned);
 
   const lines = [
     "BEGIN CRUMB",
-    "v=1.1",
+    "v=1.2",
     "kind=task",
     "title=Selection handoff",
     "source=browser.selection",
@@ -338,8 +339,34 @@ function parseSelectionToCrumb(text) {
     constraintItems.forEach((item) => lines.push(`- ${item}`));
   }
 
+  // v1.2 [handoff] — explicit "next AI do this" block.
+  lines.push("", "[handoff]");
+  if (handoffActions.length > 0) {
+    handoffActions.forEach((item) => lines.push(`- to=any  do=${item}`));
+  } else {
+    lines.push("- to=any  do=act on the goal above using the context bullets");
+  }
+
   lines.push("END CRUMB", "");
   return lines.join("\n");
+}
+
+function inferHandoffActions(text) {
+  const lines = text.split(/\n+/).map((l) => normalizeText(l)).filter(Boolean);
+  const matches = [];
+  const seen = new Set();
+  const action = /\b(TODO|should|need to|fix|implement|add|ship|write|test)\b/i;
+  for (const line of lines) {
+    if (line.length < 8) continue;
+    if (!action.test(line)) continue;
+    const cleaned = line.replace(/^[-*>]+\s*/, "").replace(/^#+\s*/, "").replace(/^\d+\.\s*/, "");
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    matches.push(truncateText(cleaned, 200));
+    if (matches.length >= 5) break;
+  }
+  return matches;
 }
 
 function buildContextItems(text) {

@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+Adoption-surface fixes — no wire-format change.
+
+- `web/index.html` (the zero-install browser generator) rewritten to emit spec-valid `v=1.2` CRUMB. Previous output used a TOML-style `[crumb]` block with `v = 1.1` and never validated against the reference parsers. New output includes required `BEGIN CRUMB` / `END CRUMB` markers, `key=value` headers, a `[handoff]` block on task kind, and a `[fold:context/summary]` + `[fold:context/full]` pair when the pasted chat exceeds ~1500 characters.
+- `browser-extension/` bumped to `v=1.2`. Selection → task path now emits a `[handoff]` block inferred from TODO / should / need-to phrases. Manifest version bumped to `1.2.0`.
+- README adds a "Pick your entry point — no install required" section listing all zero-install surfaces (web, extension, system-prompt paste, VS Code) above the `pip install` wall.
+- `tests/test_web_generator.py` + `scripts/run_web_generator.js` exercise the web generator via Node with a DOM shim, feeding three sample inputs (short, normal, long-fold) through the reference Python validator. Skipped when `node` is not on PATH.
+
 ## v0.4.0
 
 First release to bump the wire format itself from `v=1.1` to `v=1.2`. All four additions are optional, purely additive, and a v1.1 parser accepts a v1.2 file by ignoring unknown headers and sections (per `SPEC.md §8`).
