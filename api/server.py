@@ -148,24 +148,21 @@ def metalk_compress(_req, _match, _qs, body):
                 text, level=level,
                 vowel_min_length=vml, adaptive_threshold=threshold,
             )
-        elif level >= 4:
-            # plain prose: skip the CRUMB-aware encoder, just vowel-strip
-            encoded = vs_strip_text(text, min_length=vml)
         else:
-            # plain prose at L1-3: MeTalk's body transforms still help via
-            # encode_crumb's transform hook — but for true plain text we just
-            # apply the dictionary/grammar passes inline. Wrap as a synthetic
-            # crumb so the existing encoder works, then strip the wrapper.
+            # Plain prose at any level: wrap in a synthetic mem crumb so the
+            # full MeTalk pipeline (dict + grammar + condense + vowel-strip)
+            # runs, then strip the wrapper.
             wrapped = (
                 "BEGIN CRUMB\nv=1.1\nkind=mem\ntitle=playground\n---\n"
                 "[consolidated]\n" + text + "\nEND CRUMB\n"
             )
-            mt = metalk_encode(wrapped, level=level)
-            # Pull just the body content back out
+            mt = metalk_encode(
+                wrapped, level=level,
+                vowel_min_length=vml, adaptive_threshold=threshold,
+            )
             try:
                 _, after = mt.split("---\n", 1)
                 body_lines = after.rstrip().split("\n")
-                # drop section header line and trailing EC sentinel
                 cleaned = [
                     ln for ln in body_lines
                     if ln.strip() not in {"EC", "END CRUMB"}
@@ -185,6 +182,47 @@ def metalk_compress(_req, _match, _qs, body):
     stats["level"] = level
     stats["mode"] = "crumb" if is_crumb else "plain"
     return 200, {"encoded": encoded, "stats": stats}
+
+
+@route("POST", "/metalk/compare")
+def metalk_compare(_req, _match, _qs, body):
+    """Run MeTalk levels 1-5 over the same input in one request.
+
+    Body: {text, vowel_min_length?, adaptive_threshold?, mode?}
+    Returns: {levels: [{level, encoded, stats}, ...], original_tokens}
+    """
+    text = body.get("text", "")
+    if not text:
+        return 400, {"error": "missing 'text' field"}
+    vml = int(body.get("vowel_min_length", 4) or 4)
+    threshold = float(body.get("adaptive_threshold", 0.85) or 0.85)
+    mode = body.get("mode", "auto")
+
+    results = []
+    for level in (1, 2, 3, 4, 5):
+        try:
+            status, data = metalk_compress(
+                _req, _match, _qs,
+                {"text": text, "level": level,
+                 "vowel_min_length": vml, "adaptive_threshold": threshold,
+                 "mode": mode},
+            )
+        except Exception:
+            traceback.print_exc()
+            results.append({"level": level, "error": "compression failed"})
+            continue
+        if status != 200 or "encoded" not in data:
+            results.append({"level": level, "error": data.get("error", "unknown")})
+            continue
+        results.append({
+            "level": level,
+            "encoded": data["encoded"],
+            "stats": data["stats"],
+        })
+    return 200, {
+        "levels": results,
+        "original_tokens": metalk_stats(text, text)["original_tokens"],
+    }
 
 
 # ---------------------------------------------------------------------------

@@ -361,6 +361,94 @@
     font-family: var(--mono);
     font-size: 0.85em;
   }
+
+  /* ── View toggle ─────────────────────────────────────────── */
+
+  .view-toggle {
+    display: inline-flex;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    overflow: hidden;
+  }
+  .view-toggle button {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    padding: 0.4rem 0.75rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+    font: inherit;
+  }
+  .view-toggle button.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* ── Compare grid ────────────────────────────────────────── */
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  @media (max-width: 900px) {
+    .compare-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 560px) {
+    .compare-grid { grid-template-columns: 1fr; }
+  }
+
+  .compare-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-height: 240px;
+  }
+  .compare-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .compare-card .name { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+  .compare-card .savings {
+    font-size: 0.78rem;
+    font-family: var(--mono);
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .compare-card .sub {
+    font-size: 0.72rem;
+    color: var(--text-mute);
+    font-family: var(--mono);
+  }
+  .compare-card textarea {
+    min-height: 160px;
+    font-size: 0.78rem;
+    padding: 0.6rem;
+    background: var(--surface2);
+  }
+  .compare-card button.mini {
+    align-self: flex-start;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    font: inherit;
+    font-size: 0.75rem;
+  }
+  .compare-card button.mini:hover { color: var(--accent); border-color: var(--accent); }
+  .compare-card.best { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-dim); }
 </style>
 </head>
 <body>
@@ -406,6 +494,10 @@
       </select>
     </div>
     <div class="strip-right">
+      <div class="view-toggle" role="tablist" aria-label="View mode">
+        <button id="view-single" class="active">Single</button>
+        <button id="view-compare">Compare all</button>
+      </div>
       <button id="btn-advanced" class="linklike" aria-expanded="false">⚙ Advanced</button>
       <span class="kbd" title="Keyboard shortcut">⌘/Ctrl + Enter copies</span>
     </div>
@@ -439,38 +531,52 @@
     <span class="hero-sub" id="hero-sub"></span>
   </div>
 
-  <div class="panels">
-    <div class="panel">
-      <div class="panel-head">
-        <span>Your prompt</span>
-        <span class="panel-stats" id="input-stats">0 chars · ~0 tokens</span>
-      </div>
-      <textarea id="input" placeholder="Paste your prompt, system message, instructions, or .crumb here.
+  <div id="view-single-pane">
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-head">
+          <span>Your prompt</span>
+          <span class="panel-stats" id="input-stats">0 chars · ~0 tokens</span>
+        </div>
+        <textarea id="input" placeholder="Paste your prompt, system message, instructions, or .crumb here.
 
 Compression runs as you type. Pick a preset above to trade off compression vs fidelity — hover any preset for detail.
 
 Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <span>Compressed</span>
+          <span class="panel-stats" id="output-stats">—</span>
+        </div>
+        <textarea id="output" readonly placeholder="Compressed output appears here…"></textarea>
+        <div class="actions">
+          <button class="btn btn-primary" id="btn-copy">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span id="btn-copy-text">Copy compressed</span>
+          </button>
+          <button class="btn btn-secondary" id="btn-reuse">Use as input</button>
+          <button class="btn btn-secondary" id="btn-clear">Clear</button>
+        </div>
+      </div>
     </div>
+  </div>
+
+  <div id="view-compare-pane" style="display: none;">
     <div class="panel">
       <div class="panel-head">
-        <span>Compressed</span>
-        <span class="panel-stats" id="output-stats">—</span>
+        <span>Your prompt (compare mode)</span>
+        <span class="panel-stats" id="compare-input-stats">0 chars · ~0 tokens</span>
       </div>
-      <textarea id="output" readonly placeholder="Compressed output appears here…"></textarea>
-      <div class="actions">
-        <button class="btn btn-primary" id="btn-copy">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-          <span id="btn-copy-text">Copy compressed</span>
-        </button>
-        <button class="btn btn-secondary" id="btn-reuse">Use as input</button>
-        <button class="btn btn-secondary" id="btn-clear">Clear</button>
-      </div>
+      <textarea id="compare-input" placeholder="Paste once — see all five levels side-by-side. Click Copy on the card that best fits your budget." rows="6" style="min-height: 140px;"></textarea>
     </div>
+    <div class="compare-grid" id="compare-grid" style="margin-top: 1rem;"></div>
   </div>
 </main>
 
 <div class="toast" id="toast"></div>
 
+<script src="metalk.js"></script>
 <footer>
   Powered by <a href="https://github.com/XioAISolutions/crumb-format">CRUMB</a> · MeTalk + vowel-strip ·
   <code>pip install crumb-format</code>
@@ -606,6 +712,51 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
       stats.encoded_chars + " chars · ~" + stats.encoded_tokens + " tokens";
   }
 
+  // ── Offline fallback (JS port in metalk.js) ─────────────────
+
+  var jsReady = false;
+  var jsLoading = null;
+  var useServer = true;
+
+  function ensureJs() {
+    if (jsReady) return Promise.resolve();
+    if (jsLoading) return jsLoading;
+    jsLoading = window.Metalk.load().then(function () { jsReady = true; });
+    return jsLoading;
+  }
+
+  function compressLocal(text, level, vml, mode) {
+    var isCrumb = mode === "crumb" ||
+      (mode === "auto" && (text.lstrip ? text.lstrip() : text).indexOf("BEGIN CRUMB") === 0 ||
+       text.trim().indexOf("BC") === 0);
+    var encoded;
+    if (isCrumb) {
+      encoded = window.Metalk.encode(text, level, { vowel_min_length: vml });
+    } else {
+      var wrapped = "BEGIN CRUMB\nv=1.1\nkind=mem\ntitle=playground\n---\n[consolidated]\n" + text + "\nEND CRUMB\n";
+      var mt = window.Metalk.encode(wrapped, level, { vowel_min_length: vml });
+      var parts = mt.split("---\n");
+      var bodyLines = (parts[1] || "").replace(/\n+$/, "").split("\n").filter(function (ln) {
+        var s = ln.trim();
+        return s !== "EC" && s !== "END CRUMB" && !(s.startsWith("[") && s.endsWith("]"));
+      });
+      encoded = bodyLines.join("\n").trim() + "\n";
+    }
+    var stats = window.Metalk.compressionStats(text, encoded);
+    stats.level = level;
+    stats.mode = isCrumb ? "crumb" : "plain";
+    stats.vowel_retention_pct = estimateVowelRetention(text, encoded);
+    return { encoded: encoded, stats: stats };
+  }
+
+  function estimateVowelRetention(a, b) {
+    var va = (a.match(/[aeiouAEIOU]/g) || []).length;
+    var vb = (b.match(/[aeiouAEIOU]/g) || []).length;
+    return va === 0 ? 100 : Math.round((vb / va) * 1000) / 10;
+  }
+
+  // ── Compression (server-first, JS fallback) ─────────────────
+
   var inflight = null;
   var pending = false;
 
@@ -624,27 +775,42 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
       adaptive_threshold: parseFloat($("threshold").value) || 0.85,
       mode: $("mode").value
     };
-    inflight = fetch("/metalk/compress", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    }).then(function (r) {
-      return r.json().then(function (j) { return { ok: r.ok, body: j }; });
-    }).then(function (res) {
-      inflight = null;
-      if (!res.ok) {
-        output.value = "Error: " + (res.body.error || "unknown");
+
+    function tryLocal(errMessage) {
+      useServer = false;
+      return ensureJs().then(function () {
+        var local = compressLocal(text, payload.level, payload.vowel_min_length, payload.mode);
+        output.value = local.encoded;
+        setHero(local.stats);
+        if (errMessage) showToast("Running offline — JS port in use");
+      }).catch(function () {
+        output.value = "Error: " + (errMessage || "compression failed") +
+          "\n\nJS fallback also unavailable.";
         setHero(null);
-        return;
-      }
-      output.value = res.body.encoded;
-      setHero(res.body.stats);
-    }).catch(function (err) {
+      });
+    }
+
+    var run;
+    if (useServer) {
+      run = fetch("/metalk/compress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }).then(function (r) {
+        return r.json().then(function (j) { return { ok: r.ok, body: j }; });
+      }).then(function (res) {
+        if (!res.ok) throw new Error(res.body.error || "unknown");
+        output.value = res.body.encoded;
+        setHero(res.body.stats);
+      }).catch(function (err) {
+        return tryLocal(err.message);
+      });
+    } else {
+      run = tryLocal();
+    }
+
+    inflight = run.finally(function () {
       inflight = null;
-      output.value = "Error: " + err.message +
-        "\n\nIs the server running? Try: crumb playground";
-      setHero(null);
-    }).finally(function () {
       if (pending) { pending = false; compress(); }
     });
   }
@@ -721,6 +887,133 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
       e.preventDefault();
       setLevel(parseInt(e.key, 10));
     }
+  });
+
+  // ── Compare view ────────────────────────────────────────────
+
+  var PRESET_NAMES = { 1: "Safe", 2: "Tighter", 3: "Aggressive", 4: "Skeleton", 5: "Adaptive" };
+  var singlePane = $("view-single-pane");
+  var comparePane = $("view-compare-pane");
+  var btnSingle = $("view-single");
+  var btnCompare = $("view-compare");
+  var compareInput = $("compare-input");
+  var compareGrid = $("compare-grid");
+
+  function setView(v) {
+    var isCompare = v === "compare";
+    singlePane.style.display = isCompare ? "none" : "";
+    comparePane.style.display = isCompare ? "" : "none";
+    btnSingle.classList.toggle("active", !isCompare);
+    btnCompare.classList.toggle("active", isCompare);
+    saveState({ view: v });
+    if (isCompare) {
+      if (!compareInput.value && input.value) compareInput.value = input.value;
+      runCompare();
+    }
+  }
+  btnSingle.addEventListener("click", function () { setView("single"); });
+  btnCompare.addEventListener("click", function () { setView("compare"); });
+  if (state.view === "compare") setView("compare");
+
+  function updateCompareInputStats() {
+    var t = compareInput.value;
+    $("compare-input-stats").textContent =
+      t.length + " chars · ~" + estimateTokens(t) + " tokens";
+  }
+
+  function renderCompareCards(rows) {
+    // Identify which level has the best savings so we can highlight it.
+    var bestSaved = -1;
+    rows.forEach(function (r) { if (r.stats && r.stats.pct_saved > bestSaved) bestSaved = r.stats.pct_saved; });
+
+    compareGrid.innerHTML = "";
+    rows.forEach(function (r) {
+      var card = document.createElement("div");
+      card.className = "compare-card";
+      if (r.stats && r.stats.pct_saved === bestSaved && bestSaved > 0) card.classList.add("best");
+
+      var head = document.createElement("div");
+      head.className = "compare-card-head";
+      var name = document.createElement("span");
+      name.className = "name";
+      name.textContent = "L" + r.level + " · " + PRESET_NAMES[r.level];
+      var savings = document.createElement("span");
+      savings.className = "savings";
+      savings.textContent = r.stats ? r.stats.pct_saved + "%" : "err";
+      head.appendChild(name);
+      head.appendChild(savings);
+
+      var sub = document.createElement("span");
+      sub.className = "sub";
+      if (r.stats) {
+        sub.textContent = r.stats.original_tokens + "→" + r.stats.encoded_tokens + " tokens · " + r.stats.ratio + "×";
+      } else {
+        sub.textContent = r.error || "—";
+      }
+
+      var ta = document.createElement("textarea");
+      ta.readOnly = true;
+      ta.value = r.encoded || r.error || "";
+
+      var btn = document.createElement("button");
+      btn.className = "mini";
+      btn.textContent = "Copy";
+      btn.addEventListener("click", function () {
+        if (!ta.value) return;
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(ta.value);
+        } else {
+          ta.select(); document.execCommand("copy");
+        }
+        btn.textContent = "✓ Copied";
+        setTimeout(function () { btn.textContent = "Copy"; }, 1200);
+      });
+
+      card.appendChild(head);
+      card.appendChild(sub);
+      card.appendChild(ta);
+      card.appendChild(btn);
+      compareGrid.appendChild(card);
+    });
+  }
+
+  var compareInflight = null, comparePending = false;
+  function runCompare() {
+    var text = compareInput.value;
+    updateCompareInputStats();
+    if (!text.trim()) {
+      compareGrid.innerHTML = "";
+      return;
+    }
+    if (compareInflight) { comparePending = true; return; }
+    var payload = {
+      text: text,
+      vowel_min_length: parseInt($("vml").value, 10) || 4,
+      adaptive_threshold: parseFloat($("threshold").value) || 0.85,
+      mode: $("mode").value
+    };
+    compareInflight = fetch("/metalk/compare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).then(function (r) { return r.json(); }).then(function (data) {
+      compareInflight = null;
+      if (data.levels) renderCompareCards(data.levels);
+    }).catch(function () {
+      compareInflight = null;
+      compareGrid.innerHTML =
+        '<div style="color: var(--text-dim); grid-column: 1/-1; text-align: center; padding: 2rem;">' +
+        "Server unreachable. Start with <code>crumb playground</code>." +
+        "</div>";
+    }).finally(function () {
+      if (comparePending) { comparePending = false; runCompare(); }
+    });
+  }
+
+  var compareDebounce = null;
+  compareInput.addEventListener("input", function () {
+    clearTimeout(compareDebounce);
+    compareDebounce = setTimeout(runCompare, 300);
   });
 
   // ── Init ────────────────────────────────────────────────────

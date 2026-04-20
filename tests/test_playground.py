@@ -57,12 +57,17 @@ class TestCompressEndpoint:
         assert data["stats"]["level"] == 2
         assert data["stats"]["mode"] == "plain"
 
-    def test_plain_text_level_4_strips_vowels(self, server):
+    def test_plain_text_level_4_compounds_dict_and_vowel_strip(self, server):
+        # Plain prose at L4 runs the full MeTalk pipeline: dict substitution
+        # ("authentication" → "auth", "middleware" → "mw") then vowel-strip
+        # ("auth" → "ath"). Result is substantially shorter than vowel-strip alone.
         status, data = _post_json(server, "/metalk/compress",
                                   {"text": "Authentication middleware configuration.", "level": 4})
         assert status == 200
-        assert "athntctn" in data["encoded"].lower() or "Athntctn" in data["encoded"]
-        assert data["stats"]["vowel_retention_pct"] < 100
+        encoded = data["encoded"].lower()
+        assert "authentication" not in encoded  # dict pass ran
+        assert "mw" in encoded                   # middleware abbreviated
+        assert data["stats"]["vowel_retention_pct"] < 100  # vowel-strip ran
 
     def test_crumb_input_auto_detected(self, server):
         crumb = ("BEGIN CRUMB\nv=1.1\nkind=task\ntitle=T\n---\n"
@@ -98,6 +103,33 @@ class TestCompressEndpoint:
                     "pct_saved", "ratio", "vowels_removed",
                     "vowel_retention_pct", "level", "mode"):
             assert key in data["stats"], f"missing {key}"
+
+
+class TestCompareEndpoint:
+    def test_returns_all_five_levels(self, server):
+        status, data = _post_json(server, "/metalk/compare",
+                                  {"text": "Please fix authentication middleware configuration."})
+        assert status == 200
+        assert "levels" in data
+        levels = {r["level"] for r in data["levels"]}
+        assert levels == {1, 2, 3, 4, 5}
+
+    def test_l4_saves_more_than_l1_on_long_prose(self, server):
+        text = ("Please help me fix a bug in the authentication middleware. "
+                "The application is not properly validating the JSON Web Token "
+                "when users refresh the page.")
+        status, data = _post_json(server, "/metalk/compare", {"text": text})
+        assert status == 200
+        by_level = {r["level"]: r for r in data["levels"]}
+        assert by_level[4]["stats"]["pct_saved"] >= by_level[1]["stats"]["pct_saved"]
+
+    def test_missing_text_returns_400(self, server):
+        try:
+            _post_json(server, "/metalk/compare", {})
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 400
+            return
+        pytest.fail("expected HTTP 400")
 
 
 class TestStaticServing:
