@@ -2816,6 +2816,40 @@ def _copy_to_clipboard(text: str) -> bool:
     return False
 
 
+def cmd_playground(args: argparse.Namespace) -> None:
+    """Launch the local playground: REST API + browser-based compression UI."""
+    import threading
+    import time
+    import webbrowser
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from api.server import CrumbAPIHandler, print_banner
+    from http.server import HTTPServer
+
+    port = args.port
+    url = f"http://127.0.0.1:{port}/playground.html"
+
+    server = HTTPServer(("127.0.0.1", port), CrumbAPIHandler)
+    print_banner(port)
+    print(f"Playground UI: {url}\n", file=sys.stderr)
+
+    if not args.no_browser:
+        # Open browser shortly after server starts accepting connections.
+        def _open():
+            time.sleep(0.4)
+            try:
+                webbrowser.open(url)
+            except Exception:
+                pass
+        threading.Thread(target=_open, daemon=True).start()
+
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nShutting down playground.", file=sys.stderr)
+        server.server_close()
+
+
 def cmd_handoff(args: argparse.Namespace) -> None:
     """Copy a .crumb file to clipboard for pasting into an AI tool."""
     filepath = args.file
@@ -4288,7 +4322,14 @@ def cmd_metalk(args: argparse.Namespace) -> None:
             print(result)
     else:
         level = args.level
-        result = encode(text, level=level)
+        kwargs = {}
+        vml = getattr(args, 'vowel_min_length', None)
+        at = getattr(args, 'adaptive_threshold', None)
+        if vml is not None:
+            kwargs['vowel_min_length'] = vml
+        if at is not None:
+            kwargs['adaptive_threshold'] = at
+        result = encode(text, level=level, **kwargs)
         stats = compression_stats(text, result)
         if args.output and args.output != '-':
             write_text(args.output, result)
@@ -4302,6 +4343,63 @@ def cmd_metalk(args: argparse.Namespace) -> None:
                   f"{stats['original_tokens']}→{stats['encoded_tokens']} tokens "
                   f"({stats['pct_saved']}% saved, {stats['ratio']}x) ---",
                   file=sys.stderr)
+
+
+def cmd_vowelstrip(args: argparse.Namespace) -> None:
+    """Strip interior vowels from text or a CRUMB body (Layer 4 standalone)."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    from cli.vowelstrip import (
+        strip_text, encode_crumb, adaptive_strip_text, drift_stats, _load_embedder
+    )
+
+    if args.file == '-':
+        text = sys.stdin.read()
+    else:
+        text = read_text(args.file)
+
+    embedder = None
+    if args.adaptive:
+        embedder = _load_embedder()
+        if embedder is None:
+            print('warning: sentence-transformers not installed, '
+                  'falling back to deterministic strip. '
+                  'Install with: pip install crumb-format[embeddings]',
+                  file=sys.stderr)
+            transform = lambda line: __import__('cli.vowelstrip', fromlist=['strip_line']).strip_line(line, args.min_length)
+        else:
+            transform = lambda line: adaptive_strip_text(
+                line, threshold=args.threshold,
+                min_length=args.min_length, embedder=embedder
+            )
+    else:
+        transform = None  # encode_crumb will use default deterministic strip
+
+    if args.plain:
+        if args.adaptive:
+            # Reuse the embedder we already loaded above; without this kwarg
+            # adaptive_strip_text would load a second SentenceTransformer
+            # (~seconds + ~80MB) for the --plain --adaptive path.
+            result = adaptive_strip_text(text, threshold=args.threshold,
+                                         min_length=args.min_length,
+                                         embedder=embedder)
+        else:
+            result = strip_text(text, min_length=args.min_length)
+    else:
+        result = encode_crumb(text, min_length=args.min_length, transform=transform)
+
+    stats = drift_stats(text, result)
+    if args.output and args.output != '-':
+        write_text(args.output, result)
+        print(f"vowelstrip: {stats['original_tokens']}→{stats['encoded_tokens']} tokens "
+              f"({stats['pct_saved']}% saved, "
+              f"{stats['vowel_retention_pct']}% vowels retained)",
+              file=sys.stderr)
+    else:
+        print(result)
+        print(f"\n--- vowelstrip: {stats['original_tokens']}→{stats['encoded_tokens']} tokens "
+              f"({stats['pct_saved']}% saved, "
+              f"{stats['vowel_retention_pct']}% vowels retained) ---",
+              file=sys.stderr)
 
 
 # ── Format bridges ───────────────────────────────────────────────────
@@ -5056,7 +5154,7 @@ def build_parser() -> argparse.ArgumentParser:
                               help='Target retention ratio 0.0-1.0 (default: 0.5 = keep top 50%%).')
     compress_cmd.add_argument('--metalk', action='store_true',
                               help='Apply MeTalk caveman compression as Stage 3.')
-    compress_cmd.add_argument('--metalk-level', type=int, choices=[1, 2, 3], default=2,
+    compress_cmd.add_argument('--metalk-level', type=int, choices=[1, 2, 3, 4, 5], default=2,
                               help='MeTalk level (default: 2).')
     compress_cmd.set_defaults(func=cmd_compress)
 
@@ -5068,6 +5166,16 @@ def build_parser() -> argparse.ArgumentParser:
     share_cmd = sub.add_parser('share', help='Share a .crumb file via GitHub Gist or data URI.')
     share_cmd.add_argument('file', help='.crumb file to share.')
     share_cmd.set_defaults(func=cmd_share)
+
+    # playground
+    pg_cmd = sub.add_parser('playground',
+                            help='Launch the browser-based prompt-compression UI '
+                                 '(MeTalk L1-5 + vowel-strip).')
+    pg_cmd.add_argument('--port', type=int, default=8420,
+                        help='Port to bind (default: 8420).')
+    pg_cmd.add_argument('--no-browser', action='store_true',
+                        help='Do not auto-open the system browser.')
+    pg_cmd.set_defaults(func=cmd_playground)
 
     # handoff
     handoff_cmd = sub.add_parser('handoff', help='Copy a .crumb to clipboard for pasting into an AI tool.')
@@ -5094,7 +5202,7 @@ def build_parser() -> argparse.ArgumentParser:
     context_cmd.add_argument('--source', help='Override source label (default: crumb.context).')
     context_cmd.add_argument('-o', '--output', default='-', help='Output file or - for stdout.')
     context_cmd.add_argument('--metalk', action='store_true', help='Apply MeTalk compression.')
-    context_cmd.add_argument('--metalk-level', type=int, choices=[1, 2, 3], default=2,
+    context_cmd.add_argument('--metalk-level', type=int, choices=[1, 2, 3, 4, 5], default=2,
                              help='MeTalk level (default: 2).')
     context_cmd.add_argument('--clipboard', action='store_true', help='Copy result to clipboard instead of printing.')
     context_cmd.add_argument('--max-facts', type=int, default=8, help='Max palace facts to include (default: 8).')
@@ -5273,11 +5381,33 @@ def build_parser() -> argparse.ArgumentParser:
     # --- MeTalk ---
     mt_cmd = sub.add_parser('metalk', help='MeTalk caveman compression — reduce tokens for AI-to-AI communication.')
     mt_cmd.add_argument('file', help='.crumb file to encode/decode.')
-    mt_cmd.add_argument('--level', type=int, choices=[1, 2, 3], default=2,
-                        help='1=dict only (lossless), 2=dict+grammar strip, 3=aggressive (default: 2).')
+    mt_cmd.add_argument('--level', type=int, choices=[1, 2, 3, 4, 5], default=2,
+                        help='1=dict only (lossless), 2=dict+grammar strip, '
+                             '3=aggressive condense, 4=skeleton (vowel-strip), '
+                             '5=adaptive vowel-strip (needs [embeddings] extra). '
+                             'Default: 2.')
+    mt_cmd.add_argument('--vowel-min-length', type=int, default=4,
+                        help='Min word length eligible for vowel-strip at L4-5 (default: 4).')
+    mt_cmd.add_argument('--adaptive-threshold', type=float, default=0.85,
+                        help='Cosine similarity floor at L5 (default: 0.85).')
     mt_cmd.add_argument('--decode', action='store_true', help='Decode MeTalk back to full form.')
     mt_cmd.add_argument('-o', '--output', default='-', help='Output path.')
     mt_cmd.set_defaults(func=cmd_metalk)
+
+    # --- Vowelstrip (standalone) ---
+    vs_cmd = sub.add_parser('vowelstrip',
+                            help='Strip interior vowels from text or a CRUMB body (Layer 4 standalone).')
+    vs_cmd.add_argument('file', help='Input file (.crumb or plain text). Use - for stdin.')
+    vs_cmd.add_argument('--min-length', type=int, default=4,
+                        help='Min word length to strip (default: 4).')
+    vs_cmd.add_argument('--adaptive', action='store_true',
+                        help='Use embedding-aware adaptive stripping (needs [embeddings] extra).')
+    vs_cmd.add_argument('--threshold', type=float, default=0.85,
+                        help='Adaptive cosine similarity floor (default: 0.85).')
+    vs_cmd.add_argument('--plain', action='store_true',
+                        help='Treat input as plain text, not a CRUMB (skip header/section logic).')
+    vs_cmd.add_argument('-o', '--output', default='-', help='Output path (default: stdout).')
+    vs_cmd.set_defaults(func=cmd_vowelstrip)
 
     # --- Palace ---
     pal_cmd = sub.add_parser('palace', help='Hierarchical spatial memory: wings / halls / rooms / tunnels.')
@@ -5330,7 +5460,7 @@ def build_parser() -> argparse.ArgumentParser:
     wake_cmd.add_argument('-o', '--output', default='-', help='Output file or - for stdout.')
     wake_cmd.add_argument('--max-facts', type=int, default=8, help='Max facts to include (default: 8).')
     wake_cmd.add_argument('--metalk', action='store_true', help='Pipe output through MeTalk compression.')
-    wake_cmd.add_argument('--metalk-level', type=int, choices=[1, 2, 3], default=2)
+    wake_cmd.add_argument('--metalk-level', type=int, choices=[1, 2, 3, 4, 5], default=2)
     wake_cmd.add_argument('--reflect', action='store_true',
                           help='Include top knowledge gaps in the wake crumb.')
     wake_cmd.set_defaults(func=cmd_wake)

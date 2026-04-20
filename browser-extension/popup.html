@@ -2,114 +2,237 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=360">
+  <meta name="viewport" content="width=440">
   <title>CRUMB</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #181a20;
+      --surface2: #1e2028;
+      --border: #2a2d38;
+      --text: #e4e4e7;
+      --text-dim: #9294a0;
+      --text-mute: #6c6f7a;
+      --accent: #f97316;
+      --accent-dim: rgba(249, 115, 22, 0.14);
+      --good: #22c55e;
+      --mono: 'SF Mono', 'Cascadia Code', Consolas, monospace;
     }
 
     body {
-      width: 320px;
-      background: #1a1a1a;
-      color: #e5e5e5;
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      font-size: 14px;
-      padding: 20px;
+      width: 440px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 13px;
+      padding: 14px;
     }
 
     h1 {
-      font-size: 18px;
+      font-size: 15px;
       font-weight: 700;
-      color: #f97316;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
+    }
+    h1 span.brand { color: var(--accent); }
+    h1 span.sub { color: var(--text-dim); font-weight: 500; font-size: 13px; margin-left: 6px; }
+
+    /* preset tabs */
+    .presets {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 3px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px;
+      margin-bottom: 10px;
+    }
+    .preset {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-dim);
+      padding: 5px 3px;
+      border-radius: 4px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .preset:hover:not(.active) { background: var(--surface2); color: var(--text); }
+    .preset.active {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-color: var(--accent);
     }
 
-    .instruction {
-      background: #262626;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 16px;
-      line-height: 1.5;
+    /* hero */
+    .hero {
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 6px;
+      margin: 8px 0;
+      min-height: 22px;
+    }
+    .hero.empty { opacity: 0.25; }
+    .hero-value {
+      font-size: 1.4rem;
+      font-weight: 800;
+      color: var(--accent);
+      font-family: var(--mono);
+    }
+    .hero-sub {
+      font-size: 11px;
+      color: var(--text-mute);
+      font-family: var(--mono);
     }
 
-    .instruction strong {
-      color: #f97316;
-    }
-
-    .links {
+    /* textareas */
+    .pane {
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 4px;
+      margin-bottom: 8px;
     }
-
-    .links a {
+    .pane-head {
       display: flex;
-      align-items: center;
-      gap: 8px;
-      color: #f97316;
-      text-decoration: none;
-      font-size: 13px;
-      padding: 8px 12px;
-      background: #262626;
+      justify-content: space-between;
+      align-items: baseline;
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .pane-stats { font-family: var(--mono); font-weight: 500; text-transform: none; letter-spacing: 0; }
+    textarea {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
       border-radius: 6px;
-      transition: background 0.15s;
-    }
-
-    .links a:hover {
-      background: #333;
-    }
-
-    .links .label {
-      color: #a3a3a3;
+      padding: 8px;
+      font-family: var(--mono);
       font-size: 11px;
-      display: block;
+      line-height: 1.5;
+      resize: vertical;
+      outline: none;
+      min-height: 80px;
+      width: 100%;
     }
+    #output { background: var(--surface2); }
+    textarea:focus { border-color: var(--accent); }
 
-    .pip-cmd {
-      font-family: 'Courier New', monospace;
-      background: #333;
-      padding: 2px 6px;
-      border-radius: 3px;
+    /* actions */
+    .actions { display: flex; gap: 6px; margin-top: 6px; }
+    button.btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 10px;
       font-size: 12px;
-      color: #f97316;
-      user-select: all;
+      font-weight: 600;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      flex: 1;
+      justify-content: center;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 600;
     }
+    button.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover:not(:disabled) { background: #fb923c; }
+    .btn-primary.copied { background: var(--good); }
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover:not(:disabled) { background: var(--surface2); }
 
-    .footer {
-      margin-top: 16px;
-      text-align: center;
-      font-size: 11px;
-      color: #525252;
+    /* paste button (captures clipboard) */
+    .paste-row {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 8px;
     }
+    .paste-row button {
+      flex: 1;
+      background: var(--surface);
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      padding: 6px;
+      border-radius: 5px;
+      cursor: pointer;
+      font: inherit;
+      font-size: 11px;
+    }
+    .paste-row button:hover { color: var(--accent); border-color: var(--accent); }
+
+    /* footer */
+    .footer {
+      margin-top: 10px;
+      text-align: center;
+      font-size: 10px;
+      color: var(--text-mute);
+    }
+    .footer a { color: var(--accent); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
   </style>
 </head>
 <body>
-  <h1>CRUMB — AI Handoff Format</h1>
+  <h1><span class="brand">crumb</span> <span class="sub">prompt compressor</span></h1>
 
-  <div class="instruction">
-    Select text in any AI chat and right-click &rarr; <strong>Crumb it</strong>
+  <div class="presets" role="tablist">
+    <button class="preset" data-level="1" title="Lossless dictionary-only compression">Safe</button>
+    <button class="preset active" data-level="2" title="Drop filler words (default)">Tighter</button>
+    <button class="preset" data-level="3" title="Condense bullets and blank lines">Aggressive</button>
+    <button class="preset" data-level="4" title="Strip interior vowels (lossy)">Skeleton</button>
+    <button class="preset" data-level="5" title="Adaptive — uses dictionary fallback in browser">Adaptive</button>
   </div>
 
-  <div class="links">
-    <a href="https://github.com/XioAISolutions/crumb-format" target="_blank" id="github-link">
-      <span>
-        <span class="label">GitHub</span>
-        github.com/XioAISolutions/crumb-format
-      </span>
-    </a>
-    <a href="#" id="pip-link">
-      <span>
-        <span class="label">Install via pip</span>
-        <span class="pip-cmd">pip install crumb-format</span>
-      </span>
-    </a>
+  <div class="paste-row">
+    <button id="btn-paste">📋 Paste clipboard as input</button>
+    <button id="btn-selection">↧ Pull current page selection</button>
   </div>
 
-  <div class="footer">v1.0.0</div>
+  <div class="pane">
+    <div class="pane-head">
+      <span>Prompt</span>
+      <span class="pane-stats" id="input-stats">0 chars · ~0 tokens</span>
+    </div>
+    <textarea id="input" placeholder="Paste your prompt here…"></textarea>
+  </div>
 
+  <div class="hero empty" id="hero">
+    <span class="hero-value" id="hero-value">—</span>
+    <span class="hero-sub" id="hero-sub">ready</span>
+  </div>
+
+  <div class="pane">
+    <div class="pane-head">
+      <span>Compressed</span>
+      <span class="pane-stats" id="output-stats">—</span>
+    </div>
+    <textarea id="output" readonly placeholder="Compressed output appears here…"></textarea>
+    <div class="actions">
+      <button class="btn btn-primary" id="btn-copy">
+        <span id="btn-copy-text">Copy compressed</span>
+      </button>
+      <button class="btn btn-secondary" id="btn-clear">Clear</button>
+    </div>
+  </div>
+
+  <div class="footer">
+    Powered by <a href="https://github.com/XioAISolutions/crumb-format" target="_blank">CRUMB</a> —
+    MeTalk + vowel-strip, runs fully in-browser.
+  </div>
+
+  <script src="metalk.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

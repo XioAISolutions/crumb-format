@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>crumb playground — prompt compression</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #181a20;
+    --surface2: #1e2028;
+    --surface3: #23262f;
+    --border: #2a2d38;
+    --text: #e4e4e7;
+    --text-dim: #9294a0;
+    --text-mute: #6c6f7a;
+    --accent: #f97316;
+    --accent-dim: rgba(249, 115, 22, 0.12);
+    --accent-hover: #fb923c;
+    --good: #22c55e;
+    --warn: #eab308;
+    --radius: 10px;
+    --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    text-align: center;
+    padding: 2rem 1rem 0.75rem;
+  }
+
+  header h1 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  header h1 span { color: var(--accent); }
+
+  header p {
+    color: var(--text-dim);
+    margin-top: 0.35rem;
+    font-size: 0.92rem;
+  }
+
+  main {
+    flex: 1;
+    max-width: 1200px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 1.25rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+
+  /* ── Preset tabs ──────────────────────────────────────────── */
+
+  .presets {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.4rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.4rem;
+  }
+
+  @media (max-width: 680px) {
+    .presets { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .preset {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text-dim);
+    padding: 0.55rem 0.55rem;
+    border-radius: 7px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    align-items: flex-start;
+    text-align: left;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    font: inherit;
+  }
+
+  .preset:hover:not(.active) { background: var(--surface2); color: var(--text); }
+
+  .preset.active {
+    background: var(--accent-dim);
+    color: var(--text);
+    border-color: var(--accent);
+  }
+
+  .preset .name {
+    font-size: 0.86rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+  }
+  .preset.active .name { color: var(--accent); }
+  .preset .sub {
+    font-size: 0.72rem;
+    color: var(--text-mute);
+    font-family: var(--mono);
+  }
+
+  /* ── Secondary strip (examples, advanced toggle) ─────────── */
+
+  .strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+    font-size: 0.82rem;
+  }
+
+  .strip-left, .strip-right { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+
+  .linklike {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    padding: 0.35rem 0.5rem;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 0.82rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
+  .linklike:hover { color: var(--text); background: var(--surface2); }
+
+  select.example-pick {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.35rem 0.55rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+    outline: none;
+    font-family: inherit;
+  }
+
+  select.example-pick:focus { border-color: var(--accent); }
+
+  .kbd {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--text-mute);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 0.08rem 0.35rem;
+    border-radius: 4px;
+  }
+
+  /* ── Advanced panel ──────────────────────────────────────── */
+
+  .advanced {
+    display: none;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.8rem 1rem;
+  }
+  .advanced.open { display: grid; }
+
+  @media (max-width: 680px) {
+    .advanced.open { grid-template-columns: 1fr; }
+  }
+
+  .knob { display: flex; flex-direction: column; gap: 0.25rem; }
+  .knob label {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+  }
+  .knob .hint { font-size: 0.72rem; color: var(--text-mute); }
+  .knob input, .knob select {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.4rem 0.6rem;
+    font-size: 0.86rem;
+    font-family: var(--mono);
+    outline: none;
+    width: 100%;
+  }
+  .knob input:focus, .knob select:focus { border-color: var(--accent); }
+
+  /* ── Hero savings ────────────────────────────────────────── */
+
+  .hero {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.6rem;
+    padding: 0.4rem 0;
+    min-height: 2.6rem;
+    transition: opacity 0.2s;
+  }
+  .hero.empty { opacity: 0.3; }
+  .hero-value {
+    font-size: 2.1rem;
+    font-weight: 800;
+    color: var(--accent);
+    font-family: var(--mono);
+    letter-spacing: -0.02em;
+  }
+  .hero-label { color: var(--text-dim); font-size: 0.92rem; }
+  .hero-sub {
+    color: var(--text-mute);
+    font-size: 0.8rem;
+    font-family: var(--mono);
+    margin-left: 0.6rem;
+  }
+
+  /* ── Panels ──────────────────────────────────────────────── */
+
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    flex: 1;
+    min-height: 0;
+  }
+
+  @media (max-width: 760px) {
+    .panels { grid-template-columns: 1fr; }
+  }
+
+  .panel { display: flex; flex-direction: column; gap: 0.45rem; min-height: 0; }
+
+  .panel-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .panel-stats {
+    text-transform: none;
+    letter-spacing: 0;
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-weight: 500;
+  }
+
+  textarea {
+    flex: 1;
+    min-height: 300px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    font-family: var(--mono);
+    font-size: 0.88rem;
+    line-height: 1.55;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+    white-space: pre-wrap;
+  }
+
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: #555869; }
+  #output { background: var(--surface2); }
+
+  .actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.4rem;
+  }
+
+  button.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.55rem 1.1rem;
+    font-size: 0.87rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s, color 0.15s;
+  }
+
+  button.btn:active { transform: scale(0.97); }
+  button.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+  .btn-primary.copied { background: var(--good); }
+  .btn-secondary {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover:not(:disabled) { background: var(--surface2); }
+
+  /* ── Toast ───────────────────────────────────────────────── */
+
+  .toast {
+    position: fixed;
+    bottom: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--accent);
+    color: #fff;
+    padding: 0.55rem 1.2rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  footer {
+    text-align: center;
+    padding: 1.25rem 1rem;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    border-top: 1px solid var(--border);
+  }
+  footer a { color: var(--accent); text-decoration: none; font-weight: 600; }
+  footer a:hover { text-decoration: underline; }
+  footer code {
+    background: var(--accent-dim);
+    color: var(--accent);
+    padding: 0.15em 0.45em;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 0.85em;
+  }
+
+  /* ── View toggle ─────────────────────────────────────────── */
+
+  .view-toggle {
+    display: inline-flex;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    overflow: hidden;
+  }
+  .view-toggle button {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    padding: 0.4rem 0.75rem;
+    font-size: 0.82rem;
+    cursor: pointer;
+    font: inherit;
+  }
+  .view-toggle button.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  /* ── Compare grid ────────────────────────────────────────── */
+
+  .compare-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  @media (max-width: 900px) {
+    .compare-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 560px) {
+    .compare-grid { grid-template-columns: 1fr; }
+  }
+
+  .compare-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-height: 240px;
+  }
+  .compare-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .compare-card .name { font-size: 0.9rem; font-weight: 700; color: var(--text); }
+  .compare-card .savings {
+    font-size: 0.78rem;
+    font-family: var(--mono);
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .compare-card .sub {
+    font-size: 0.72rem;
+    color: var(--text-mute);
+    font-family: var(--mono);
+  }
+  .compare-card textarea {
+    min-height: 160px;
+    font-size: 0.78rem;
+    padding: 0.6rem;
+    background: var(--surface2);
+  }
+  .compare-card button.mini {
+    align-self: flex-start;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+    font: inherit;
+    font-size: 0.75rem;
+  }
+  .compare-card button.mini:hover { color: var(--accent); border-color: var(--accent); }
+  .compare-card.best { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-dim); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span>crumb</span> playground</h1>
+  <p>Paste a prompt. Pick a tradeoff. Copy the slim version.</p>
+</header>
+
+<main>
+  <div class="presets" role="tablist" aria-label="Compression preset">
+    <button class="preset" data-level="1" role="tab">
+      <span class="name">Safe</span>
+      <span class="sub">dict only · lossless</span>
+    </button>
+    <button class="preset active" data-level="2" role="tab">
+      <span class="name">Tighter</span>
+      <span class="sub">drop filler · default</span>
+    </button>
+    <button class="preset" data-level="3" role="tab">
+      <span class="name">Aggressive</span>
+      <span class="sub">condense bullets</span>
+    </button>
+    <button class="preset" data-level="4" role="tab">
+      <span class="name">Skeleton</span>
+      <span class="sub">strip vowels · lossy</span>
+    </button>
+    <button class="preset" data-level="5" role="tab">
+      <span class="name">Adaptive</span>
+      <span class="sub">embedding-guarded</span>
+    </button>
+  </div>
+
+  <div class="strip">
+    <div class="strip-left">
+      <label for="example" style="color: var(--text-dim); font-size: 0.82rem;">Load example</label>
+      <select id="example" class="example-pick">
+        <option value="">— choose —</option>
+        <option value="bug">Bug report</option>
+        <option value="system">System prompt</option>
+        <option value="long">Long instructions</option>
+        <option value="crumb">.crumb handoff</option>
+      </select>
+    </div>
+    <div class="strip-right">
+      <div class="view-toggle" role="tablist" aria-label="View mode">
+        <button id="view-single" class="active">Single</button>
+        <button id="view-compare">Compare all</button>
+      </div>
+      <button id="btn-advanced" class="linklike" aria-expanded="false">⚙ Advanced</button>
+      <span class="kbd" title="Keyboard shortcut">⌘/Ctrl + Enter copies</span>
+    </div>
+  </div>
+
+  <div id="advanced" class="advanced">
+    <div class="knob">
+      <label for="vml">Min word length</label>
+      <input type="number" id="vml" min="3" max="12" value="4">
+      <span class="hint">L4/L5 only strip words at or above this length.</span>
+    </div>
+    <div class="knob">
+      <label for="threshold">Adaptive threshold</label>
+      <input type="number" id="threshold" min="0" max="1" step="0.05" value="0.85">
+      <span class="hint">L5 keeps the strip only if cosine sim ≥ this.</span>
+    </div>
+    <div class="knob">
+      <label for="mode">Input mode</label>
+      <select id="mode">
+        <option value="auto" selected>auto-detect</option>
+        <option value="plain">plain text</option>
+        <option value="crumb">.crumb</option>
+      </select>
+      <span class="hint">Auto treats BEGIN CRUMB blocks as structured.</span>
+    </div>
+  </div>
+
+  <div class="hero empty" id="hero">
+    <span class="hero-value" id="hero-value">—</span>
+    <span class="hero-label">tokens saved</span>
+    <span class="hero-sub" id="hero-sub"></span>
+  </div>
+
+  <div id="view-single-pane">
+    <div class="panels">
+      <div class="panel">
+        <div class="panel-head">
+          <span>Your prompt</span>
+          <span class="panel-stats" id="input-stats">0 chars · ~0 tokens</span>
+        </div>
+        <textarea id="input" placeholder="Paste your prompt, system message, instructions, or .crumb here.
+
+Compression runs as you type. Pick a preset above to trade off compression vs fidelity — hover any preset for detail.
+
+Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <span>Compressed</span>
+          <span class="panel-stats" id="output-stats">—</span>
+        </div>
+        <textarea id="output" readonly placeholder="Compressed output appears here…"></textarea>
+        <div class="actions">
+          <button class="btn btn-primary" id="btn-copy">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <span id="btn-copy-text">Copy compressed</span>
+          </button>
+          <button class="btn btn-secondary" id="btn-reuse">Use as input</button>
+          <button class="btn btn-secondary" id="btn-clear">Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-compare-pane" style="display: none;">
+    <div class="panel">
+      <div class="panel-head">
+        <span>Your prompt (compare mode)</span>
+        <span class="panel-stats" id="compare-input-stats">0 chars · ~0 tokens</span>
+      </div>
+      <textarea id="compare-input" placeholder="Paste once — see all five levels side-by-side. Click Copy on the card that best fits your budget." rows="6" style="min-height: 140px;"></textarea>
+    </div>
+    <div class="compare-grid" id="compare-grid" style="margin-top: 1rem;"></div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="metalk.js"></script>
+<footer>
+  Powered by <a href="https://github.com/XioAISolutions/crumb-format">CRUMB</a> · MeTalk + vowel-strip ·
+  <code>pip install crumb-format</code>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var STORAGE_KEY = "crumb_playground_v1";
+
+  var EXAMPLES = {
+    bug: "Please help me fix a bug in the authentication middleware. The application is not properly validating the JSON Web Token when users refresh the page. The implementation should preserve the existing cookie names and we definitely need to add a regression test before merging.",
+    system: "You are a helpful assistant. Please make sure to respond in a concise and direct manner. Do not use unnecessary filler words. When referencing code, just use the function name. It is important to note that you should always be honest about uncertainty.",
+    long: "In order to complete this task, you will need to review the authentication implementation, understand the configuration, and then write comprehensive documentation. You should start by reading the existing specification. After that, please examine the infrastructure. Finally, you need to document all the integration points. Make sure to include information about the dependencies, the environment variables, and the deployment requirements.",
+    crumb: "BEGIN CRUMB\nv=1.1\nkind=task\ntitle=Fix login redirect bug\nsource=cursor.agent\nproject=web-app\n---\n[goal]\nFix the bug where authenticated users are redirected back to /login after refresh.\n\n[context]\n- App uses JWT cookie auth\n- Redirect loop happens only on full page refresh\n- Middleware reads auth state before cookie parsing is complete\n\n[constraints]\n- Do not change the login UI\n- Preserve existing cookie names\n- Add a regression check before merging\nEND CRUMB"
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var input = $("input");
+  var output = $("output");
+  var hero = $("hero");
+  var heroValue = $("hero-value");
+  var heroSub = $("hero-sub");
+
+  // ── State persistence ───────────────────────────────────────
+
+  function loadState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"); }
+    catch (e) { return {}; }
+  }
+  function saveState(patch) {
+    var s = loadState();
+    Object.keys(patch).forEach(function (k) { s[k] = patch[k]; });
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); } catch (e) {}
+  }
+
+  var state = loadState();
+  var currentLevel = state.level || 2;
+  var advancedOpen = !!state.advanced;
+
+  // ── Preset tabs ─────────────────────────────────────────────
+
+  function setLevel(lv) {
+    currentLevel = lv;
+    document.querySelectorAll(".preset").forEach(function (el) {
+      el.classList.toggle("active", parseInt(el.dataset.level, 10) === lv);
+    });
+    saveState({ level: lv });
+    scheduleCompress();
+  }
+
+  document.querySelectorAll(".preset").forEach(function (el) {
+    el.addEventListener("click", function () {
+      setLevel(parseInt(el.dataset.level, 10));
+    });
+  });
+
+  // Initialise tab from stored preference
+  if (currentLevel !== 2) setLevel(currentLevel);
+
+  // ── Advanced toggle ─────────────────────────────────────────
+
+  var advanced = $("advanced");
+  var advBtn = $("btn-advanced");
+
+  function setAdvanced(open) {
+    advancedOpen = open;
+    advanced.classList.toggle("open", open);
+    advBtn.setAttribute("aria-expanded", String(open));
+    advBtn.textContent = open ? "⚙ Hide advanced" : "⚙ Advanced";
+    saveState({ advanced: open });
+  }
+  advBtn.addEventListener("click", function () { setAdvanced(!advancedOpen); });
+  setAdvanced(advancedOpen);
+
+  // Restore advanced values from storage, if any
+  if (state.vml) $("vml").value = state.vml;
+  if (state.threshold) $("threshold").value = state.threshold;
+  if (state.mode) $("mode").value = state.mode;
+
+  ["vml", "threshold", "mode"].forEach(function (id) {
+    $(id).addEventListener("change", function () {
+      var patch = {}; patch[id] = $(id).value; saveState(patch);
+      scheduleCompress();
+    });
+  });
+
+  // ── Examples ────────────────────────────────────────────────
+
+  $("example").addEventListener("change", function () {
+    var key = this.value;
+    if (!key || !EXAMPLES[key]) return;
+    input.value = EXAMPLES[key];
+    updateInputStats();
+    scheduleCompress();
+    this.value = "";
+  });
+
+  // ── Toast ───────────────────────────────────────────────────
+
+  function showToast(msg) {
+    var t = $("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    setTimeout(function () { t.classList.remove("show"); }, 1800);
+  }
+
+  // ── Stats & compression ─────────────────────────────────────
+
+  function estimateTokens(text) { return Math.max(1, Math.floor(text.length / 4)); }
+
+  function updateInputStats() {
+    var t = input.value;
+    $("input-stats").textContent =
+      t.length + " chars · ~" + estimateTokens(t) + " tokens";
+  }
+
+  function setHero(stats) {
+    if (!stats) {
+      hero.classList.add("empty");
+      heroValue.textContent = "—";
+      heroSub.textContent = "";
+      $("output-stats").textContent = "—";
+      return;
+    }
+    hero.classList.remove("empty");
+    heroValue.textContent = stats.pct_saved + "%";
+    heroSub.textContent =
+      stats.original_tokens + "→" + stats.encoded_tokens + " tokens · " +
+      stats.ratio + "× · L" + stats.level + " " + stats.mode;
+    $("output-stats").textContent =
+      stats.encoded_chars + " chars · ~" + stats.encoded_tokens + " tokens";
+  }
+
+  // Finite-number fallback — avoids `|| default` which would treat a
+  // legitimate user-entered 0 (valid for adaptive_threshold, and uniformly
+  // rejected by the server for vml) as missing. Matches the server-side
+  // `is None` check so the user's explicit 0 survives the round-trip.
+  function numericKnob(raw, parser, fallback) {
+    var parsed = parser(raw);
+    return (typeof parsed === "number" && isFinite(parsed)) ? parsed : fallback;
+  }
+
+  // ── Offline fallback (JS port in metalk.js) ─────────────────
+
+  var jsReady = false;
+  var jsLoading = null;
+  var useServer = true;
+
+  function ensureJs() {
+    if (jsReady) return Promise.resolve();
+    if (jsLoading) return jsLoading;
+    jsLoading = window.Metalk.load().then(function () { jsReady = true; });
+    return jsLoading;
+  }
+
+  // Strict auto-detection — mirrors api/server.py::_looks_like_crumb.
+  // The entire first non-empty line must be exactly BEGIN CRUMB or BC,
+  // not just a prefix. Prevents a prompt like "BC drivers are failing"
+  // from being routed through the structured encoder.
+  function looksLikeCrumb(text) {
+    var stripped = text.trimStart ? text.trimStart() : text.replace(/^\s+/, "");
+    var nl = stripped.indexOf("\n");
+    var firstLine = (nl < 0 ? stripped : stripped.slice(0, nl)).trim();
+    return firstLine === "BEGIN CRUMB" || firstLine === "BC";
+  }
+
+  function compressLocal(text, level, vml, mode) {
+    var isCrumb = mode === "crumb" || (mode === "auto" && looksLikeCrumb(text));
+    // Plain mode now uses encodePlain directly instead of wrapping in a
+    // synthetic CRUMB — the old path ran user text through the structured
+    // encoder, which silently rewrote legitimate `[goal]` / `[context]`
+    // headings to their MeTalk-abbreviated forms.
+    var encoded = isCrumb
+      ? window.Metalk.encode(text, level, { vowel_min_length: vml })
+      : window.Metalk.encodePlain(text, level, { vowel_min_length: vml });
+    var stats = window.Metalk.compressionStats(text, encoded);
+    stats.level = level;
+    stats.mode = isCrumb ? "crumb" : "plain";
+    stats.vowel_retention_pct = estimateVowelRetention(text, encoded);
+    return { encoded: encoded, stats: stats };
+  }
+
+  function estimateVowelRetention(a, b) {
+    var va = (a.match(/[aeiouAEIOU]/g) || []).length;
+    var vb = (b.match(/[aeiouAEIOU]/g) || []).length;
+    return va === 0 ? 100 : Math.round((vb / va) * 1000) / 10;
+  }
+
+  // ── Compression (server-first, JS fallback) ─────────────────
+
+  var inflight = null;
+  var pending = false;
+
+  function compress() {
+    var text = input.value;
+    if (!text.trim()) {
+      output.value = "";
+      setHero(null);
+      return;
+    }
+    if (inflight) { pending = true; return; }
+    var payload = {
+      text: text,
+      level: currentLevel,
+      vowel_min_length: numericKnob($("vml").value, function (v) { return parseInt(v, 10); }, 4),
+      adaptive_threshold: numericKnob($("threshold").value, parseFloat, 0.85),
+      mode: $("mode").value
+    };
+
+    function tryLocal(errMessage) {
+      useServer = false;
+      return ensureJs().then(function () {
+        var local = compressLocal(text, payload.level, payload.vowel_min_length, payload.mode);
+        output.value = local.encoded;
+        setHero(local.stats);
+        if (errMessage) showToast("Running offline — JS port in use");
+      }).catch(function () {
+        output.value = "Error: " + (errMessage || "compression failed") +
+          "\n\nJS fallback also unavailable.";
+        setHero(null);
+      });
+    }
+
+    function showServerError(err) {
+      // Server reachable + responded with a 4xx/5xx. Surface the error
+      // inline; do NOT flip useServer — the server is up, the input was
+      // bad (validation) or transiently failing (5xx), and offline mode
+      // has different validation semantics so it could mislead.
+      output.value = "Error: " + err;
+      setHero(null);
+    }
+
+    var run;
+    if (useServer) {
+      run = fetch("/metalk/compress", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }).then(function (r) {
+        return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; });
+      }).then(function (res) {
+        if (res.ok) {
+          output.value = res.body.encoded;
+          setHero(res.body.stats);
+          return;
+        }
+        // Server responded — don't fall through to offline.
+        showServerError(res.body && res.body.error ? res.body.error : ("HTTP " + res.status));
+      }).catch(function (err) {
+        // True network failure (fetch rejected before we got headers) —
+        // this is the only case where offline fallback is appropriate.
+        return tryLocal(err.message);
+      });
+    } else {
+      run = tryLocal();
+    }
+
+    inflight = run.finally(function () {
+      inflight = null;
+      if (pending) { pending = false; compress(); }
+    });
+  }
+
+  var debounceTimer = null;
+  function scheduleCompress() {
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(compress, 220);
+  }
+
+  input.addEventListener("input", function () {
+    updateInputStats();
+    scheduleCompress();
+  });
+
+  // ── Copy button with transient "Copied" state ───────────────
+
+  var copyBtn = $("btn-copy");
+  var copyText = $("btn-copy-text");
+  var copyResetTimer = null;
+
+  function doCopy() {
+    if (!output.value) { showToast("Nothing to copy"); return; }
+    var done = function () {
+      copyBtn.classList.add("copied");
+      copyText.textContent = "✓ Copied!";
+      clearTimeout(copyResetTimer);
+      copyResetTimer = setTimeout(function () {
+        copyBtn.classList.remove("copied");
+        copyText.textContent = "Copy compressed";
+      }, 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(output.value).then(done, function () {
+        output.select(); document.execCommand("copy"); done();
+      });
+    } else {
+      output.select(); document.execCommand("copy"); done();
+    }
+  }
+
+  copyBtn.addEventListener("click", doCopy);
+
+  $("btn-reuse").addEventListener("click", function () {
+    if (!output.value) return;
+    input.value = output.value;
+    updateInputStats();
+    scheduleCompress();
+  });
+
+  $("btn-clear").addEventListener("click", function () {
+    input.value = "";
+    output.value = "";
+    updateInputStats();
+    setHero(null);
+    input.focus();
+  });
+
+  // ── Keyboard shortcuts ──────────────────────────────────────
+
+  document.addEventListener("keydown", function (e) {
+    var mod = e.metaKey || e.ctrlKey;
+    if (!mod) return;
+    if (e.key === "Enter") { e.preventDefault(); doCopy(); }
+    else if (e.key === "k" || e.key === "K") {
+      e.preventDefault();
+      input.value = "";
+      output.value = "";
+      updateInputStats();
+      setHero(null);
+      input.focus();
+    }
+    else if (e.key >= "1" && e.key <= "5") {
+      e.preventDefault();
+      setLevel(parseInt(e.key, 10));
+    }
+  });
+
+  // ── Compare view ────────────────────────────────────────────
+
+  var PRESET_NAMES = { 1: "Safe", 2: "Tighter", 3: "Aggressive", 4: "Skeleton", 5: "Adaptive" };
+  var singlePane = $("view-single-pane");
+  var comparePane = $("view-compare-pane");
+  var btnSingle = $("view-single");
+  var btnCompare = $("view-compare");
+  var compareInput = $("compare-input");
+  var compareGrid = $("compare-grid");
+
+  function setView(v) {
+    var isCompare = v === "compare";
+    singlePane.style.display = isCompare ? "none" : "";
+    comparePane.style.display = isCompare ? "" : "none";
+    btnSingle.classList.toggle("active", !isCompare);
+    btnCompare.classList.toggle("active", isCompare);
+    saveState({ view: v });
+    if (isCompare) {
+      if (!compareInput.value && input.value) compareInput.value = input.value;
+      runCompare();
+    }
+  }
+  btnSingle.addEventListener("click", function () { setView("single"); });
+  btnCompare.addEventListener("click", function () { setView("compare"); });
+  if (state.view === "compare") setView("compare");
+
+  function updateCompareInputStats() {
+    var t = compareInput.value;
+    $("compare-input-stats").textContent =
+      t.length + " chars · ~" + estimateTokens(t) + " tokens";
+  }
+
+  function renderCompareCards(rows) {
+    // Identify which level has the best savings so we can highlight it.
+    var bestSaved = -1;
+    rows.forEach(function (r) { if (r.stats && r.stats.pct_saved > bestSaved) bestSaved = r.stats.pct_saved; });
+
+    compareGrid.innerHTML = "";
+    rows.forEach(function (r) {
+      var card = document.createElement("div");
+      card.className = "compare-card";
+      if (r.stats && r.stats.pct_saved === bestSaved && bestSaved > 0) card.classList.add("best");
+
+      var head = document.createElement("div");
+      head.className = "compare-card-head";
+      var name = document.createElement("span");
+      name.className = "name";
+      name.textContent = "L" + r.level + " · " + PRESET_NAMES[r.level];
+      var savings = document.createElement("span");
+      savings.className = "savings";
+      savings.textContent = r.stats ? r.stats.pct_saved + "%" : "err";
+      head.appendChild(name);
+      head.appendChild(savings);
+
+      var sub = document.createElement("span");
+      sub.className = "sub";
+      if (r.stats) {
+        sub.textContent = r.stats.original_tokens + "→" + r.stats.encoded_tokens + " tokens · " + r.stats.ratio + "×";
+      } else {
+        sub.textContent = r.error || "—";
+      }
+
+      var ta = document.createElement("textarea");
+      ta.readOnly = true;
+      ta.value = r.encoded || r.error || "";
+
+      var btn = document.createElement("button");
+      btn.className = "mini";
+      btn.textContent = "Copy";
+      btn.addEventListener("click", function () {
+        if (!ta.value) return;
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(ta.value);
+        } else {
+          ta.select(); document.execCommand("copy");
+        }
+        btn.textContent = "✓ Copied";
+        setTimeout(function () { btn.textContent = "Copy"; }, 1200);
+      });
+
+      card.appendChild(head);
+      card.appendChild(sub);
+      card.appendChild(ta);
+      card.appendChild(btn);
+      compareGrid.appendChild(card);
+    });
+  }
+
+  var compareInflight = null, comparePending = false;
+  function runCompare() {
+    var text = compareInput.value;
+    updateCompareInputStats();
+    if (!text.trim()) {
+      compareGrid.innerHTML = "";
+      return;
+    }
+    if (compareInflight) { comparePending = true; return; }
+    var payload = {
+      text: text,
+      vowel_min_length: numericKnob($("vml").value, function (v) { return parseInt(v, 10); }, 4),
+      adaptive_threshold: numericKnob($("threshold").value, parseFloat, 0.85),
+      mode: $("mode").value
+    };
+    function showCompareError(msg) {
+      // Replaces stale cards with a visible error so the user sees that
+      // the last request failed rather than reading outdated comparisons.
+      compareGrid.innerHTML =
+        '<div style="color: var(--text-dim); grid-column: 1/-1; text-align: center; padding: 2rem;">' +
+        msg + "</div>";
+    }
+
+    // Local compare using the JS port — reused for offline fallback so the
+    // Compare tab works on static hosts too, mirroring the single-compress
+    // behavior advertised for offline mode.
+    function runCompareLocal() {
+      return ensureJs().then(function () {
+        var rows = [1, 2, 3, 4, 5].map(function (level) {
+          try {
+            var res = compressLocal(text, level, payload.vowel_min_length, payload.mode);
+            return { level: level, encoded: res.encoded, stats: res.stats };
+          } catch (err) {
+            return { level: level, error: String(err && err.message || err) };
+          }
+        });
+        renderCompareCards(rows);
+        showToast("Running offline — JS port in use");
+      }).catch(function () {
+        showCompareError("Server unreachable and JS fallback failed to load.");
+      });
+    }
+
+    compareInflight = fetch("/metalk/compare", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).then(function (r) {
+      return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; });
+    }).then(function (res) {
+      compareInflight = null;
+      if (!res.ok) {
+        // Server replied with 4xx/5xx — surface the error inline and
+        // clear stale cards instead of silently keeping them visible.
+        // Don't fall back to local here: the server was reachable, the
+        // request was rejected, so treat it the same way single-compress
+        // does (see round-5 Codex review).
+        var msg = (res.body && res.body.error) ? res.body.error : ("HTTP " + res.status);
+        showCompareError("Error: " + msg);
+        return;
+      }
+      if (res.body && res.body.levels) {
+        renderCompareCards(res.body.levels);
+      } else {
+        showCompareError("Error: malformed response (no levels field)");
+      }
+    }).catch(function () {
+      // True network failure — fall back to the JS port, matching the
+      // single-compress offline behavior so the Compare tab stays usable
+      // on static hosts or when the server is down.
+      return runCompareLocal().finally(function () { compareInflight = null; });
+    }).finally(function () {
+      if (comparePending) { comparePending = false; runCompare(); }
+    });
+  }
+
+  var compareDebounce = null;
+  compareInput.addEventListener("input", function () {
+    clearTimeout(compareDebounce);
+    compareDebounce = setTimeout(runCompare, 300);
+  });
+
+  // ── Init ────────────────────────────────────────────────────
+
+  updateInputStats();
+})();
+</script>
+
+</body>
+</html>

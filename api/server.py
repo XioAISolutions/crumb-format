@@ -22,6 +22,16 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from cli.crumb import parse_crumb, render_crumb  # noqa: E402
+from cli.metalk import (  # noqa: E402
+    encode as metalk_encode,
+    encode_plain as metalk_encode_plain,
+    compression_stats as metalk_stats,
+)
+from cli.vowelstrip import (  # noqa: E402
+    drift_stats as vs_drift_stats,
+    encode_crumb as vs_encode_crumb,
+    strip_text as vs_strip_text,
+)
 from agentauth.store import PassportStore  # noqa: E402
 from agentauth.passport import AgentPassport  # noqa: E402
 from agentauth.policy import ToolPolicy  # noqa: E402
@@ -99,6 +109,171 @@ def crumb_render(_req, _match, _qs, body):
         return 200, {"text": text}
     except Exception as exc:
         return 400, {"error": str(exc)}
+
+
+# ---------------------------------------------------------------------------
+# MeTalk / vowel-strip compression endpoint (powers the playground)
+# ---------------------------------------------------------------------------
+
+# Section markers written by _wrap_plain_text — these are the ONLY bracketed
+# lines the unwrap step should drop. Keeping the allowlist explicit prevents
+# legitimate user content like `[todo]` or `[note]` from being deleted.
+_CRUMB_SENTINELS = frozenset({"BEGIN CRUMB", "BC"})
+
+
+def _looks_like_crumb(text: str) -> bool:
+    """Auto-mode CRUMB detection — requires the sentinel to be the entire
+    first non-empty line, not just a prefix. Previously `startswith("BC")`
+    false-matched prompts like "BC drivers are failing" and routed them to
+    the structured encoder (which returns input unchanged when no `---`
+    separator is present), reporting the wrong mode in stats."""
+    stripped = text.lstrip()
+    first_line = stripped.split("\n", 1)[0].strip()
+    return first_line in _CRUMB_SENTINELS
+
+
+_VALID_MODES = frozenset({"auto", "crumb", "plain"})
+
+
+def _parse_metalk_knobs(body):
+    """Parse vowel_min_length + adaptive_threshold with 400-on-bad-input.
+
+    Uses explicit `is None` checks rather than `x or default` so that a
+    legitimate numeric `0` (or `0.0`) isn't silently replaced by the
+    default. `0` fails the bounds check on vml (must be ≥ 1) but `0.0`
+    is a valid threshold.
+
+    Returns either (vml, threshold, None) on success or
+    (None, None, (status, data)) on validation failure so callers can
+    short-circuit with `return`.
+    """
+    raw_vml = body.get("vowel_min_length")
+    try:
+        vml = int(raw_vml) if raw_vml is not None else 4
+    except (TypeError, ValueError):
+        return None, None, (400, {"error": "'vowel_min_length' must be a positive integer"})
+    if vml < 1:
+        return None, None, (400, {"error": "'vowel_min_length' must be a positive integer"})
+
+    raw_threshold = body.get("adaptive_threshold")
+    try:
+        threshold = float(raw_threshold) if raw_threshold is not None else 0.85
+    except (TypeError, ValueError):
+        return None, None, (400, {"error": "'adaptive_threshold' must be a number between 0 and 1"})
+    if not (0.0 <= threshold <= 1.0):
+        return None, None, (400, {"error": "'adaptive_threshold' must be between 0 and 1"})
+
+    return vml, threshold, None
+
+
+@route("POST", "/metalk/compress")
+def metalk_compress(_req, _match, _qs, body):
+    """Compress arbitrary text or a CRUMB through MeTalk levels 1-5.
+
+    Body:
+      text                 (str, required) — input text
+      level                (int 1-5, default 2) — MeTalk level
+      vowel_min_length     (int, default 4)   — L4-5 word length floor
+      adaptive_threshold   (float, default 0.85) — L5 sim floor
+      mode                 (str, default "auto") — "auto" | "crumb" | "plain"
+                            auto = detect by BEGIN CRUMB sentinel
+    """
+    text = body.get("text", "")
+    if not text:
+        return 400, {"error": "missing 'text' field"}
+    if not isinstance(text, str):
+        return 400, {"error": "'text' must be a string"}
+    try:
+        level = int(body.get("level", 2))
+    except (TypeError, ValueError):
+        return 400, {"error": "'level' must be an integer 1-5"}
+    if level not in (1, 2, 3, 4, 5):
+        return 400, {"error": "'level' must be 1, 2, 3, 4, or 5"}
+
+    vml, threshold, err = _parse_metalk_knobs(body)
+    if err:
+        return err
+
+    mode = body.get("mode", "auto")
+    if mode not in _VALID_MODES:
+        return 400, {"error": "'mode' must be one of: auto, crumb, plain"}
+
+    is_crumb = mode == "crumb" or (mode == "auto" and _looks_like_crumb(text))
+
+    try:
+        if is_crumb:
+            encoded = metalk_encode(
+                text, level=level,
+                vowel_min_length=vml, adaptive_threshold=threshold,
+            )
+        else:
+            # Plain prose: run the body transforms directly via encode_plain
+            # so that user [bracket] headings are preserved verbatim. The
+            # earlier wrap-and-unwrap hack ran the user text through the
+            # CRUMB encoder, which rewrote `[goal]`/`[context]` to their
+            # MeTalk-abbreviated forms — silent content corruption.
+            encoded = metalk_encode_plain(
+                text, level=level,
+                vowel_min_length=vml, adaptive_threshold=threshold,
+            )
+    except Exception as exc:
+        traceback.print_exc()
+        return 500, {"error": f"compression failed: {exc}"}
+
+    stats = metalk_stats(text, encoded)
+    drift = vs_drift_stats(text, encoded)
+    stats["vowels_removed"] = drift["vowels_removed"]
+    stats["vowel_retention_pct"] = drift["vowel_retention_pct"]
+    stats["level"] = level
+    stats["mode"] = "crumb" if is_crumb else "plain"
+    return 200, {"encoded": encoded, "stats": stats}
+
+
+@route("POST", "/metalk/compare")
+def metalk_compare(_req, _match, _qs, body):
+    """Run MeTalk levels 1-5 over the same input in one request.
+
+    Body: {text, vowel_min_length?, adaptive_threshold?, mode?}
+    Returns: {levels: [{level, encoded, stats}, ...], original_tokens}
+    """
+    text = body.get("text", "")
+    if not text:
+        return 400, {"error": "missing 'text' field"}
+    if not isinstance(text, str):
+        return 400, {"error": "'text' must be a string"}
+
+    vml, threshold, err = _parse_metalk_knobs(body)
+    if err:
+        return err
+    mode = body.get("mode", "auto")
+    if mode not in _VALID_MODES:
+        return 400, {"error": "'mode' must be one of: auto, crumb, plain"}
+
+    results = []
+    for level in (1, 2, 3, 4, 5):
+        try:
+            status, data = metalk_compress(
+                _req, _match, _qs,
+                {"text": text, "level": level,
+                 "vowel_min_length": vml, "adaptive_threshold": threshold,
+                 "mode": mode},
+            )
+        except Exception:
+            traceback.print_exc()
+            results.append({"level": level, "error": "compression failed"})
+            continue
+        if status != 200 or "encoded" not in data:
+            results.append({"level": level, "error": data.get("error", "unknown")})
+            continue
+        results.append({
+            "level": level,
+            "encoded": data["encoded"],
+            "stats": data["stats"],
+        })
+    return 200, {
+        "levels": results,
+        "original_tokens": metalk_stats(text, text)["original_tokens"],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -298,6 +473,46 @@ def health(_req, _match, _qs, _body):
 
 
 # ---------------------------------------------------------------------------
+# Static file serving (web/ directory) — powers the playground UI
+# ---------------------------------------------------------------------------
+
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+_STATIC_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "application/javascript; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+    ".json": "application/json",
+}
+
+
+def _serve_static(handler, rel_path: str) -> bool:
+    """Serve a file from web/ if it exists. Returns True if handled."""
+    if not rel_path or rel_path == "/":
+        rel_path = "playground.html"
+    rel_path = rel_path.lstrip("/")
+    # Prevent directory traversal
+    safe = (WEB_DIR / rel_path).resolve()
+    try:
+        safe.relative_to(WEB_DIR.resolve())
+    except ValueError:
+        return False
+    if not safe.is_file():
+        return False
+    data = safe.read_bytes()
+    ctype = _STATIC_TYPES.get(safe.suffix.lower(), "application/octet-stream")
+    handler.send_response(200)
+    handler._add_cors_headers()
+    handler.send_header("Content-Type", ctype)
+    handler.send_header("Content-Length", str(len(data)))
+    handler.end_headers()
+    handler.wfile.write(data)
+    return True
+
+
+# ---------------------------------------------------------------------------
 # HTTP Request Handler
 # ---------------------------------------------------------------------------
 
@@ -360,6 +575,12 @@ class CrumbAPIHandler(BaseHTTPRequestHandler):
                 self._send_json(status_code, data)
                 return
 
+        # Fall through to static file serving for GETs (powers /playground.html
+        # and any sibling assets dropped under web/).
+        if method == "GET":
+            if _serve_static(self, path):
+                return
+
         self._send_json(404, {"error": f"not found: {method} {path}"})
 
     def _send_json(self, status_code: int, data):
@@ -380,6 +601,8 @@ ENDPOINT_LIST = [
     ("POST", "/crumb/validate", "Validate a crumb document"),
     ("POST", "/crumb/parse", "Parse crumb text to JSON"),
     ("POST", "/crumb/render", "Render JSON to crumb text"),
+    ("POST", "/metalk/compress", "Compress text via MeTalk levels 1-5"),
+    ("GET",  "/playground.html", "Browser-based prompt compression UI"),
     ("POST", "/passport/register", "Register a new agent passport"),
     ("GET",  "/passport/:id", "Inspect a passport"),
     ("GET",  "/passport/:id/verify", "Verify passport validity"),

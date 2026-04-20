@@ -248,11 +248,101 @@ crumb metalk task.crumb --level 1
 # Aggressive condensing (~50-60% savings)
 crumb metalk task.crumb --level 3
 
+# Skeleton — interior vowel-strip on top of L3
+crumb metalk task.crumb --level 4
+
+# Adaptive — vowel-strip with embedding drift guard (needs [embeddings] extra)
+pip install crumb-format[embeddings]
+crumb metalk task.crumb --level 5 --adaptive-threshold 0.85
+
 # Chain with compress for maximum density
 crumb compress task.crumb --metalk
 ```
 
 Output shows live stats: `MeTalk: 127 → 68 tokens (46.5% saved, 1.87x ratio)`.
+
+Levels 4 and 5 add interior vowel-stripping (`btfl dy` ≈ "beautiful day").
+L4 is rule-based; L5 measures per-line embedding cosine drift and only
+keeps the strip if the line stays above a similarity threshold. See
+[`docs/vowel-drift.md`](docs/vowel-drift.md) for methodology and
+[`docs/vowel-drift-benchmark.md`](docs/vowel-drift-benchmark.md) for the
+bundled numbers. Standalone use:
+
+```bash
+crumb vowelstrip notes.txt --plain               # plain prose
+crumb vowelstrip task.crumb --min-length 5       # only strip 5+ char words
+crumb vowelstrip task.crumb --adaptive           # embedding-aware
+```
+
+### Playground — chat-box style prompt compressor
+
+Don't want to memorize flags? Run
+
+```bash
+crumb playground
+```
+
+which boots a local REST server and opens a browser-based chat-box UI:
+paste a prompt or `.crumb` on the left, pick a named preset
+(`Safe · Tighter · Aggressive · Skeleton · Adaptive`), watch the
+compressed version and savings update live on the right, copy with one
+click. Advanced knobs (min word length, adaptive threshold, input mode)
+hide behind a toggle. Keyboard: `⌘/Ctrl+Enter` copies, `⌘/Ctrl+K`
+clears, `⌘/Ctrl+1..5` switches preset. Preset and settings persist
+across sessions via `localStorage`.
+
+![playground — default Tighter preset (L2) on a bug report](docs/assets/playground-compressed-l2.png)
+
+The same backend exposes `POST /metalk/compress` and `POST /metalk/compare`
+(all five levels at once) for programmatic use. Defaults to
+`http://127.0.0.1:8420/playground.html`; pass `--port` or `--no-browser`
+to override. The playground also ships a **Compare all** tab that renders
+L1-L5 side-by-side and highlights the best-savings level — handy for
+picking a preset.
+
+**Offline mode**: `web/metalk.js` is a complete JS port of MeTalk +
+vowel-strip. When the local server is unreachable the playground
+transparently falls back to the in-browser port — the page works served
+from `file://`, GitHub Pages, or any static host. A drift-guard test
+(`tests/test_js_port.py`) runs the JS port in Node and asserts its
+output is byte-identical to the Python implementation across every
+example crumb.
+
+### Browser extension — prompt compressor popup
+
+The CRUMB browser extension (`browser-extension/`) gains a mini-playground
+popup in v1.2.0 — paste any prompt, pick a preset, copy the compressed
+version. Everything runs client-side via the bundled JS port; no server
+round-trip, works offline.
+
+| ![extension popup, Tighter preset](docs/assets/extension-popup.png) | ![extension popup, Skeleton preset](docs/assets/extension-popup-skeleton.png) |
+|:-:|:-:|
+| L2 · Tighter (29.7% saved) | L4 · Skeleton (43.2% saved) |
+
+Also adds a "Pull current page selection" button so you can grab text
+directly from whatever chat UI you're in. The existing "Copy as CRUMB"
+context menu for ChatGPT / Claude / Gemini is unchanged.
+
+<details>
+<summary>More playground screenshots (empty state, Skeleton preset, Advanced panel, mobile)</summary>
+
+**Empty state — pick a preset or load an example.**
+
+![empty state](docs/assets/playground-empty.png)
+
+**Skeleton (L4) on the same input — vowel-strip on top of dict + grammar.**
+
+![skeleton L4 preset](docs/assets/playground-skeleton-l4.png)
+
+**Advanced panel open on a `.crumb` — mode auto-detected as structured.**
+
+![advanced panel open on a .crumb](docs/assets/playground-advanced-crumb.png)
+
+**Mobile — presets collapse to 2-up, panels stack.**
+
+![mobile viewport](docs/assets/playground-mobile.png)
+
+</details>
 
 ## Cross-AI Interop
 

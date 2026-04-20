@@ -1,31 +1,48 @@
---- task: CRUMB 0.4.0 — v1.2 wire format (standalone cannibalization)
+--- task: 0.5.0 — prompt-compression release (playground, JS port, extension popup)
 source: github.pr
-pr: #12
-generated: 2026-04-15T15:45:27Z
+pr: #15
+generated: 2026-04-20T14:04:47Z
 ---
 
 [goal]
-# CRUMB 0.4.0 — v1.2 wire format, standalone
+## Summary
 
 [context]
 Changed files in this PR:
 - .crumb/latest.crumb
 - CHANGELOG.md
-- CODEX_HANDOFF_0.4.0.crumb
 - README.md
-- RELEASE_NOTES_0.4.0_DRAFT.md
-- SPEC.md
+- api/server.py
+- browser-extension/manifest.json
+- browser-extension/metalk-data.json
+- browser-extension/metalk.js
+- browser-extension/popup.html
+- browser-extension/popup.js
 - cli/crumb.py
-- docs/v1.2-fold-heuristic.md
-- docs/v1.2-ref-resolution.md
-- examples/v12-fold.crumb
-- examples/v12-handoff.crumb
-- examples/v12-refs.crumb
-- examples/v12-typed-content.crumb
+- cli/metalk.py
+- cli/vowelstrip.py
+- docs/assets/extension-popup-skeleton.png
+- docs/assets/extension-popup.png
+- docs/assets/playground-advanced-crumb.png
+- docs/assets/playground-compressed-l2.png
+- docs/assets/playground-empty.png
+- docs/assets/playground-mobile.png
+- docs/assets/playground-skeleton-l4.png
+- docs/vowel-drift-benchmark.md
+- docs/vowel-drift.md
 - pyproject.toml
-- tests/test_crumb.py
-- validators/validate.js
-- validators/validate.py
+- scripts/export_metalk_data.py
+- scripts/measure_drift.py
+- scripts/screenshot_extension.js
+- scripts/screenshot_playground.js
+- tests/test_browser_regression.py
+- tests/test_js_port.py
+- tests/test_metalk.py
+- tests/test_playground.py
+- tests/test_vowelstrip.py
+- web/metalk-data.json
+- web/metalk.js
+- web/playground.html
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
