@@ -293,12 +293,38 @@ across sessions via `localStorage`.
 
 ![playground — default Tighter preset (L2) on a bug report](docs/assets/playground-compressed-l2.png)
 
-The same backend exposes `POST /metalk/compress` for programmatic use.
-Defaults to `http://127.0.0.1:8420/playground.html`; pass `--port` or
-`--no-browser` to override.
+The same backend exposes `POST /metalk/compress` and `POST /metalk/compare`
+(all five levels at once) for programmatic use. Defaults to
+`http://127.0.0.1:8420/playground.html`; pass `--port` or `--no-browser`
+to override. The playground also ships a **Compare all** tab that renders
+L1-L5 side-by-side and highlights the best-savings level — handy for
+picking a preset.
+
+**Offline mode**: `web/metalk.js` is a complete JS port of MeTalk +
+vowel-strip. When the local server is unreachable the playground
+transparently falls back to the in-browser port — the page works served
+from `file://`, GitHub Pages, or any static host. A drift-guard test
+(`tests/test_js_port.py`) runs the JS port in Node and asserts its
+output is byte-identical to the Python implementation across every
+example crumb.
+
+### Browser extension — prompt compressor popup
+
+The CRUMB browser extension (`browser-extension/`) gains a mini-playground
+popup in v1.2.0 — paste any prompt, pick a preset, copy the compressed
+version. Everything runs client-side via the bundled JS port; no server
+round-trip, works offline.
+
+| ![extension popup, Tighter preset](docs/assets/extension-popup.png) | ![extension popup, Skeleton preset](docs/assets/extension-popup-skeleton.png) |
+|:-:|:-:|
+| L2 · Tighter (29.7% saved) | L4 · Skeleton (43.2% saved) |
+
+Also adds a "Pull current page selection" button so you can grab text
+directly from whatever chat UI you're in. The existing "Copy as CRUMB"
+context menu for ChatGPT / Claude / Gemini is unchanged.
 
 <details>
-<summary>More screenshots (empty state, Skeleton preset, Advanced panel, mobile)</summary>
+<summary>More playground screenshots (empty state, Skeleton preset, Advanced panel, mobile)</summary>
 
 **Empty state — pick a preset or load an example.**
 

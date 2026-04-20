@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## v0.5.0
+
+Prompt-compression release. Adds the chat-box-style playground UI, a pure-JS port of the whole MeTalk + vowel-strip pipeline, a browser-extension popup that runs the algorithm fully in-browser, and the embedding-drift research tooling from the original vowel-strip work.
 
 ### Playground — chat-box style prompt compressor
 
@@ -18,6 +20,26 @@
 - **Docs**: `docs/vowel-drift.md` methodology + tuning, `docs/vowel-drift-benchmark.md` bundled ngram benchmark across the 17 example crumbs.
 - **Wire format**: encoded crumbs carry a new `vs=N` header recording the min-length threshold; `decode()` strips both `mt=` and `vs=` headers.
 - **Optional dependency**: `pip install crumb-format[embeddings]` installs `sentence-transformers` for L5 and the semantic drift backend.
+
+### Compare view + `/metalk/compare` endpoint
+
+- **Playground "Compare all" tab**: renders L1-L5 side-by-side against the same input, highlights the level with the highest savings, per-card Copy button.
+- **`POST /metalk/compare`** runs all five levels in one request and returns `{levels: [{level, encoded, stats}, ...], original_tokens}`.
+- Server-side plain-text handling now wraps at all levels (previously L1-3 only) so L4/L5 plain prose gets the full dict + grammar + condense + vowel-strip pipeline — visible e.g. "authentication middleware configuration" → `Pls fix ath mw cfg.` at L4 (58% saved vs 50% at L1-3).
+
+### Pure-JS port (runs fully in-browser)
+
+- **`web/metalk.js`**: complete port of `cli/metalk.py` and `cli/vowelstrip.py` to a single UMD module — encode/decode/stripText/stripLine/compressionStats. Loads dictionary data from `web/metalk-data.json`.
+- **`scripts/export_metalk_data.py`**: exports Python dicts/frozensets to the JSON file; Python remains the single source of truth.
+- **`tests/test_js_port.py`**: drift-guard test that regenerates the JSON in memory and compares against the checked-in file, plus a Node-driver parametric test that asserts JS encode output matches Python byte-for-byte across every example crumb at L1-L4.
+- **Playground falls back to the JS port** when the server is unreachable — the page now works served from `file://` or a static host.
+
+### Browser extension v1.2.0 — prompt-compressor popup
+
+- Rewritten `browser-extension/popup.html` + `popup.js` as a compact mini-playground: preset tabs, paste-from-clipboard, pull-current-page-selection (via `chrome.scripting.executeScript`), live debounced compression, `Cmd/Ctrl+Enter` to copy, `Cmd/Ctrl+1..5` to switch preset.
+- Bundles `metalk.js` + `metalk-data.json`; **everything runs client-side** — no server round-trip, no network traffic. Works offline.
+- Manifest updated to v1.2.0; added `scripting` and `storage` permissions, declared `metalk-data.json` as a web-accessible resource.
+- Existing "Copy as CRUMB" context menu for ChatGPT / Claude / Gemini is unchanged.
 
 ## v0.4.0
 
