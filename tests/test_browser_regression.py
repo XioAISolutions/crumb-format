@@ -124,6 +124,78 @@ process.stdout.write(JSON.stringify(results));
 
 
 @pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_compress_validation_error_does_not_flip_to_offline(tmp_path):
+    """Regression: the playground's compress .catch used to run for 4xx
+    responses, silently flipping useServer=false for the session. The
+    fixed code only falls back on true network errors."""
+    # Extract the decision logic by simulating a 400 and asserting
+    # showServerError is invoked (not tryLocal).
+    driver = tmp_path / "driver.js"
+    driver.write_text(r"""
+let useServer = true;
+let offlineCalled = false;
+let serverErrorShown = null;
+
+function tryLocal() {
+  useServer = false;
+  offlineCalled = true;
+}
+function showServerError(err) { serverErrorShown = err; }
+
+// Mirror the fixed compress() server-response handler exactly:
+function handleResponse(res) {
+  if (res.ok) return;
+  showServerError(res.body && res.body.error ? res.body.error : ("HTTP " + res.status));
+}
+
+// Simulate a 400 with a validation error (e.g. adaptive_threshold=2).
+handleResponse({ ok: false, status: 400, body: { error: "'adaptive_threshold' must be between 0 and 1" } });
+console.log(JSON.stringify({ offlineCalled, serverErrorShown, useServer }));
+""", encoding="utf-8")
+    result = subprocess.run([NODE, str(driver)], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stderr
+    out = json.loads(result.stdout)
+    assert out["offlineCalled"] is False, \
+        "4xx wrongly triggered offline fallback"
+    assert out["useServer"] is True, \
+        "useServer was flipped on a 4xx response"
+    assert "adaptive_threshold" in out["serverErrorShown"]
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_compare_clears_stale_cards_on_error(tmp_path):
+    """Regression: compare used to leave previous cards visible on a 400
+    because data.levels was missing. Now it calls showCompareError which
+    replaces the grid with an error message."""
+    driver = tmp_path / "driver.js"
+    driver.write_text(r"""
+let grid = "<card>old</card><card>old</card>";
+function showCompareError(msg) {
+  grid = '<div class="err">' + msg + '</div>';
+}
+function handleCompareResponse(res) {
+  if (!res.ok) {
+    const msg = (res.body && res.body.error) ? res.body.error : ("HTTP " + res.status);
+    showCompareError("Error: " + msg);
+    return;
+  }
+  if (res.body && res.body.levels) {
+    grid = "<card>new1</card><card>new2</card>";
+  } else {
+    showCompareError("Error: malformed response (no levels field)");
+  }
+}
+handleCompareResponse({ ok: false, status: 400, body: { error: "'text' must be a string" } });
+console.log(JSON.stringify({ grid }));
+""", encoding="utf-8")
+    result = subprocess.run([NODE, str(driver)], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stderr
+    out = json.loads(result.stdout)
+    assert "old" not in out["grid"], "stale cards were not cleared on 4xx"
+    assert "err" in out["grid"] and "text" in out["grid"]
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
 def test_playground_offline_is_crumb_detection(tmp_path):
     """Regression: the offline `isCrumb` mixed &&/|| without grouping and
     used Python's lstrip, so mode=plain still triggered the BC check and

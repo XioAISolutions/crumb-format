@@ -814,6 +814,15 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
       });
     }
 
+    function showServerError(err) {
+      // Server reachable + responded with a 4xx/5xx. Surface the error
+      // inline; do NOT flip useServer — the server is up, the input was
+      // bad (validation) or transiently failing (5xx), and offline mode
+      // has different validation semantics so it could mislead.
+      output.value = "Error: " + err;
+      setHero(null);
+    }
+
     var run;
     if (useServer) {
       run = fetch("/metalk/compress", {
@@ -821,12 +830,18 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       }).then(function (r) {
-        return r.json().then(function (j) { return { ok: r.ok, body: j }; });
+        return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; });
       }).then(function (res) {
-        if (!res.ok) throw new Error(res.body.error || "unknown");
-        output.value = res.body.encoded;
-        setHero(res.body.stats);
+        if (res.ok) {
+          output.value = res.body.encoded;
+          setHero(res.body.stats);
+          return;
+        }
+        // Server responded — don't fall through to offline.
+        showServerError(res.body && res.body.error ? res.body.error : ("HTTP " + res.status));
       }).catch(function (err) {
+        // True network failure (fetch rejected before we got headers) —
+        // this is the only case where offline fallback is appropriate.
         return tryLocal(err.message);
       });
     } else {
@@ -1016,19 +1031,37 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
       adaptive_threshold: numericKnob($("threshold").value, parseFloat, 0.85),
       mode: $("mode").value
     };
+    function showCompareError(msg) {
+      // Replaces stale cards with a visible error so the user sees that
+      // the last request failed rather than reading outdated comparisons.
+      compareGrid.innerHTML =
+        '<div style="color: var(--text-dim); grid-column: 1/-1; text-align: center; padding: 2rem;">' +
+        msg + "</div>";
+    }
+
     compareInflight = fetch("/metalk/compare", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
-    }).then(function (r) { return r.json(); }).then(function (data) {
+    }).then(function (r) {
+      return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; });
+    }).then(function (res) {
       compareInflight = null;
-      if (data.levels) renderCompareCards(data.levels);
+      if (!res.ok) {
+        // Server replied with 4xx/5xx — surface the error inline and
+        // clear stale cards instead of silently keeping them visible.
+        var msg = (res.body && res.body.error) ? res.body.error : ("HTTP " + res.status);
+        showCompareError("Error: " + msg);
+        return;
+      }
+      if (res.body && res.body.levels) {
+        renderCompareCards(res.body.levels);
+      } else {
+        showCompareError("Error: malformed response (no levels field)");
+      }
     }).catch(function () {
       compareInflight = null;
-      compareGrid.innerHTML =
-        '<div style="color: var(--text-dim); grid-column: 1/-1; text-align: center; padding: 2rem;">' +
-        "Server unreachable. Start with <code>crumb playground</code>." +
-        "</div>";
+      showCompareError("Server unreachable. Start with <code>crumb playground</code>.");
     }).finally(function () {
       if (comparePending) { comparePending = false; runCompare(); }
     });

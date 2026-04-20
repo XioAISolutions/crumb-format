@@ -4357,6 +4357,7 @@ def cmd_vowelstrip(args: argparse.Namespace) -> None:
     else:
         text = read_text(args.file)
 
+    embedder = None
     if args.adaptive:
         embedder = _load_embedder()
         if embedder is None:
@@ -4375,8 +4376,12 @@ def cmd_vowelstrip(args: argparse.Namespace) -> None:
 
     if args.plain:
         if args.adaptive:
+            # Reuse the embedder we already loaded above; without this kwarg
+            # adaptive_strip_text would load a second SentenceTransformer
+            # (~seconds + ~80MB) for the --plain --adaptive path.
             result = adaptive_strip_text(text, threshold=args.threshold,
-                                         min_length=args.min_length)
+                                         min_length=args.min_length,
+                                         embedder=embedder)
         else:
             result = strip_text(text, min_length=args.min_length)
     else:

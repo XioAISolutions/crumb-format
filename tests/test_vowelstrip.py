@@ -263,3 +263,42 @@ class TestMetalkLevel4Integration:
         l5_body = l5.split('---', 1)[1]
         assert l4_body == l5_body
         assert "mt=4" in l4 and "mt=5" in l5
+
+    def test_cmd_vowelstrip_plain_adaptive_loads_embedder_once(self, monkeypatch, tmp_path, capsys):
+        """Regression: cmd_vowelstrip --plain --adaptive called
+        adaptive_strip_text without passing the embedder it had just
+        loaded, causing a second SentenceTransformer load (~seconds +
+        ~80MB). The fix passes embedder= through."""
+        from cli import crumb as _crumb_cli
+        from cli import vowelstrip as _vs
+        import argparse
+
+        calls = {"n": 0}
+
+        class FakeEmbedder:
+            def encode(self, pairs):
+                return [[1.0, 0.0], [0.999, 0.001]]
+
+        def fake_load_embedder(*a, **kw):
+            calls["n"] += 1
+            return FakeEmbedder()
+
+        monkeypatch.setattr(_vs, "_load_embedder", fake_load_embedder)
+
+        src = tmp_path / "prose.txt"
+        src.write_text(
+            "Fix authentication middleware.\nUpdate configuration documentation.\n"
+            "Review dependency management.\n",
+            encoding="utf-8",
+        )
+        args = argparse.Namespace(
+            file=str(src), output="-", min_length=4,
+            adaptive=True, threshold=0.85, plain=True,
+        )
+        _crumb_cli.cmd_vowelstrip(args)
+        capsys.readouterr()  # discard printed output
+
+        assert calls["n"] == 1, (
+            f"expected _load_embedder called once for --plain --adaptive, "
+            f"got {calls['n']}"
+        )
