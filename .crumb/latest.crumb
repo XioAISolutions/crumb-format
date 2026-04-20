@@ -1,7 +1,7 @@
 --- task: 0.5.0 — prompt-compression release (playground, JS port, extension popup)
 source: github.pr
 pr: #15
-generated: 2026-04-20T02:55:22Z
+generated: 2026-04-20T03:04:11Z
 ---
 
 [goal]
@@ -35,6 +35,7 @@ Changed files in this PR:
 - scripts/measure_drift.py
 - scripts/screenshot_extension.js
 - scripts/screenshot_playground.js
+- tests/test_browser_regression.py
 - tests/test_js_port.py
 - tests/test_metalk.py
 - tests/test_playground.py
