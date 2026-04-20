@@ -1026,6 +1026,26 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
         msg + "</div>";
     }
 
+    // Local compare using the JS port — reused for offline fallback so the
+    // Compare tab works on static hosts too, mirroring the single-compress
+    // behavior advertised for offline mode.
+    function runCompareLocal() {
+      return ensureJs().then(function () {
+        var rows = [1, 2, 3, 4, 5].map(function (level) {
+          try {
+            var res = compressLocal(text, level, payload.vowel_min_length, payload.mode);
+            return { level: level, encoded: res.encoded, stats: res.stats };
+          } catch (err) {
+            return { level: level, error: String(err && err.message || err) };
+          }
+        });
+        renderCompareCards(rows);
+        showToast("Running offline — JS port in use");
+      }).catch(function () {
+        showCompareError("Server unreachable and JS fallback failed to load.");
+      });
+    }
+
     compareInflight = fetch("/metalk/compare", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1037,6 +1057,9 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
       if (!res.ok) {
         // Server replied with 4xx/5xx — surface the error inline and
         // clear stale cards instead of silently keeping them visible.
+        // Don't fall back to local here: the server was reachable, the
+        // request was rejected, so treat it the same way single-compress
+        // does (see round-5 Codex review).
         var msg = (res.body && res.body.error) ? res.body.error : ("HTTP " + res.status);
         showCompareError("Error: " + msg);
         return;
@@ -1047,8 +1070,10 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
         showCompareError("Error: malformed response (no levels field)");
       }
     }).catch(function () {
-      compareInflight = null;
-      showCompareError("Server unreachable. Start with <code>crumb playground</code>.");
+      // True network failure — fall back to the JS port, matching the
+      // single-compress offline behavior so the Compare tab stays usable
+      // on static hosts or when the server is down.
+      return runCompareLocal().finally(function () { compareInflight = null; });
     }).finally(function () {
       if (comparePending) { comparePending = false; runCompare(); }
     });

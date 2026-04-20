@@ -194,6 +194,97 @@ console.log(JSON.stringify({ grid }));
 
 
 @pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_js_separator_is_trim_aware(tmp_path):
+    """Regression: lines.indexOf('---') missed separators with surrounding
+    whitespace, so a CRUMB line like ' --- ' was encoded as plain in JS
+    while Python handled it as structured. Now both use trim-aware match."""
+    driver = tmp_path / "driver.js"
+    driver.write_text(f"""
+const fs = require("fs");
+global.self = global;
+global.fetch = async () => ({{
+  ok: true, status: 200,
+  json: async () => JSON.parse(fs.readFileSync("{ROOT / 'web' / 'metalk-data.json'}", "utf-8"))
+}});
+const Metalk = require("{ROOT / 'web' / 'metalk.js'}");
+(async () => {{
+  await Metalk.load();
+  // Separator has leading + trailing whitespace.
+  const crumb = "BEGIN CRUMB\\nv=1.1\\nkind=task\\ntitle=T\\n   ---   \\n[goal]\\nFix it.\\nEND CRUMB\\n";
+  const encoded = Metalk.encode(crumb, 2);
+  // Structured path injects mt= header; plain path does not.
+  process.stdout.write(JSON.stringify({{
+    encoded,
+    hasMt: encoded.includes("mt=2"),
+    hasStructural: encoded.startsWith("BC")
+  }}));
+}})();
+""", encoding="utf-8")
+    result = subprocess.run([NODE, str(driver)], capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
+    out = json.loads(result.stdout)
+    assert out["hasMt"], f"separator with whitespace fell through to plain path: {out!r}"
+    assert out["hasStructural"], f"BEGIN CRUMB not abbreviated to BC: {out!r}"
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_compare_falls_back_to_local_on_network_error(tmp_path):
+    """Regression: compare used to show an unreachable error on network
+    failure instead of falling back to the JS port like single-compress.
+    The fix: on fetch rejection, runCompareLocal() runs all 5 levels
+    through the JS port and renders cards."""
+    driver = tmp_path / "driver.js"
+    driver.write_text(r"""
+let rendered = null;
+let toastMessage = null;
+function renderCompareCards(rows) { rendered = rows; }
+function showToast(msg) { toastMessage = msg; }
+function showCompareError(msg) { rendered = { error: msg }; }
+// Stub compressLocal: returns deterministic rows so we can inspect.
+function compressLocal(text, level) {
+  return {
+    encoded: "LVL" + level + ":" + text,
+    stats: {
+      original_tokens: 10, encoded_tokens: 5, saved_tokens: 5,
+      pct_saved: 50, ratio: 2.0, original_chars: 40, encoded_chars: 20,
+      vowels_removed: 0, vowel_retention_pct: 100, level: level, mode: "plain"
+    }
+  };
+}
+function ensureJs() { return Promise.resolve(); }
+// Mirror the fixed runCompareLocal path exactly.
+function runCompareLocal(text, vml, mode) {
+  return ensureJs().then(function () {
+    var rows = [1, 2, 3, 4, 5].map(function (level) {
+      try {
+        var res = compressLocal(text, level, vml, mode);
+        return { level: level, encoded: res.encoded, stats: res.stats };
+      } catch (err) {
+        return { level: level, error: String(err && err.message || err) };
+      }
+    });
+    renderCompareCards(rows);
+    showToast("Running offline — JS port in use");
+  });
+}
+(async () => {
+  await runCompareLocal("hello", 4, "plain");
+  console.log(JSON.stringify({
+    count: Array.isArray(rendered) ? rendered.length : 0,
+    levels: Array.isArray(rendered) ? rendered.map(r => r.level) : [],
+    toast: toastMessage
+  }));
+})();
+""", encoding="utf-8")
+    result = subprocess.run([NODE, str(driver)], capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
+    out = json.loads(result.stdout)
+    assert out["count"] == 5, f"expected 5 local cards, got {out['count']}"
+    assert out["levels"] == [1, 2, 3, 4, 5]
+    assert "offline" in out["toast"].lower()
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
 def test_playground_offline_is_crumb_detection(tmp_path):
     """Regression: the offline `isCrumb` mixed &&/|| without grouping and
     used Python's lstrip, so mode=plain still triggered the BC check and

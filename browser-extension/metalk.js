@@ -77,6 +77,18 @@
     return Math.max(1, Math.floor(text.length / 4));
   }
 
+  // Trim-aware separator detection — mirrors Python's `line.strip() == "---"`.
+  // Returns the first index whose trimmed value is exactly "---", else -1.
+  // indexOf("---") would miss `" --- "`, causing a CRUMB with leading/trailing
+  // whitespace on the separator line to fall through to the plain path in
+  // offline/extension mode while the server/CLI encoded it as structured.
+  function findSeparator(lines) {
+    for (var i = 0; i < lines.length; i++) {
+      if (lines[i].trim() === "---") return i;
+    }
+    return -1;
+  }
+
   function matchCase(target, sourceFirst) {
     // Preserve capitalization of first character from source.
     if (!target) return target;
@@ -281,7 +293,7 @@
     var vml = opts.vowel_min_length || 4;
 
     var lines = text.trim().split("\n");
-    var sepIdx = lines.indexOf("---");
+    var sepIdx = findSeparator(lines);
     if (sepIdx === -1) {
       // Not a structured crumb — run the plain pipeline.
       return encodePlain(text, level, opts);
@@ -351,7 +363,7 @@
     if (lines[0].trim() === "BC") lines[0] = "BEGIN CRUMB";
     if (lines[lines.length - 1].trim() === "EC") lines[lines.length - 1] = "END CRUMB";
 
-    var sepIdx = lines.indexOf("---");
+    var sepIdx = findSeparator(lines);
     if (sepIdx === -1) return lines.join("\n") + "\n";
 
     var headerLines = [];
