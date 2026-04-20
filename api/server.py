@@ -111,6 +111,38 @@ def crumb_render(_req, _match, _qs, body):
 # MeTalk / vowel-strip compression endpoint (powers the playground)
 # ---------------------------------------------------------------------------
 
+# Section markers written by _wrap_plain_text — these are the ONLY bracketed
+# lines the unwrap step should drop. Keeping the allowlist explicit prevents
+# legitimate user content like `[todo]` or `[note]` from being deleted.
+_SYNTHETIC_SECTION_MARKERS = frozenset({
+    "[consolidated]",  # v1 wrapper
+    "[cs]",            # MeTalk-abbreviated form (SECTION_MAP['consolidated'])
+})
+
+
+def _parse_metalk_knobs(body):
+    """Parse vowel_min_length + adaptive_threshold with 400-on-bad-input.
+
+    Returns either (vml, threshold, None) on success or (None, None, (status, data))
+    on validation failure so callers can short-circuit with `return`.
+    """
+    try:
+        vml = int(body.get("vowel_min_length") or 4)
+    except (TypeError, ValueError):
+        return None, None, (400, {"error": "'vowel_min_length' must be a positive integer"})
+    if vml < 1:
+        return None, None, (400, {"error": "'vowel_min_length' must be a positive integer"})
+
+    try:
+        threshold = float(body.get("adaptive_threshold") or 0.85)
+    except (TypeError, ValueError):
+        return None, None, (400, {"error": "'adaptive_threshold' must be a number between 0 and 1"})
+    if not (0.0 <= threshold <= 1.0):
+        return None, None, (400, {"error": "'adaptive_threshold' must be between 0 and 1"})
+
+    return vml, threshold, None
+
+
 @route("POST", "/metalk/compress")
 def metalk_compress(_req, _match, _qs, body):
     """Compress arbitrary text or a CRUMB through MeTalk levels 1-5.
@@ -133,19 +165,9 @@ def metalk_compress(_req, _match, _qs, body):
     if level not in (1, 2, 3, 4, 5):
         return 400, {"error": "'level' must be 1, 2, 3, 4, or 5"}
 
-    try:
-        vml = int(body.get("vowel_min_length") or 4)
-    except (TypeError, ValueError):
-        return 400, {"error": "'vowel_min_length' must be a positive integer"}
-    if vml < 1:
-        return 400, {"error": "'vowel_min_length' must be a positive integer"}
-
-    try:
-        threshold = float(body.get("adaptive_threshold") or 0.85)
-    except (TypeError, ValueError):
-        return 400, {"error": "'adaptive_threshold' must be a number between 0 and 1"}
-    if not (0.0 <= threshold <= 1.0):
-        return 400, {"error": "'adaptive_threshold' must be between 0 and 1"}
+    vml, threshold, err = _parse_metalk_knobs(body)
+    if err:
+        return err
 
     mode = body.get("mode", "auto")
 
@@ -175,10 +197,13 @@ def metalk_compress(_req, _match, _qs, body):
             try:
                 _, after = mt.split("---\n", 1)
                 body_lines = after.rstrip().split("\n")
+                # Drop only the terminating sentinel and the EXACT synthetic
+                # wrapper section markers — any other bracketed line is user
+                # content (e.g. `[todo]`, `[note]`) and must be preserved.
                 cleaned = [
                     ln for ln in body_lines
                     if ln.strip() not in {"EC", "END CRUMB"}
-                    and not (ln.strip().startswith("[") and ln.strip().endswith("]"))
+                    and ln.strip() not in _SYNTHETIC_SECTION_MARKERS
                 ]
                 encoded = "\n".join(cleaned).strip() + "\n"
             except ValueError:
@@ -206,8 +231,10 @@ def metalk_compare(_req, _match, _qs, body):
     text = body.get("text", "")
     if not text:
         return 400, {"error": "missing 'text' field"}
-    vml = int(body.get("vowel_min_length", 4) or 4)
-    threshold = float(body.get("adaptive_threshold", 0.85) or 0.85)
+
+    vml, threshold, err = _parse_metalk_knobs(body)
+    if err:
+        return err
     mode = body.get("mode", "auto")
 
     results = []

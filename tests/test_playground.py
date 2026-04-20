@@ -163,6 +163,53 @@ class TestCompareEndpoint:
             return
         pytest.fail("expected HTTP 400")
 
+    def test_invalid_vowel_min_length_returns_400(self, server):
+        """Regression: /metalk/compare used to 500 on non-numeric knobs."""
+        try:
+            _post_json(server, "/metalk/compare",
+                       {"text": "hi", "vowel_min_length": "abc"})
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 400
+            body = json.loads(exc.read())
+            assert "vowel_min_length" in body["error"]
+            return
+        pytest.fail("expected HTTP 400")
+
+    def test_invalid_adaptive_threshold_returns_400(self, server):
+        try:
+            _post_json(server, "/metalk/compare",
+                       {"text": "hi", "adaptive_threshold": "nope"})
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 400
+            return
+        pytest.fail("expected HTTP 400")
+
+
+class TestPlainModeBracketPreservation:
+    """Regression: the plain-text unwrap used to drop any [foo] line, which
+    silently deleted legitimate user content like `[todo]` or `[note]`.
+    Only the exact synthetic section marker should be stripped."""
+
+    def test_user_bracket_tag_preserved(self, server):
+        text = "Ship the auth fix.\n[todo]\nWrite a regression test.\n[note]\nMerge after CI."
+        status, data = _post_json(server, "/metalk/compress",
+                                  {"text": text, "level": 1, "mode": "plain"})
+        assert status == 200
+        encoded = data["encoded"]
+        assert "[todo]" in encoded, f"user [todo] tag was dropped: {encoded!r}"
+        assert "[note]" in encoded, f"user [note] tag was dropped: {encoded!r}"
+        # The synthetic wrapper must still be gone.
+        assert "[consolidated]" not in encoded
+
+    def test_user_bracket_tag_preserved_on_compare(self, server):
+        text = "Please fix auth.\n[todo]\nadd test"
+        status, data = _post_json(server, "/metalk/compare", {"text": text})
+        assert status == 200
+        for row in data["levels"]:
+            if "encoded" in row:
+                assert "[todo]" in row["encoded"], \
+                    f"L{row['level']} dropped user [todo] tag: {row['encoded']!r}"
+
 
 class TestStaticServing:
     def test_playground_html_served(self, server):
