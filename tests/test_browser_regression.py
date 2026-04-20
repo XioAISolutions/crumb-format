@@ -196,6 +196,39 @@ console.log(JSON.stringify({ grid }));
 
 
 @pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_js_encode_passthrough_on_missing_separator(tmp_path):
+    """Regression: JS encode fell through to encodePlain when no `---`
+    separator was present, which diverges from Python where encode()
+    returns input unchanged. That caused offline/extension flows running
+    `encode(mode="crumb")` on an incomplete snippet to silently rewrite
+    the text while the server left it alone."""
+    driver = tmp_path / "driver.js"
+    driver.write_text(f"""
+const fs = require("fs");
+global.self = global;
+global.fetch = async () => ({{
+  ok: true, status: 200,
+  json: async () => JSON.parse(fs.readFileSync("{ROOT / 'web' / 'metalk-data.json'}", "utf-8"))
+}});
+const Metalk = require("{ROOT / 'web' / 'metalk.js'}");
+(async () => {{
+  await Metalk.load();
+  // An incomplete CRUMB snippet — headers but no `---` separator.
+  const snippet = "BEGIN CRUMB\\nv=1.1\\nkind=task\\ntitle=Draft\\n";
+  const out = Metalk.encode(snippet, 2, {{ vowel_min_length: 4 }});
+  process.stdout.write(JSON.stringify({{ input: snippet, output: out, unchanged: out === snippet }}));
+}})();
+""", encoding="utf-8")
+    result = subprocess.run([NODE, str(driver)], capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
+    out = json.loads(result.stdout)
+    assert out["unchanged"], (
+        f"JS encode rewrote separator-less input: input={out['input']!r} "
+        f"output={out['output']!r}"
+    )
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
 def test_js_contractions_pass_through_vowel_strip(tmp_path):
     """Regression: the JS port reads opaque_chars from metalk-data.json,
     so adding `'` on the Python side propagates here. Confirms the JS

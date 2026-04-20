@@ -295,8 +295,13 @@
     var lines = text.trim().split("\n");
     var sepIdx = findSeparator(lines);
     if (sepIdx === -1) {
-      // Not a structured crumb — run the plain pipeline.
-      return encodePlain(text, level, opts);
+      // No `---` separator — mirror Python's `encode()` which returns
+      // input unchanged in this case. Callers that want to compress
+      // arbitrary prose should use `encodePlain()` explicitly; falling
+      // through to it here would make `encode(mode="crumb")` on an
+      // incomplete snippet silently apply lossy plain-text transforms
+      // and diverge from the server.
+      return text;
     }
 
     if (lines[0].trim() === "BEGIN CRUMB") lines[0] = "BC";
