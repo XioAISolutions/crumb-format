@@ -283,11 +283,40 @@ crumb playground
 ```
 
 which boots a local REST server and opens a browser-based chat-box UI:
-paste a prompt or `.crumb` on the left, slide between L1-L5, watch the
-compressed version (and savings) update live on the right, copy with one
-click. The same backend exposes `POST /metalk/compress` for programmatic
-use. Defaults to `http://127.0.0.1:8420/playground.html`; pass `--port`
-or `--no-browser` to override.
+paste a prompt or `.crumb` on the left, pick a named preset
+(`Safe · Tighter · Aggressive · Skeleton · Adaptive`), watch the
+compressed version and savings update live on the right, copy with one
+click. Advanced knobs (min word length, adaptive threshold, input mode)
+hide behind a toggle. Keyboard: `⌘/Ctrl+Enter` copies, `⌘/Ctrl+K`
+clears, `⌘/Ctrl+1..5` switches preset. Preset and settings persist
+across sessions via `localStorage`.
+
+![playground — default Tighter preset (L2) on a bug report](docs/assets/playground-compressed-l2.png)
+
+The same backend exposes `POST /metalk/compress` for programmatic use.
+Defaults to `http://127.0.0.1:8420/playground.html`; pass `--port` or
+`--no-browser` to override.
+
+<details>
+<summary>More screenshots (empty state, Skeleton preset, Advanced panel, mobile)</summary>
+
+**Empty state — pick a preset or load an example.**
+
+![empty state](docs/assets/playground-empty.png)
+
+**Skeleton (L4) on the same input — vowel-strip on top of dict + grammar.**
+
+![skeleton L4 preset](docs/assets/playground-skeleton-l4.png)
+
+**Advanced panel open on a `.crumb` — mode auto-detected as structured.**
+
+![advanced panel open on a .crumb](docs/assets/playground-advanced-crumb.png)
+
+**Mobile — presets collapse to 2-up, panels stack.**
+
+![mobile viewport](docs/assets/playground-mobile.png)
+
+</details>
 
 ## Cross-AI Interop
 
