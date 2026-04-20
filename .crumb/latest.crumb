@@ -1,7 +1,7 @@
---- task: metalk: add vowel-strip L4/L5 with embedding-drift harness
+--- task: 0.5.0 — prompt-compression release (playground, JS port, extension popup)
 source: github.pr
 pr: #15
-generated: 2026-04-20T02:40:46Z
+generated: 2026-04-20T02:48:47Z
 ---
 
 [goal]
