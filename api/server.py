@@ -123,18 +123,26 @@ _SYNTHETIC_SECTION_MARKERS = frozenset({
 def _parse_metalk_knobs(body):
     """Parse vowel_min_length + adaptive_threshold with 400-on-bad-input.
 
-    Returns either (vml, threshold, None) on success or (None, None, (status, data))
-    on validation failure so callers can short-circuit with `return`.
+    Uses explicit `is None` checks rather than `x or default` so that a
+    legitimate numeric `0` (or `0.0`) isn't silently replaced by the
+    default. `0` fails the bounds check on vml (must be ≥ 1) but `0.0`
+    is a valid threshold.
+
+    Returns either (vml, threshold, None) on success or
+    (None, None, (status, data)) on validation failure so callers can
+    short-circuit with `return`.
     """
+    raw_vml = body.get("vowel_min_length")
     try:
-        vml = int(body.get("vowel_min_length") or 4)
+        vml = int(raw_vml) if raw_vml is not None else 4
     except (TypeError, ValueError):
         return None, None, (400, {"error": "'vowel_min_length' must be a positive integer"})
     if vml < 1:
         return None, None, (400, {"error": "'vowel_min_length' must be a positive integer"})
 
+    raw_threshold = body.get("adaptive_threshold")
     try:
-        threshold = float(body.get("adaptive_threshold") or 0.85)
+        threshold = float(raw_threshold) if raw_threshold is not None else 0.85
     except (TypeError, ValueError):
         return None, None, (400, {"error": "'adaptive_threshold' must be a number between 0 and 1"})
     if not (0.0 <= threshold <= 1.0):

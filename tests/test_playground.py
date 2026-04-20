@@ -127,6 +127,26 @@ class TestCompressEndpoint:
             return
         pytest.fail("expected HTTP 400")
 
+    def test_threshold_zero_is_accepted(self, server):
+        """Regression: `or 0.85` truthy-fallback used to silently upgrade
+        an explicit 0.0 (a valid in-range value) to 0.85."""
+        status, data = _post_json(server, "/metalk/compress",
+                                  {"text": "Please fix authentication.",
+                                   "level": 5, "adaptive_threshold": 0.0})
+        assert status == 200
+        assert "encoded" in data
+
+    def test_vowel_min_length_explicit_zero_returns_400(self, server):
+        """0 is out of range (min 1); must be a clean 400, not a 500.
+        This confirms we stopped using `or 4` which would have masked 0."""
+        try:
+            _post_json(server, "/metalk/compress",
+                       {"text": "hi", "level": 4, "vowel_min_length": 0})
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 400
+            return
+        pytest.fail("expected HTTP 400")
+
     def test_stats_shape(self, server):
         status, data = _post_json(server, "/metalk/compress",
                                   {"text": "Authentication middleware test text.", "level": 3})

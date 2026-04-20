@@ -725,10 +725,23 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
     return jsLoading;
   }
 
+  // Kept in sync with api/server.py::_SYNTHETIC_SECTION_MARKERS and
+  // browser-extension/popup.js. Only these exact markers are dropped when
+  // unwrapping plain-mode output — any other bracketed line is user content.
+  var SYNTHETIC_SECTION_MARKERS = { "[consolidated]": true, "[cs]": true };
+
   function compressLocal(text, level, vml, mode) {
-    var isCrumb = mode === "crumb" ||
-      (mode === "auto" && (text.lstrip ? text.lstrip() : text).indexOf("BEGIN CRUMB") === 0 ||
-       text.trim().indexOf("BC") === 0);
+    // Auto-detection mirrors the server: starts with BEGIN CRUMB or BC after
+    // leading-whitespace trim. Grouping is explicit so mode=plain never
+    // triggers the BC check; JS uses trimStart, not Python's lstrip.
+    var leading = text.trimStart ? text.trimStart() : text.replace(/^\s+/, "");
+    var isCrumb = (
+      mode === "crumb" ||
+      (mode === "auto" && (
+        leading.indexOf("BEGIN CRUMB") === 0 ||
+        leading.indexOf("BC") === 0
+      ))
+    );
     var encoded;
     if (isCrumb) {
       encoded = window.Metalk.encode(text, level, { vowel_min_length: vml });
@@ -738,7 +751,9 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
       var parts = mt.split("---\n");
       var bodyLines = (parts[1] || "").replace(/\n+$/, "").split("\n").filter(function (ln) {
         var s = ln.trim();
-        return s !== "EC" && s !== "END CRUMB" && !(s.startsWith("[") && s.endsWith("]"));
+        if (s === "EC" || s === "END CRUMB") return false;
+        if (SYNTHETIC_SECTION_MARKERS[s]) return false;
+        return true;
       });
       encoded = bodyLines.join("\n").trim() + "\n";
     }
