@@ -95,6 +95,38 @@ class TestCompressEndpoint:
             return
         pytest.fail("expected HTTP 400")
 
+    def test_invalid_vowel_min_length_returns_400(self, server):
+        # Regression: non-numeric vml used to raise ValueError and surface as 500.
+        try:
+            _post_json(server, "/metalk/compress",
+                       {"text": "hi", "level": 4, "vowel_min_length": "abc"})
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 400
+            body = json.loads(exc.read())
+            assert "vowel_min_length" in body["error"]
+            return
+        pytest.fail("expected HTTP 400")
+
+    def test_invalid_adaptive_threshold_returns_400(self, server):
+        try:
+            _post_json(server, "/metalk/compress",
+                       {"text": "hi", "level": 5, "adaptive_threshold": "not-a-float"})
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 400
+            body = json.loads(exc.read())
+            assert "adaptive_threshold" in body["error"]
+            return
+        pytest.fail("expected HTTP 400")
+
+    def test_out_of_range_threshold_returns_400(self, server):
+        try:
+            _post_json(server, "/metalk/compress",
+                       {"text": "hi", "level": 5, "adaptive_threshold": 1.5})
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 400
+            return
+        pytest.fail("expected HTTP 400")
+
     def test_stats_shape(self, server):
         status, data = _post_json(server, "/metalk/compress",
                                   {"text": "Authentication middleware test text.", "level": 3})

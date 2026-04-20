@@ -211,6 +211,46 @@ class TestMetalkLevel4Integration:
         decoded = decode(encoded)
         assert "vs=" not in decoded
 
+    def test_level5_loads_embedder_once_per_encode(self, monkeypatch):
+        """Regression: L5 must load the SentenceTransformer model ONCE per
+        encode() call, not once per line. Previously adaptive_strip_text
+        was called with embedder=None every time, so a 20-line crumb
+        would load the model 20 times (seconds + ~80MB each)."""
+        from cli import metalk as _metalk
+        from cli import vowelstrip as _vs
+
+        call_count = {"n": 0}
+
+        class FakeEmbedder:
+            def encode(self, pairs):
+                # Return two small vectors that are highly similar (cos ~ 1)
+                # so every line keeps the vowel-stripped candidate.
+                return [[1.0, 0.0, 0.0], [0.999, 0.001, 0.0]]
+
+        def fake_load_embedder(*args, **kwargs):
+            call_count["n"] += 1
+            return FakeEmbedder()
+
+        # Patch in both modules: encode() imports _load_embedder from vowelstrip,
+        # and adaptive_strip_text falls back to it if embedder=None.
+        monkeypatch.setattr(_vs, "_load_embedder", fake_load_embedder)
+
+        crumb = (
+            "BEGIN CRUMB\nv=1.1\nkind=task\ntitle=T\n---\n"
+            "[goal]\nFix the authentication middleware.\n"
+            "[context]\n- Line one about authentication.\n"
+            "- Line two about configuration.\n"
+            "- Line three about deployment.\n"
+            "- Line four about middleware.\n"
+            "- Line five about implementation.\n"
+            "END CRUMB\n"
+        )
+        _metalk.encode(crumb, level=5)
+        # One load call for the whole encode, regardless of line count.
+        assert call_count["n"] == 1, (
+            f"expected _load_embedder called once per encode, got {call_count['n']}"
+        )
+
     def test_level5_falls_back_when_no_st(self):
         # Without sentence-transformers installed (the test environment),
         # level 5 should produce the same body as level 4 — only the

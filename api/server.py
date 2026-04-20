@@ -133,8 +133,20 @@ def metalk_compress(_req, _match, _qs, body):
     if level not in (1, 2, 3, 4, 5):
         return 400, {"error": "'level' must be 1, 2, 3, 4, or 5"}
 
-    vml = int(body.get("vowel_min_length", 4) or 4)
-    threshold = float(body.get("adaptive_threshold", 0.85) or 0.85)
+    try:
+        vml = int(body.get("vowel_min_length") or 4)
+    except (TypeError, ValueError):
+        return 400, {"error": "'vowel_min_length' must be a positive integer"}
+    if vml < 1:
+        return 400, {"error": "'vowel_min_length' must be a positive integer"}
+
+    try:
+        threshold = float(body.get("adaptive_threshold") or 0.85)
+    except (TypeError, ValueError):
+        return 400, {"error": "'adaptive_threshold' must be a number between 0 and 1"}
+    if not (0.0 <= threshold <= 1.0):
+        return 400, {"error": "'adaptive_threshold' must be between 0 and 1"}
+
     mode = body.get("mode", "auto")
 
     is_crumb = (

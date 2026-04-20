@@ -361,10 +361,20 @@ def encode(text: str, level: int = 2, *,
     # dictionary substitutions (Layer 1) have already canonicalized the
     # most ambiguous tech terms before vowels are removed.
     if level >= 4:
-        from cli.vowelstrip import encode_crumb as _vs_encode, adaptive_strip_text, strip_line
+        from cli.vowelstrip import (
+            encode_crumb as _vs_encode,
+            adaptive_strip_text,
+            strip_line,
+            _load_embedder,
+        )
         if level >= 5:
+            # Load the SentenceTransformer model ONCE here, then pass it into
+            # every per-line call. adaptive_strip_text would otherwise re-load
+            # the model on each invocation, which is ~seconds + ~80MB per line.
+            shared_embedder = _load_embedder()
             transform = lambda line: adaptive_strip_text(
-                line, threshold=adaptive_threshold, min_length=vowel_min_length
+                line, threshold=adaptive_threshold,
+                min_length=vowel_min_length, embedder=shared_embedder,
             )
         else:
             transform = lambda line: strip_line(line, vowel_min_length)
