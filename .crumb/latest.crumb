@@ -1,7 +1,7 @@
 --- task: metalk: add vowel-strip L4/L5 with embedding-drift harness
 source: github.pr
 pr: #15
-generated: 2026-04-19T20:23:24Z
+generated: 2026-04-20T02:19:11Z
 ---
 
 [goal]
@@ -16,10 +16,16 @@ Changed files in this PR:
 - cli/crumb.py
 - cli/metalk.py
 - cli/vowelstrip.py
+- docs/assets/playground-advanced-crumb.png
+- docs/assets/playground-compressed-l2.png
+- docs/assets/playground-empty.png
+- docs/assets/playground-mobile.png
+- docs/assets/playground-skeleton-l4.png
 - docs/vowel-drift-benchmark.md
 - docs/vowel-drift.md
 - pyproject.toml
 - scripts/measure_drift.py
+- scripts/screenshot_playground.js
 - tests/test_metalk.py
 - tests/test_playground.py
 - tests/test_vowelstrip.py
