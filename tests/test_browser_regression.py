@@ -57,6 +57,7 @@ def test_extension_popup_preserves_user_brackets(tmp_path):
     plain text goes directly through the body-transform pipeline."""
     popup_src = (ROOT / "browser-extension" / "popup.js").read_text(encoding="utf-8")
     fn_src = _extract_function(popup_src, "compressLocal")
+    sentinel_src = _extract_function(popup_src, "looksLikeCrumb")
 
     driver = tmp_path / "driver.js"
     driver.write_text(f"""
@@ -70,6 +71,7 @@ global.fetch = async () => ({{
 }});
 const Metalk = require("{ROOT / 'browser-extension' / 'metalk.js'}");
 self.Metalk = Metalk;
+{sentinel_src}
 {fn_src}
 (async () => {{
   await Metalk.load();
@@ -194,6 +196,42 @@ console.log(JSON.stringify({ grid }));
 
 
 @pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_looks_like_crumb_strict_first_line(tmp_path):
+    """Regression: the JS auto-detection used `startswith` which matched
+    any 'BC...' prefix. Now it requires the full sentinel as the first
+    non-empty line, mirroring the Python server helper."""
+    html = (ROOT / "web" / "playground.html").read_text(encoding="utf-8")
+    fn_src = _extract_function(html, "looksLikeCrumb")
+
+    driver = tmp_path / "driver.js"
+    driver.write_text(f"""
+{fn_src}
+const cases = [
+  // Positive — real CRUMB sentinels.
+  {{ text: "BEGIN CRUMB\\nv=1.1\\n---\\n...",  want: true }},
+  {{ text: "   BEGIN CRUMB\\nv=1.1\\n...",     want: true }},
+  {{ text: "BC\\nv=1.1\\n---\\n...",           want: true }},
+  // Negative — prompts that merely start with BC/BEGIN-like letters.
+  {{ text: "BC drivers are failing today.",    want: false }},
+  {{ text: "BCD framework comparison.",        want: false }},
+  {{ text: "BC Technologies released a report.", want: false }},
+  {{ text: "BEGIN CRUMBLE cookies recipe.",    want: false }},
+  {{ text: "Please fix the bug.",              want: false }},
+];
+const got = cases.map((c) => ({{ text: c.text, want: c.want, got: looksLikeCrumb(c.text) }}));
+process.stdout.write(JSON.stringify(got));
+""", encoding="utf-8")
+
+    result = subprocess.run([NODE, str(driver)], capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
+    rows = json.loads(result.stdout)
+    for row in rows:
+        assert row["got"] == row["want"], (
+            f"looksLikeCrumb({row['text']!r}): want {row['want']}, got {row['got']}"
+        )
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
 def test_js_separator_is_trim_aware(tmp_path):
     """Regression: lines.indexOf('---') missed separators with surrounding
     whitespace, so a CRUMB line like ' --- ' was encoded as plain in JS
@@ -292,6 +330,7 @@ def test_playground_offline_is_crumb_detection(tmp_path):
     html = (ROOT / "web" / "playground.html").read_text(encoding="utf-8")
     # Extract the compressLocal function body verbatim.
     fn_src = _extract_function(html, "compressLocal")
+    sentinel_src = _extract_function(html, "looksLikeCrumb")
     estimate_src = _extract_function(html, "estimateVowelRetention")
 
     driver = tmp_path / "driver.js"
@@ -306,6 +345,7 @@ global.fetch = async () => ({{
 }});
 const Metalk = require("{ROOT / 'web' / 'metalk.js'}");
 window.Metalk = Metalk;
+{sentinel_src}
 {estimate_src}
 {fn_src}
 (async () => {{

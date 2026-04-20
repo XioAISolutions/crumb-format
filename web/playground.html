@@ -734,18 +734,19 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
     return jsLoading;
   }
 
+  // Strict auto-detection — mirrors api/server.py::_looks_like_crumb.
+  // The entire first non-empty line must be exactly BEGIN CRUMB or BC,
+  // not just a prefix. Prevents a prompt like "BC drivers are failing"
+  // from being routed through the structured encoder.
+  function looksLikeCrumb(text) {
+    var stripped = text.trimStart ? text.trimStart() : text.replace(/^\s+/, "");
+    var nl = stripped.indexOf("\n");
+    var firstLine = (nl < 0 ? stripped : stripped.slice(0, nl)).trim();
+    return firstLine === "BEGIN CRUMB" || firstLine === "BC";
+  }
+
   function compressLocal(text, level, vml, mode) {
-    // Auto-detection mirrors the server: starts with BEGIN CRUMB or BC after
-    // leading-whitespace trim. Grouping is explicit so mode=plain never
-    // triggers the BC check; JS uses trimStart, not Python's lstrip.
-    var leading = text.trimStart ? text.trimStart() : text.replace(/^\s+/, "");
-    var isCrumb = (
-      mode === "crumb" ||
-      (mode === "auto" && (
-        leading.indexOf("BEGIN CRUMB") === 0 ||
-        leading.indexOf("BC") === 0
-      ))
-    );
+    var isCrumb = mode === "crumb" || (mode === "auto" && looksLikeCrumb(text));
     // Plain mode now uses encodePlain directly instead of wrapping in a
     // synthetic CRUMB — the old path ran user text through the structured
     // encoder, which silently rewrote legitimate `[goal]` / `[context]`

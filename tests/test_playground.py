@@ -332,6 +332,57 @@ class TestModeValidation:
             assert status == 200
 
 
+class TestCrumbAutoDetection:
+    """Regression: auto mode used `startswith("BC")` which false-matched
+    any prompt beginning with those letters (like 'BC drivers are failing'
+    or 'BC Technologies'). It now requires the entire first non-empty line
+    to be exactly BEGIN CRUMB or BC."""
+
+    def test_bc_prefix_is_not_crumb(self, server):
+        # "BC drivers are failing" is plain prose, not a CRUMB. Previously
+        # this would route through metalk_encode (no `---` separator, so
+        # the encoder returns input unchanged) and falsely report mode=crumb.
+        status, data = _post_json(server, "/metalk/compress",
+                                  {"text": "BC drivers are failing today.",
+                                   "level": 2, "mode": "auto"})
+        assert status == 200
+        assert data["stats"]["mode"] == "plain", \
+            f"'BC drivers...' was misdetected as crumb: {data['stats']!r}"
+        # Plain encoder also actually compresses the text (dict + grammar).
+        assert data["stats"]["saved_tokens"] >= 0
+
+    def test_bc_as_word_prefix_is_not_crumb(self, server):
+        status, data = _post_json(server, "/metalk/compress",
+                                  {"text": "BCD framework comparison.",
+                                   "level": 1, "mode": "auto"})
+        assert status == 200
+        assert data["stats"]["mode"] == "plain"
+
+    def test_begin_crumb_sentinel_is_detected(self, server):
+        crumb = "BEGIN CRUMB\nv=1.1\nkind=task\ntitle=T\n---\n[goal]\nX\nEND CRUMB\n"
+        status, data = _post_json(server, "/metalk/compress",
+                                  {"text": crumb, "level": 2, "mode": "auto"})
+        assert status == 200
+        assert data["stats"]["mode"] == "crumb"
+
+    def test_leading_whitespace_crumb_detected(self, server):
+        # Whitespace before the sentinel is fine — first non-empty line
+        # still matches exactly after strip.
+        crumb = "   BEGIN CRUMB\nv=1.1\nkind=task\ntitle=T\n---\n[goal]\nX\nEND CRUMB\n"
+        status, data = _post_json(server, "/metalk/compress",
+                                  {"text": crumb, "level": 2, "mode": "auto"})
+        assert status == 200
+        assert data["stats"]["mode"] == "crumb"
+
+    def test_bc_standalone_line_detected(self, server):
+        # MeTalk-abbreviated CRUMB starts with `BC` on its own line.
+        crumb = "BC\nv=1.1\nk=task\nt=T\n---\n[g]\nX\nEC\n"
+        status, data = _post_json(server, "/metalk/compress",
+                                  {"text": crumb, "level": 2, "mode": "auto"})
+        assert status == 200
+        assert data["stats"]["mode"] == "crumb"
+
+
 class TestStaticServing:
     def test_playground_html_served(self, server):
         status, body, ctype = _get(server, "/playground.html")

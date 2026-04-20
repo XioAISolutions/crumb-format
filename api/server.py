@@ -118,6 +118,20 @@ def crumb_render(_req, _match, _qs, body):
 # Section markers written by _wrap_plain_text — these are the ONLY bracketed
 # lines the unwrap step should drop. Keeping the allowlist explicit prevents
 # legitimate user content like `[todo]` or `[note]` from being deleted.
+_CRUMB_SENTINELS = frozenset({"BEGIN CRUMB", "BC"})
+
+
+def _looks_like_crumb(text: str) -> bool:
+    """Auto-mode CRUMB detection — requires the sentinel to be the entire
+    first non-empty line, not just a prefix. Previously `startswith("BC")`
+    false-matched prompts like "BC drivers are failing" and routed them to
+    the structured encoder (which returns input unchanged when no `---`
+    separator is present), reporting the wrong mode in stats."""
+    stripped = text.lstrip()
+    first_line = stripped.split("\n", 1)[0].strip()
+    return first_line in _CRUMB_SENTINELS
+
+
 _VALID_MODES = frozenset({"auto", "crumb", "plain"})
 
 
@@ -184,10 +198,7 @@ def metalk_compress(_req, _match, _qs, body):
     if mode not in _VALID_MODES:
         return 400, {"error": "'mode' must be one of: auto, crumb, plain"}
 
-    is_crumb = (
-        mode == "crumb"
-        or (mode == "auto" and text.lstrip().startswith(("BEGIN CRUMB", "BC")))
-    )
+    is_crumb = mode == "crumb" or (mode == "auto" and _looks_like_crumb(text))
 
     try:
         if is_crumb:

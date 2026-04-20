@@ -80,10 +80,21 @@ function setHero(stats) {
   $("output-stats").textContent = `${stats.encoded_chars} chars · ~${stats.encoded_tokens} tokens`;
 }
 
+// Strict auto-detection — mirrors api/server.py::_looks_like_crumb. The
+// entire first non-empty line must be exactly BEGIN CRUMB or BC, not just
+// a prefix. Prevents a prompt like "BC drivers are failing" from being
+// routed through the structured encoder.
+function looksLikeCrumb(text) {
+  const stripped = text.trimStart ? text.trimStart() : text.replace(/^\s+/, "");
+  const nl = stripped.indexOf("\n");
+  const firstLine = (nl < 0 ? stripped : stripped.slice(0, nl)).trim();
+  return firstLine === "BEGIN CRUMB" || firstLine === "BC";
+}
+
 function compressLocal(text, level) {
   // Plain mode calls Metalk.encodePlain directly — no synthetic CRUMB wrap,
   // so user `[goal]` / `[context]` bracket headings are preserved verbatim.
-  const isCrumb = text.trim().startsWith("BEGIN CRUMB") || text.trim().startsWith("BC");
+  const isCrumb = looksLikeCrumb(text);
   const encoded = isCrumb
     ? self.Metalk.encode(text, level, { vowel_min_length: 4 })
     : self.Metalk.encodePlain(text, level, { vowel_min_length: 4 });
