@@ -52,12 +52,11 @@ def _extract_function(src: str, name: str) -> str:
 
 @pytest.mark.skipif(NODE is None, reason="node not installed")
 def test_extension_popup_preserves_user_brackets(tmp_path):
-    """Regression: extension popup used to drop `[todo]` / `[note]` lines."""
+    """Regression: extension popup used to drop `[todo]` / `[note]` lines.
+    With the encodePlain refactor there's no longer a wrap/unwrap phase —
+    plain text goes directly through the body-transform pipeline."""
     popup_src = (ROOT / "browser-extension" / "popup.js").read_text(encoding="utf-8")
-    # compressLocal + its SYNTHETIC_SECTION_MARKERS sibling.
     fn_src = _extract_function(popup_src, "compressLocal")
-    markers_src = re.search(r"const SYNTHETIC_SECTION_MARKERS = new Set\(\[.*?\]\);",
-                            popup_src, re.DOTALL).group(0)
 
     driver = tmp_path / "driver.js"
     driver.write_text(f"""
@@ -71,7 +70,6 @@ global.fetch = async () => ({{
 }});
 const Metalk = require("{ROOT / 'browser-extension' / 'metalk.js'}");
 self.Metalk = Metalk;
-{markers_src}
 {fn_src}
 (async () => {{
   await Metalk.load();
@@ -203,8 +201,6 @@ def test_playground_offline_is_crumb_detection(tmp_path):
     html = (ROOT / "web" / "playground.html").read_text(encoding="utf-8")
     # Extract the compressLocal function body verbatim.
     fn_src = _extract_function(html, "compressLocal")
-    markers_src = re.search(r"var SYNTHETIC_SECTION_MARKERS =.*?\};",
-                            html, re.DOTALL).group(0)
     estimate_src = _extract_function(html, "estimateVowelRetention")
 
     driver = tmp_path / "driver.js"
@@ -219,7 +215,6 @@ global.fetch = async () => ({{
 }});
 const Metalk = require("{ROOT / 'web' / 'metalk.js'}");
 window.Metalk = Metalk;
-{markers_src}
 {estimate_src}
 {fn_src}
 (async () => {{

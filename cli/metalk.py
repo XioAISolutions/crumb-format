@@ -264,6 +264,43 @@ def _condense_aggressive(text: str) -> str:
     return text
 
 
+def encode_plain(text: str, level: int = 2, *,
+                 vowel_min_length: int = 4,
+                 adaptive_threshold: float = 0.85) -> str:
+    """Compress arbitrary plain prose without any CRUMB structural logic.
+
+    Runs the same body transforms as `encode()` (dict subs, grammar strip,
+    condense, vowel strip, adaptive vowel strip) but never treats
+    `[bracket]` lines as section headers — so a user prompt containing
+    legitimate `[goal]` or `[context]` headings is preserved verbatim
+    instead of being rewritten to `[g]`/`[cx]`.
+
+    Args:
+        text: arbitrary plain prose
+        level: 1=dict, 2=+grammar, 3=+condense, 4=+vowel-strip, 5=+adaptive
+        vowel_min_length: L4-5 word length floor
+        adaptive_threshold: L5 cosine similarity floor
+    """
+    out = _apply_dict_sub(text, _ABBREV_SORTED)
+    if level >= 2:
+        out = _strip_grammar(out)
+    if level >= 3:
+        out = _condense_aggressive(out)
+    if level >= 4:
+        from cli.vowelstrip import strip_text, adaptive_strip_text, _load_embedder
+        if level >= 5:
+            embedder = _load_embedder()
+            # adaptive_strip_text falls back to deterministic strip if
+            # embedder is None (no [embeddings] extra installed).
+            out = adaptive_strip_text(
+                out, threshold=adaptive_threshold,
+                min_length=vowel_min_length, embedder=embedder,
+            )
+        else:
+            out = strip_text(out, min_length=vowel_min_length)
+    return out
+
+
 def encode(text: str, level: int = 2, *,
            vowel_min_length: int = 4,
            adaptive_threshold: float = 0.85) -> str:

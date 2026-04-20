@@ -80,28 +80,13 @@ function setHero(stats) {
   $("output-stats").textContent = `${stats.encoded_chars} chars · ~${stats.encoded_tokens} tokens`;
 }
 
-// Only the exact synthetic section markers we inject get stripped on unwrap —
-// any other bracketed line is user content (e.g. `[todo]`, `[note]`) and must
-// be preserved. Keep this in sync with api/server.py::_SYNTHETIC_SECTION_MARKERS.
-const SYNTHETIC_SECTION_MARKERS = new Set(["[consolidated]", "[cs]"]);
-
 function compressLocal(text, level) {
+  // Plain mode calls Metalk.encodePlain directly — no synthetic CRUMB wrap,
+  // so user `[goal]` / `[context]` bracket headings are preserved verbatim.
   const isCrumb = text.trim().startsWith("BEGIN CRUMB") || text.trim().startsWith("BC");
-  let encoded;
-  if (isCrumb) {
-    encoded = self.Metalk.encode(text, level, { vowel_min_length: 4 });
-  } else {
-    const wrapped = `BEGIN CRUMB\nv=1.1\nkind=mem\ntitle=ext\n---\n[consolidated]\n${text}\nEND CRUMB\n`;
-    const mt = self.Metalk.encode(wrapped, level, { vowel_min_length: 4 });
-    const parts = mt.split("---\n");
-    const body = (parts[1] || "").replace(/\n+$/, "").split("\n").filter((ln) => {
-      const s = ln.trim();
-      if (s === "EC" || s === "END CRUMB") return false;
-      if (SYNTHETIC_SECTION_MARKERS.has(s)) return false;
-      return true;
-    });
-    encoded = body.join("\n").trim() + "\n";
-  }
+  const encoded = isCrumb
+    ? self.Metalk.encode(text, level, { vowel_min_length: 4 })
+    : self.Metalk.encodePlain(text, level, { vowel_min_length: 4 });
   const stats = self.Metalk.compressionStats(text, encoded);
   stats.level = level;
   stats.mode = isCrumb ? "crumb" : "plain";

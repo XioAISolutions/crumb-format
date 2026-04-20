@@ -244,13 +244,92 @@ class TestPlainModeBracketPreservation:
         assert "[consolidated]" not in encoded
 
     def test_user_bracket_tag_preserved_on_compare(self, server):
+        # At L1-L3 the bracketed tag survives intact; at L4-L5 vowel-strip
+        # legitimately shortens the word inside (`todo` → `td`), but the
+        # brackets themselves must remain — the token must never be dropped.
         text = "Please fix auth.\n[todo]\nadd test"
         status, data = _post_json(server, "/metalk/compare", {"text": text})
         assert status == 200
         for row in data["levels"]:
-            if "encoded" in row:
+            if "encoded" not in row:
+                continue
+            if row["level"] <= 3:
                 assert "[todo]" in row["encoded"], \
                     f"L{row['level']} dropped user [todo] tag: {row['encoded']!r}"
+            else:
+                # L4/L5: brackets preserved, interior can be vowel-stripped.
+                assert "[" in row["encoded"] and "]" in row["encoded"], \
+                    f"L{row['level']} dropped the brackets: {row['encoded']!r}"
+
+    def test_section_headings_not_remapped_in_plain_mode(self, server):
+        """Regression: the plain-text path used to wrap user text in a
+        synthetic CRUMB and run it through metalk_encode, which rewrote
+        legitimate `[goal]` / `[context]` bracket headings to the
+        MeTalk-abbreviated forms `[g]` / `[cx]` even at level 1 —
+        silent content corruption."""
+        text = ("Fix the login bug.\n"
+                "[goal]\nrestore session\n"
+                "[context]\nJWT expires early\n")
+        status, data = _post_json(server, "/metalk/compress",
+                                  {"text": text, "level": 1, "mode": "plain"})
+        assert status == 200
+        encoded = data["encoded"]
+        assert "[goal]" in encoded, \
+            f"user [goal] was rewritten to [g]: {encoded!r}"
+        assert "[context]" in encoded, \
+            f"user [context] was rewritten to [cx]: {encoded!r}"
+        assert "[g]" not in encoded
+        assert "[cx]" not in encoded
+
+    def test_section_headings_preserved_across_compare(self, server):
+        # At L1-L3 the bracket contents survive because no vowel-strip runs
+        # and we no longer rewrite them as section headers. At L4+ vowel-
+        # strip legitimately affects the word inside the brackets, but the
+        # critical test is that L1 (the level Codex flagged) doesn't do
+        # the section-abbreviation `[goal]` → `[g]` rewrite anymore.
+        text = "Fix login.\n[goal]\nsession\n[context]\nJWT"
+        status, data = _post_json(server, "/metalk/compare", {"text": text})
+        assert status == 200
+        by_level = {r["level"]: r for r in data["levels"] if "encoded" in r}
+        for lv in (1, 2, 3):
+            enc = by_level[lv]["encoded"]
+            assert "[goal]" in enc, \
+                f"L{lv} rewrote [goal] as section header: {enc!r}"
+            assert "[context]" in enc, \
+                f"L{lv} rewrote [context] as section header: {enc!r}"
+            # The abbreviated forms must NOT appear.
+            assert "[g]" not in enc and "[cx]" not in enc
+
+
+class TestModeValidation:
+    """Regression: `mode` used to accept any string, silently running
+    plain-mode compression for typos like 'plian'."""
+
+    def test_unknown_mode_returns_400_on_compress(self, server):
+        try:
+            _post_json(server, "/metalk/compress",
+                       {"text": "hi", "level": 2, "mode": "plian"})
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 400
+            body = json.loads(exc.read())
+            assert "mode" in body["error"]
+            return
+        pytest.fail("expected HTTP 400")
+
+    def test_unknown_mode_returns_400_on_compare(self, server):
+        try:
+            _post_json(server, "/metalk/compare",
+                       {"text": "hi", "mode": "AUTO"})
+        except urllib.error.HTTPError as exc:
+            assert exc.code == 400
+            return
+        pytest.fail("expected HTTP 400")
+
+    def test_valid_modes_accepted(self, server):
+        for mode in ("auto", "crumb", "plain"):
+            status, _ = _post_json(server, "/metalk/compress",
+                                   {"text": "hi", "level": 1, "mode": mode})
+            assert status == 200
 
 
 class TestStaticServing:

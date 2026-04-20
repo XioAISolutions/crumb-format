@@ -734,11 +734,6 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
     return jsLoading;
   }
 
-  // Kept in sync with api/server.py::_SYNTHETIC_SECTION_MARKERS and
-  // browser-extension/popup.js. Only these exact markers are dropped when
-  // unwrapping plain-mode output — any other bracketed line is user content.
-  var SYNTHETIC_SECTION_MARKERS = { "[consolidated]": true, "[cs]": true };
-
   function compressLocal(text, level, vml, mode) {
     // Auto-detection mirrors the server: starts with BEGIN CRUMB or BC after
     // leading-whitespace trim. Grouping is explicit so mode=plain never
@@ -751,21 +746,13 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
         leading.indexOf("BC") === 0
       ))
     );
-    var encoded;
-    if (isCrumb) {
-      encoded = window.Metalk.encode(text, level, { vowel_min_length: vml });
-    } else {
-      var wrapped = "BEGIN CRUMB\nv=1.1\nkind=mem\ntitle=playground\n---\n[consolidated]\n" + text + "\nEND CRUMB\n";
-      var mt = window.Metalk.encode(wrapped, level, { vowel_min_length: vml });
-      var parts = mt.split("---\n");
-      var bodyLines = (parts[1] || "").replace(/\n+$/, "").split("\n").filter(function (ln) {
-        var s = ln.trim();
-        if (s === "EC" || s === "END CRUMB") return false;
-        if (SYNTHETIC_SECTION_MARKERS[s]) return false;
-        return true;
-      });
-      encoded = bodyLines.join("\n").trim() + "\n";
-    }
+    // Plain mode now uses encodePlain directly instead of wrapping in a
+    // synthetic CRUMB — the old path ran user text through the structured
+    // encoder, which silently rewrote legitimate `[goal]` / `[context]`
+    // headings to their MeTalk-abbreviated forms.
+    var encoded = isCrumb
+      ? window.Metalk.encode(text, level, { vowel_min_length: vml })
+      : window.Metalk.encodePlain(text, level, { vowel_min_length: vml });
     var stats = window.Metalk.compressionStats(text, encoded);
     stats.level = level;
     stats.mode = isCrumb ? "crumb" : "plain";

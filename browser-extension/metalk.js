@@ -258,6 +258,22 @@
 
   // ── Encode / decode pipelines ───────────────────────────────
 
+  function encodePlain(text, level, opts) {
+    // Pure body-transform pipeline for arbitrary prose. Mirrors
+    // cli/metalk.py::encode_plain — never treats `[bracket]` lines as
+    // section headers, so user headings like `[goal]` or `[context]` are
+    // preserved verbatim.
+    ensureData();
+    opts = opts || {};
+    level = level || 2;
+    var vml = opts.vowel_min_length || 4;
+    var result = applyDict(text, DATA._abbrevSorted);
+    if (level >= 2) result = stripGrammar(result);
+    if (level >= 3) result = condenseAggressive(result);
+    if (level >= 4) result = stripText(result, vml);
+    return result;
+  }
+
   function encode(text, level, opts) {
     ensureData();
     opts = opts || {};
@@ -267,12 +283,8 @@
     var lines = text.trim().split("\n");
     var sepIdx = lines.indexOf("---");
     if (sepIdx === -1) {
-      // Not a structured crumb — apply body transforms inline.
-      var result = applyDict(text, DATA._abbrevSorted);
-      if (level >= 2) result = stripGrammar(result);
-      if (level >= 3) result = condenseAggressive(result);
-      if (level >= 4) result = stripText(result, vml);
-      return result;
+      // Not a structured crumb — run the plain pipeline.
+      return encodePlain(text, level, opts);
     }
 
     if (lines[0].trim() === "BEGIN CRUMB") lines[0] = "BC";
@@ -399,6 +411,7 @@
     load: load,
     setData: setData,
     encode: encode,
+    encodePlain: encodePlain,
     decode: decode,
     stripText: stripText,
     stripLine: stripLine,

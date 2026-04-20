@@ -22,7 +22,11 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from cli.crumb import parse_crumb, render_crumb  # noqa: E402
-from cli.metalk import encode as metalk_encode, compression_stats as metalk_stats  # noqa: E402
+from cli.metalk import (  # noqa: E402
+    encode as metalk_encode,
+    encode_plain as metalk_encode_plain,
+    compression_stats as metalk_stats,
+)
 from cli.vowelstrip import (  # noqa: E402
     drift_stats as vs_drift_stats,
     encode_crumb as vs_encode_crumb,
@@ -114,10 +118,7 @@ def crumb_render(_req, _match, _qs, body):
 # Section markers written by _wrap_plain_text — these are the ONLY bracketed
 # lines the unwrap step should drop. Keeping the allowlist explicit prevents
 # legitimate user content like `[todo]` or `[note]` from being deleted.
-_SYNTHETIC_SECTION_MARKERS = frozenset({
-    "[consolidated]",  # v1 wrapper
-    "[cs]",            # MeTalk-abbreviated form (SECTION_MAP['consolidated'])
-})
+_VALID_MODES = frozenset({"auto", "crumb", "plain"})
 
 
 def _parse_metalk_knobs(body):
@@ -180,6 +181,8 @@ def metalk_compress(_req, _match, _qs, body):
         return err
 
     mode = body.get("mode", "auto")
+    if mode not in _VALID_MODES:
+        return 400, {"error": "'mode' must be one of: auto, crumb, plain"}
 
     is_crumb = (
         mode == "crumb"
@@ -193,31 +196,15 @@ def metalk_compress(_req, _match, _qs, body):
                 vowel_min_length=vml, adaptive_threshold=threshold,
             )
         else:
-            # Plain prose at any level: wrap in a synthetic mem crumb so the
-            # full MeTalk pipeline (dict + grammar + condense + vowel-strip)
-            # runs, then strip the wrapper.
-            wrapped = (
-                "BEGIN CRUMB\nv=1.1\nkind=mem\ntitle=playground\n---\n"
-                "[consolidated]\n" + text + "\nEND CRUMB\n"
-            )
-            mt = metalk_encode(
-                wrapped, level=level,
+            # Plain prose: run the body transforms directly via encode_plain
+            # so that user [bracket] headings are preserved verbatim. The
+            # earlier wrap-and-unwrap hack ran the user text through the
+            # CRUMB encoder, which rewrote `[goal]`/`[context]` to their
+            # MeTalk-abbreviated forms — silent content corruption.
+            encoded = metalk_encode_plain(
+                text, level=level,
                 vowel_min_length=vml, adaptive_threshold=threshold,
             )
-            try:
-                _, after = mt.split("---\n", 1)
-                body_lines = after.rstrip().split("\n")
-                # Drop only the terminating sentinel and the EXACT synthetic
-                # wrapper section markers — any other bracketed line is user
-                # content (e.g. `[todo]`, `[note]`) and must be preserved.
-                cleaned = [
-                    ln for ln in body_lines
-                    if ln.strip() not in {"EC", "END CRUMB"}
-                    and ln.strip() not in _SYNTHETIC_SECTION_MARKERS
-                ]
-                encoded = "\n".join(cleaned).strip() + "\n"
-            except ValueError:
-                encoded = mt
     except Exception as exc:
         traceback.print_exc()
         return 500, {"error": f"compression failed: {exc}"}
@@ -248,6 +235,8 @@ def metalk_compare(_req, _match, _qs, body):
     if err:
         return err
     mode = body.get("mode", "auto")
+    if mode not in _VALID_MODES:
+        return 400, {"error": "'mode' must be one of: auto, crumb, plain"}
 
     results = []
     for level in (1, 2, 3, 4, 5):
