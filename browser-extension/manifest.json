@@ -1,14 +1,20 @@
 {
   "manifest_version": 3,
-  "name": "CRUMB — AI Handoff Format",
-  "version": "1.1.0",
-  "description": "Injects a one-click Copy as CRUMB handoff button into major AI chat interfaces",
-  "permissions": ["contextMenus", "clipboardWrite", "activeTab"],
+  "name": "CRUMB — AI Handoff + Prompt Compressor",
+  "version": "1.2.0",
+  "description": "One-click Copy as CRUMB in major AI chats, plus a popup prompt compressor (MeTalk + vowel-strip, runs fully in-browser).",
+  "permissions": ["contextMenus", "clipboardWrite", "activeTab", "scripting", "storage"],
   "host_permissions": [
     "https://chatgpt.com/*",
     "https://chat.openai.com/*",
     "https://claude.ai/*",
     "https://gemini.google.com/*"
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["metalk-data.json"],
+      "matches": ["<all_urls>"]
+    }
   ],
   "background": {
     "service_worker": "background.js"
