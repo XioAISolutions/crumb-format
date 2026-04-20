@@ -56,7 +56,7 @@ _WORD_RUN = re.compile(r"[A-Za-z]+")
 _WHITESPACE_SPLIT = re.compile(r"(\s+)")
 # A token is treated as opaque (skip vowel strip entirely) if it contains
 # any of these — covers URLs, file paths, identifiers, versions, emails.
-_OPAQUE_CHARS = frozenset("/:_.@\\=#")
+_OPAQUE_CHARS = frozenset("/:_.@\\=#'")
 # Punctuation safe to peel off the ends of a token before deciding whether
 # the remaining core is opaque. Anything outside this set (slashes, @, etc.)
 # is treated as part of the token's identity — peeling it would corrupt

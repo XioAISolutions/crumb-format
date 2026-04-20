@@ -196,6 +196,36 @@ console.log(JSON.stringify({ grid }));
 
 
 @pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_js_contractions_pass_through_vowel_strip(tmp_path):
+    """Regression: the JS port reads opaque_chars from metalk-data.json,
+    so adding `'` on the Python side propagates here. Confirms the JS
+    encodePlain at L4 leaves contractions and apostrophe-names untouched."""
+    driver = tmp_path / "driver.js"
+    driver.write_text(f"""
+const fs = require("fs");
+global.self = global;
+global.fetch = async () => ({{
+  ok: true, status: 200,
+  json: async () => JSON.parse(fs.readFileSync("{ROOT / 'web' / 'metalk-data.json'}", "utf-8"))
+}});
+const Metalk = require("{ROOT / 'web' / 'metalk.js'}");
+(async () => {{
+  await Metalk.load();
+  const cases = ["couldn't", "don't", "isn't", "O'Reilly", "O'Brien"];
+  const out = cases.map(s => ({{ input: s, encoded: Metalk.encodePlain(s, 4, {{ vowel_min_length: 4 }}) }}));
+  process.stdout.write(JSON.stringify(out));
+}})();
+""", encoding="utf-8")
+    result = subprocess.run([NODE, str(driver)], capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, result.stderr
+    rows = json.loads(result.stdout)
+    for row in rows:
+        assert row["encoded"] == row["input"], (
+            f"JS L4 vowel-stripped {row['input']!r} → {row['encoded']!r}"
+        )
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
 def test_looks_like_crumb_strict_first_line(tmp_path):
     """Regression: the JS auto-detection used `startswith` which matched
     any 'BC...' prefix. Now it requires the full sentinel as the first

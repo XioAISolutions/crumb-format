@@ -94,6 +94,30 @@ class TestStripLine:
         assert out.endswith(".")
         assert "athntctn" in out
 
+    def test_contractions_unchanged(self):
+        # Regression: `'` was not in _OPAQUE_CHARS, so contractions like
+        # "couldn't" got their alpha runs (couldn / t) processed by the
+        # vowel-strip regex and became "cldn't". The fix adds `'` to the
+        # opaque set so the whole token passes through.
+        for word in ["couldn't", "don't", "isn't", "wouldn't", "they're"]:
+            assert strip_word(word) == word, \
+                f"contraction {word!r} was vowel-stripped"
+            assert strip_line(word) == word, \
+                f"contraction {word!r} was vowel-stripped via strip_line"
+
+    def test_apostrophe_names_unchanged(self):
+        # "O'Reilly" used to become "O'Rlly" — internal apostrophe.
+        for name in ["O'Reilly", "O'Brien", "D'Angelo"]:
+            assert strip_line(name) == name, \
+                f"name {name!r} was vowel-stripped"
+
+    def test_plural_possessive_apostrophe_preserved_via_peel(self):
+        # `dogs'` ends with apostrophe (sentence punct) — peeled off,
+        # then `dogs` is a regular word that gets vowel-stripped, then
+        # apostrophe re-attached. End result keeps the trailing marker.
+        out = strip_line("the dogs' bones")
+        assert out.endswith("' bones") or "dogs'" in out or "dgs'" in out
+
     def test_mixed_short_and_long(self):
         out = strip_line("A simple authentication test.")
         assert "A" in out
