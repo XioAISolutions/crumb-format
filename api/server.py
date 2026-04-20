@@ -166,6 +166,8 @@ def metalk_compress(_req, _match, _qs, body):
     text = body.get("text", "")
     if not text:
         return 400, {"error": "missing 'text' field"}
+    if not isinstance(text, str):
+        return 400, {"error": "'text' must be a string"}
     try:
         level = int(body.get("level", 2))
     except (TypeError, ValueError):
@@ -239,6 +241,8 @@ def metalk_compare(_req, _match, _qs, body):
     text = body.get("text", "")
     if not text:
         return 400, {"error": "missing 'text' field"}
+    if not isinstance(text, str):
+        return 400, {"error": "'text' must be a string"}
 
     vml, threshold, err = _parse_metalk_knobs(body)
     if err:

@@ -712,6 +712,15 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
       stats.encoded_chars + " chars · ~" + stats.encoded_tokens + " tokens";
   }
 
+  // Finite-number fallback — avoids `|| default` which would treat a
+  // legitimate user-entered 0 (valid for adaptive_threshold, and uniformly
+  // rejected by the server for vml) as missing. Matches the server-side
+  // `is None` check so the user's explicit 0 survives the round-trip.
+  function numericKnob(raw, parser, fallback) {
+    var parsed = parser(raw);
+    return (typeof parsed === "number" && isFinite(parsed)) ? parsed : fallback;
+  }
+
   // ── Offline fallback (JS port in metalk.js) ─────────────────
 
   var jsReady = false;
@@ -786,8 +795,8 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
     var payload = {
       text: text,
       level: currentLevel,
-      vowel_min_length: parseInt($("vml").value, 10) || 4,
-      adaptive_threshold: parseFloat($("threshold").value) || 0.85,
+      vowel_min_length: numericKnob($("vml").value, function (v) { return parseInt(v, 10); }, 4),
+      adaptive_threshold: numericKnob($("threshold").value, parseFloat, 0.85),
       mode: $("mode").value
     };
 
@@ -1003,8 +1012,8 @@ Try the ⚙ Advanced knobs if you want per-word or per-line control."></textarea
     if (compareInflight) { comparePending = true; return; }
     var payload = {
       text: text,
-      vowel_min_length: parseInt($("vml").value, 10) || 4,
-      adaptive_threshold: parseFloat($("threshold").value) || 0.85,
+      vowel_min_length: numericKnob($("vml").value, function (v) { return parseInt(v, 10); }, 4),
+      adaptive_threshold: numericKnob($("threshold").value, parseFloat, 0.85),
       mode: $("mode").value
     };
     compareInflight = fetch("/metalk/compare", {

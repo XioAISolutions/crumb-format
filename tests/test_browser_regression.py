@@ -90,6 +90,40 @@ self.Metalk = Metalk;
 
 
 @pytest.mark.skipif(NODE is None, reason="node not installed")
+def test_playground_numeric_knob_preserves_zero(tmp_path):
+    """Regression: `parseFloat(x) || 0.85` replaced a user-entered 0 with 0.85.
+    The new `numericKnob` helper uses isFinite so legitimate zeroes survive."""
+    html = (ROOT / "web" / "playground.html").read_text(encoding="utf-8")
+    fn_src = _extract_function(html, "numericKnob")
+
+    driver = tmp_path / "driver.js"
+    driver.write_text(f"""
+{fn_src}
+const cases = [
+  {{ raw: "0",   parser: parseFloat, fb: 0.85, want: 0 }},
+  {{ raw: "0.0", parser: parseFloat, fb: 0.85, want: 0 }},
+  {{ raw: "0.5", parser: parseFloat, fb: 0.85, want: 0.5 }},
+  {{ raw: "",    parser: parseFloat, fb: 0.85, want: 0.85 }},
+  {{ raw: "abc", parser: parseFloat, fb: 0.85, want: 0.85 }},
+  {{ raw: "0",   parser: (v) => parseInt(v, 10), fb: 4, want: 0 }},
+  {{ raw: "5",   parser: (v) => parseInt(v, 10), fb: 4, want: 5 }},
+];
+const results = cases.map((c) => ({{
+  input: c.raw, want: c.want, got: numericKnob(c.raw, c.parser, c.fb)
+}}));
+process.stdout.write(JSON.stringify(results));
+""", encoding="utf-8")
+
+    result = subprocess.run([NODE, str(driver)], capture_output=True, text=True, timeout=15)
+    assert result.returncode == 0, f"node driver failed: {result.stderr}"
+    rows = json.loads(result.stdout)
+    for r in rows:
+        assert r["got"] == r["want"], (
+            f"numericKnob({r['input']!r}): want {r['want']}, got {r['got']}"
+        )
+
+
+@pytest.mark.skipif(NODE is None, reason="node not installed")
 def test_playground_offline_is_crumb_detection(tmp_path):
     """Regression: the offline `isCrumb` mixed &&/|| without grouping and
     used Python's lstrip, so mode=plain still triggered the BC check and

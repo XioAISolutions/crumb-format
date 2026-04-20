@@ -147,6 +147,28 @@ class TestCompressEndpoint:
             return
         pytest.fail("expected HTTP 400")
 
+    def test_non_string_text_returns_400_on_compress(self, server):
+        """Regression: {"text": 123} used to raise AttributeError on lstrip()
+        and surface as HTTP 500."""
+        for bad in (123, {"a": 1}, [1, 2, 3], True):
+            try:
+                _post_json(server, "/metalk/compress", {"text": bad, "level": 2})
+            except urllib.error.HTTPError as exc:
+                assert exc.code == 400, f"expected 400 for text={bad!r}, got {exc.code}"
+                continue
+            pytest.fail(f"expected HTTP 400 for text={bad!r}")
+
+    def test_non_string_text_returns_400_on_compare(self, server):
+        """Regression: /metalk/compare used to return 200 with five
+        'compression failed' rows on non-string text."""
+        for bad in (123, {"a": 1}, [1, 2, 3]):
+            try:
+                _post_json(server, "/metalk/compare", {"text": bad})
+            except urllib.error.HTTPError as exc:
+                assert exc.code == 400, f"expected 400 for text={bad!r}, got {exc.code}"
+                continue
+            pytest.fail(f"expected HTTP 400 for text={bad!r}")
+
     def test_stats_shape(self, server):
         status, data = _post_json(server, "/metalk/compress",
                                   {"text": "Authentication middleware test text.", "level": 3})
