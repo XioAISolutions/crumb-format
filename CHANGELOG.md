@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.5.0
 
 ### Efficiency layers (SPEC §§13-16)
 

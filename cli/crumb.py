@@ -32,7 +32,7 @@ REQUIRED_SECTIONS = {
     "wake": ["identity"],
     "delta": ["changes"],
 }
-CLI_VERSION = "0.4.0"
+CLI_VERSION = "0.5.0"
 SUPPORTED_VERSIONS = {"1.1", "1.2"}
 FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
 CONTENT_REF_RE = re.compile(r"^sha256:[0-9a-f]{16,64}$")
