@@ -10,7 +10,7 @@ Ever been deep into a task with one AI, then need to switch to another? You eith
 
 CRUMB is a third option. It's a small, structured text block you copy-paste between AI tools. The next AI gets exactly what it needs to continue your work -- the goal, the context, and the constraints -- without the noise.
 
-> **v0.4.0** — First wire-format bump. `v=1.2` adds four additive primitives: cross-crumb `refs`, foldable sections, a `[handoff]` block, and typed content annotations. v1.1 parsers accept v1.2 files unchanged. All v0.3.0 features (Palace, Reflect, MeTalk, `crumb pack`, `crumb lint`, MemPalace bridge, REST/A2A, AgentAuth, MCP servers, 41+ CLI commands) ship unchanged. Standalone — no bridge code to Weft/WeaveMind, LangGraph, n8n, or external orchestration runtimes. `pip install crumb-format`.
+> **v0.5.0** — Four efficiency layers on top of the v1.2 wire format: `crumb squeeze --budget N` (budget-aware packer), content-addressed `refs=sha256:…` with a receiver-side seen set, `kind=delta` crumbs that carry only what changed, and `@priority: 1..10` on any section so packers know what to drop first. All additive — a v1.2 consumer that ignores them is still compliant. v0.4.0's wire-format additions (cross-crumb `refs`, foldable sections, `[handoff]` block, typed content annotations) and the full 0.3.0 surface (Palace, Reflect, MeTalk, `crumb pack`, `crumb lint`, MemPalace bridge, REST/A2A, AgentAuth, MCP servers, 41+ CLI commands) ship unchanged. Standalone — no bridge code to external orchestration runtimes. `pip install crumb-format`.
 
 ## Try it right now
 

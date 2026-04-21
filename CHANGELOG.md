@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.5.0
+
+### Efficiency layers (SPEC §§13-16)
+
+Four additive layers that let a sender fit more signal into a fixed token budget without changing v1.2 compatibility. Inspired by the KV-cache-quantization playbook: compose decomposition, sparse references, delta encoding, and dictionary compression to push the token/information ratio down.
+
+- **Content-addressed refs** — `refs=sha256:<hex>` entries identify a CRUMB by a stable digest computed over its canonical form (volatile `id`, `dream_pass`, `dream_sessions`, and `refs` headers excluded). A receiver's "seen set" (`$CRUMB_SEEN_FILE`, default `~/.crumb/seen`) lets the sender elide content the receiver already holds.
+- **Priority annotations** — `@priority: 1..10` on a section body tells a budget-aware consumer which optional sections to drop first. Required sections are always priority 10.
+- **Delta crumbs** — `kind=delta`, `base=sha256:...`, `target=sha256:...` carries only the `+` / `-` / `~` operations needed to reconstruct the target. Headers diffs travel in a pseudo-section `@headers`. Apply is verify-by-default: the reconstructed digest is checked against `target=`.
+- **Budget-aware packing** — a prescriptive ordering that composes the above: elide seen refs → drop `[fold:X/full]` → drop lowest-priority optional sections → escalate MeTalk (1 → 2 → 3) → fail loudly if required content still won't fit.
+
+### New CLI commands
+
+- `crumb squeeze FILE --budget N` — apply the budget-aware packing order end to end. `--seen`, `--seen-hash`, `--no-seen`, `--metalk-max-level`, `--dry-run` for report-only.
+- `crumb hash FILE [--short N]` — print a CRUMB's `sha256:<hex>` content digest.
+- `crumb seen {add,remove,list,check,clear}` — manage the receiver-side seen set.
+- `crumb delta BASE TARGET` — compute a `kind=delta` crumb.
+- `crumb apply BASE DELTA` — reconstruct a target from its base + delta (verify by default).
+
+### Parser & examples
+
+- `cli/crumb.py` now recognises `kind=delta`, validates `@priority:` integer values and `refs=sha256:...` digest format, and parses `[changes]` entries with the `+` / `-` / `~` prefix grammar.
+- New examples: `examples/v12-priority.crumb`, `examples/v12-content-ref.crumb`, `examples/v12-delta.crumb`.
+- Tests: `tests/test_squeeze.py` covers all four layers (30 new cases).
+
+All additions are v1.2-compatible. A v1.2 consumer that ignores §§13–16 is still a compliant consumer.
+
 ## v0.4.0
 
 First release to bump the wire format itself from `v=1.1` to `v=1.2`. All four additions are optional, purely additive, and a v1.1 parser accepts a v1.2 file by ignoring unknown headers and sections (per `SPEC.md §8`).
