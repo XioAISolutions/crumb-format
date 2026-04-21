@@ -30,10 +30,14 @@ REQUIRED_SECTIONS = {
     "passport": ["identity", "permissions"],
     "audit": ["goal", "actions", "verdict"],
     "wake": ["identity"],
+    "delta": ["changes"],
 }
 CLI_VERSION = "0.4.0"
 SUPPORTED_VERSIONS = {"1.1", "1.2"}
 FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
+CONTENT_REF_RE = re.compile(r"^sha256:[0-9a-f]{16,64}$")
+DELTA_CHANGE_RE = re.compile(r"^\s*-\s*([+\-~])\[(@?[a-z0-9_:/-]+)\]\s*(.*)$", re.IGNORECASE)
+DELTA_HEADERS_SECTION = "@headers"
 
 
 def read_text(path: str | None) -> str:
@@ -131,6 +135,10 @@ def _validate_v12_additive(
         for ref in (r.strip() for r in refs_value.split(",")):
             if not ref:
                 raise ValueError("refs header contains an empty entry")
+            if ref.startswith("sha256:") and not CONTENT_REF_RE.match(ref):
+                raise ValueError(
+                    f"refs entry {ref!r} has a malformed sha256: digest"
+                )
 
     if "refs" in sections and not any(line.strip() for line in sections["refs"]):
         raise ValueError("[refs] section is empty; omit it instead")
@@ -155,12 +163,46 @@ def _validate_v12_additive(
             )
 
     for section_name, body in sections.items():
-        first_nonblank = next((line for line in body if line.strip()), "")
-        if first_nonblank.strip().startswith("@type:"):
-            content_type = first_nonblank.strip().split(":", 1)[1].strip()
-            if not content_type:
+        meaningful = [line for line in body if line.strip()]
+        for idx, line in enumerate(meaningful[:2]):
+            stripped = line.strip()
+            if stripped.startswith("@type:") and idx == 0:
+                content_type = stripped.split(":", 1)[1].strip()
+                if not content_type:
+                    raise ValueError(
+                        f"@type annotation has empty value in [{section_name}]"
+                    )
+            if stripped.startswith("@priority:"):
+                raw = stripped.split(":", 1)[1].strip()
+                if not raw:
+                    raise ValueError(
+                        f"@priority annotation has empty value in [{section_name}]"
+                    )
+                try:
+                    score = int(raw)
+                except ValueError:
+                    raise ValueError(
+                        f"@priority value in [{section_name}] must be an integer 1-10"
+                    )
+                if not 1 <= score <= 10:
+                    raise ValueError(
+                        f"@priority value in [{section_name}] must be between 1 and 10"
+                    )
+
+    if headers.get("kind") == "delta":
+        if "base" not in headers or not headers["base"].strip():
+            raise ValueError("kind=delta requires a 'base' header identifying the parent crumb")
+        changes = [line for line in sections.get("changes", []) if line.strip()]
+        if not changes:
+            raise ValueError("kind=delta requires at least one entry in [changes]")
+        for line in changes:
+            stripped = line.strip()
+            if stripped.startswith("@"):
+                continue
+            if not DELTA_CHANGE_RE.match(line):
                 raise ValueError(
-                    f"@type annotation has empty value in [{section_name}]"
+                    f"malformed [changes] entry: {stripped!r} "
+                    "(expected '- +[section] text', '- -[section] text', or '- ~[section] text')"
                 )
 
 
@@ -4602,6 +4644,141 @@ def cmd_lint(args: argparse.Namespace) -> None:
         sys.exit(2)
 
 
+# ── squeeze (budget-aware packer) ─────────────────────────────────────
+
+def cmd_squeeze(args: argparse.Namespace) -> None:
+    from cli import hashing, squeeze as squeeze_mod
+
+    text = read_text(args.file)
+    seen: set[str] = set()
+    if args.no_seen:
+        seen = set()
+    elif args.seen:
+        seen = hashing.load_seen(args.seen)
+    else:
+        seen = hashing.load_seen()
+    for extra in args.seen_hash or []:
+        seen.add(extra.strip())
+
+    try:
+        rendered, report = squeeze_mod.squeeze_crumb(
+            text,
+            budget=args.budget,
+            seen=seen,
+            metalk_max_level=args.metalk_max_level,
+        )
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.dry_run:
+        print(squeeze_mod.format_report(report))
+        return
+
+    write_text(args.output, rendered)
+    if args.output != '-':
+        print(squeeze_mod.format_report(report))
+
+
+# ── hash ──────────────────────────────────────────────────────────────
+
+def cmd_hash(args: argparse.Namespace) -> None:
+    from cli import hashing
+
+    text = read_text(args.file)
+    try:
+        digest = hashing.content_hash(text)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    if args.short:
+        digest = hashing.short_hash(digest, length=args.short)
+    print(digest)
+
+
+# ── seen set ──────────────────────────────────────────────────────────
+
+def cmd_seen(args: argparse.Namespace) -> None:
+    from cli import hashing
+
+    action = args.seen_action
+    store = getattr(args, 'store', None)
+
+    if action == 'list':
+        for entry in sorted(hashing.load_seen(store)):
+            print(entry)
+        return
+
+    if action == 'add':
+        digests = list(args.digests or [])
+        for path in args.from_file or []:
+            text = read_text(path)
+            digests.append(hashing.content_hash(text))
+        if not digests:
+            print("Error: provide at least one sha256:<hex> digest or --from-file path", file=sys.stderr)
+            sys.exit(1)
+        updated = hashing.add_seen(digests, store)
+        print(f"Seen set now holds {len(updated)} digest(s).")
+        return
+
+    if action == 'remove':
+        updated = hashing.remove_seen(args.digests or [], store)
+        print(f"Seen set now holds {len(updated)} digest(s).")
+        return
+
+    if action == 'clear':
+        hashing.clear_seen(store)
+        print("Seen set cleared.")
+        return
+
+    if action == 'check':
+        exit_code = 0
+        for digest in args.digests or []:
+            present = hashing.is_seen(digest, store)
+            print(f"{digest}: {'seen' if present else 'missing'}")
+            if not present:
+                exit_code = 1
+        sys.exit(exit_code)
+
+
+# ── delta / apply ─────────────────────────────────────────────────────
+
+def cmd_delta(args: argparse.Namespace) -> None:
+    from cli import delta as delta_mod
+
+    base_text = read_text(args.base)
+    target_text = read_text(args.target)
+    try:
+        rendered = delta_mod.build_delta_crumb(
+            base_text,
+            target_text,
+            source=args.source or 'crumb.delta',
+            title=args.title,
+        )
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+    write_text(args.output, rendered)
+    if args.output != '-':
+        print(f"Wrote delta crumb → {args.output} (~{estimate_tokens(rendered)} tokens)")
+
+
+def cmd_apply(args: argparse.Namespace) -> None:
+    from cli import delta as delta_mod
+
+    base_text = read_text(args.base)
+    delta_text = read_text(args.delta)
+    try:
+        rendered = delta_mod.apply_delta(base_text, delta_text, verify=not args.no_verify)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+    write_text(args.output, rendered)
+    if args.output != '-':
+        print(f"Reconstructed target → {args.output} (~{estimate_tokens(rendered)} tokens)")
+
+
 # ── Webhook commands ─────────────────────────────────────────────────
 
 def cmd_webhook(args: argparse.Namespace) -> None:
@@ -5242,6 +5419,68 @@ def build_parser() -> argparse.ArgumentParser:
                           help='Local Ollama model to use when --ollama is set (default: llama3.2:3b).')
     pack_cmd.add_argument('--output', '-o', required=True, help='Output .crumb file path.')
     pack_cmd.set_defaults(func=cmd_pack)
+
+    # --- Squeeze (budget-aware packer) ---
+    squeeze_cmd = sub.add_parser('squeeze',
+                                 help='Compress a CRUMB to fit a token budget (drops folds, elides seen refs, escalates MeTalk).')
+    squeeze_cmd.add_argument('file', help='.crumb file to squeeze.')
+    squeeze_cmd.add_argument('--budget', type=int, required=True,
+                             help='Target estimated token budget.')
+    squeeze_cmd.add_argument('--seen', help='Path to a seen-set file (defaults to ~/.crumb/seen or $CRUMB_SEEN_FILE).')
+    squeeze_cmd.add_argument('--seen-hash', action='append', default=[],
+                             help='Extra sha256:<hex> digests to treat as already-seen. Repeatable.')
+    squeeze_cmd.add_argument('--no-seen', action='store_true',
+                             help='Ignore any persisted seen set.')
+    squeeze_cmd.add_argument('--metalk-max-level', type=int, choices=[1, 2, 3], default=3,
+                             help='Highest MeTalk level to apply if folds + priorities are not enough (default: 3).')
+    squeeze_cmd.add_argument('--dry-run', action='store_true',
+                             help='Print the compression report without writing output.')
+    squeeze_cmd.add_argument('-o', '--output', default='-', help='Output file or - for stdout.')
+    squeeze_cmd.set_defaults(func=cmd_squeeze)
+
+    # --- Hash (content-addressed digest) ---
+    hash_cmd = sub.add_parser('hash', help='Print the sha256 content digest of a CRUMB.')
+    hash_cmd.add_argument('file', help='.crumb file to hash.')
+    hash_cmd.add_argument('--short', type=int,
+                          help='Print a shortened sha256:<hex> digest truncated to this many hex chars.')
+    hash_cmd.set_defaults(func=cmd_hash)
+
+    # --- Seen set (content-addressed ref registry) ---
+    seen_cmd = sub.add_parser('seen', help='Manage the content-addressed seen-set registry.')
+    seen_sub = seen_cmd.add_subparsers(dest='seen_action', required=True)
+    seen_add = seen_sub.add_parser('add', help='Add sha256:<hex> digests (or digests derived from files) to the seen set.')
+    seen_add.add_argument('digests', nargs='*', help='sha256:<hex> digests to add.')
+    seen_add.add_argument('--from-file', action='append', default=[],
+                          help='Derive a digest from this .crumb file and add it. Repeatable.')
+    seen_add.add_argument('--store', help='Override the seen-set file path.')
+    seen_remove = seen_sub.add_parser('remove', help='Remove digests from the seen set.')
+    seen_remove.add_argument('digests', nargs='+')
+    seen_remove.add_argument('--store')
+    seen_list = seen_sub.add_parser('list', help='List digests in the seen set.')
+    seen_list.add_argument('--store')
+    seen_check = seen_sub.add_parser('check', help='Exit non-zero if any digest is missing from the seen set.')
+    seen_check.add_argument('digests', nargs='+')
+    seen_check.add_argument('--store')
+    seen_clear = seen_sub.add_parser('clear', help='Empty the seen set.')
+    seen_clear.add_argument('--store')
+    seen_cmd.set_defaults(func=cmd_seen)
+
+    # --- Delta / Apply ---
+    delta_cmd = sub.add_parser('delta', help='Compute a kind=delta CRUMB between two CRUMBs.')
+    delta_cmd.add_argument('base', help='Base .crumb file.')
+    delta_cmd.add_argument('target', help='Target .crumb file.')
+    delta_cmd.add_argument('--title', help='Optional title for the delta crumb.')
+    delta_cmd.add_argument('--source', help='Source header (default: crumb.delta).')
+    delta_cmd.add_argument('-o', '--output', default='-', help='Output file or - for stdout.')
+    delta_cmd.set_defaults(func=cmd_delta)
+
+    apply_cmd = sub.add_parser('apply', help='Apply a kind=delta CRUMB to a base CRUMB and reconstruct the target.')
+    apply_cmd.add_argument('base', help='Base .crumb file.')
+    apply_cmd.add_argument('delta', help='Delta .crumb file (kind=delta).')
+    apply_cmd.add_argument('--no-verify', action='store_true',
+                           help='Skip sha256 verification of base and reconstructed target digests.')
+    apply_cmd.add_argument('-o', '--output', default='-', help='Output file or - for stdout.')
+    apply_cmd.set_defaults(func=cmd_apply)
 
     # --- Lint ---
     lint_cmd = sub.add_parser('lint', help='Lint CRUMBs for secrets, oversized raw logs, suspicious headers, and budget issues.')

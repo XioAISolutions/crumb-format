@@ -15,9 +15,12 @@ REQUIRED_SECTIONS = {
     "log": ["entries"],
     "todo": ["tasks"],
     "wake": ["identity"],
+    "delta": ["changes"],
 }
 SUPPORTED_VERSIONS = {"1.1", "1.2"}
 FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
+CONTENT_REF_RE = re.compile(r"^sha256:[0-9a-f]{16,64}$")
+DELTA_CHANGE_RE = re.compile(r"^\s*-\s*([+\-~])\[(@?[a-z0-9_:/-]+)\]\s*(.*)$", re.IGNORECASE)
 
 class ValidationError(Exception):
     pass
@@ -97,6 +100,10 @@ def _validate_v12_additive(
         for ref in (r.strip() for r in refs_value.split(",")):
             if not ref:
                 raise ValidationError("refs header contains an empty entry")
+            if ref.startswith("sha256:") and not CONTENT_REF_RE.match(ref):
+                raise ValidationError(
+                    f"refs entry {ref!r} has a malformed sha256: digest"
+                )
     if "refs" in sections and not any(line.strip() for line in sections["refs"]):
         raise ValidationError("[refs] section is empty; omit it instead")
     if "handoff" in sections and not any(
@@ -116,12 +123,46 @@ def _validate_v12_additive(
                 f"fold:{fold_name} declares /full without a paired /summary"
             )
     for name, body in sections.items():
-        first = next((line for line in body if line.strip()), "")
-        if first.strip().startswith("@type:"):
-            type_value = first.strip().split(":", 1)[1].strip()
-            if not type_value:
+        meaningful = [line for line in body if line.strip()]
+        for idx, line in enumerate(meaningful[:2]):
+            stripped = line.strip()
+            if stripped.startswith("@type:") and idx == 0:
+                type_value = stripped.split(":", 1)[1].strip()
+                if not type_value:
+                    raise ValidationError(
+                        f"@type annotation has empty value in [{name}]"
+                    )
+            if stripped.startswith("@priority:"):
+                raw = stripped.split(":", 1)[1].strip()
+                if not raw:
+                    raise ValidationError(
+                        f"@priority annotation has empty value in [{name}]"
+                    )
+                try:
+                    score = int(raw)
+                except ValueError as exc:
+                    raise ValidationError(
+                        f"@priority value in [{name}] must be an integer 1-10"
+                    ) from exc
+                if not 1 <= score <= 10:
+                    raise ValidationError(
+                        f"@priority value in [{name}] must be between 1 and 10"
+                    )
+    if headers.get("kind") == "delta":
+        if "base" not in headers or not headers["base"].strip():
+            raise ValidationError(
+                "kind=delta requires a 'base' header identifying the parent crumb"
+            )
+        changes = [line for line in sections.get("changes", []) if line.strip()]
+        if not changes:
+            raise ValidationError("kind=delta requires at least one entry in [changes]")
+        for line in changes:
+            stripped = line.strip()
+            if stripped.startswith("@"):
+                continue
+            if not DELTA_CHANGE_RE.match(line):
                 raise ValidationError(
-                    f"@type annotation has empty value in [{name}]"
+                    f"malformed [changes] entry: {stripped!r}"
                 )
 
 if __name__ == "__main__":

@@ -1,0 +1,24 @@
+BEGIN CRUMB
+v=1.2
+kind=task
+title=Handoff with content-addressed refs
+source=claude.code
+project=web-app
+refs=sha256:9dbaddaac199f037b3cff1dff42bb46928a8cd26f86e3b197846a160d76626fc, mem-user-preferences
+---
+[goal]
+Implement refresh token rotation following the plan in the referenced task.
+
+[context]
+- Base task (fold-demo crumb) has the full investigation and repro steps.
+- The caller already has the base task cached (seen set).
+- This crumb can elide the sha256 ref — receiver holds the bytes.
+
+[constraints]
+- Do not change the cookie names.
+- Add a regression test before merging.
+
+[refs]
+- sha256:9dba…76626fc  role=base-task  why=receiver should already hold this, elide if seen
+- mem-user-preferences role=style       why=caller prefers terse commits
+END CRUMB

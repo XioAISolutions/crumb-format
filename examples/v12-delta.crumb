@@ -1,0 +1,24 @@
+BEGIN CRUMB
+v=1.2
+kind=delta
+source=crumb.delta
+base=sha256:7d9fac9551feff6207936aa95f42ad7b9da597eb686ca595d3a3fdeb5ee4d4a6
+target=sha256:8272ab282caed3be899cc9258b404af3808309c2505c82c098dd32bb304d8ee1
+title=Shift bug-fix task → export feature
+---
+[changes]
+- ~[@headers] title=Continue export feature :: replaces :: title=Fix login redirect bug
+- ~[@headers] source=claude.chat :: replaces :: source=cursor.agent
+- ~[@headers] project=apps/dashboard :: replaces :: project=web-app
+- ~[goal] Finish wiring the Export to CSV feature for the Orders page. :: replaces :: Fix the bug where authenticated users are redirected back to /login after refresh.
+- -[context] - App uses JWT cookie auth
+- -[context] - Redirect loop happens only on full page refresh
+- -[context] - Middleware reads auth state before cookie parsing is complete
+- +[context] - Repo: /apps/dashboard
+- +[context] - Tech: Next.js 14, React 18, PostgreSQL 15
+- +[context] - Existing UI button is already on the Orders page
+- +[context] - API route skeleton exists at /api/orders/export
+- ~[constraints] - Do not change the existing UI layout :: replaces :: - Do not change the login UI
+- ~[constraints] - Use the existing db helpers :: replaces :: - Preserve existing cookie names
+- ~[constraints] - Handle large exports without blocking the UI :: replaces :: - Add a regression check before merging
+END CRUMB

@@ -6,6 +6,8 @@
 
 **Version compatibility:** v1.2 is backward-compatible with v1.1. A v1.1 parser will accept a v1.2 file by ignoring unknown headers and sections (per §8). A v1.2 parser accepts both `v=1.1` and `v=1.2`. Every v1.2 addition is optional and purely additive.
 
+**Efficiency layers (§§13–16):** content-addressed refs, priority annotations, delta crumbs, and budget-aware packing. All additive — a v1.2 consumer that ignores them is still a compliant consumer.
+
 ---
 
 ## 1. Design goals
@@ -368,3 +370,122 @@ The value is an advisory media-type-ish string. Suggested forms:
 - An empty `@type:` value is a validation error.
 - Unknown type values MUST NOT break parsing — consumers fall back to plain text.
 - `@type:` SHOULD NOT be used on required sections where prose is the dominant form (`[goal]`, `[consolidated]`, `[identity]`) — prefer a dedicated section instead.
+
+---
+
+## 13. Content-addressed refs (v1.2)
+
+A ref MAY be a content-addressed digest instead of a bare id. The receiver can then elide content it has already seen, the way a KV cache reuses already-computed key/value vectors across turns.
+
+### 13.1 Syntax
+
+```text
+refs=sha256:9dbaddaac199f037b3cff1dff42bb46928a8cd26f86e3b197846a160d76626fc
+```
+
+Digest rules:
+
+- Only `sha256:` is defined in v1.2.
+- The hex part MUST be 16–64 lowercase hex characters. 64 is canonical; shorter forms are prefix matches (a receiver with a shorter seen-digest MAY still claim a match).
+- `refs=` MAY mix digest refs and id refs.
+
+### 13.2 Canonical form for hashing
+
+The digest is computed over a normalized re-render of the crumb:
+
+- parse and re-render via the standard renderer (sections emitted in document order)
+- drop volatile headers: `id`, `dream_pass`, `dream_sessions`, and `refs` itself
+
+This keeps a crumb's identity tied to its body, not to who last indexed it or what it currently points at.
+
+### 13.3 Receiver "seen set"
+
+A consumer MAY maintain a seen set — a persisted set of digests it has already loaded this session — and elide refs that match it. CRUMB's reference CLI stores this at `$CRUMB_SEEN_FILE` (default: `~/.crumb/seen`). The seen set is advisory; senders MUST NOT assume it exists.
+
+---
+
+## 14. Priority annotations (v1.2)
+
+A section's body MAY start with `@priority: N` (optionally after `@type:`). Budget-aware packers drop the lowest-priority optional sections first.
+
+### 14.1 Syntax
+
+```text
+[notes]
+@priority: 2
+- Low-priority scratch pad.
+
+[rationale]
+@priority: 8
+- High-priority explanation.
+```
+
+### 14.2 Rules
+
+- `N` MUST be an integer between 1 and 10 inclusive. `10` is highest priority, `1` is lowest.
+- `@priority:` MUST appear as the first non-blank line of the section body, OR as the second such line when preceded by `@type:`.
+- Required sections implicitly have priority `10` regardless of annotation and MUST NOT be dropped by a budget packer.
+- Default priority for unmarked sections:
+  - `[fold:X/summary]` → 9
+  - optional non-fold sections → 5
+  - `[fold:X/full]` → 4
+- Unknown / missing annotations MUST NOT break parsing.
+
+---
+
+## 15. Delta crumbs (v1.2)
+
+A `kind=delta` crumb carries only what changed between two crumbs, analogous to a residual after a polar projection. A receiver with the base reconstructs the target without a full resend.
+
+### 15.1 Header
+
+```text
+v=1.2
+kind=delta
+base=sha256:<digest>
+target=sha256:<digest>   # optional but recommended
+source=...
+```
+
+`base=` is REQUIRED. `target=` is OPTIONAL but strongly recommended — it lets the receiver verify reconstruction.
+
+### 15.2 `[changes]` section
+
+Required. One operation per line:
+
+```text
+[changes]
+- +[section] new text
+- -[section] removed text
+- ~[section] new text :: replaces :: old text
+- ~[@headers] key=new :: replaces :: key=old
+- +[@headers] key=value
+- -[@headers] key=value
+```
+
+The pseudo-section `@headers` carries header diffs. Excluded keys (never diffed): `v`, `kind`, `base`, `target`, `id`. The text portion is preserved verbatim so bullet-vs-prose formatting roundtrips cleanly.
+
+### 15.3 Apply semantics
+
+When applying a delta to a base:
+
+1. Parse both. Verify `base` digest matches the supplied base if present.
+2. Apply `@headers` ops to the header map.
+3. For each section op, replace/insert/remove lines within the named section by exact-line match.
+4. Render the result. If `target=` was declared, verify the reconstructed digest matches.
+
+Producers SHOULD emit operations in the order they should be applied. Consumers that cannot resolve a `-` operation (line missing from base) SHOULD continue with a warning rather than abort — delta apply is best-effort.
+
+---
+
+## 16. Budget-aware packing (v1.2)
+
+A consumer MAY compress a crumb to fit a token budget by composing the additive primitives above. The order is intentional — the sender's declared priorities come before any lossy compression:
+
+1. **Elide seen refs** (§13.3) — drop digest refs the receiver has confirmed.
+2. **Drop `[fold:X/full]` variants** (§10) — the `/summary` survives.
+3. **Drop lowest-priority optional sections** (§14) — never drop required sections.
+4. **Escalate MeTalk** (levels 1 → 2 → 3) — dictionary, grammar strip, aggressive condensing.
+5. If still over budget, fail loudly rather than truncate required content.
+
+The reference CLI exposes this as `crumb squeeze --budget N`. A consumer MAY implement a subset — the ordering is prescriptive, but every step is optional.

@@ -1,0 +1,35 @@
+BEGIN CRUMB
+v=1.2
+kind=task
+title=Priority-weighted packing demo
+source=crumb.examples
+project=web-app
+---
+[goal]
+Ship the auth refresh fix to production with minimal regression risk.
+
+[context]
+- JWT refresh races the cookie parser on full-page reload.
+- Reproduces only on Chrome 121+ with SameSite=Strict.
+
+[constraints]
+- Do not change the login UI.
+- Preserve existing cookie names.
+- Add a regression test before merging.
+
+[notes]
+@priority: 2
+- Rand mentioned trying a service worker — probably out of scope for this sprint.
+- Old workaround in commit 4f3a2d1 might still be useful as a reference.
+
+[rationale]
+@priority: 8
+- The middleware change affects every authenticated route, so the test plan
+  must cover both first-visit and refresh flows. Dropping this section under
+  budget pressure would hide the actual reason the reviewer should approve.
+
+[raw_sessions]
+@priority: 1
+- 2026-04-21T09:12 asked Claude to bisect — unhelpful output.
+- 2026-04-21T09:30 pair with Raza, reproduced on staging.
+END CRUMB
