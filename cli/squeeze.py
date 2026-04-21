@@ -17,9 +17,10 @@ components that carry the most signal.
 
 from __future__ import annotations
 
-import importlib
 from dataclasses import dataclass, field
 from typing import Dict, List, Tuple
+
+from cli import crumb, hashing, metalk
 
 
 DEFAULT_PRIORITY = 5
@@ -38,32 +39,8 @@ class SqueezeReport:
     elided_refs: List[str] = field(default_factory=list)
     budget: int = 0
 
-    def as_dict(self) -> Dict[str, object]:
-        return {
-            "original_tokens": self.original_tokens,
-            "final_tokens": self.final_tokens,
-            "budget": self.budget,
-            "metalk_level": self.metalk_level,
-            "dropped_sections": list(self.dropped_sections),
-            "dropped_full_folds": list(self.dropped_full_folds),
-            "elided_refs": list(self.elided_refs),
-        }
-
-
-def _crumb():
-    return importlib.import_module("cli.crumb")
-
-
-def _metalk():
-    return importlib.import_module("cli.metalk")
-
-
-def _hashing():
-    return importlib.import_module("cli.hashing")
-
 
 def _required_section_names(kind: str) -> set[str]:
-    crumb = _crumb()
     names = set(crumb.REQUIRED_SECTIONS.get(kind, []))
     # A fold pair substituting a required section is also required — mark both sides.
     result: set[str] = set()
@@ -124,7 +101,7 @@ def _elide_refs(headers: Dict[str, str], seen: set[str], report: SqueezeReport) 
         ref = raw.strip()
         if not ref:
             continue
-        if ref.startswith("sha256:") and _digest_in_set(ref, seen):
+        if ref.startswith("sha256:") and hashing.digest_matches_set(ref, seen):
             report.elided_refs.append(ref)
             continue
         kept.append(ref)
@@ -134,26 +111,10 @@ def _elide_refs(headers: Dict[str, str], seen: set[str], report: SqueezeReport) 
         headers.pop("refs", None)
 
 
-def _digest_in_set(digest: str, seen: set[str]) -> bool:
-    if digest in seen:
-        return True
-    hex_part = digest.split(":", 1)[1]
-    for entry in seen:
-        if not entry.startswith("sha256:"):
-            continue
-        entry_hex = entry.split(":", 1)[1]
-        if not entry_hex:
-            continue
-        if hex_part.startswith(entry_hex) or entry_hex.startswith(hex_part):
-            return True
-    return False
-
-
 def _drop_fold_full_variants(
     sections: Dict[str, List[str]], report: SqueezeReport
 ) -> bool:
     """Drop a single [fold:X/full] variant; return True if something was dropped."""
-    crumb = _crumb()
     fold_pairs: Dict[str, Dict[str, str]] = {}
     for name in sections:
         match = crumb.FOLD_SECTION_RE.match(name)
@@ -183,7 +144,6 @@ def _drop_fold_full_variants(
 def _drop_lowest_priority_optional(
     sections: Dict[str, List[str]], required: set[str], report: SqueezeReport
 ) -> bool:
-    crumb = _crumb()
     optional: List[Tuple[int, str]] = []
     for name, body in sections.items():
         if name in required:
@@ -207,11 +167,6 @@ def _drop_lowest_priority_optional(
     return True
 
 
-def _apply_metalk(text: str, level: int) -> str:
-    metalk = _metalk()
-    return metalk.encode(text, level=level)
-
-
 def squeeze_crumb(
     text: str,
     budget: int,
@@ -226,7 +181,6 @@ def squeeze_crumb(
     if budget <= 0:
         raise ValueError("budget must be a positive integer")
 
-    crumb = _crumb()
     seen = seen or set()
     original_parsed = crumb.parse_crumb(text)
     headers = dict(original_parsed["headers"])
@@ -253,14 +207,11 @@ def squeeze_crumb(
 
     if crumb.estimate_tokens(current) > budget:
         for level in range(1, max(1, metalk_max_level) + 1):
-            candidate = _apply_metalk(current, level)
-            if crumb.estimate_tokens(candidate) <= budget:
-                report.metalk_level = level
-                current = candidate
+            candidate = metalk.encode(current, level=level)
+            report.metalk_level = level
+            current = candidate
+            if crumb.estimate_tokens(current) <= budget:
                 break
-        else:
-            report.metalk_level = metalk_max_level
-            current = _apply_metalk(current, metalk_max_level)
 
     report.final_tokens = crumb.estimate_tokens(current)
     if report.final_tokens > budget:

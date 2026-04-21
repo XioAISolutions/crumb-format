@@ -27,9 +27,10 @@ Each entry starts with ``+`` (added), ``-`` (removed), or ``~`` (changed).
 from __future__ import annotations
 
 import difflib
-import importlib
 from dataclasses import dataclass
 from typing import Dict, List, Tuple
+
+from cli import crumb, hashing
 
 
 CHANGED_SEP = " :: replaces :: "
@@ -38,16 +39,12 @@ CHANGED_SEP = " :: replaces :: "
 EXCLUDED_HEADER_DIFF = frozenset({"v", "kind", "base", "target", "id"})
 
 
-def _crumb():
-    return importlib.import_module("cli.crumb")
-
-
 @dataclass(frozen=True)
 class Change:
-    op: str  # "+", "-", or "~"
+    op: str
     section: str
     text: str
-    previous: str | None = None  # only set for op="~"
+    previous: str | None = None
 
 
 def _section_entries(sections: Dict[str, List[str]]) -> Dict[str, List[str]]:
@@ -73,7 +70,6 @@ def compute_changes(
     Header differences are encoded as operations on the pseudo-section
     ``@headers`` (entries formatted as ``key=value``).
     """
-    crumb = _crumb()
     changes: List[Change] = []
 
     if base_headers is not None or target_headers is not None:
@@ -147,7 +143,6 @@ def changes_to_lines(changes: List[Change]) -> List[str]:
 
 
 def parse_changes(body: List[str]) -> List[Change]:
-    crumb = _crumb()
     result: List[Change] = []
     for raw in body:
         if not raw.strip() or raw.strip().startswith("@"):
@@ -175,8 +170,6 @@ def build_delta_crumb(
     title: str | None = None,
 ) -> str:
     """Return a kind=delta crumb encoding base → target."""
-    crumb = _crumb()
-    hashing = importlib.import_module("cli.hashing")
     base_parsed = crumb.parse_crumb(base_text)
     target_parsed = crumb.parse_crumb(target_text)
     changes = compute_changes(
@@ -204,8 +197,6 @@ def build_delta_crumb(
 
 def apply_delta(base_text: str, delta_text: str, verify: bool = True) -> str:
     """Apply a delta crumb to a base crumb, returning the reconstructed target."""
-    crumb = _crumb()
-    hashing = importlib.import_module("cli.hashing")
     base_parsed = crumb.parse_crumb(base_text)
     delta_parsed = crumb.parse_crumb(delta_text)
     if delta_parsed["headers"].get("kind") != "delta":
@@ -233,7 +224,8 @@ def apply_delta(base_text: str, delta_text: str, verify: bool = True) -> str:
         elif change.op == "-":
             _remove_line(body, change.text)
         elif change.op == "~":
-            assert change.previous is not None
+            if change.previous is None:
+                raise ValueError(f"~[{change.section}] change missing previous text")
             _replace_line(body, change.previous, change.text)
 
     for name in list(sections):

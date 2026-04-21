@@ -13,10 +13,11 @@ Canonical form for hashing:
 from __future__ import annotations
 
 import hashlib
-import importlib
 import os
 from pathlib import Path
 from typing import Iterable
+
+from cli import crumb
 
 
 VOLATILE_HEADERS = frozenset({"id", "dream_pass", "dream_sessions", "refs"})
@@ -24,13 +25,8 @@ SEEN_FILE_ENV = "CRUMB_SEEN_FILE"
 DEFAULT_SEEN_FILE = Path.home() / ".crumb" / "seen"
 
 
-def _crumb():
-    return importlib.import_module("cli.crumb")
-
-
 def canonical_form(text: str) -> str:
     """Return a normalized text form suitable for hashing."""
-    crumb = _crumb()
     parsed = crumb.parse_crumb(text)
     headers = {
         key: value
@@ -116,18 +112,29 @@ def clear_seen(path: str | os.PathLike | None = None) -> Path:
     return file_path
 
 
-def is_seen(digest: str, path: str | os.PathLike | None = None) -> bool:
+def digest_matches_set(digest: str, seen: set[str]) -> bool:
+    """Return True if ``digest`` matches any entry in ``seen`` by sha256 prefix.
+
+    Either side may be a prefix of the other so short-form digests can
+    satisfy long-form entries and vice versa.
+    """
     if not digest.startswith("sha256:"):
         return False
-    seen = load_seen(path)
     if digest in seen:
         return True
-    # allow a long digest to satisfy a short-prefix seen entry and vice versa
     hex_part = digest.split(":", 1)[1]
+    if not hex_part:
+        return False
     for entry in seen:
         if not entry.startswith("sha256:"):
             continue
         entry_hex = entry.split(":", 1)[1]
+        if not entry_hex:
+            continue
         if hex_part.startswith(entry_hex) or entry_hex.startswith(hex_part):
             return True
     return False
+
+
+def is_seen(digest: str, path: str | os.PathLike | None = None) -> bool:
+    return digest_matches_set(digest, load_seen(path))

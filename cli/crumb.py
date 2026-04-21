@@ -4733,9 +4733,10 @@ def cmd_seen(args: argparse.Namespace) -> None:
         return
 
     if action == 'check':
+        seen = hashing.load_seen(store)
         exit_code = 0
         for digest in args.digests or []:
-            present = hashing.is_seen(digest, store)
+            present = hashing.digest_matches_set(digest, seen)
             print(f"{digest}: {'seen' if present else 'missing'}")
             if not present:
                 exit_code = 1
