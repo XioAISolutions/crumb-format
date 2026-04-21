@@ -1,7 +1,7 @@
 --- task: v1.2 efficiency layers: squeeze, content-hash refs, delta, priority
 source: github.pr
 pr: #16
-generated: 2026-04-21T02:59:26Z
+generated: 2026-04-21T03:08:20Z
 ---
 
 [goal]
@@ -9,6 +9,7 @@ generated: 2026-04-21T02:59:26Z
 
 [context]
 Changed files in this PR:
+- .crumb/latest.crumb
 - CHANGELOG.md
 - SPEC.md
 - cli/crumb.py
