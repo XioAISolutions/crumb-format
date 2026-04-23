@@ -1,7 +1,7 @@
 --- task: docs: draft v1.3 spec
 source: github.pr
 pr: #17
-generated: 2026-04-23T13:33:36Z
+generated: 2026-04-23T15:22:26Z
 ---
 
 [goal]
@@ -10,8 +10,24 @@ generated: 2026-04-23T13:33:36Z
 [context]
 Changed files in this PR:
 - .crumb/latest.crumb
+- CHANGELOG.md
+- README.md
+- cli/crumb.py
+- cli/ref_resolver.py
+- cli/squeeze.py
 - docs/v1.3-DRAFT.md
+- examples/v13-agent.crumb
+- examples/v13-checks.crumb
+- examples/v13-fold-priority.crumb
+- examples/v13-guardrails.crumb
+- examples/v13-handoff-deps.crumb
+- examples/v13-script.crumb
+- examples/v13-workflow.crumb
+- pyproject.toml
+- tests/test_crumb.py
+- tests/test_v13.py
 - validators/validate.js
+- validators/validate.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
