@@ -9,6 +9,7 @@ const REQUIRED_SECTIONS = {
   log: ["entries"],
   todo: ["tasks"],
   wake: ["identity"],
+  delta: ["changes"],
 };
 const SUPPORTED_VERSIONS = new Set(["1.1", "1.2"]);
 const FOLD_SECTION_RE = /^fold:([^/]+)\/(summary|full)$/;
