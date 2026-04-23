@@ -1,7 +1,7 @@
 --- task: docs: draft v1.3 spec
 source: github.pr
 pr: #17
-generated: 2026-04-23T13:30:27Z
+generated: 2026-04-23T13:33:36Z
 ---
 
 [goal]
@@ -9,7 +9,9 @@ generated: 2026-04-23T13:30:27Z
 
 [context]
 Changed files in this PR:
+- .crumb/latest.crumb
 - docs/v1.3-DRAFT.md
+- validators/validate.js
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
