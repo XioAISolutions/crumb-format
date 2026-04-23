@@ -1,0 +1,24 @@
+BEGIN CRUMB
+v=1.3
+kind=task
+title=Carry executable validation intent with the handoff
+source=claude.agent
+project=web-app
+---
+[goal]
+Validate that the receiving agent honors a specific policy before running.
+
+[context]
+- The caller already ran the tests.
+- The receiver must confirm it cannot shell-exec before proceeding.
+
+[constraints]
+- Do not execute [script] bodies in untrusted runtimes
+
+[script]
+@type: weave
+@action: validate
+---
+agent.can("shell-exec") -> false
+agent.must("run_tests") -> true
+END CRUMB

@@ -1,0 +1,26 @@
+BEGIN CRUMB
+v=1.3
+kind=task
+title=Fix auth race with dependency-ordered handoff
+source=cursor.agent
+project=web-app
+---
+[goal]
+Resolve the JWT middleware / cookie parser race that causes a redirect loop on refresh.
+
+[context]
+- Bug reproduces on full page refresh only.
+- requireAuth() reads auth state before the cookie parser settles.
+
+[constraints]
+- Do not change the login UI
+- Preserve existing cookie names
+- require=regression_test_before_merge  why=audit gate
+
+[handoff]
+- id=repro   to=any    do=reproduce the failing test on main
+- id=fix     to=any    do=propose a fix that removes the race  after=repro
+- id=test    to=any    do=add a regression test                after=fix
+- id=review  to=human  do=approve before merge                 after=test
+- [x] reproduced on main@da5e312
+END CRUMB

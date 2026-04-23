@@ -1,0 +1,27 @@
+BEGIN CRUMB
+v=1.3
+kind=task
+title=Hand off refresh-token rotation with verification report
+source=cursor.agent
+project=web-app
+---
+[goal]
+Wire refresh-token rotation and hand off to the reviewer with a clean verification report.
+
+[context]
+- Refresh token is now rotated on every access-token refresh.
+- Old refresh token is invalidated server-side.
+
+[constraints]
+- Preserve cookie names
+- deny=filesystem.write(/etc/**)
+
+[checks]
+- tests.test_auth_rotation.py :: pass
+- coverage :: 91%  threshold=85
+- type_check :: pass
+- lint :: fail  note=unused import in auth/rotation.py:12
+
+[handoff]
+- to=human  do=read [checks], unblock merge if acceptable
+END CRUMB
