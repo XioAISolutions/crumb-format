@@ -1,7 +1,7 @@
---- task: v1.2 efficiency layers: squeeze, content-hash refs, delta, priority
+--- task: docs: draft v1.3 spec
 source: github.pr
-pr: #16
-generated: 2026-04-21T03:12:32Z
+pr: #17
+generated: 2026-04-23T13:30:27Z
 ---
 
 [goal]
@@ -9,21 +9,7 @@ generated: 2026-04-21T03:12:32Z
 
 [context]
 Changed files in this PR:
-- .crumb/latest.crumb
-- CHANGELOG.md
-- README.md
-- SPEC.md
-- cli/crumb.py
-- cli/delta.py
-- cli/hashing.py
-- cli/squeeze.py
-- examples/v12-content-ref.crumb
-- examples/v12-delta.crumb
-- examples/v12-priority.crumb
-- pyproject.toml
-- tests/test_crumb.py
-- tests/test_squeeze.py
-- validators/validate.py
+- docs/v1.3-DRAFT.md
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
