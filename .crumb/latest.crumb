@@ -1,7 +1,7 @@
---- task: docs: draft v1.3 spec
+--- task: feat: CRUMB v1.3 — full wire format implementation
 source: github.pr
 pr: #17
-generated: 2026-04-23T15:22:26Z
+generated: 2026-04-23T19:47:48Z
 ---
 
 [goal]
@@ -12,7 +12,9 @@ Changed files in this PR:
 - .crumb/latest.crumb
 - CHANGELOG.md
 - README.md
+- SPEC.md
 - cli/crumb.py
+- cli/linting.py
 - cli/ref_resolver.py
 - cli/squeeze.py
 - docs/v1.3-DRAFT.md
@@ -23,6 +25,12 @@ Changed files in this PR:
 - examples/v13-handoff-deps.crumb
 - examples/v13-script.crumb
 - examples/v13-workflow.crumb
+- fixtures/valid/agent-basic.crumb
+- fixtures/valid/agent-basic.expected.json
+- fixtures/valid/v13-checks.crumb
+- fixtures/valid/v13-checks.expected.json
+- fixtures/valid/v13-handoff-deps.crumb
+- fixtures/valid/v13-handoff-deps.expected.json
 - pyproject.toml
 - tests/test_crumb.py
 - tests/test_v13.py
