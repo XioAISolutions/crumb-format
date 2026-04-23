@@ -501,6 +501,24 @@ TEMPLATES = {
         {tasks}
         END CRUMB
     """),
+    "agent": dedent("""\
+        BEGIN CRUMB
+        v=1.3
+        kind=agent
+        id={agent_id}
+        title={title}
+        source={source}
+        ---
+        [identity]
+        {identity}
+
+        [rules]
+        {rules}
+
+        [knowledge]
+        {knowledge}
+        END CRUMB
+    """),
 }
 
 PLACEHOLDERS = {
@@ -521,6 +539,11 @@ PLACEHOLDERS = {
     },
     "todo": {
         "tasks": "- [ ] <task description>",
+    },
+    "agent": {
+        "identity": "role=<role>\nstyle=<style>",
+        "rules": "- <standing order>",
+        "knowledge": "- expert=<area>",
     },
 }
 
@@ -565,6 +588,17 @@ def cmd_new(args: argparse.Namespace) -> None:
             values["tasks"] = "\n".join(f"- [ ] {e}" for e in args.entries)
         else:
             values["tasks"] = PLACEHOLDERS["todo"]["tasks"]
+    elif kind == "agent":
+        values["agent_id"] = args.agent_id or f"agent-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        values["identity"] = args.identity or PLACEHOLDERS["agent"]["identity"]
+        if args.rules:
+            values["rules"] = "\n".join(f"- {r}" for r in args.rules)
+        else:
+            values["rules"] = PLACEHOLDERS["agent"]["rules"]
+        if args.knowledge:
+            values["knowledge"] = "\n".join(f"- {k}" for k in args.knowledge)
+        else:
+            values["knowledge"] = PLACEHOLDERS["agent"]["knowledge"]
 
     crumb = TEMPLATES[kind].format(**values)
     write_text(args.output, crumb)
@@ -4836,6 +4870,50 @@ def cmd_hash(args: argparse.Namespace) -> None:
     print(digest)
 
 
+# ── resolve (v1.3) ────────────────────────────────────────────────────
+
+def cmd_resolve(args: argparse.Namespace) -> None:
+    """Resolve a ref (bare id, sha256:, URL) per SPEC v1.3 §17."""
+    try:
+        from cli import ref_resolver
+    except ImportError:
+        import ref_resolver  # type: ignore[no-redef]
+
+    search_paths = None
+    if args.search_path:
+        search_paths = [Path(p) for p in args.search_path]
+
+    if args.walk:
+        walked = ref_resolver.walk_refs(
+            args.ref,
+            search_paths=search_paths,
+            allow_network=args.allow_network,
+            depth_limit=args.depth,
+        )
+        any_missing = False
+        for ref, path in walked:
+            if path is None:
+                print(f"UNRESOLVED  {ref}")
+                any_missing = True
+            else:
+                print(f"OK          {ref}  ->  {path}")
+        if any_missing and args.strict:
+            sys.exit(1)
+        return
+
+    path = ref_resolver.resolve_ref(
+        args.ref,
+        search_paths=search_paths,
+        allow_network=args.allow_network,
+    )
+    if path is None:
+        print(f"UNRESOLVED  {args.ref}")
+        if args.strict:
+            sys.exit(1)
+    else:
+        print(f"OK          {args.ref}  ->  {path}")
+
+
 # ── seen set ──────────────────────────────────────────────────────────
 
 def cmd_seen(args: argparse.Namespace) -> None:
@@ -5186,7 +5264,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # new
     new = sub.add_parser('new', help='Create a new .crumb file.')
-    new.add_argument('kind', choices=['task', 'mem', 'map', 'log', 'todo'], help='Kind of crumb to create.')
+    new.add_argument('kind', choices=['task', 'mem', 'map', 'log', 'todo', 'agent'], help='Kind of crumb to create.')
     new.add_argument('--title', '-t', help='Title for the crumb.')
     new.add_argument('--source', '-s', help='Source label (e.g. claude.chat, cursor.agent).')
     new.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
@@ -5200,6 +5278,11 @@ def build_parser() -> argparse.ArgumentParser:
     new.add_argument('--project', '-p', help='Project name (map only).')
     new.add_argument('--description', '-d', help='Project description (map only).')
     new.add_argument('--modules', '-m', nargs='*', help='Module entries (map only).')
+    # agent-specific (v1.3)
+    new.add_argument('--agent-id', help='Stable agent id (agent only).')
+    new.add_argument('--identity', help='Identity block body (agent only).')
+    new.add_argument('--rules', nargs='*', help='Standing-order rules (agent only).')
+    new.add_argument('--knowledge', nargs='*', help='Knowledge areas (agent only).')
     new.set_defaults(func=cmd_new)
 
     # from-chat
@@ -5585,6 +5668,24 @@ def build_parser() -> argparse.ArgumentParser:
                           help='Print a shortened sha256:<hex> digest truncated to this many hex chars.')
     hash_cmd.set_defaults(func=cmd_hash)
 
+    # --- Resolve (v1.3 §17) ---
+    resolve_cmd = sub.add_parser(
+        'resolve',
+        help='Resolve a CRUMB ref (bare id, sha256: digest, or URL) per SPEC v1.3 §17.',
+    )
+    resolve_cmd.add_argument('ref', help='Ref to resolve.')
+    resolve_cmd.add_argument('--search-path', nargs='*',
+                             help='Directories to search for bare ids (default: CWD, $CRUMB_HOME).')
+    resolve_cmd.add_argument('--allow-network', action='store_true',
+                             help='Allow URL refs to be fetched. Default: off.')
+    resolve_cmd.add_argument('--walk', action='store_true',
+                             help='Walk transitively, following refs in resolved files.')
+    resolve_cmd.add_argument('--depth', type=int, default=5,
+                             help='Max walk depth (default: 5).')
+    resolve_cmd.add_argument('--strict', action='store_true',
+                             help='Exit 1 if any ref is unresolved.')
+    resolve_cmd.set_defaults(func=cmd_resolve)
+
     # --- Seen set (content-addressed ref registry) ---
     seen_cmd = sub.add_parser('seen', help='Manage the content-addressed seen-set registry.')
     seen_sub = seen_cmd.add_subparsers(dest='seen_action', required=True)
@@ -5631,6 +5732,8 @@ def build_parser() -> argparse.ArgumentParser:
                           help='Warn when estimated total or raw section tokens exceed this value.')
     lint_cmd.add_argument('--strict', action='store_true', help='Return a non-zero exit code for warnings.')
     lint_cmd.add_argument('--output', help='Optional output file or directory for redacted content.')
+    lint_cmd.add_argument('--check-refs', action='store_true',
+                          help='Warn when refs= entries do not resolve via SPEC v1.3 §17 rules.')
     lint_cmd.set_defaults(func=cmd_lint)
 
     # --- Webhooks ---
