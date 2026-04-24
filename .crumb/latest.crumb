@@ -1,7 +1,7 @@
---- task: feat: CRUMB v1.3 — full wire format implementation
+--- task: docs: v1.3 README/QUICKSTART + fix script-invocation imports
 source: github.pr
-pr: #17
-generated: 2026-04-23T19:47:48Z
+pr: #18
+generated: 2026-04-24T03:45:49Z
 ---
 
 [goal]
@@ -9,33 +9,10 @@ generated: 2026-04-23T19:47:48Z
 
 [context]
 Changed files in this PR:
-- .crumb/latest.crumb
-- CHANGELOG.md
 - README.md
-- SPEC.md
 - cli/crumb.py
 - cli/linting.py
-- cli/ref_resolver.py
-- cli/squeeze.py
-- docs/v1.3-DRAFT.md
-- examples/v13-agent.crumb
-- examples/v13-checks.crumb
-- examples/v13-fold-priority.crumb
-- examples/v13-guardrails.crumb
-- examples/v13-handoff-deps.crumb
-- examples/v13-script.crumb
-- examples/v13-workflow.crumb
-- fixtures/valid/agent-basic.crumb
-- fixtures/valid/agent-basic.expected.json
-- fixtures/valid/v13-checks.crumb
-- fixtures/valid/v13-checks.expected.json
-- fixtures/valid/v13-handoff-deps.crumb
-- fixtures/valid/v13-handoff-deps.expected.json
-- pyproject.toml
-- tests/test_crumb.py
-- tests/test_v13.py
-- validators/validate.js
-- validators/validate.py
+- docs/QUICKSTART.md
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
