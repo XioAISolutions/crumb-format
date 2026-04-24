@@ -1,0 +1,28 @@
+BEGIN CRUMB
+v=1.3
+kind=task
+title=Writer-declared fold upgrade order
+source=cursor.agent
+project=web-app
+fold_priority=context, constraints
+---
+[goal]
+Fix the auth redirect loop on full refresh.
+
+[fold:context/summary]
+JWT middleware races the cookie parser on refresh.
+
+[fold:context/full]
+Full repro + stack trace + 40 lines of investigation. requireAuth() reads state before
+the cookie parser settles, which forces a redirect to /login even when the refresh token
+is valid. Observed on main@da5e312.
+
+[fold:constraints/summary]
+Do not change login UI; preserve cookie names; regression test required.
+
+[fold:constraints/full]
+- Do not change the login UI (copy, layout, or redirects that aren't the bug).
+- Preserve existing cookie names exactly — external integrations read them.
+- Add a regression test that fails on main and passes on the fix.
+- deny=filesystem.write(/etc/**)
+END CRUMB

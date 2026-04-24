@@ -193,7 +193,7 @@ class TestCliVersion:
         with pytest.raises(SystemExit) as exc:
             crumb.main(["--version"])
         assert exc.value.code == 0
-        assert capsys.readouterr().out.strip() == "crumb 0.5.0"
+        assert capsys.readouterr().out.strip() == "crumb 0.6.0"
 
 
 class TestCmdNew:

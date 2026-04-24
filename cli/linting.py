@@ -172,6 +172,29 @@ def lint_text(path: str, text: str, args: argparse.Namespace) -> tuple[list[Lint
         except ValueError:
             findings.append(LintFinding("WARN", "budget_index_format", "max_index_tokens is not an integer", path))
 
+    if getattr(args, "check_refs", False):
+        try:
+            from cli import ref_resolver
+        except ImportError:
+            import ref_resolver  # type: ignore[no-redef]
+        refs_value = headers.get("refs", "").strip()
+        if refs_value:
+            base_dir = Path(path).resolve().parent
+            search_paths = [base_dir]
+            for ref in (r.strip() for r in refs_value.split(",")):
+                if not ref:
+                    continue
+                resolved = ref_resolver.resolve_ref(ref, search_paths=search_paths)
+                if resolved is None:
+                    findings.append(
+                        LintFinding(
+                            "WARN",
+                            "unresolved_ref",
+                            f"ref {ref!r} did not resolve (SPEC v1.3 §17.3)",
+                            path,
+                        )
+                    )
+
     return findings, redacted
 
 

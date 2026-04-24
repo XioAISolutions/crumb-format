@@ -1,12 +1,14 @@
-# .crumb Specification (v1.2)
+# .crumb Specification (v1.3)
 
 **Status:** Draft  
 **Category:** AI handoff format  
 **Goal:** A tiny, human-readable protocol for portable AI context handoffs between tools and memory systems.
 
-**Version compatibility:** v1.2 is backward-compatible with v1.1. A v1.1 parser will accept a v1.2 file by ignoring unknown headers and sections (per §8). A v1.2 parser accepts both `v=1.1` and `v=1.2`. Every v1.2 addition is optional and purely additive.
+**Version compatibility:** v1.3 is backward-compatible with v1.1 and v1.2. A v1.2 parser accepts a v1.3 file by ignoring unknown headers and sections (per §8). A v1.3 parser accepts `v ∈ {1.1, 1.2, 1.3}`. Every v1.3 addition is optional and purely additive.
 
 **Efficiency layers (§§13–16):** content-addressed refs, priority annotations, delta crumbs, and budget-aware packing. All additive — a v1.2 consumer that ignores them is still a compliant consumer.
+
+**v1.3 additions (§§17–23):** normative ref resolution, normative fold selection, `[handoff]` dependencies, structured `[constraints]`, new optional sections (`[checks]`, `[guardrails]`, `[capabilities]`, `[script]`, `[workflow]`), `[invariants]` extended to `kind=task`, and a new `kind=agent` for reusable personas.
 
 ---
 
@@ -72,6 +74,8 @@ Allowed `kind` values:
 - `log`
 - `todo`
 - `wake`
+- `delta` (v1.2; see §15)
+- `agent` (v1.3; see §23)
 
 ### 3.2 Recommended fields
 
@@ -489,3 +493,268 @@ A consumer MAY compress a crumb to fit a token budget by composing the additive 
 5. If still over budget, fail loudly rather than truncate required content.
 
 The reference CLI exposes this as `crumb squeeze --budget N`. A consumer MAY implement a subset — the ordering is prescriptive, but every step is optional.
+
+---
+
+## 17. Normative ref resolution (v1.3)
+
+v1.2 §9 left `refs` resolution to implementations. v1.3 normatively specifies the default.
+
+### 17.1 Resolution order
+
+A conforming consumer MUST attempt resolution in this order and stop at the first hit:
+
+1. **Bare id → local directory.** Look for `<id>.crumb` in a consumer-configured search path. Default search path: the current working directory, then `$CRUMB_HOME` (default `~/.crumb/`).
+2. **`sha256:<hex>` digest → content store.** If a consumer maintains a content-addressed store (`$CRUMB_STORE`, default `~/.crumb/store/`), look up by digest.
+3. **URL → fetch.** Only if network is explicitly enabled by the consumer. Default: disabled.
+4. **Registry lookup.** Only if a registry is explicitly configured. Default: none.
+
+A consumer MUST NOT fail a parse on an unresolvable ref. Refs are advisory.
+
+### 17.2 Cycles
+
+Consumers MUST walk refs with a visited-set. Default depth limit: **5**. Consumers MAY configure.
+
+### 17.3 `crumb lint` contract
+
+`crumb lint` SHOULD warn on unresolvable refs when invoked with `--check-refs`. Parsers MUST NOT warn.
+
+---
+
+## 18. Normative fold selection (v1.3)
+
+v1.2 §10 left fold variant selection to implementations. v1.3 normatively specifies the default.
+
+### 18.1 Size-greedy with summary floor
+
+A conforming budget-aware consumer MUST:
+
+1. Count every `[fold:X/summary]` as mandatory.
+2. For each fold, attempt to upgrade `/summary` to `/full` in **declaration order** until the remaining token budget would be exceeded.
+3. Never load both `/summary` and `/full` for the same NAME.
+
+### 18.2 Writer override
+
+A writer MAY declare `fold_priority=` as an optional header listing fold NAMEs in upgrade order:
+
+```text
+fold_priority=context, constraints
+```
+
+When present, consumers MUST honor this order over declaration order.
+
+### 18.3 Both variants loaded
+
+Forbidden. A consumer that loads both variants for the same NAME is non-conforming.
+
+---
+
+## 19. `[handoff]` dependencies (v1.3)
+
+v1.2 §11 defines top-down ordering. v1.3 adds optional explicit dependencies.
+
+### 19.1 Syntax
+
+Two new optional keys on a `[handoff]` line:
+
+- `id=<token>` — stable identifier. Tokens match `[a-zA-Z0-9_-]+`.
+- `after=<token>[,<token>...]` — comma-separated dependency list.
+
+```text
+[handoff]
+- id=repro   to=any    do=reproduce the failing test
+- id=fix     to=any    do=propose a fix                  after=repro
+- id=test    to=any    do=add regression test            after=fix
+- id=review  to=human  do=approve before merge           after=test
+```
+
+### 19.2 Execution semantics
+
+- A step with unmet `after=` dependencies is blocked and MUST NOT run.
+- Earlier-line priority (v1.2 §11.2) applies as a tiebreaker among ready steps.
+- A `- [x]` completed line satisfies dependencies on its id.
+- Cycles MUST be detected. Consumers SHOULD warn and fall back to linear order.
+
+### 19.3 Backward compatibility
+
+A v1.2 consumer that sees `id=` / `after=` as unknown keys treats the whole line as a bullet (v1.2 §11.1).
+
+---
+
+## 20. Structured `[constraints]` lines (v1.3)
+
+`[constraints]` bodies remain free prose. v1.3 formalizes an **optional** structured bullet form. Mixed bodies (prose + structured) are valid.
+
+### 20.1 Syntax
+
+```text
+[constraints]
+- Do not change the login UI                   # prose, unchanged
+- deny=filesystem.write(/etc/**)               # structured
+- require=regression_test_before_merge  why=audit
+- prefer=incremental_patches
+```
+
+Recognized keys (all optional, all advisory):
+
+- `deny=<expr>` — an action the receiving agent SHOULD NOT take.
+- `require=<expr>` — a precondition the receiving agent SHOULD satisfy.
+- `prefer=<expr>` — a soft preference.
+- `why=<text>` — rationale.
+
+Unknown keys do not invalidate a line.
+
+---
+
+## 21. New optional sections (v1.3)
+
+All sections in this block are optional and carrier-only — CRUMB parsers do not execute or enforce their contents.
+
+### 21.1 `[checks]`
+
+Verification results at handoff time. One check per line in `name :: status` form, with optional trailing `key=value` annotations:
+
+```text
+[checks]
+- tests.test_auth.py :: pass
+- coverage :: 87%      threshold=85
+- lint :: fail         note=unused import in auth.py:12
+```
+
+### 21.2 `[guardrails]`
+
+Structured enforcement hints. CRUMB parsers do not enforce; downstream runtimes (AgentAuth, MCP policy engines, CI guards) MAY translate lines into real policy.
+
+Recognized keys:
+
+- `type=<tool|scope|verify|approval>`
+- `deny=`, `require=`, `max=`, `min=`, `who=`, `action=`
+- `why=<text>`
+
+```text
+[guardrails]
+- type=tool      deny=shell-exec      why=security boundary
+- type=approval  action=merge         who=human
+```
+
+### 21.3 `[capabilities]`
+
+Handoff-time sender self-description. Recognized keys:
+
+- `can=<expr>[,<expr>...]`
+- `cannot=<expr>[,<expr>...]`
+- `prefers=<expr>[,<expr>...]`
+
+```text
+[capabilities]
+- can=read_files, run_tests, git_commit
+- cannot=deploy_prod, shell_exec
+- prefers=incremental_patches
+```
+
+When an AgentAuth passport is also present for the sender, the passport is authoritative.
+
+### 21.4 `[script]`
+
+Opaque executable-intent block. The body MUST begin with `@type: <lang>`. CRUMB parsers MUST NOT execute `[script]` bodies.
+
+```text
+[script]
+@type: weave
+@action: validate
+---
+agent.can("shell-exec") -> false
+agent.must("run_tests") -> true
+```
+
+`crumb lint` SHOULD warn on `[script]` bodies larger than 2 KB.
+
+### 21.5 `[workflow]`
+
+Numbered multi-step state machine for orchestration use cases that outgrow `[handoff]`. Recognized keys on each line:
+
+- `id=<token>` — stable id (defaults to the numeric prefix).
+- `status=<pending|blocked|in_progress|done|skipped>`
+- `owner=<expr>`
+- `depends_on=<id>[,<id>...]`
+- `why=<text>`
+
+```text
+[workflow]
+1. reproduce_bug     status=pending     owner=any
+2. write_test        status=blocked     owner=any      depends_on=1
+3. implement_fix     status=blocked     owner=any      depends_on=2
+4. human_approval    status=blocked     owner=human    depends_on=3
+```
+
+Cycle detection and unknown-dep rejection apply as in §19.2.
+
+### 21.6 When to pick which
+
+- `[handoff]` — linear or lightly-branched next steps (3–5 items).
+- `[workflow]` — non-trivial ownership or cross-session status tracking.
+- Both MAY coexist.
+
+---
+
+## 22. `[invariants]` on `kind=task` (v1.3)
+
+`[invariants]` already exists on `kind=map` (§4.3) meaning architectural truths. v1.3 extends it to `kind=task` as an optional section capturing runtime assertions the receiving agent must maintain while performing the task.
+
+```text
+[invariants]
+- auth.middleware completes before auth.state read
+- tests.test_auth.py passes
+- no new dependencies introduced
+```
+
+Distinctions:
+
+- `[constraints]` — what the receiver must not do.
+- `[invariants]` — what must remain true throughout the work.
+- `[checks]` — what was verified before handoff.
+
+Overlap is permitted.
+
+---
+
+## 23. `kind=agent` (v1.3)
+
+A `kind=agent` crumb describes a reusable agent persona — identity, style, standing orders — without tying it to a specific task.
+
+### 23.1 Required sections
+
+- `[identity]` — role, style, scope.
+
+### 23.2 Optional sections
+
+- `[rules]` — standing orders.
+- `[knowledge]` — expertise and learning areas.
+- `[capabilities]` — see §21.3.
+- `[guardrails]` — see §21.2.
+
+### 23.3 Example
+
+```text
+BEGIN CRUMB
+v=1.3
+kind=agent
+id=code-reviewer-v2
+source=human.notes
+---
+[identity]
+role=senior_reviewer
+style=focus_on_edge_cases
+
+[rules]
+- never approve without tests
+
+[knowledge]
+- expert=python, typescript
+- learning=rust
+END CRUMB
+```
+
+### 23.4 Usage
+
+A task crumb references an agent crumb via `refs=<agent-id>`. The receiving runtime loads the agent crumb first to establish persona, then processes the task.

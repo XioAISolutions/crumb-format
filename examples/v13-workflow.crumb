@@ -1,0 +1,27 @@
+BEGIN CRUMB
+v=1.3
+kind=task
+title=Launch checklist with multi-agent workflow
+source=human.notes
+project=web-app
+---
+[goal]
+Ship the refresh-token rotation feature through a 4-step workflow with human approval at the end.
+
+[context]
+- Feature branch is green on CI.
+- Staging is deployed.
+
+[constraints]
+- No production writes before step 4
+- prefer=incremental_patches
+
+[workflow]
+1. reproduce_bug      status=pending     owner=any
+2. write_test         status=blocked     owner=any      depends_on=1
+3. implement_fix      status=blocked     owner=any      depends_on=2
+4. human_approval     status=blocked     owner=human    depends_on=3
+
+[handoff]
+- to=any  do=start at workflow step 1 (reproduce_bug)
+END CRUMB

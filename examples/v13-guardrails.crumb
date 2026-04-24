@@ -1,0 +1,28 @@
+BEGIN CRUMB
+v=1.3
+kind=task
+title=Scoped migration with explicit guardrails
+source=claude.agent
+project=web-app
+---
+[goal]
+Migrate the user.settings schema from JSON to TOML without touching deploy.
+
+[context]
+- Settings are currently stored in user_settings.json.
+- Target format: TOML, with a backfill script.
+
+[constraints]
+- Preserve existing setting keys
+- Do not change the public API shape
+
+[guardrails]
+- type=tool      deny=shell-exec          why=security boundary
+- type=scope     max=files=5              why=token budget for the handoff
+- type=verify    require=tests            why=regression prevention
+- type=approval  action=merge  who=human  why=schema change touches prod data
+
+[invariants]
+- schema version bumps monotonically
+- existing user_settings.json rows still validate during rollout
+END CRUMB

@@ -1,7 +1,7 @@
---- task: v1.2 efficiency layers: squeeze, content-hash refs, delta, priority
+--- task: feat: CRUMB v1.3 — full wire format implementation
 source: github.pr
-pr: #16
-generated: 2026-04-21T03:12:32Z
+pr: #17
+generated: 2026-04-23T19:47:48Z
 ---
 
 [goal]
@@ -14,15 +14,27 @@ Changed files in this PR:
 - README.md
 - SPEC.md
 - cli/crumb.py
-- cli/delta.py
-- cli/hashing.py
+- cli/linting.py
+- cli/ref_resolver.py
 - cli/squeeze.py
-- examples/v12-content-ref.crumb
-- examples/v12-delta.crumb
-- examples/v12-priority.crumb
+- docs/v1.3-DRAFT.md
+- examples/v13-agent.crumb
+- examples/v13-checks.crumb
+- examples/v13-fold-priority.crumb
+- examples/v13-guardrails.crumb
+- examples/v13-handoff-deps.crumb
+- examples/v13-script.crumb
+- examples/v13-workflow.crumb
+- fixtures/valid/agent-basic.crumb
+- fixtures/valid/agent-basic.expected.json
+- fixtures/valid/v13-checks.crumb
+- fixtures/valid/v13-checks.expected.json
+- fixtures/valid/v13-handoff-deps.crumb
+- fixtures/valid/v13-handoff-deps.expected.json
 - pyproject.toml
 - tests/test_crumb.py
-- tests/test_squeeze.py
+- tests/test_v13.py
+- validators/validate.js
 - validators/validate.py
 
 [constraints]

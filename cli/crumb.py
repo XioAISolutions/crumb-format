@@ -31,13 +31,16 @@ REQUIRED_SECTIONS = {
     "audit": ["goal", "actions", "verdict"],
     "wake": ["identity"],
     "delta": ["changes"],
+    "agent": ["identity"],
 }
-CLI_VERSION = "0.5.0"
-SUPPORTED_VERSIONS = {"1.1", "1.2"}
+CLI_VERSION = "0.6.0"
+SUPPORTED_VERSIONS = {"1.1", "1.2", "1.3"}
 FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
 CONTENT_REF_RE = re.compile(r"^sha256:[0-9a-f]{16,64}$")
 DELTA_CHANGE_RE = re.compile(r"^\s*-\s*([+\-~])\[(@?[a-z0-9_:/-]+)\]\s*(.*)$", re.IGNORECASE)
 DELTA_HEADERS_SECTION = "@headers"
+HANDOFF_ID_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
+WORKFLOW_LINE_RE = re.compile(r"^\s*-?\s*(\d+)[.)]\s*(.+)$")
 
 
 def read_text(path: str | None) -> str:
@@ -119,6 +122,7 @@ def parse_crumb(text: str) -> Dict[str, object]:
             )
 
     _validate_v12_additive(headers, sections)
+    _validate_v13_additive(headers, sections)
 
     return {"headers": headers, "sections": sections}
 
@@ -204,6 +208,141 @@ def _validate_v12_additive(
                     f"malformed [changes] entry: {stripped!r} "
                     "(expected '- +[section] text', '- -[section] text', or '- ~[section] text')"
                 )
+
+
+def _parse_kv_line(line: str) -> Dict[str, str]:
+    """Parse 'key=value  key=value' style trailing annotations on a bullet line."""
+    tokens: Dict[str, str] = {}
+    body = line.strip()
+    if body.startswith("- "):
+        body = body[2:]
+    elif body.startswith("-"):
+        body = body[1:]
+    for match in re.finditer(r"([a-zA-Z_][a-zA-Z0-9_]*)=([^\s]+)", body):
+        tokens[match.group(1)] = match.group(2)
+    return tokens
+
+
+def _validate_v13_additive(
+    headers: Dict[str, str], sections: Dict[str, List[str]]
+) -> None:
+    """Additive v1.3 validation. Does not reject v1.1 or v1.2 files."""
+    if "fold_priority" in headers:
+        value = headers["fold_priority"].strip()
+        if not value:
+            raise ValueError("fold_priority header must not be empty when present")
+        for name in (n.strip() for n in value.split(",")):
+            if not name:
+                raise ValueError("fold_priority contains an empty entry")
+            if not re.match(r"^[a-zA-Z0-9_-]+$", name):
+                raise ValueError(f"fold_priority entry {name!r} has invalid characters")
+
+    if "handoff" in sections:
+        step_ids: Dict[str, int] = {}
+        deps: Dict[str, List[str]] = {}
+        position = 0
+        for line in sections["handoff"]:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("- [x]"):
+                continue
+            if not stripped.startswith("-"):
+                continue
+            position += 1
+            tokens = _parse_kv_line(stripped)
+            step_id = tokens.get("id", str(position))
+            if not HANDOFF_ID_RE.match(step_id):
+                raise ValueError(
+                    f"[handoff] id={step_id!r} must match [a-zA-Z0-9_-]+"
+                )
+            if step_id in step_ids:
+                raise ValueError(f"[handoff] duplicate id={step_id!r}")
+            step_ids[step_id] = position
+            after = tokens.get("after", "")
+            if after:
+                deps[step_id] = [
+                    d.strip() for d in after.split(",") if d.strip()
+                ]
+        for step_id, refs in deps.items():
+            for ref in refs:
+                if ref not in step_ids:
+                    raise ValueError(
+                        f"[handoff] id={step_id!r} has unknown after= dependency {ref!r}"
+                    )
+        _detect_dep_cycle(deps, label="[handoff]")
+
+    if "workflow" in sections:
+        step_ids: Dict[str, int] = {}
+        deps: Dict[str, List[str]] = {}
+        for line in sections["workflow"]:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            match = WORKFLOW_LINE_RE.match(stripped)
+            if not match:
+                if stripped.startswith("-"):
+                    continue
+                raise ValueError(
+                    f"[workflow] line must be numbered (e.g. '1. reproduce_bug'): {stripped!r}"
+                )
+            num, rest = match.group(1), match.group(2)
+            tokens = _parse_kv_line("- " + rest)
+            step_id = tokens.get("id", num)
+            if not HANDOFF_ID_RE.match(step_id):
+                raise ValueError(
+                    f"[workflow] id={step_id!r} must match [a-zA-Z0-9_-]+"
+                )
+            if step_id in step_ids:
+                raise ValueError(f"[workflow] duplicate id={step_id!r}")
+            step_ids[step_id] = int(num)
+            depends = tokens.get("depends_on", "")
+            if depends:
+                deps[step_id] = [
+                    d.strip() for d in depends.split(",") if d.strip()
+                ]
+        for step_id, refs in deps.items():
+            for ref in refs:
+                if ref not in step_ids:
+                    raise ValueError(
+                        f"[workflow] id={step_id!r} has unknown depends_on {ref!r}"
+                    )
+        _detect_dep_cycle(deps, label="[workflow]")
+
+    if "script" in sections:
+        meaningful = [line for line in sections["script"] if line.strip()]
+        if meaningful and not meaningful[0].strip().startswith("@type:"):
+            raise ValueError("[script] section must begin with @type: <lang>")
+
+    if "checks" in sections:
+        for line in sections["checks"]:
+            stripped = line.strip()
+            if not stripped or not stripped.startswith("-"):
+                continue
+            body = stripped[1:].strip()
+            if "::" not in body:
+                raise ValueError(
+                    f"[checks] line must use 'name :: status' format: {stripped!r}"
+                )
+
+
+def _detect_dep_cycle(deps: Dict[str, List[str]], label: str) -> None:
+    """Raise if deps contains a cycle. Uses DFS coloring."""
+    WHITE, GRAY, BLACK = 0, 1, 2
+    color: Dict[str, int] = {k: WHITE for k in deps}
+
+    def visit(node: str) -> None:
+        if color.get(node, WHITE) == GRAY:
+            raise ValueError(f"{label} dependency cycle through {node!r}")
+        if color.get(node, WHITE) == BLACK:
+            return
+        color[node] = GRAY
+        for child in deps.get(node, []):
+            if child in deps:
+                visit(child)
+        color[node] = BLACK
+
+    for node in list(deps):
+        if color[node] == WHITE:
+            visit(node)
 
 
 def render_crumb(headers: Dict[str, str], sections: Dict[str, List[str]]) -> str:
@@ -362,6 +501,24 @@ TEMPLATES = {
         {tasks}
         END CRUMB
     """),
+    "agent": dedent("""\
+        BEGIN CRUMB
+        v=1.3
+        kind=agent
+        id={agent_id}
+        title={title}
+        source={source}
+        ---
+        [identity]
+        {identity}
+
+        [rules]
+        {rules}
+
+        [knowledge]
+        {knowledge}
+        END CRUMB
+    """),
 }
 
 PLACEHOLDERS = {
@@ -382,6 +539,11 @@ PLACEHOLDERS = {
     },
     "todo": {
         "tasks": "- [ ] <task description>",
+    },
+    "agent": {
+        "identity": "role=<role>\nstyle=<style>",
+        "rules": "- <standing order>",
+        "knowledge": "- expert=<area>",
     },
 }
 
@@ -426,6 +588,17 @@ def cmd_new(args: argparse.Namespace) -> None:
             values["tasks"] = "\n".join(f"- [ ] {e}" for e in args.entries)
         else:
             values["tasks"] = PLACEHOLDERS["todo"]["tasks"]
+    elif kind == "agent":
+        values["agent_id"] = args.agent_id or f"agent-{datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%d%H%M%S')}"
+        values["identity"] = args.identity or PLACEHOLDERS["agent"]["identity"]
+        if args.rules:
+            values["rules"] = "\n".join(f"- {r}" for r in args.rules)
+        else:
+            values["rules"] = PLACEHOLDERS["agent"]["rules"]
+        if args.knowledge:
+            values["knowledge"] = "\n".join(f"- {k}" for k in args.knowledge)
+        else:
+            values["knowledge"] = PLACEHOLDERS["agent"]["knowledge"]
 
     crumb = TEMPLATES[kind].format(**values)
     write_text(args.output, crumb)
@@ -4697,6 +4870,50 @@ def cmd_hash(args: argparse.Namespace) -> None:
     print(digest)
 
 
+# ── resolve (v1.3) ────────────────────────────────────────────────────
+
+def cmd_resolve(args: argparse.Namespace) -> None:
+    """Resolve a ref (bare id, sha256:, URL) per SPEC v1.3 §17."""
+    try:
+        from cli import ref_resolver
+    except ImportError:
+        import ref_resolver  # type: ignore[no-redef]
+
+    search_paths = None
+    if args.search_path:
+        search_paths = [Path(p) for p in args.search_path]
+
+    if args.walk:
+        walked = ref_resolver.walk_refs(
+            args.ref,
+            search_paths=search_paths,
+            allow_network=args.allow_network,
+            depth_limit=args.depth,
+        )
+        any_missing = False
+        for ref, path in walked:
+            if path is None:
+                print(f"UNRESOLVED  {ref}")
+                any_missing = True
+            else:
+                print(f"OK          {ref}  ->  {path}")
+        if any_missing and args.strict:
+            sys.exit(1)
+        return
+
+    path = ref_resolver.resolve_ref(
+        args.ref,
+        search_paths=search_paths,
+        allow_network=args.allow_network,
+    )
+    if path is None:
+        print(f"UNRESOLVED  {args.ref}")
+        if args.strict:
+            sys.exit(1)
+    else:
+        print(f"OK          {args.ref}  ->  {path}")
+
+
 # ── seen set ──────────────────────────────────────────────────────────
 
 def cmd_seen(args: argparse.Namespace) -> None:
@@ -5047,7 +5264,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # new
     new = sub.add_parser('new', help='Create a new .crumb file.')
-    new.add_argument('kind', choices=['task', 'mem', 'map', 'log', 'todo'], help='Kind of crumb to create.')
+    new.add_argument('kind', choices=['task', 'mem', 'map', 'log', 'todo', 'agent'], help='Kind of crumb to create.')
     new.add_argument('--title', '-t', help='Title for the crumb.')
     new.add_argument('--source', '-s', help='Source label (e.g. claude.chat, cursor.agent).')
     new.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
@@ -5061,6 +5278,11 @@ def build_parser() -> argparse.ArgumentParser:
     new.add_argument('--project', '-p', help='Project name (map only).')
     new.add_argument('--description', '-d', help='Project description (map only).')
     new.add_argument('--modules', '-m', nargs='*', help='Module entries (map only).')
+    # agent-specific (v1.3)
+    new.add_argument('--agent-id', help='Stable agent id (agent only).')
+    new.add_argument('--identity', help='Identity block body (agent only).')
+    new.add_argument('--rules', nargs='*', help='Standing-order rules (agent only).')
+    new.add_argument('--knowledge', nargs='*', help='Knowledge areas (agent only).')
     new.set_defaults(func=cmd_new)
 
     # from-chat
@@ -5446,6 +5668,24 @@ def build_parser() -> argparse.ArgumentParser:
                           help='Print a shortened sha256:<hex> digest truncated to this many hex chars.')
     hash_cmd.set_defaults(func=cmd_hash)
 
+    # --- Resolve (v1.3 §17) ---
+    resolve_cmd = sub.add_parser(
+        'resolve',
+        help='Resolve a CRUMB ref (bare id, sha256: digest, or URL) per SPEC v1.3 §17.',
+    )
+    resolve_cmd.add_argument('ref', help='Ref to resolve.')
+    resolve_cmd.add_argument('--search-path', nargs='*',
+                             help='Directories to search for bare ids (default: CWD, $CRUMB_HOME).')
+    resolve_cmd.add_argument('--allow-network', action='store_true',
+                             help='Allow URL refs to be fetched. Default: off.')
+    resolve_cmd.add_argument('--walk', action='store_true',
+                             help='Walk transitively, following refs in resolved files.')
+    resolve_cmd.add_argument('--depth', type=int, default=5,
+                             help='Max walk depth (default: 5).')
+    resolve_cmd.add_argument('--strict', action='store_true',
+                             help='Exit 1 if any ref is unresolved.')
+    resolve_cmd.set_defaults(func=cmd_resolve)
+
     # --- Seen set (content-addressed ref registry) ---
     seen_cmd = sub.add_parser('seen', help='Manage the content-addressed seen-set registry.')
     seen_sub = seen_cmd.add_subparsers(dest='seen_action', required=True)
@@ -5492,6 +5732,8 @@ def build_parser() -> argparse.ArgumentParser:
                           help='Warn when estimated total or raw section tokens exceed this value.')
     lint_cmd.add_argument('--strict', action='store_true', help='Return a non-zero exit code for warnings.')
     lint_cmd.add_argument('--output', help='Optional output file or directory for redacted content.')
+    lint_cmd.add_argument('--check-refs', action='store_true',
+                          help='Warn when refs= entries do not resolve via SPEC v1.3 §17 rules.')
     lint_cmd.set_defaults(func=cmd_lint)
 
     # --- Webhooks ---

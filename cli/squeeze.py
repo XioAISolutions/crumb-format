@@ -112,9 +112,15 @@ def _elide_refs(headers: Dict[str, str], seen: set[str], report: SqueezeReport) 
 
 
 def _drop_fold_full_variants(
-    sections: Dict[str, List[str]], report: SqueezeReport
+    sections: Dict[str, List[str]],
+    report: SqueezeReport,
+    fold_priority: List[str] | None = None,
 ) -> bool:
-    """Drop a single [fold:X/full] variant; return True if something was dropped."""
+    """Drop a single [fold:X/full] variant; return True if something was dropped.
+
+    If ``fold_priority`` is supplied (v1.3 §2.2), folds NOT in the list are dropped
+    first, and folds at the end of the list are dropped before folds at the front.
+    """
     fold_pairs: Dict[str, Dict[str, str]] = {}
     for name in sections:
         match = crumb.FOLD_SECTION_RE.match(name)
@@ -123,22 +129,75 @@ def _drop_fold_full_variants(
         fold_name, variant = match.group(1), match.group(2)
         fold_pairs.setdefault(fold_name, {})[variant] = name
 
-    candidates: List[Tuple[int, str, str]] = []
+    candidates: List[Tuple[int, int, str, str]] = []
+    priority_map = {name: idx for idx, name in enumerate(fold_priority or [])}
+    unlisted_rank = len(priority_map)
     for fold_name, variants in fold_pairs.items():
         if "full" in variants and "summary" in variants:
             full_name = variants["full"]
             body = sections.get(full_name, [])
             priority = _section_priority(full_name, body, set())
-            candidates.append((priority, fold_name, full_name))
+            listed_rank = priority_map.get(fold_name, unlisted_rank)
+            drop_rank = -listed_rank if listed_rank < unlisted_rank else 1
+            candidates.append((drop_rank, priority, fold_name, full_name))
 
     if not candidates:
         return False
 
-    candidates.sort(key=lambda row: (row[0], row[1]))
-    _, fold_name, full_name = candidates[0]
+    candidates.sort(key=lambda row: (row[0], row[1], row[2]))
+    _, _, fold_name, full_name = candidates[0]
     sections.pop(full_name, None)
     report.dropped_full_folds.append(fold_name)
     return True
+
+
+def select_folds_size_greedy(
+    sections: Dict[str, List[str]],
+    budget: int,
+    fold_priority: List[str] | None = None,
+) -> Dict[str, str]:
+    """v1.3 §2.1 — size-greedy fold selection.
+
+    Returns a map {fold_name: "summary" | "full"} describing which variant of
+    each fold pair fits within ``budget``. `/summary` is always loaded first;
+    upgrades happen in declaration order (or ``fold_priority`` order if given).
+
+    The returned map is advisory — callers decide what to do with dropped /full
+    variants.
+    """
+    fold_pairs: Dict[str, Dict[str, str]] = {}
+    declaration_order: List[str] = []
+    for name in sections:
+        match = crumb.FOLD_SECTION_RE.match(name)
+        if not match:
+            continue
+        fold_name, variant = match.group(1), match.group(2)
+        if fold_name not in fold_pairs:
+            declaration_order.append(fold_name)
+        fold_pairs.setdefault(fold_name, {})[variant] = name
+
+    selection: Dict[str, str] = {}
+    total = 0
+    for fold_name, variants in fold_pairs.items():
+        if "summary" in variants:
+            selection[fold_name] = "summary"
+            body = sections.get(variants["summary"], [])
+            total += crumb.estimate_tokens("\n".join(body))
+
+    order = fold_priority or declaration_order
+    for fold_name in order:
+        variants = fold_pairs.get(fold_name, {})
+        if "full" not in variants or "summary" not in variants:
+            continue
+        summary_body = sections.get(variants["summary"], [])
+        full_body = sections.get(variants["full"], [])
+        delta = crumb.estimate_tokens("\n".join(full_body)) - crumb.estimate_tokens(
+            "\n".join(summary_body)
+        )
+        if total + delta <= budget:
+            selection[fold_name] = "full"
+            total += delta
+    return selection
 
 
 def _drop_lowest_priority_optional(
@@ -195,9 +254,16 @@ def squeeze_crumb(
     def _render() -> str:
         return crumb.render_crumb(headers, sections)
 
+    fold_priority_header = headers.get("fold_priority", "").strip()
+    fold_priority = (
+        [p.strip() for p in fold_priority_header.split(",") if p.strip()]
+        if fold_priority_header
+        else None
+    )
+
     current = _render()
     while crumb.estimate_tokens(current) > budget:
-        if _drop_fold_full_variants(sections, report):
+        if _drop_fold_full_variants(sections, report, fold_priority):
             current = _render()
             continue
         if _drop_lowest_priority_optional(sections, required, report):

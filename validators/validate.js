@@ -9,9 +9,14 @@ const REQUIRED_SECTIONS = {
   log: ["entries"],
   todo: ["tasks"],
   wake: ["identity"],
+  delta: ["changes"],
+  agent: ["identity"],
 };
-const SUPPORTED_VERSIONS = new Set(["1.1", "1.2"]);
+const SUPPORTED_VERSIONS = new Set(["1.1", "1.2", "1.3"]);
 const FOLD_SECTION_RE = /^fold:([^/]+)\/(summary|full)$/;
+const HANDOFF_ID_RE = /^[a-zA-Z0-9_-]+$/;
+const WORKFLOW_LINE_RE = /^\s*-?\s*(\d+)[.)]\s*(.+)$/;
+const KV_RE = /([a-zA-Z_][a-zA-Z0-9_]*)=([^\s]+)/g;
 
 function parseCrumb(text) {
   const lines = text.split(/\r?\n/).map((line) => line.replace(/\n$/, ""));
@@ -75,6 +80,7 @@ function parseCrumb(text) {
   }
 
   validateV12Additive(headers, sections);
+  validateV13Additive(headers, sections);
 
   return { headers, sections };
 }
@@ -114,6 +120,127 @@ function validateV12Additive(headers, sections) {
       const value = first.trim().slice("@type:".length).trim();
       if (!value)
         throw new Error(`@type annotation has empty value in [${name}]`);
+    }
+  }
+}
+
+function parseKvLine(line) {
+  let body = line.trim();
+  if (body.startsWith("- ")) body = body.slice(2);
+  else if (body.startsWith("-")) body = body.slice(1);
+  const tokens = {};
+  for (const m of body.matchAll(KV_RE)) {
+    tokens[m[1]] = m[2];
+  }
+  return tokens;
+}
+
+function detectDepCycle(deps, label) {
+  const color = {};
+  for (const k of Object.keys(deps)) color[k] = 0;
+  function visit(node) {
+    const c = color[node] ?? 0;
+    if (c === 1) throw new Error(`${label} dependency cycle through '${node}'`);
+    if (c === 2) return;
+    color[node] = 1;
+    for (const child of deps[node] || []) {
+      if (child in deps) visit(child);
+    }
+    color[node] = 2;
+  }
+  for (const node of Object.keys(deps)) {
+    if ((color[node] ?? 0) === 0) visit(node);
+  }
+}
+
+function validateV13Additive(headers, sections) {
+  if ("fold_priority" in headers) {
+    const value = headers.fold_priority.trim();
+    if (!value) throw new Error("fold_priority header must not be empty when present");
+    for (const name of value.split(",").map((n) => n.trim())) {
+      if (!name) throw new Error("fold_priority contains an empty entry");
+      if (!/^[a-zA-Z0-9_-]+$/.test(name))
+        throw new Error(`fold_priority entry '${name}' has invalid characters`);
+    }
+  }
+  if ("handoff" in sections) {
+    const stepIds = {};
+    const deps = {};
+    let position = 0;
+    for (const line of sections.handoff) {
+      const stripped = line.trim();
+      if (!stripped || stripped.startsWith("- [x]")) continue;
+      if (!stripped.startsWith("-")) continue;
+      position += 1;
+      const tokens = parseKvLine(stripped);
+      const stepId = tokens.id ?? String(position);
+      if (!HANDOFF_ID_RE.test(stepId))
+        throw new Error(`[handoff] id='${stepId}' must match [a-zA-Z0-9_-]+`);
+      if (stepId in stepIds) throw new Error(`[handoff] duplicate id='${stepId}'`);
+      stepIds[stepId] = position;
+      const after = tokens.after;
+      if (after) {
+        deps[stepId] = after.split(",").map((d) => d.trim()).filter(Boolean);
+      }
+    }
+    for (const [stepId, refs] of Object.entries(deps)) {
+      for (const ref of refs) {
+        if (!(ref in stepIds))
+          throw new Error(
+            `[handoff] id='${stepId}' has unknown after= dependency '${ref}'`,
+          );
+      }
+    }
+    detectDepCycle(deps, "[handoff]");
+  }
+  if ("workflow" in sections) {
+    const stepIds = {};
+    const deps = {};
+    for (const line of sections.workflow) {
+      const stripped = line.trim();
+      if (!stripped) continue;
+      const match = stripped.match(WORKFLOW_LINE_RE);
+      if (!match) {
+        if (stripped.startsWith("-")) continue;
+        throw new Error(`[workflow] line must be numbered: ${stripped}`);
+      }
+      const num = match[1];
+      const rest = match[2];
+      const tokens = parseKvLine("- " + rest);
+      const stepId = tokens.id ?? num;
+      if (!HANDOFF_ID_RE.test(stepId))
+        throw new Error(`[workflow] id='${stepId}' must match [a-zA-Z0-9_-]+`);
+      if (stepId in stepIds) throw new Error(`[workflow] duplicate id='${stepId}'`);
+      stepIds[stepId] = parseInt(num, 10);
+      const depends = tokens.depends_on;
+      if (depends) {
+        deps[stepId] = depends.split(",").map((d) => d.trim()).filter(Boolean);
+      }
+    }
+    for (const [stepId, refs] of Object.entries(deps)) {
+      for (const ref of refs) {
+        if (!(ref in stepIds))
+          throw new Error(
+            `[workflow] id='${stepId}' has unknown depends_on '${ref}'`,
+          );
+      }
+    }
+    detectDepCycle(deps, "[workflow]");
+  }
+  if ("script" in sections) {
+    const meaningful = sections.script.filter((line) => line.trim());
+    if (meaningful.length && !meaningful[0].trim().startsWith("@type:"))
+      throw new Error("[script] section must begin with @type: <lang>");
+  }
+  if ("checks" in sections) {
+    for (const line of sections.checks) {
+      const stripped = line.trim();
+      if (!stripped || !stripped.startsWith("-")) continue;
+      const body = stripped.slice(1).trim();
+      if (!body.includes("::"))
+        throw new Error(
+          `[checks] line must use 'name :: status' format: ${stripped}`,
+        );
     }
   }
 }

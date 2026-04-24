@@ -1,0 +1,27 @@
+{
+  "headers": {
+    "v": "1.3",
+    "kind": "task",
+    "title": "Handoff with dependencies",
+    "source": "cursor.agent"
+  },
+  "sections": {
+    "goal": [
+      "Hand off a fix through three ordered steps.",
+      ""
+    ],
+    "context": [
+      "- Bug reproduced on main",
+      ""
+    ],
+    "constraints": [
+      "- Preserve cookie names",
+      ""
+    ],
+    "handoff": [
+      "- id=repro  to=any  do=reproduce on main",
+      "- id=fix    to=any  do=propose fix  after=repro",
+      "- id=test   to=any  do=add regression test  after=fix"
+    ]
+  }
+}

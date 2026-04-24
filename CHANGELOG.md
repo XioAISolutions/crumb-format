@@ -1,5 +1,42 @@
 # Changelog
 
+## v0.6.0
+
+### v1.3 wire format
+
+First release to bump the wire format from `v=1.2` to `v=1.3`. All additions are optional and purely additive. A v1.2 parser accepts a v1.3 file by ignoring unknown headers and sections (per SPEC §8); a v1.3 parser accepts `v ∈ {1.1, 1.2, 1.3}`.
+
+**Closed v1.2 open questions**
+
+- **Ref resolution (§1)** — normative order: bare id → local dir, `sha256:` → content store, URL (opt-in), registry (opt-in). Default depth limit 5 with visited-set cycle handling. New module `cli/ref_resolver.py`.
+- **Fold heuristic (§2)** — size-greedy with summary floor. Writer override via new optional `fold_priority=` header. New helper `squeeze.select_folds_size_greedy()`.
+
+**New primitives**
+
+- **`kind=agent`** — reusable agent personas. Required `[identity]`; optional `[rules]`, `[knowledge]`, `[capabilities]`, `[guardrails]`.
+- **`[handoff]` dependencies** — optional `id=<token>` and `after=<id>[,...]` on handoff lines for non-linear graphs. Cycle detection and unknown-dep rejection in the parser.
+- **`[workflow]` section** — numbered steps with `status=`, `owner=`, `depends_on=`. Same cycle detection as `[handoff]`.
+- **`[checks]` section** — verification results in `name :: status` form with trailing `key=value` annotations.
+- **`[guardrails]` section** — structured enforcement hints (`type=`, `deny=`, `require=`, `who=`, `action=`) for downstream runtimes. Parsers do not enforce.
+- **`[capabilities]` section** — handoff-time self-description (`can=`, `cannot=`, `prefers=`).
+- **`[script]` section** — executable-intent carrier with required `@type:` first line. Parsers do not execute.
+- **`[invariants]` on `kind=task`** — previously map-only; now allowed on task crumbs too.
+- **Structured `[constraints]` lines** — optional `deny=`, `require=`, `prefer=`, `why=` keys alongside prose bullets. Unknown keys do not invalidate a line.
+
+**Parser & validator**
+
+- `cli/crumb.py`, `validators/validate.py`, `validators/validate.js` accept `v=1.3` and `kind=agent`, validate handoff/workflow dependency graphs, cycle-check both, and enforce `@type:` on `[script]`.
+- `CLI_VERSION` bumped to `0.6.0`.
+
+**Examples & tests**
+
+- `examples/v13-agent.crumb`, `v13-handoff-deps.crumb`, `v13-checks.crumb`, `v13-guardrails.crumb`, `v13-workflow.crumb`, `v13-script.crumb`, `v13-fold-priority.crumb`.
+- `tests/test_v13.py` — 35 new cases covering kind=agent, handoff deps, workflow, fold_priority, checks, script, ref resolver, size-greedy folds.
+
+**Validator mirror fix**
+
+- The Node validator (`validators/validate.js`) was missing `kind=delta` support from v0.5.0; now mirrors the Python validator's REQUIRED_SECTIONS entry.
+
 ## v0.5.0
 
 ### Efficiency layers (SPEC §§13-16)
