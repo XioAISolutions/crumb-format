@@ -4921,6 +4921,57 @@ def cmd_resolve(args: argparse.Namespace) -> None:
         print(f"OK          {args.ref}  ->  {path}")
 
 
+# ── guardrails (v1.3 §21.2) ───────────────────────────────────────────
+
+def cmd_guardrails(args: argparse.Namespace) -> None:
+    """Translate a crumb's [guardrails] section into AgentAuth policy terms.
+
+    By default this is a dry run — it prints what would be applied without
+    touching the AgentAuth store. Pass --apply and --agent-name to actually
+    set the policy.
+    """
+    from cli import guardrails as gr
+
+    text = read_text(args.file)
+    try:
+        parsed = parse_crumb(text)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    lines = parsed["sections"].get("guardrails", [])
+    if not lines:
+        print(f"No [guardrails] section in {args.file}.")
+        sys.exit(0 if not args.strict else 1)
+
+    policy = None
+    if args.apply:
+        if not args.agent_name:
+            print("Error: --apply requires --agent-name", file=sys.stderr)
+            sys.exit(2)
+        from agentauth import ToolPolicy
+        policy = ToolPolicy()
+
+    agent_name = args.agent_name or parsed["headers"].get("id", "unknown-agent")
+    summary = gr.apply_guardrails_to_policy(lines, agent_name=agent_name, policy=policy)
+
+    mode = "APPLIED" if summary["applied"] else "DRY-RUN"
+    print(f"[{mode}] agent_name={summary['agent_name']}")
+    if summary["tools_denied"]:
+        print(f"  deny:      {', '.join(summary['tools_denied'])}")
+    if summary["tools_required"]:
+        print(f"  require:   {', '.join(summary['tools_required'])}")
+    if summary["approvals"]:
+        for appr in summary["approvals"]:
+            print(f"  approval:  {appr.get('action', '?')} by {appr.get('who', '?')}")
+    if summary["scope"]:
+        for scope in summary["scope"]:
+            print(f"  scope:     {scope.get('max', scope)}")
+    if summary["skipped"]:
+        for item in summary["skipped"]:
+            print(f"  skipped:   {item.get('_raw', '')!r}  ({item.get('_reason', '')})")
+
+
 # ── seen set ──────────────────────────────────────────────────────────
 
 def cmd_seen(args: argparse.Namespace) -> None:
@@ -5692,6 +5743,20 @@ def build_parser() -> argparse.ArgumentParser:
     resolve_cmd.add_argument('--strict', action='store_true',
                              help='Exit 1 if any ref is unresolved.')
     resolve_cmd.set_defaults(func=cmd_resolve)
+
+    # --- Guardrails translator (v1.3 §21.2) ---
+    guard_cmd = sub.add_parser(
+        'guardrails',
+        help='Translate a crumb\'s [guardrails] section into AgentAuth policy terms (dry-run by default).',
+    )
+    guard_cmd.add_argument('file', help='Crumb file containing a [guardrails] section.')
+    guard_cmd.add_argument('--agent-name',
+                           help='Agent name for the policy. Defaults to the crumb\'s id header.')
+    guard_cmd.add_argument('--apply', action='store_true',
+                           help='Actually call ToolPolicy.set_policy(). Requires --agent-name.')
+    guard_cmd.add_argument('--strict', action='store_true',
+                           help='Exit non-zero if no [guardrails] section is present.')
+    guard_cmd.set_defaults(func=cmd_guardrails)
 
     # --- Seen set (content-addressed ref registry) ---
     seen_cmd = sub.add_parser('seen', help='Manage the content-addressed seen-set registry.')

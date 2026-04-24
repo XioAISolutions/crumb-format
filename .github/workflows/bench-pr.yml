@@ -37,7 +37,21 @@ jobs:
           python-version: ${{ inputs.python-version || '3.11' }}
 
       - name: Install crumb-format
-        run: pip install crumb-format
+        # When run in the crumb-format repo itself (via pull_request trigger),
+        # install from the checkout so bench reflects the PR under review.
+        # When called from another repo (workflow_call), install from PyPI.
+        # Previously always used `pip install crumb-format`, which pinned to
+        # the last PyPI release and caused bench to return N/A for every
+        # crumb that used features newer than that release (v=1.2, v=1.3,
+        # kind=agent, kind=delta, ...).
+        run: |
+          if grep -q '^name = "crumb-format"' pyproject.toml 2>/dev/null; then
+            echo "Installing crumb-format from local checkout"
+            pip install .
+          else
+            echo "Installing crumb-format from PyPI"
+            pip install crumb-format
+          fi
 
       - name: Find and bench .crumb files
         id: bench
