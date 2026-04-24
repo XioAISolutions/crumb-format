@@ -1,7 +1,7 @@
---- task: docs: v1.3 README/QUICKSTART + fix script-invocation imports
+--- task: feat(v1.3): next-layer — bench/workflow fixes, AgentAuth bridge, MCP, v1.4 scope
 source: github.pr
-pr: #18
-generated: 2026-04-24T03:45:49Z
+pr: #19
+generated: 2026-04-24T03:59:43Z
 ---
 
 [goal]
@@ -9,10 +9,14 @@ generated: 2026-04-24T03:45:49Z
 
 [context]
 Changed files in this PR:
-- README.md
+- .github/workflows/auto-crumb-pr.yml
+- .github/workflows/auto-crumb-template.yml
+- .github/workflows/bench-pr.yml
 - cli/crumb.py
-- cli/linting.py
-- docs/QUICKSTART.md
+- cli/guardrails.py
+- docs/v1.4-scoping.md
+- mcp/server.py
+- tests/test_guardrails.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
