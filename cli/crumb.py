@@ -19,6 +19,16 @@ from pathlib import Path
 from textwrap import dedent
 from typing import Dict, List
 
+# When run as a script (python3 cli/crumb.py ...), sibling submodules like
+# `cli.linting` can't be imported unless the repo root is on sys.path. Adding
+# the parent directory here makes `from cli import <module>` work no matter
+# how the CLI is invoked (installed entry point, `python3 cli/crumb.py`, or
+# `python3 -m cli.crumb`).
+if __name__ == "__main__":
+    _repo_root = str(Path(__file__).resolve().parent.parent)
+    if _repo_root not in sys.path:
+        sys.path.insert(0, _repo_root)
+
 
 REQUIRED_HEADERS = ["v", "kind", "source"]
 REQUIRED_SECTIONS = {
@@ -4874,10 +4884,7 @@ def cmd_hash(args: argparse.Namespace) -> None:
 
 def cmd_resolve(args: argparse.Namespace) -> None:
     """Resolve a ref (bare id, sha256:, URL) per SPEC v1.3 §17."""
-    try:
-        from cli import ref_resolver
-    except ImportError:
-        import ref_resolver  # type: ignore[no-redef]
+    from cli import ref_resolver
 
     search_paths = None
     if args.search_path:

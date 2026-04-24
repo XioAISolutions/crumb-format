@@ -131,9 +131,52 @@ crumb init --cursor-rules     # just .cursor/rules
 4. **Receiving handoffs**: `crumb receive --palace` — validate and file incoming crumbs
 5. **End of session**: `crumb dream prefs.crumb` — consolidate raw observations
 
+## 11. v1.3 — agent personas and dependency-aware handoffs
+
+**Create a reusable agent persona** (v1.3 `kind=agent`):
+
+```bash
+crumb new agent \
+  --agent-id reviewer-v2 \
+  --title "Senior code reviewer" \
+  --source human.notes \
+  --rules "never approve without tests" "flag O(n^2) in hot paths" \
+  --knowledge "expert=python, typescript"
+```
+
+Reference it from a task handoff by putting `refs=reviewer-v2` in the task's header. A v1.3 runtime loads the persona first, then processes the task.
+
+**Handoffs with dependencies** — non-linear order without inventing a new section:
+
+```text
+[handoff]
+- id=repro   to=any    do=reproduce on main
+- id=fix     to=any    do=propose a fix              after=repro
+- id=test    to=any    do=add regression test        after=fix
+- id=review  to=human  do=approve before merge       after=test
+```
+
+Parsers detect cycles (`crumb validate` rejects them) and reject unknown deps.
+
+**Resolve a ref** (bare id, sha256, or URL) per SPEC §17:
+
+```bash
+crumb resolve reviewer-v2                  # bare id → local directory
+crumb resolve sha256:abc123...              # digest → content store
+crumb resolve some-id --walk --depth 5      # transitive walk
+crumb resolve unknown-id --strict           # exit 1 when unresolved
+```
+
+**Lint with reference checks**:
+
+```bash
+crumb lint handoff.crumb --check-refs             # warns on unresolved refs
+crumb lint handoff.crumb --check-refs --strict    # exit 1 on any warning
+```
+
 ## Full reference
 
 ```bash
-crumb --help        # 41 commands
+crumb --help        # 43 commands (v0.6.0: adds `new agent`, `resolve`)
 crumb <cmd> --help  # per-command help
 ```
