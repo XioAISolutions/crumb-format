@@ -173,10 +173,7 @@ def lint_text(path: str, text: str, args: argparse.Namespace) -> tuple[list[Lint
             findings.append(LintFinding("WARN", "budget_index_format", "max_index_tokens is not an integer", path))
 
     if getattr(args, "check_refs", False):
-        try:
-            from cli import ref_resolver
-        except ImportError:
-            import ref_resolver  # type: ignore[no-redef]
+        from cli import ref_resolver
         refs_value = headers.get("refs", "").strip()
         if refs_value:
             base_dir = Path(path).resolve().parent

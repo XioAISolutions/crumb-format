@@ -115,7 +115,90 @@ Full repro + stack trace + 40 lines of investigation...
 export async function requireAuth(req) { ... }
 ```
 
-See the [v1.2 examples](examples/) (`v12-refs.crumb`, `v12-fold.crumb`, `v12-handoff.crumb`, `v12-typed-content.crumb`), the full [SPEC](SPEC.md) for §§9-12, and two open design docs — [ref resolution](docs/v1.2-ref-resolution.md) and [fold heuristic](docs/v1.2-fold-heuristic.md) — where the consumer-side behavior is intentionally left for v1.3.
+See the [v1.2 examples](examples/) (`v12-refs.crumb`, `v12-fold.crumb`, `v12-handoff.crumb`, `v12-typed-content.crumb`), the full [SPEC](SPEC.md) for §§9-12, and two open design docs — [ref resolution](docs/v1.2-ref-resolution.md) and [fold heuristic](docs/v1.2-fold-heuristic.md) — which are now resolved normatively in v1.3 §§17–18.
+
+## v1.3 — agents, dependencies, and closed open questions
+
+v0.6.0 bumps the format to `v=1.3`. Every addition is optional and purely additive — v1.2 parsers accept v1.3 files unchanged by ignoring unknown headers and sections (SPEC §8).
+
+**`kind=agent`** — reusable agent personas. A task crumb can `refs=` an agent crumb to establish persona before processing the work:
+
+```text
+BEGIN CRUMB
+v=1.3
+kind=agent
+id=code-reviewer-v2
+source=human.notes
+---
+[identity]
+role=senior_reviewer
+style=focus_on_edge_cases
+
+[rules]
+- never approve without tests
+
+[knowledge]
+- expert=python, typescript
+END CRUMB
+```
+
+**`[handoff]` dependencies** — non-linear graphs without a new section. Optional `id=<token>` and `after=<id>[,...]` on any handoff line; parsers detect cycles and reject unknown deps:
+
+```text
+[handoff]
+- id=repro   to=any    do=reproduce the failing test
+- id=fix     to=any    do=propose a fix                 after=repro
+- id=review  to=human  do=approve before merge          after=fix
+```
+
+**`[workflow]`** — numbered state machine for orchestration that outgrows `[handoff]`:
+
+```text
+[workflow]
+1. reproduce_bug    status=pending     owner=any
+2. write_test       status=blocked     owner=any      depends_on=1
+3. implement_fix    status=blocked     owner=any      depends_on=2
+4. human_approval   status=blocked     owner=human    depends_on=3
+```
+
+**`[checks]`** — verification results at handoff time, one check per line as `name :: status` with optional `key=value` annotations:
+
+```text
+[checks]
+- tests.test_auth.py :: pass
+- coverage :: 87%      threshold=85
+- lint :: fail         note=unused import
+```
+
+**`[guardrails]`, `[capabilities]`, `[script]`** — machine-readable policy hints, sender self-description, and opaque executable-intent carriers respectively. Parsers do not enforce or execute; AgentAuth-aware runtimes can consume them.
+
+**Structured `[constraints]`** — optional `deny=`/`require=`/`prefer=`/`why=` lines alongside prose bullets. Prose still works.
+
+**Normative ref resolution (§17)** — bare id → local dir, `sha256:` → content store, URL opt-in, registry opt-in. Depth-5 visited-set cycle handling. `crumb resolve <ref>` is the reference implementation.
+
+**Normative size-greedy fold selection (§18)** — `/summary` is always loaded; `/full` upgrades happen in declaration order (or `fold_priority=` header order) until the budget exhausts.
+
+See the [v1.3 examples](examples/) (`v13-agent.crumb`, `v13-handoff-deps.crumb`, `v13-checks.crumb`, `v13-guardrails.crumb`, `v13-workflow.crumb`, `v13-script.crumb`, `v13-fold-priority.crumb`) and the full [SPEC](SPEC.md) §§17–23.
+
+## New in v0.6.0 — CLI commands
+
+```bash
+# Create a reusable agent persona
+crumb new agent --agent-id reviewer-v2 --title "Senior reviewer" \
+  --source human.notes \
+  --rules "never approve without tests" "require regression test" \
+  --knowledge "expert=python"
+
+# Resolve a ref the way the spec says to resolve it
+crumb resolve reviewer-v2                     # bare id → local dir
+crumb resolve sha256:abc123...                 # digest → content store
+crumb resolve some-id --walk --depth 5         # walk refs transitively
+crumb resolve unknown-id --strict              # exit 1 if unresolved
+
+# Lint with reference resolution checks
+crumb lint handoff.crumb --check-refs          # warn on unresolved refs
+crumb lint handoff.crumb --check-refs --strict # non-zero on any warning
+```
 
 ## Add "crumb it" to your AI
 
