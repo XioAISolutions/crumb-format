@@ -58,7 +58,8 @@ def parse_crumb(text: str) -> Dict[str, object]:
         raise ValidationError(f"unsupported version: {headers['v']}")
     kind = headers["kind"]
     if kind not in REQUIRED_SECTIONS:
-        raise ValidationError(f"unknown kind: {kind}")
+        valid = ", ".join(sorted(REQUIRED_SECTIONS.keys()))
+        raise ValidationError(f"unknown kind: {kind!r}. valid: {valid}")
     sections: Dict[str, List[str]] = {}
     current_section: str | None = None
     for line in lines[sep_index + 1 : -1]:
@@ -86,8 +87,7 @@ def parse_crumb(text: str) -> Dict[str, object]:
                     raise ValidationError(f"section is empty: {variant}")
         else:
             raise ValidationError(
-                f"missing required section for kind={kind}: {section} "
-                f"(or fold:{section}/summary + fold:{section}/full)"
+                f"missing required section for kind={kind}: {section}"
             )
     _validate_v12_additive(headers, sections)
     _validate_v13_additive(headers, sections)

@@ -44,8 +44,10 @@ function parseCrumb(text) {
   }
   if (!SUPPORTED_VERSIONS.has(headers.v))
     throw new Error(`unsupported version: ${headers.v}`);
-  if (!(headers.kind in REQUIRED_SECTIONS))
-    throw new Error(`unknown kind: ${headers.kind}`);
+  if (!(headers.kind in REQUIRED_SECTIONS)) {
+    const valid = Object.keys(REQUIRED_SECTIONS).sort().join(", ");
+    throw new Error(`unknown kind: '${headers.kind}'. valid: ${valid}`);
+  }
 
   const sections = {};
   let current = null;
@@ -74,7 +76,7 @@ function parseCrumb(text) {
       }
     } else {
       throw new Error(
-        `missing required section for kind=${headers.kind}: ${section} (or fold:${section}/summary + fold:${section}/full)`,
+        `missing required section for kind=${headers.kind}: ${section}`,
       );
     }
   }

@@ -1,5 +1,76 @@
 # Changelog
 
+## v0.7.0
+
+### Usability and simplicity pass
+
+No wire-format changes. This release is about reducing surface friction and
+fixing places where the repo contradicted its own docs.
+
+**Dissonance fixes**
+
+- `crumb new <kind>` templates now emit `v=1.3` for every kind (was `v=1.1`
+  for everything except `agent`). README documented v1.3 features the default
+  emitter wouldn't produce.
+- Unknown-kind errors now enumerate valid kinds. `unknown kind: 'frogpile'`
+  → `unknown kind: 'frogpile'. valid: agent, delta, log, map, mem, task, todo, wake`.
+- AgentAuth's `.crumb-auth/` storage now prints a one-time stderr notice on
+  first creation so users aren't surprised by a new directory tree appearing
+  silently. Suppress with `CRUMB_QUIET=1`.
+- `crumb validate` exit code on parse error is now `2` (was `1`), matching
+  `crumb lint` and pytest convention. Scripts pinned to exit `1` need updating.
+- Missing-section error simplified: `missing required section for kind=task: [goal]`
+  (no fold-syntax tail). Run `crumb validate --hint <file>` to see the fold
+  alternative when relevant.
+- `crumb handoff` now exits `1` and warns explicitly when every clipboard
+  tool fails (pbcopy / xclip / xsel / clip.exe), rather than printing the
+  crumb to stderr and silently exiting `0`.
+- `crumb optimize --mode budget` failure suggests recovery (`--metalk-max-level`,
+  `--seen`, raise budget) instead of just "cannot squeeze".
+
+**Surface simplification**
+
+- New `crumb todo {add,done,list,dream}` nested form (mirrors `palace`,
+  `passport`, etc.). Old `todo-add` / `todo-done` / `todo-list` / `todo-dream`
+  remain as deprecated aliases for one release; they print a `[deprecated]`
+  hint to stderr and call through to the new handler.
+- New `crumb optimize --mode {minimal,signal,budget}` replaces the three
+  separate `compact` / `compress` / `squeeze` commands. Old commands are
+  deprecated aliases for one release.
+- `crumb share` and `crumb dashboard` are now deprecated (removal scheduled
+  for v0.8). Replacements: `crumb handoff` (clipboard) and
+  `crumb audit export --format html` respectively.
+- `crumb --help` now opens with a grouped command index (Create, Inspect,
+  Edit, Optimize, Handoff, Memory, Format, Governance, Todo, Other) instead
+  of an alphabetical dump.
+
+**Onboarding**
+
+- README front-loads the "Add 'crumb it' to your AI" prompt above the v1.2
+  / v1.3 spec deep-dives so users adopting via AI custom instructions see
+  the most relevant content first.
+- README's "Configuration" subsection documents `CRUMB_HOME`, `CRUMB_STORE`,
+  `CRUMB_SEEN_FILE`, and `CRUMB_QUIET`.
+- `docs/QUICKSTART.md` adds a "0. (Optional) One-time setup" block calling
+  out `crumb palace init` for the Palace / Wake / Receive flows.
+- `examples/v13-script.crumb` replaced. The original Weave-DSL example was
+  abstract; the new one carries a literal shell verification command
+  (`pytest tests/test_auth.py -q`) that a receiver can run to reproduce the
+  sender's checks.
+
+**Tests**
+
+- New `tests/test_usability.py` with 21 cases covering template versions,
+  deprecation aliases, optimize modes, exit codes, unknown-kind enumeration,
+  AgentAuth notice, and grouped-help rendering.
+- 455 tests passing (was 445).
+
+**Deprecations (removal scheduled for v0.8)**
+
+`compress`, `compact`, `squeeze`, `share`, `dashboard`, `todo-add`,
+`todo-done`, `todo-list`, `todo-dream`. All print `[deprecated]` hints and
+continue to function.
+
 ## v0.6.0
 
 ### v1.3 wire format

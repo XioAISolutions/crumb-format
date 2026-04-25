@@ -282,8 +282,9 @@ def squeeze_crumb(
     report.final_tokens = crumb.estimate_tokens(current)
     if report.final_tokens > budget:
         raise ValueError(
-            f"cannot squeeze crumb to {budget} tokens without dropping required sections "
-            f"(final estimate: {report.final_tokens})"
+            f"cannot fit {report.final_tokens} tokens in budget {budget} without dropping required sections. "
+            f"try: --metalk-max-level 3, --seen <digests> the receiver already has, "
+            f"or raise the budget."
         )
     return current, report
 

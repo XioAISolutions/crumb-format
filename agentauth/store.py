@@ -1,6 +1,8 @@
 """PassportStore — file-based storage backend for Agent Passport."""
 
 import json
+import os
+import sys
 from datetime import date, datetime
 from pathlib import Path
 
@@ -23,10 +25,23 @@ class PassportStore:
         self.audit_dir = self.root / "audit"
         self.revoked_path = self.root / "revoked.json"
 
+        # Surface a one-time stderr notice the first time we materialize the
+        # store, so a user running `crumb passport list` or `crumb audit feed`
+        # in a fresh repo isn't surprised by a new directory tree appearing
+        # silently next to their code. Suppress with CRUMB_QUIET=1.
+        already_existed = self.root.exists()
+
         # Create directories if missing
         self.passports_dir.mkdir(parents=True, exist_ok=True)
         self.policies_dir.mkdir(parents=True, exist_ok=True)
         self.audit_dir.mkdir(parents=True, exist_ok=True)
+
+        if not already_existed and not os.environ.get("CRUMB_QUIET"):
+            print(
+                f"AgentAuth storage initialized at {self.root}/ "
+                "(passports, policies, audit). Set CRUMB_QUIET=1 to suppress.",
+                file=sys.stderr,
+            )
 
     # ── passports ──────────────────────────────────────────────
 

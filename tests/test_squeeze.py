@@ -140,7 +140,8 @@ class TestSqueeze:
             assert required in parsed["sections"] or f"fold:{required}/summary" in parsed["sections"]
 
     def test_squeeze_fails_if_budget_below_required_floor(self):
-        with pytest.raises(ValueError, match="cannot squeeze"):
+        # v0.7: error wording changed to include actionable recovery hints.
+        with pytest.raises(ValueError, match="cannot fit"):
             squeeze.squeeze_crumb(TASK_WITH_FOLDS, budget=5)
 
     def test_squeeze_escalates_metalk_when_needed(self):

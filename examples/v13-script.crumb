@@ -1,24 +1,28 @@
 BEGIN CRUMB
 v=1.3
 kind=task
-title=Carry executable validation intent with the handoff
-source=claude.agent
+title=Carry the verification command with the handoff
+source=cursor.agent
 project=web-app
 ---
 [goal]
-Validate that the receiving agent honors a specific policy before running.
+Re-run the same verification the sender ran before the handoff, then continue the work.
 
 [context]
-- The caller already ran the tests.
-- The receiver must confirm it cannot shell-exec before proceeding.
+- The sender ran `pytest tests/test_auth.py -q` and recorded the result in [checks].
+- The receiver should re-run it on their machine before changing any code.
 
 [constraints]
-- Do not execute [script] bodies in untrusted runtimes
+- Do not change the login UI
+- Do not execute [script] bodies in untrusted runtimes — this is a handoff hint, not a sandbox
+
+[checks]
+- tests.test_auth.py :: pass
+- coverage :: 87% threshold=85
 
 [script]
-@type: weave
-@action: validate
+@type: shell
+@action: verify
 ---
-agent.can("shell-exec") -> false
-agent.must("run_tests") -> true
+pytest tests/test_auth.py -q
 END CRUMB
