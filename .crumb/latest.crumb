@@ -1,7 +1,7 @@
---- task: docs: v1.3 README/QUICKSTART + fix script-invocation imports
+--- task: feat(v0.7): usability and simplicity pass
 source: github.pr
-pr: #18
-generated: 2026-04-24T03:45:49Z
+pr: #20
+generated: 2026-04-25T22:21:20Z
 ---
 
 [goal]
@@ -9,10 +9,19 @@ generated: 2026-04-24T03:45:49Z
 
 [context]
 Changed files in this PR:
+- CHANGELOG.md
 - README.md
+- agentauth/store.py
 - cli/crumb.py
-- cli/linting.py
+- cli/squeeze.py
 - docs/QUICKSTART.md
+- examples/v13-script.crumb
+- pyproject.toml
+- tests/test_crumb.py
+- tests/test_squeeze.py
+- tests/test_usability.py
+- validators/validate.js
+- validators/validate.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
