@@ -1,7 +1,7 @@
---- task: feat(v0.7): usability and simplicity pass
+--- task: feat(v0.8): guardrails bridge, MCP v1.3 surface, CI bench fix
 source: github.pr
-pr: #20
-generated: 2026-04-25T22:21:20Z
+pr: #21
+generated: 2026-04-28T03:16:30Z
 ---
 
 [goal]
@@ -9,19 +9,18 @@ generated: 2026-04-25T22:21:20Z
 
 [context]
 Changed files in this PR:
+- .github/workflows/auto-crumb-pr.yml
+- .github/workflows/auto-crumb-template.yml
+- .github/workflows/bench-pr.yml
 - CHANGELOG.md
-- README.md
-- agentauth/store.py
 - cli/crumb.py
-- cli/squeeze.py
+- cli/guardrails.py
 - docs/QUICKSTART.md
-- examples/v13-script.crumb
+- docs/v1.4-scoping.md
+- mcp/server.py
 - pyproject.toml
 - tests/test_crumb.py
-- tests/test_squeeze.py
-- tests/test_usability.py
-- validators/validate.js
-- validators/validate.py
+- tests/test_guardrails.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
