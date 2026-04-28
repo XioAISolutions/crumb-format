@@ -193,7 +193,7 @@ class TestCliVersion:
         with pytest.raises(SystemExit) as exc:
             crumb.main(["--version"])
         assert exc.value.code == 0
-        assert capsys.readouterr().out.strip() == "crumb 0.6.0"
+        assert capsys.readouterr().out.strip() == "crumb 0.7.0"
 
 
 class TestCmdNew:
@@ -234,7 +234,8 @@ class TestCmdValidate:
         f.write_text("not a crumb")
         with pytest.raises(SystemExit) as exc:
             crumb.main(["validate", str(f)])
-        assert exc.value.code == 1
+        # v0.7: exit 2 on parse error to match `crumb lint` and pytest convention.
+        assert exc.value.code == 2
 
 
 # ── cmd_inspect ──────────────────────────────────────────────────────

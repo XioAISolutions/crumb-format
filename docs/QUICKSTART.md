@@ -8,6 +8,16 @@ Get productive with CRUMB in five minutes.
 pip install crumb-format
 ```
 
+## 0. (Optional) One-time setup
+
+Most commands work right after install. The Palace, Wake, and Resolve commands need a one-time directory. Run this only if you want persistent memory:
+
+```bash
+crumb palace init        # creates .crumb-palace/ in the current directory
+```
+
+`crumb resolve` and `crumb seen` honor `CRUMB_HOME` (default `~/.crumb/`) and `CRUMB_STORE` (default `~/.crumb/store/`); set them only if you want a non-default location.
+
 ## 1. Create your first crumb
 
 ```bash
@@ -78,10 +88,10 @@ crumb wake
 ## 6. Track work with todos
 
 ```bash
-crumb todo-add sprint.crumb "Add rate limiting" "Write payment tests"
-crumb todo-list sprint.crumb
-crumb todo-done sprint.crumb "rate limiting"
-crumb todo-dream sprint.crumb   # archive completed tasks
+crumb todo add sprint.crumb "Add rate limiting" "Write payment tests"
+crumb todo list sprint.crumb
+crumb todo done sprint.crumb "rate limiting"
+crumb todo dream sprint.crumb   # archive completed tasks
 ```
 
 ## 7. Compress for token efficiency

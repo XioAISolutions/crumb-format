@@ -10,7 +10,7 @@ Ever been deep into a task with one AI, then need to switch to another? You eith
 
 CRUMB is a third option. It's a small, structured text block you copy-paste between AI tools. The next AI gets exactly what it needs to continue your work -- the goal, the context, and the constraints -- without the noise.
 
-> **v0.6.0** — First release on the v1.3 wire format. New `kind=agent` for reusable agent personas; `[handoff]` lines now carry optional `id=`/`after=` dependencies with cycle detection; new sections `[workflow]`, `[checks]`, `[guardrails]`, `[capabilities]`, `[script]`. `[invariants]` extends from `kind=map` to `kind=task`. Structured `deny=`/`require=`/`prefer=` lines inside `[constraints]`. Normative ref resolution (bare id → local dir, `sha256:` → content store, URL opt-in) and normative size-greedy fold selection with optional `fold_priority=` writer override. All additive — a v1.2 parser accepts a v1.3 file by ignoring unknown headers and sections. v0.5.0's efficiency layers (squeeze, sha256 refs, delta crumbs, priority folds) and the full 0.3.0 surface (Palace, Reflect, MeTalk, pack/lint, MemPalace bridge, REST/A2A, AgentAuth, MCP servers, 41+ CLI commands) ship unchanged. `pip install crumb-format`.
+> **v0.6.0** — First release on the v1.3 wire format. New `kind=agent` for reusable agent personas; `[handoff]` lines now carry optional `id=`/`after=` dependencies with cycle detection; new sections `[workflow]`, `[checks]`, `[guardrails]`, `[capabilities]`, `[script]`. `[invariants]` extends from `kind=map` to `kind=task`. Structured `deny=`/`require=`/`prefer=` lines inside `[constraints]`. Normative ref resolution (bare id → local dir, `sha256:` → content store, URL opt-in) and normative size-greedy fold selection with optional `fold_priority=` writer override. All additive — a v1.2 parser accepts a v1.3 file by ignoring unknown headers and sections. v0.5.0's efficiency layers (squeeze, sha256 refs, delta crumbs, priority folds) and the full 0.3.0 surface (Palace, Reflect, MeTalk, pack/lint, MemPalace bridge, REST/A2A, AgentAuth, MCP servers, ~45 CLI commands grouped by concern) ship unchanged. `pip install crumb-format`.
 
 ## Try it right now
 
@@ -64,7 +64,24 @@ END CRUMB
 
 Paste it at the start of any session. No more "I like concise answers, don't use emojis, prefer TypeScript..." every time.
 
-Five kinds: `task` (what to do next), `mem` (long-term memory), `map` (repo overview), `log` (session transcript), `todo` (work items).
+Five kinds: `task` (what to do next), `mem` (long-term memory), `map` (repo overview), `log` (session transcript), `todo` (work items). v1.3 adds a sixth: `agent` (reusable persona).
+
+## Add "crumb it" to your AI (no install needed)
+
+Most users start here. Paste this into ChatGPT custom instructions, Claude Projects, Cursor rules, or any AI with a system prompt and it can generate CRUMBs on command:
+
+```text
+When I say "crumb it", generate a CRUMB summarizing the current state.
+
+For tasks: kind=task with [goal], [context], [constraints]
+For memory: kind=mem with [consolidated]
+For repos: kind=map with [project], [modules]
+For agent personas: kind=agent with [identity], [rules], [knowledge]
+
+Format: BEGIN CRUMB / v=1.3 / headers / --- / sections / END CRUMB
+```
+
+The format works without the CLI — copy-paste handoffs travel by themselves. The CLI (`pip install crumb-format`, see below) only adds tooling: validation, search, palace memory, packing, governance.
 
 ## How it compares
 
@@ -200,27 +217,24 @@ crumb lint handoff.crumb --check-refs          # warn on unresolved refs
 crumb lint handoff.crumb --check-refs --strict # non-zero on any warning
 ```
 
-## Add "crumb it" to your AI
-
-Add this to your AI's custom instructions and it generates CRUMBs on command:
-
-```text
-When I say "crumb it", generate a CRUMB summarizing the current state.
-
-For tasks: kind=task with [goal], [context], [constraints]
-For memory: kind=mem with [consolidated]
-For repos: kind=map with [project], [modules]
-
-Format: BEGIN CRUMB / v=1.1 / headers / --- / sections / END CRUMB
-```
-
-Works in ChatGPT custom instructions, Claude Projects, Cursor rules, or any AI with system prompts.
-
 ## Install
 
 ```bash
 pip install crumb-format
 ```
+
+### Configuration
+
+Environment variables (all optional, sane defaults):
+
+| Var | Default | Used by |
+|-----|---------|---------|
+| `CRUMB_HOME` | `~/.crumb/` | local search root for `crumb resolve` |
+| `CRUMB_STORE` | `~/.crumb/store/` | content-addressed store for `sha256:` refs |
+| `CRUMB_SEEN_FILE` | `~/.crumb/seen` | receiver-side "already-seen" set for `crumb optimize --mode budget` |
+| `CRUMB_QUIET` | unset | set to `1` to suppress AgentAuth's first-use storage notice |
+
+Palace lives in `.crumb-palace/` in whichever directory you ran `crumb palace init`. AgentAuth writes to `.crumb-auth/` in the current directory on first use and prints a one-time stderr notice.
 
 ## Quick start
 
@@ -242,7 +256,7 @@ crumb search "auth JWT" --dir ./crumbs/
 crumb init --all
 ```
 
-Full command reference: `crumb --help` (41 commands including export, import, templates, todos, watch mode, compression, agent governance, and more). See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for a 5-minute walkthrough.
+Full command reference: `crumb --help` (~45 commands grouped by concern: create, inspect, edit, optimize, handoff, memory, governance, format). See [`docs/QUICKSTART.md`](docs/QUICKSTART.md) for a 5-minute walkthrough.
 
 ## Palace — Spatial Memory That Stays With You
 
@@ -436,7 +450,7 @@ repos:
 - [`DREAMING.md`](DREAMING.md) -- how memory consolidation works
 - [`docs/QUICKSTART.md`](docs/QUICKSTART.md) -- 5-minute daily workflow guide
 - [`examples/`](examples/) -- ready-to-paste `.crumb` files (task, mem, map, log, todo, wake)
-- [`cli/crumb.py`](cli/crumb.py) -- full CLI (41 commands)
+- [`cli/crumb.py`](cli/crumb.py) -- full CLI (~45 commands grouped by concern)
 - [`cli/reflect.py`](cli/reflect.py) -- self-learning gap detection and knowledge health scoring
 - [`cli/palace.py`](cli/palace.py) -- Palace spatial memory (wings/halls/rooms/tunnels)
 - [`cli/classify.py`](cli/classify.py) -- rule-based hall classifier
