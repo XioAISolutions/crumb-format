@@ -33,7 +33,10 @@ name: Auto-Generate Crumb from PR
 
 on:
   pull_request:
-    types: [opened, synchronize]
+    # Only regenerate on open/reopen — running on every push (synchronize)
+    # caused churn with multiple auto-commits per PR. Downstream consumers
+    # that want per-push regeneration can add `synchronize` back.
+    types: [opened, reopened]
 
 permissions:
   contents: write
@@ -58,7 +61,13 @@ jobs:
           python-version: "3.11"
 
       - name: Install crumb-format
-        run: pip install crumb-format
+        # Prefer the checkout when running in the crumb-format repo itself.
+        run: |
+          if grep -q '^name = "crumb-format"' pyproject.toml 2>/dev/null; then
+            pip install .
+          else
+            pip install crumb-format
+          fi
 
       - name: Get changed files
         id: changed
