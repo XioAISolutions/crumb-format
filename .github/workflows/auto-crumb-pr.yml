@@ -39,7 +39,14 @@ jobs:
           python-version: "3.11"
 
       - name: Install crumb-format
-        run: pip install crumb-format
+        # Prefer local install when running inside the crumb-format repo so
+        # PRs test with their own code; fall back to PyPI for external callers.
+        run: |
+          if grep -q '^name = "crumb-format"' pyproject.toml 2>/dev/null; then
+            pip install .
+          else
+            pip install crumb-format
+          fi
 
       - name: Get changed files
         id: changed

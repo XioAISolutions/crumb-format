@@ -43,7 +43,7 @@ REQUIRED_SECTIONS = {
     "delta": ["changes"],
     "agent": ["identity"],
 }
-CLI_VERSION = "0.7.0"
+CLI_VERSION = "0.8.0"
 SUPPORTED_VERSIONS = {"1.1", "1.2", "1.3"}
 FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
 CONTENT_REF_RE = re.compile(r"^sha256:[0-9a-f]{16,64}$")
@@ -4990,6 +4990,57 @@ def cmd_resolve(args: argparse.Namespace) -> None:
         print(f"OK          {args.ref}  ->  {path}")
 
 
+# ── guardrails (v1.3 §21.2) ───────────────────────────────────────────
+
+def cmd_guardrails(args: argparse.Namespace) -> None:
+    """Translate a crumb's [guardrails] section into AgentAuth policy terms.
+
+    By default this is a dry run — it prints what would be applied without
+    touching the AgentAuth store. Pass --apply and --agent-name to actually
+    set the policy.
+    """
+    from cli import guardrails as gr
+
+    text = read_text(args.file)
+    try:
+        parsed = parse_crumb(text)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    lines = parsed["sections"].get("guardrails", [])
+    if not lines:
+        print(f"No [guardrails] section in {args.file}.")
+        sys.exit(0 if not args.strict else 1)
+
+    policy = None
+    if args.apply:
+        if not args.agent_name:
+            print("Error: --apply requires --agent-name", file=sys.stderr)
+            sys.exit(2)
+        from agentauth import ToolPolicy
+        policy = ToolPolicy()
+
+    agent_name = args.agent_name or parsed["headers"].get("id", "unknown-agent")
+    summary = gr.apply_guardrails_to_policy(lines, agent_name=agent_name, policy=policy)
+
+    mode = "APPLIED" if summary["applied"] else "DRY-RUN"
+    print(f"[{mode}] agent_name={summary['agent_name']}")
+    if summary["tools_denied"]:
+        print(f"  deny:      {', '.join(summary['tools_denied'])}")
+    if summary["tools_required"]:
+        print(f"  require:   {', '.join(summary['tools_required'])}")
+    if summary["approvals"]:
+        for appr in summary["approvals"]:
+            print(f"  approval:  {appr.get('action', '?')} by {appr.get('who', '?')}")
+    if summary["scope"]:
+        for scope in summary["scope"]:
+            print(f"  scope:     {scope.get('max', scope)}")
+    if summary["skipped"]:
+        for item in summary["skipped"]:
+            print(f"  skipped:   {item.get('_raw', '')!r}  ({item.get('_reason', '')})")
+
+
 # ── seen set ──────────────────────────────────────────────────────────
 
 def cmd_seen(args: argparse.Namespace) -> None:
@@ -5344,12 +5395,12 @@ def build_parser() -> argparse.ArgumentParser:
           Optimize:  optimize   lint   metalk
           Handoff:   handoff   receive   export
           Memory:    palace   wake   reflect   classify
-          Format:    bridge   resolve   hash   delta   apply   seen   guardrails
-          Governance:passport   policy   audit   scan   comply   webhook
+          Format:    bridge   resolve   hash   delta   apply   seen
+          Governance:passport   policy   audit   scan   comply   webhook   guardrails
           Todo:      todo (add | done | list | dream)
           Other:     init   hooks   context   pack
 
-        Deprecated (removal scheduled for v0.8): compress, compact, squeeze,
+        Deprecated (removal scheduled for v0.9): compress, compact, squeeze,
         share, dashboard, todo-add, todo-done, todo-list, todo-dream.
     """).strip()
 
@@ -5487,7 +5538,7 @@ def build_parser() -> argparse.ArgumentParser:
     compact = sub.add_parser('compact', help='[deprecated] use `crumb optimize --mode minimal`.')
     compact.add_argument('file', nargs='?', help='.crumb file to compact (default: stdin).')
     compact.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
-    compact.set_defaults(func=_deprecated(cmd_compact, "`crumb compact` is deprecated; use `crumb optimize --mode minimal` instead. Removal scheduled for v0.8."))
+    compact.set_defaults(func=_deprecated(cmd_compact, "`crumb compact` is deprecated; use `crumb optimize --mode minimal` instead. Removal scheduled for v0.9."))
 
     # diff
     diff = sub.add_parser('diff', help='Compare two .crumb files.')
@@ -5556,21 +5607,21 @@ def build_parser() -> argparse.ArgumentParser:
     todo_add_cmd.add_argument('tasks', nargs='+', help='Tasks to add.')
     todo_add_cmd.add_argument('--title', '-t', help='Title (for new todo crumbs).')
     todo_add_cmd.add_argument('--source', '-s', help='Source label.')
-    todo_add_cmd.set_defaults(func=_deprecated(cmd_todo_add, "`crumb todo-add` is deprecated; use `crumb todo add` instead. Removal scheduled for v0.8."))
+    todo_add_cmd.set_defaults(func=_deprecated(cmd_todo_add, "`crumb todo-add` is deprecated; use `crumb todo add` instead. Removal scheduled for v0.9."))
 
     todo_done_cmd = sub.add_parser('todo-done', help='[deprecated] use `crumb todo done`.')
     todo_done_cmd.add_argument('file', help='Path to a todo crumb.')
     todo_done_cmd.add_argument('query', help='Substring to match against open tasks.')
-    todo_done_cmd.set_defaults(func=_deprecated(cmd_todo_done, "`crumb todo-done` is deprecated; use `crumb todo done` instead. Removal scheduled for v0.8."))
+    todo_done_cmd.set_defaults(func=_deprecated(cmd_todo_done, "`crumb todo-done` is deprecated; use `crumb todo done` instead. Removal scheduled for v0.9."))
 
     todo_list_cmd = sub.add_parser('todo-list', help='[deprecated] use `crumb todo list`.')
     todo_list_cmd.add_argument('file', nargs='?', help='Path to a todo crumb.')
     todo_list_cmd.add_argument('--all', '-a', dest='show_all', action='store_true', help='Show completed tasks too.')
-    todo_list_cmd.set_defaults(func=_deprecated(cmd_todo_list, "`crumb todo-list` is deprecated; use `crumb todo list` instead. Removal scheduled for v0.8."))
+    todo_list_cmd.set_defaults(func=_deprecated(cmd_todo_list, "`crumb todo-list` is deprecated; use `crumb todo list` instead. Removal scheduled for v0.9."))
 
     todo_dream_cmd = sub.add_parser('todo-dream', help='[deprecated] use `crumb todo dream`.')
     todo_dream_cmd.add_argument('file', help='Path to a todo crumb.')
-    todo_dream_cmd.set_defaults(func=_deprecated(cmd_todo_dream, "`crumb todo-dream` is deprecated; use `crumb todo dream` instead. Removal scheduled for v0.8."))
+    todo_dream_cmd.set_defaults(func=_deprecated(cmd_todo_dream, "`crumb todo-dream` is deprecated; use `crumb todo dream` instead. Removal scheduled for v0.9."))
 
     # watch
     watch_cmd = sub.add_parser('watch', help='Watch crumbs and auto-dream when raw exceeds threshold.')
@@ -5619,7 +5670,7 @@ def build_parser() -> argparse.ArgumentParser:
                               help='Apply MeTalk caveman compression as Stage 3.')
     compress_cmd.add_argument('--metalk-level', type=int, choices=[1, 2, 3], default=2,
                               help='MeTalk level (default: 2).')
-    compress_cmd.set_defaults(func=_deprecated(cmd_compress, "`crumb compress` is deprecated; use `crumb optimize --mode signal` instead. Removal scheduled for v0.8."))
+    compress_cmd.set_defaults(func=_deprecated(cmd_compress, "`crumb compress` is deprecated; use `crumb optimize --mode signal` instead. Removal scheduled for v0.9."))
 
     # bench
     bench_cmd = sub.add_parser('bench', help='Benchmark compression efficiency and information density.')
@@ -5628,7 +5679,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     share_cmd = sub.add_parser('share', help='[deprecated] use `crumb handoff` (clipboard) or paste the file directly.')
     share_cmd.add_argument('file', help='.crumb file to share.')
-    share_cmd.set_defaults(func=_deprecated(cmd_share, "`crumb share` is deprecated and will be removed in v0.8. Use `crumb handoff` (clipboard) or paste the file content directly."))
+    share_cmd.set_defaults(func=_deprecated(cmd_share, "`crumb share` is deprecated and will be removed in v0.9. Use `crumb handoff` (clipboard) or paste the file content directly."))
 
     # handoff
     handoff_cmd = sub.add_parser('handoff', help='Copy a .crumb to clipboard for pasting into an AI tool.')
@@ -5732,7 +5783,7 @@ def build_parser() -> argparse.ArgumentParser:
     # --- Dashboard ---
     dash_cmd = sub.add_parser('dashboard', help='[deprecated] use `crumb audit export --format html`.')
     dash_cmd.add_argument('-o', '--output', default='agentauth-dashboard.html')
-    dash_cmd.set_defaults(func=_deprecated(cmd_dashboard, "`crumb dashboard` is deprecated and will be removed in v0.8. Use `crumb audit export --format html -o dashboard.html` instead."))
+    dash_cmd.set_defaults(func=_deprecated(cmd_dashboard, "`crumb dashboard` is deprecated and will be removed in v0.9. Use `crumb audit export --format html -o dashboard.html` instead."))
 
     # --- Format Bridges ---
     bridge_cmd = sub.add_parser('bridge', help='Convert between CRUMB and other AI formats.')
@@ -5820,7 +5871,7 @@ def build_parser() -> argparse.ArgumentParser:
     squeeze_cmd.add_argument('--dry-run', action='store_true',
                              help='Print the compression report without writing output.')
     squeeze_cmd.add_argument('-o', '--output', default='-', help='Output file or - for stdout.')
-    squeeze_cmd.set_defaults(func=_deprecated(cmd_squeeze, "`crumb squeeze` is deprecated; use `crumb optimize --mode budget --budget N` instead. Removal scheduled for v0.8."))
+    squeeze_cmd.set_defaults(func=_deprecated(cmd_squeeze, "`crumb squeeze` is deprecated; use `crumb optimize --mode budget --budget N` instead. Removal scheduled for v0.9."))
 
     # --- Hash (content-addressed digest) ---
     hash_cmd = sub.add_parser('hash', help='Print the sha256 content digest of a CRUMB.')
@@ -5846,6 +5897,20 @@ def build_parser() -> argparse.ArgumentParser:
     resolve_cmd.add_argument('--strict', action='store_true',
                              help='Exit 1 if any ref is unresolved.')
     resolve_cmd.set_defaults(func=cmd_resolve)
+
+    # --- Guardrails translator (v1.3 §21.2) ---
+    guard_cmd = sub.add_parser(
+        'guardrails',
+        help='Translate a crumb\'s [guardrails] section into AgentAuth policy terms (dry-run by default).',
+    )
+    guard_cmd.add_argument('file', help='Crumb file containing a [guardrails] section.')
+    guard_cmd.add_argument('--agent-name',
+                           help='Agent name for the policy. Defaults to the crumb\'s id header.')
+    guard_cmd.add_argument('--apply', action='store_true',
+                           help='Actually call ToolPolicy.set_policy(). Requires --agent-name.')
+    guard_cmd.add_argument('--strict', action='store_true',
+                           help='Exit non-zero if no [guardrails] section is present.')
+    guard_cmd.set_defaults(func=cmd_guardrails)
 
     # --- Seen set (content-addressed ref registry) ---
     seen_cmd = sub.add_parser('seen', help='Manage the content-addressed seen-set registry.')

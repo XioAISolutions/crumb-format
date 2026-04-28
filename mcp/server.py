@@ -39,11 +39,11 @@ def respond_error(req_id, code, message):
 TOOLS = [
     {
         "name": "crumb_new",
-        "description": "Create a new .crumb file. Kinds: task, mem, map, log, todo.",
+        "description": "Create a new .crumb file. Kinds: task, mem, map, log, todo, agent (v1.3).",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "kind": {"type": "string", "enum": ["task", "mem", "map", "log", "todo"]},
+                "kind": {"type": "string", "enum": ["task", "mem", "map", "log", "todo", "agent"]},
                 "title": {"type": "string", "description": "Title for the crumb"},
                 "goal": {"type": "string", "description": "Goal text (task only)"},
                 "context": {"type": "array", "items": {"type": "string"}, "description": "Context items (task only)"},
@@ -52,6 +52,10 @@ TOOLS = [
                 "project": {"type": "string", "description": "Project name (map only)"},
                 "description": {"type": "string", "description": "Project description (map only)"},
                 "modules": {"type": "array", "items": {"type": "string"}, "description": "Module entries (map only)"},
+                "agent_id": {"type": "string", "description": "Stable agent id (agent only)"},
+                "identity": {"type": "string", "description": "Identity block body (agent only)"},
+                "rules": {"type": "array", "items": {"type": "string"}, "description": "Standing rules (agent only)"},
+                "knowledge": {"type": "array", "items": {"type": "string"}, "description": "Knowledge areas (agent only)"},
             },
             "required": ["kind"],
         },
@@ -134,7 +138,7 @@ TOOLS = [
     },
     {
         "name": "crumb_lint",
-        "description": "Lint CRUMBs for secrets, oversize logs, suspicious headers, and budget issues.",
+        "description": "Lint CRUMBs for secrets, oversize logs, suspicious headers, budget issues, and unresolved refs.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -142,6 +146,7 @@ TOOLS = [
                 "secrets": {"type": "boolean"},
                 "strict": {"type": "boolean"},
                 "max_size": {"type": "integer"},
+                "check_refs": {"type": "boolean", "description": "Warn on unresolvable refs (v1.3 §17.3)"},
             },
             "required": ["files"],
         },
@@ -312,6 +317,36 @@ TOOLS = [
             "required": ["text"],
         },
     },
+    {
+        "name": "crumb_resolve",
+        "description": "Resolve a CRUMB ref (bare id, sha256: digest, or URL) per SPEC v1.3 §17. Dry-run walker; does not fetch URLs unless allow_network is set.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "ref": {"type": "string", "description": "Ref to resolve (bare id, sha256:<hex>, or URL)"},
+                "search_path": {"type": "array", "items": {"type": "string"}, "description": "Directories to search for bare ids"},
+                "allow_network": {"type": "boolean", "description": "Allow URL refs to be fetched"},
+                "walk": {"type": "boolean", "description": "Walk transitively"},
+                "depth": {"type": "integer", "description": "Max walk depth (default 5)"},
+                "strict": {"type": "boolean", "description": "Exit 1 if any ref is unresolved"},
+            },
+            "required": ["ref"],
+        },
+    },
+    {
+        "name": "crumb_guardrails",
+        "description": "Translate a crumb's [guardrails] section into AgentAuth policy terms (v1.3 §21.2). Dry-run by default.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "file": {"type": "string", "description": "Crumb file containing a [guardrails] section"},
+                "agent_name": {"type": "string", "description": "Agent name for the policy"},
+                "apply": {"type": "boolean", "description": "Actually call ToolPolicy.set_policy()"},
+                "strict": {"type": "boolean", "description": "Exit non-zero if no [guardrails] section present"},
+            },
+            "required": ["file"],
+        },
+    },
 ]
 
 
@@ -350,6 +385,15 @@ def handle_tool_call(name, args):
             elif kind in ("log", "todo"):
                 for e in args.get("entries", []):
                     cli_args.extend(["-e", e])
+            elif kind == "agent":
+                if args.get("agent_id"):
+                    cli_args.extend(["--agent-id", args["agent_id"]])
+                if args.get("identity"):
+                    cli_args.extend(["--identity", args["identity"]])
+                for r in args.get("rules", []):
+                    cli_args.extend(["--rules", r])
+                for k in args.get("knowledge", []):
+                    cli_args.extend(["--knowledge", k])
 
             with redirect_stdout(stdout_buf):
                 crumb.main(cli_args)
@@ -426,6 +470,8 @@ def handle_tool_call(name, args):
                 cli_args.append("--strict")
             if args.get("max_size") is not None:
                 cli_args.extend(["--max-size", str(args["max_size"])])
+            if args.get("check_refs"):
+                cli_args.append("--check-refs")
             with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
                 try:
                     crumb.main(cli_args)
@@ -560,6 +606,40 @@ def handle_tool_call(name, args):
             with redirect_stdout(stdout_buf):
                 crumb.main(cli_args)
             return stdout_buf.getvalue()
+
+        elif name == "crumb_resolve":
+            cli_args = ["resolve", args["ref"]]
+            for path in args.get("search_path", []) or []:
+                cli_args.extend(["--search-path", path])
+            if args.get("allow_network"):
+                cli_args.append("--allow-network")
+            if args.get("walk"):
+                cli_args.append("--walk")
+            if args.get("depth") is not None:
+                cli_args.extend(["--depth", str(args["depth"])])
+            if args.get("strict"):
+                cli_args.append("--strict")
+            with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+                try:
+                    crumb.main(cli_args)
+                except SystemExit:
+                    pass
+            return stdout_buf.getvalue() + stderr_buf.getvalue()
+
+        elif name == "crumb_guardrails":
+            cli_args = ["guardrails", args["file"]]
+            if args.get("agent_name"):
+                cli_args.extend(["--agent-name", args["agent_name"]])
+            if args.get("apply"):
+                cli_args.append("--apply")
+            if args.get("strict"):
+                cli_args.append("--strict")
+            with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
+                try:
+                    crumb.main(cli_args)
+                except SystemExit:
+                    pass
+            return stdout_buf.getvalue() + stderr_buf.getvalue()
 
         else:
             return f"Unknown tool: {name}"

@@ -1,5 +1,73 @@
 # Changelog
 
+## v0.8.0
+
+### Guardrails bridge, MCP v1.3 surface, CI bench fix
+
+No wire-format changes. v0.8.0 makes a normative SPEC SHOULD actually
+work, exposes the v1.3 surface through MCP, and fixes the CI workflows
+that were silently producing N/A bench scores for newer crumbs.
+
+**`[guardrails]` → AgentAuth bridge (SPEC §21.2 implemented)**
+
+Was aspirational in v0.6.0 ("AgentAuth-aware runtimes SHOULD translate"),
+now there is code:
+
+- `cli/guardrails.py` — `parse_guardrail_line`, `translate_guardrails`,
+  `apply_guardrails_to_policy`. Dry-run by default.
+- `crumb guardrails <file>` — preview the translation. `--apply --agent-name <name>`
+  actually sets policy via `agentauth.ToolPolicy`.
+- 11 new tests in `tests/test_guardrails.py` covering parsing, bucketing,
+  dry-run, real application, and no-op paths.
+
+Smoke against `examples/v13-guardrails.crumb`:
+```
+[DRY-RUN] agent_name=unknown-agent
+  deny:      shell-exec
+  require:   tests
+  approval:  merge by human
+  scope:     files=5
+```
+
+Listed under Governance in `crumb --help`.
+
+**MCP surface exposes v1.3**
+
+`mcp/server.py`:
+- `crumb_new` accepts `kind=agent` plus `agent_id` / `identity` / `rules` / `knowledge`.
+- `crumb_lint` accepts `check_refs`.
+- New tools: `crumb_resolve`, `crumb_guardrails`.
+- Tool count went from 22 → 24.
+
+**CI workflow fixes**
+
+- `bench-pr.yml`, `auto-crumb-pr.yml`, `auto-crumb-template.yml` all installed
+  via `pip install crumb-format`, which pinned to the last PyPI release.
+  Result: `crumb bench` returned `N/A` for every crumb using features newer
+  than that release (v=1.2, v=1.3, kind=agent, kind=delta). All three
+  workflows now install from the local checkout when running inside the
+  `crumb-format` repo (detected via `pyproject.toml` name check), and from
+  PyPI when called from another repo. External callers keep working.
+- `auto-crumb-template.yml` was triggering on `[opened, synchronize]`,
+  which made every push to a PR auto-commit a new crumb (which was itself
+  a push that triggered another commit). Trigger scoped to `[opened, reopened]`.
+
+**v1.4 scoping doc**
+
+`docs/v1.4-scoping.md` is a non-normative parking lot for next-bump
+candidates: `kind=review`, typed `[checks]` thresholds, `kind=receipt`,
+`[handoff] until=` deadlines normative. Explicitly scoping-only — nothing
+committed.
+
+**Tests**
+
+466 passing (was 455). Adds 11 guardrails tests. All pre-v0.8 deprecation
+shims still honored — `compress`, `compact`, `squeeze`, `share`,
+`dashboard`, `todo-add`/`-done`/`-list`/`-dream` continue to function with
+their `[deprecated]` stderr hint. Removal still scheduled for the release
+after v0.8 (i.e. v0.9), since v0.7 was the announce release and v0.8 is
+the second release of the deprecation window.
+
 ## v0.7.0
 
 ### Usability and simplicity pass
@@ -65,7 +133,7 @@ fixing places where the repo contradicted its own docs.
   AgentAuth notice, and grouped-help rendering.
 - 455 tests passing (was 445).
 
-**Deprecations (removal scheduled for v0.8)**
+**Deprecations (removal scheduled for v0.9 — see v0.8.0 note above)**
 
 `compress`, `compact`, `squeeze`, `share`, `dashboard`, `todo-add`,
 `todo-done`, `todo-list`, `todo-dream`. All print `[deprecated]` hints and

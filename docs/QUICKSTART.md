@@ -187,6 +187,6 @@ crumb lint handoff.crumb --check-refs --strict    # exit 1 on any warning
 ## Full reference
 
 ```bash
-crumb --help        # 43 commands (v0.6.0: adds `new agent`, `resolve`)
+crumb --help        # ~46 commands grouped by concern (v0.7.0: grouping; v0.8.0: adds `guardrails`)
 crumb <cmd> --help  # per-command help
 ```
