@@ -29,6 +29,17 @@ cd "$(dirname "$0")/.."
 # Resolve --help / unknown flags BEFORE running the test suite or build,
 # so a typo (`--tset`) or `--help` never burns a minute on tests + a wheel
 # build that the user didn't actually want.
+#
+# Reject extra args too — `publish.sh --test --help` would otherwise run
+# the full --test pipeline and silently ignore --help. Same risk class
+# as the `--tset` typo: unexpected flags should fail fast, not get
+# absorbed into a real upload.
+if (( $# > 1 )); then
+    echo "ERROR: too many arguments ($#); expected at most one" >&2
+    echo "Usage: $0 [--test|--help]" >&2
+    exit 2
+fi
+
 case "${1:-}" in
     "")
         MODE=prod
