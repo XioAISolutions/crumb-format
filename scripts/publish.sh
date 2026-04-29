@@ -24,7 +24,15 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+# Read project.version from pyproject.toml without depending on tomllib
+# (3.11+) — pyproject declares requires-python = ">=3.10", so tomllib import
+# would crash this script on 3.10. The grep/sed below works on any Python
+# version (and indeed needs no Python at all to extract the version).
+VERSION=$(grep -E '^version\s*=' pyproject.toml | head -1 | sed -E 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/')
+if [[ -z "$VERSION" ]]; then
+    echo "ERROR: could not parse 'version' from pyproject.toml" >&2
+    exit 1
+fi
 echo "==> Releasing crumb-format v${VERSION}"
 
 # Sanity: CHANGELOG mentions this version.
@@ -46,14 +54,27 @@ python3 -m build
 echo "==> Verifying metadata with twine"
 python3 -m twine check dist/*
 
-# Upload.
-TARGET="${1:-pypi}"
-if [[ "$TARGET" == "--test" ]]; then
-    echo "==> Uploading to TestPyPI"
-    python3 -m twine upload --repository testpypi dist/*
-    echo "Done. Verify with: pip install -i https://test.pypi.org/simple/ crumb-format==${VERSION}"
-else
-    echo "==> Uploading to PyPI"
-    python3 -m twine upload dist/*
-    echo "Done. Verify with: pip install crumb-format==${VERSION}"
-fi
+# Upload. Strict arg parsing — anything other than "" or "--test" must
+# error rather than silently fall through to a production upload (a typo
+# like `--tset` is a real risk; treating "unknown == prod" is dangerous).
+case "${1:-}" in
+    "")
+        echo "==> Uploading to PyPI"
+        python3 -m twine upload dist/*
+        echo "Done. Verify with: pip install crumb-format==${VERSION}"
+        ;;
+    --test)
+        echo "==> Uploading to TestPyPI"
+        python3 -m twine upload --repository testpypi dist/*
+        echo "Done. Verify with: pip install -i https://test.pypi.org/simple/ crumb-format==${VERSION}"
+        ;;
+    -h|--help)
+        sed -n '2,16p' "$0"
+        exit 0
+        ;;
+    *)
+        echo "ERROR: unknown argument: '$1'" >&2
+        echo "Usage: $0 [--test|--help]" >&2
+        exit 2
+        ;;
+esac
