@@ -4,6 +4,7 @@
 # Usage:
 #   scripts/publish.sh           # uploads the version currently in pyproject.toml
 #   scripts/publish.sh --test    # uploads to TestPyPI first
+#   scripts/publish.sh --help    # show this help
 #
 # Prerequisites (run once on your machine):
 #   1. PyPI account: https://pypi.org/account/register/
@@ -24,6 +25,30 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
+# ── Phase 1: parse arguments ────────────────────────────────────────────
+# Resolve --help / unknown flags BEFORE running the test suite or build,
+# so a typo (`--tset`) or `--help` never burns a minute on tests + a wheel
+# build that the user didn't actually want.
+case "${1:-}" in
+    "")
+        MODE=prod
+        ;;
+    --test)
+        MODE=test
+        ;;
+    -h|--help)
+        # Print the leading comment block (lines 2–23) as the help text.
+        sed -n '2,23p' "$0"
+        exit 0
+        ;;
+    *)
+        echo "ERROR: unknown argument: '$1'" >&2
+        echo "Usage: $0 [--test|--help]" >&2
+        exit 2
+        ;;
+esac
+
+# ── Phase 2: prechecks ──────────────────────────────────────────────────
 # Read project.version from pyproject.toml without depending on tomllib
 # (3.11+) — pyproject declares requires-python = ">=3.10", so tomllib import
 # would crash this script on 3.10. The grep/sed below works on any Python
@@ -45,36 +70,24 @@ fi
 echo "==> Running test suite"
 python3 -m pytest tests/ -q
 
-# Clean and build.
+# ── Phase 3: build ──────────────────────────────────────────────────────
 echo "==> Building artifacts"
 rm -rf dist/ build/ ./*.egg-info
 python3 -m build
 
-# Verify metadata.
 echo "==> Verifying metadata with twine"
 python3 -m twine check dist/*
 
-# Upload. Strict arg parsing — anything other than "" or "--test" must
-# error rather than silently fall through to a production upload (a typo
-# like `--tset` is a real risk; treating "unknown == prod" is dangerous).
-case "${1:-}" in
-    "")
+# ── Phase 4: upload ─────────────────────────────────────────────────────
+case "$MODE" in
+    prod)
         echo "==> Uploading to PyPI"
         python3 -m twine upload dist/*
         echo "Done. Verify with: pip install crumb-format==${VERSION}"
         ;;
-    --test)
+    test)
         echo "==> Uploading to TestPyPI"
         python3 -m twine upload --repository testpypi dist/*
         echo "Done. Verify with: pip install -i https://test.pypi.org/simple/ crumb-format==${VERSION}"
-        ;;
-    -h|--help)
-        sed -n '2,16p' "$0"
-        exit 0
-        ;;
-    *)
-        echo "ERROR: unknown argument: '$1'" >&2
-        echo "Usage: $0 [--test|--help]" >&2
-        exit 2
         ;;
 esac
