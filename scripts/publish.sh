@@ -71,8 +71,12 @@ if [[ -z "$VERSION" ]]; then
 fi
 echo "==> Releasing crumb-format v${VERSION}"
 
-# Sanity: CHANGELOG mentions this version.
-if ! grep -q "^## v${VERSION}" CHANGELOG.md; then
+# Sanity: CHANGELOG mentions this version. Match exactly:
+#   - escape dots in $VERSION so '0.8.0' isn't a regex wildcard for '0x8x0'
+#   - require the heading to end after the version (or be followed by
+#     whitespace) so '## v0.8.0-rc1' doesn't satisfy 'VERSION=0.8.0'
+ESCAPED_VERSION=${VERSION//./\\.}
+if ! grep -qE "^## v${ESCAPED_VERSION}([[:space:]]|$)" CHANGELOG.md; then
     echo "ERROR: CHANGELOG.md is missing a '## v${VERSION}' heading." >&2
     exit 1
 fi
