@@ -1,0 +1,28 @@
+BEGIN CRUMB
+v=1.3
+kind=task
+title=Release gate — typed checks demo
+source=ci.github
+project=crumb-format
+---
+[goal]
+Decide whether main is ready to release.
+
+[context]
+- All tests green on the latest run
+- Coverage held steady around 87%
+- Latency p99 regressed slightly since the last release; flagged but not blocking
+- Bundle size exceeded the 1500 KB budget; needs investigation before tagging
+
+[constraints]
+- Do not ship if any check is `fail`
+- A `warn` is acceptable if covered in the release notes
+- Coverage must be at least 85%
+
+[checks]
+- tests         :: pass
+- coverage      :: pass   value=87     threshold=85     op=>=    unit=%
+- latency_p99   :: warn   value=120    threshold=100    op=<=    unit=ms     note=regressed since main
+- bundle_size   :: fail   value=1840   threshold=1500   op=<=    unit=KB
+- version       :: pass   value=0.8.0  threshold=0.8.0  op===
+END CRUMB
