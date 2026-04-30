@@ -43,7 +43,7 @@ REQUIRED_SECTIONS = {
     "delta": ["changes"],
     "agent": ["identity"],
 }
-CLI_VERSION = "0.8.0"
+CLI_VERSION = "0.9.0"
 SUPPORTED_VERSIONS = {"1.1", "1.2", "1.3"}
 FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
 CONTENT_REF_RE = re.compile(r"^sha256:[0-9a-f]{16,64}$")
