@@ -99,11 +99,14 @@ For receivers, the path is: ignore `deadline=` (v1.3 behavior), then opt in to l
 
 When v1.4 lands normatively:
 
-1. `validators/validate.py` — new `_validate_handoff_deadlines()` walking `[handoff]` lines, calling `datetime.fromisoformat` on each `deadline=`, raising on malformed dates only.
-2. `validators/validate.js` — mirror using `Date.parse()` plus the explicit-timezone check.
-3. `cli/linting.py` — `--check-deadlines` flag wires into the existing lint pass.
+1. `validators/validate.py` — new `_validate_handoff_deadlines()` walking `[handoff]` lines. For each `deadline=`:
+   - Try `datetime.fromisoformat(value)` (handles both date-only and datetime forms in 3.11+; for 3.10 supply a small backport that splits on `T` and dispatches to `date.fromisoformat` or the datetime path).
+   - If the value parses as a `datetime` (not a bare `date`), require `parsed.tzinfo is not None`. `fromisoformat` accepts tz-less datetimes; the grammar above rejects them, so we add the explicit check ourselves.
+   - On any parse failure or missing-tz, emit a `WARN` and continue. **Never raise.** Malformed `deadline=` values do not invalidate the document — that's the warn-not-reject contract from §"Why warn-not-reject" above. `--strict` promotes WARN to ERROR via the existing lint exit-code path; the validator itself stays warn-only so a v1.3 free-form deadline keeps validating.
+2. `validators/validate.js` — mirror. `Date.parse()` is too loose (accepts tz-less local time per ECMAScript), so reproduce the same explicit checks: regex-test the form, then verify a `Z` or `±HH:MM` suffix on datetimes. Same warn-not-reject behavior.
+3. `cli/linting.py` — `--check-deadlines` flag wires into the existing lint pass. Past deadlines trigger a separate WARN line; malformed values reuse the validator's WARN.
 
-Estimated change: ~80 LOC across the three files. Tests: `tests/test_v14_deadlines.py` ~60 LOC, 6 cases (valid date, valid datetime with Z, valid datetime with offset, malformed month, missing timezone on datetime, past deadline → lint warning).
+Estimated change: ~100 LOC across the three files (slightly higher than the original estimate because of the explicit timezone-required check and the `--strict`-vs-validator separation). Tests: `tests/test_v14_deadlines.py` ~80 LOC, 7 cases (valid date, valid datetime with Z, valid datetime with offset, malformed month, missing timezone on datetime, past deadline → lint warning, free-form non-ISO-8601 `deadline=` → still validates with a WARN).
 
 The wire-format version bump itself is a separate concern — SPEC §11.1 gains one paragraph. Per SPEC §8 backward compat holds: a v1.3 parser ignoring `deadline=` reads the same crumb just fine.
 
