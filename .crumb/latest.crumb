@@ -1,7 +1,7 @@
---- task: docs(v1.4): typed [checks] thresholds draft + release script
+--- task: docs(v1.4): handoff deadlines normative draft
 source: github.pr
-pr: #22
-generated: 2026-04-29T14:32:01Z
+pr: #23
+generated: 2026-04-30T16:49:06Z
 ---
 
 [goal]
@@ -10,9 +10,8 @@ generated: 2026-04-29T14:32:01Z
 [context]
 Changed files in this PR:
 - docs/v1.4-scoping.md
-- docs/v1.4/typed-checks.md
-- examples/v14-typed-checks.crumb
-- scripts/publish.sh
+- docs/v1.4/handoff-deadlines.md
+- examples/v14-handoff-deadlines.crumb
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions

@@ -1,0 +1,32 @@
+BEGIN CRUMB
+v=1.3
+kind=task
+title=Release v0.9 — coordinated handoff with deadlines
+source=ci.github
+project=crumb-format
+---
+[goal]
+Tag and publish v0.9 of crumb-format on the schedule.
+
+[context]
+- v1.4 draft features merged on main
+- CHANGELOG entry for v0.9 written
+- PyPI artifacts not yet built
+- Release window: end-of-week 2026-04-30 → 2026-05-01
+
+[constraints]
+- Don't ship if pytest is red on main
+- Don't ship without CHANGELOG verified
+- A blown deadline should surface in `crumb lint --check-deadlines`, not block the handoff
+
+[handoff]
+- id=verify   to=any     do=run scripts/publish.sh --test on TestPyPI    deadline=2026-04-30
+- id=tag      to=human   do=tag v0.9.0 and push                          deadline=2026-04-30T17:00:00Z   after=verify
+- id=publish  to=human   do=run scripts/publish.sh                       deadline=2026-05-01T00:00:00Z   after=tag
+- id=announce to=any     do=post release notes to ANNOUNCEMENTS.md       deadline=2026-05-01T18:00:00Z   after=publish
+
+[checks]
+- pytest        :: pass
+- changelog     :: pass    value=0.9.0   threshold=0.9.0   op===
+- last_release  :: pass    note=v0.8.0 shipped 2026-04-28
+END CRUMB
