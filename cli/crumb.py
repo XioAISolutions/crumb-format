@@ -5960,6 +5960,8 @@ def build_parser() -> argparse.ArgumentParser:
     lint_cmd.add_argument('--output', help='Optional output file or directory for redacted content.')
     lint_cmd.add_argument('--check-refs', action='store_true',
                           help='Warn when refs= entries do not resolve via SPEC v1.3 §17 rules.')
+    lint_cmd.add_argument('--check-deadlines', action='store_true',
+                          help='Warn when [handoff] deadline= values are malformed (per docs/v1.4/handoff-deadlines.md) or in the past.')
     lint_cmd.set_defaults(func=cmd_lint)
 
     # --- Webhooks ---

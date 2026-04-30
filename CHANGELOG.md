@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### v1.4 deadlines — first implementation behind opt-in flag
+
+- New module `cli/deadlines.py`: strict ISO-8601 parsing for `[handoff] deadline=` annotations per the v1.4 draft (`docs/v1.4/handoff-deadlines.md`). Two accepted forms — date-only `YYYY-MM-DD` (receiver-local) and datetime `YYYY-MM-DDTHH:MM:SS` with required `Z` or `±HH:MM` suffix. Anything else raises `DeadlineParseError`. Public surface: `parse_deadline`, `is_overdue`, `check_deadline_lines`.
+- New flag `crumb lint --check-deadlines`. Walks `[handoff]` lines; emits `WARN malformed_deadline` for non-ISO-8601 values and `WARN overdue_deadline` for past-due deadlines. Off by default. `--strict` promotes to exit 1 (matching the existing strict-warning convention; exit 2 stays reserved for parse failures).
+- The wire format is unchanged (still v=1.3); this implements the doc-as-of-v0.8.x and lets adopters opt in via the lint flag before v1.4 lands normatively. Free-form `deadline=` values continue to validate.
+- 27 new tests in `tests/test_deadlines.py`. Each Codex-found defect from PR #23's review (10 across 6 rounds) maps to one test, plus happy-path, lint integration, and exit-code cases.
+- 499 tests passing (was 472).
+
 ## v0.8.0
 
 ### Guardrails bridge, MCP v1.3 surface, CI bench fix
