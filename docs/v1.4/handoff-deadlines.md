@@ -87,7 +87,7 @@ New flag in `cli/linting.py`. Walks every `[handoff]` line. For each `deadline=`
 - **Past:** `WARN handoff line N: deadline=<value> is overdue by <duration>`
 - **Future:** silent (or under `--verbose`, an info line)
 
-`--strict` promotes WARN to ERROR (exit 2, matching the existing lint exit code convention).
+`--strict` promotes WARN to ERROR (exit **1**, matching `cli/linting.py`'s existing convention: exit 2 is reserved for parse failures, exit 1 covers security failures and strict-warning failures including overdue deadlines).
 
 ## Migration
 
@@ -100,10 +100,11 @@ For receivers, the path is: ignore `deadline=` (v1.3 behavior), then opt in to l
 When v1.4 lands normatively:
 
 1. `validators/validate.py` — new `_validate_handoff_deadlines()` walking `[handoff]` lines. For each `deadline=`:
-   - Try `datetime.fromisoformat(value)` (handles both date-only and datetime forms in 3.11+; for 3.10 supply a small backport that splits on `T` and dispatches to `date.fromisoformat` or the datetime path).
-   - If the value parses as a `datetime` (not a bare `date`), require `parsed.tzinfo is not None`. `fromisoformat` accepts tz-less datetimes; the grammar above rejects them, so we add the explicit check ourselves.
-   - On any parse failure or missing-tz, emit a `WARN` and continue. **Never raise.** Malformed `deadline=` values do not invalidate the document — that's the warn-not-reject contract from §"Why warn-not-reject" above. `--strict` promotes WARN to ERROR via the existing lint exit-code path; the validator itself stays warn-only so a v1.3 free-form deadline keeps validating.
-2. `validators/validate.js` — mirror. `Date.parse()` is too loose (accepts tz-less local time per ECMAScript), so reproduce the same explicit checks: regex-test the form, then verify a `Z` or `±HH:MM` suffix on datetimes. Same warn-not-reject behavior.
+   - **Dispatch on form before any timezone check.** Look at the value: if it contains a literal `T`, treat it as the datetime form; otherwise treat it as the date-only form. Doing this first matters because in Python 3.11+, `datetime.fromisoformat("2026-04-30")` succeeds and returns a tz-naive `datetime`, so a blanket `tzinfo is not None` check would reject valid date-only deadlines.
+   - **Date-only branch (`YYYY-MM-DD`, no `T`):** parse with `date.fromisoformat(value)`. No timezone enforcement; date-only deadlines are receiver-local by spec.
+   - **Datetime branch (contains `T`):** parse with `datetime.fromisoformat(value)`, then require `parsed.tzinfo is not None`. `fromisoformat` accepts tz-less datetimes; the grammar above rejects them, so we add the explicit check ourselves.
+   - On any parse failure or (datetime-form) missing-tz, emit a `WARN` and continue. **Never raise.** Malformed `deadline=` values do not invalidate the document — that's the warn-not-reject contract from §"Why warn-not-reject" above. `--strict` promotes WARN to ERROR (exit 1) via the existing lint exit-code path; the validator itself stays warn-only so a v1.3 free-form deadline keeps validating.
+2. `validators/validate.js` — mirror. Same form-first dispatch: split on `T`. For date-only, regex-test `^\d{4}-\d{2}-\d{2}$` and feed to `Date.parse(value + "T00:00:00Z")` to get a real Date object without timezone ambiguity. For datetime, regex-test that the string ends in `Z` or matches `±HH:MM` (since `Date.parse()` is too loose under ECMAScript and accepts tz-less local time silently). Same warn-not-reject behavior.
 3. `cli/linting.py` — `--check-deadlines` flag wires into the existing lint pass. Past deadlines trigger a separate WARN line; malformed values reuse the validator's WARN.
 
 Estimated change: ~100 LOC across the three files (slightly higher than the original estimate because of the explicit timezone-required check and the `--strict`-vs-validator separation). Tests: `tests/test_v14_deadlines.py` ~80 LOC, 7 cases (valid date, valid datetime with Z, valid datetime with offset, malformed month, missing timezone on datetime, past deadline → lint warning, free-form non-ISO-8601 `deadline=` → still validates with a WARN).
