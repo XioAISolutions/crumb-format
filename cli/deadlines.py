@@ -138,9 +138,19 @@ def is_overdue(parsed: ParsedDeadline, now: Optional[datetime] = None) -> bool:
     For date-only deadlines, "in the past" means the date is strictly
     before today (receiver-local). For datetime deadlines, the comparison
     is at instant precision in UTC.
+
+    A caller-supplied ``now`` may be naive (e.g. ``datetime.utcnow()`` or
+    a deterministic test clock). Naive values are normalized to UTC
+    rather than triggering a ``TypeError`` on comparison — preserves the
+    "never raises" contract that ``check_deadline_lines`` depends on.
     """
     if now is None:
         now = datetime.now(tz=timezone.utc)
+    elif now.tzinfo is None:
+        # Treat naive datetimes as UTC. This matches the convention most
+        # server-side Python uses (datetime.utcnow returns naive but is
+        # universally read as UTC) and avoids a comparison-time TypeError.
+        now = now.replace(tzinfo=timezone.utc)
 
     if parsed.kind == "date":
         # Receiver-local: compare against today in the receiver's local zone,

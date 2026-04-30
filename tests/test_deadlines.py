@@ -131,6 +131,16 @@ class TestIsOverdue:
         parsed = parse_deadline("2020-01-01T00:00:00+02:00")
         assert is_overdue(parsed, now=datetime(2020, 1, 2, tzinfo=timezone.utc)) is True
 
+    def test_naive_now_treated_as_utc(self):
+        # Codex finding: a caller-supplied naive `now` (e.g. datetime.utcnow())
+        # used to raise TypeError at comparison time, breaking the lint
+        # never-raises contract. Now we normalize to UTC.
+        parsed = parse_deadline("2020-01-01T00:00:00Z")
+        # Naive `now` past the deadline → overdue, no exception.
+        assert is_overdue(parsed, now=datetime(2020, 1, 2)) is True
+        # Naive `now` before the deadline → not overdue, no exception.
+        assert is_overdue(parsed, now=datetime(2019, 12, 31)) is False
+
 
 # ── check_deadline_lines (lint surface) ────────────────────────────────
 
