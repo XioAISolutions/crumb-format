@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crumb-format"
-version = "0.8.0"
+version = "0.9.0"
 description = "The copy-paste AI handoff format — v1.3 wire format with kind=agent personas, [handoff] dependencies, [workflow] state machines, [guardrails]/[capabilities]/[script]/[checks] sections, structured [constraints], and normative ref resolution. Plus v1.2 efficiency layers (squeeze, sha256 refs, delta crumbs, priority folds), MeTalk compression, pack/lint/mempalace bridges, REST/A2A bridges, and AgentAuth identity/governance/audit."
 readme = "README.md"
 license = "MIT"

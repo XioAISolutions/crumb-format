@@ -192,6 +192,19 @@ def lint_text(path: str, text: str, args: argparse.Namespace) -> tuple[list[Lint
                         )
                     )
 
+    if getattr(args, "check_deadlines", False):
+        from cli import deadlines
+        handoff_lines = parsed.get("sections", {}).get("handoff", [])
+        for finding in deadlines.check_deadline_lines(handoff_lines):
+            findings.append(
+                LintFinding(
+                    "WARN",
+                    finding.code,
+                    f"[handoff] line {finding.line_no}: {finding.message}",
+                    path,
+                )
+            )
+
     return findings, redacted
 
 

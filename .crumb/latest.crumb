@@ -1,7 +1,7 @@
---- task: docs(v1.4): handoff deadlines normative draft
+--- task: feat(v1.4): cli/deadlines.py + lint --check-deadlines + 27 tests
 source: github.pr
-pr: #23
-generated: 2026-04-30T16:49:06Z
+pr: #24
+generated: 2026-04-30T18:45:19Z
 ---
 
 [goal]
@@ -9,9 +9,11 @@ generated: 2026-04-30T16:49:06Z
 
 [context]
 Changed files in this PR:
-- docs/v1.4-scoping.md
-- docs/v1.4/handoff-deadlines.md
-- examples/v14-handoff-deadlines.crumb
+- CHANGELOG.md
+- cli/crumb.py
+- cli/deadlines.py
+- cli/linting.py
+- tests/test_deadlines.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions

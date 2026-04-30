@@ -43,7 +43,7 @@ REQUIRED_SECTIONS = {
     "delta": ["changes"],
     "agent": ["identity"],
 }
-CLI_VERSION = "0.8.0"
+CLI_VERSION = "0.9.0"
 SUPPORTED_VERSIONS = {"1.1", "1.2", "1.3"}
 FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
 CONTENT_REF_RE = re.compile(r"^sha256:[0-9a-f]{16,64}$")
@@ -5960,6 +5960,8 @@ def build_parser() -> argparse.ArgumentParser:
     lint_cmd.add_argument('--output', help='Optional output file or directory for redacted content.')
     lint_cmd.add_argument('--check-refs', action='store_true',
                           help='Warn when refs= entries do not resolve via SPEC v1.3 §17 rules.')
+    lint_cmd.add_argument('--check-deadlines', action='store_true',
+                          help='Warn when [handoff] deadline= values are malformed (per docs/v1.4/handoff-deadlines.md) or in the past.')
     lint_cmd.set_defaults(func=cmd_lint)
 
     # --- Webhooks ---

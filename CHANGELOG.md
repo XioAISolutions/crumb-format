@@ -1,5 +1,40 @@
 # Changelog
 
+## v0.9.0
+
+### v1.4 deadlines — first implementation behind opt-in flag
+
+No wire-format change. Format stays at v=1.3. This release implements
+the v0.8.x deadlines design doc (`docs/v1.4/handoff-deadlines.md`) and
+lets adopters opt in via a new lint flag before v1.4 lands normatively.
+
+**`cli/deadlines.py`** — strict ISO-8601 parser for `[handoff] deadline=`
+annotations. Two accepted forms:
+- Date-only `YYYY-MM-DD` (receiver-local).
+- Datetime `YYYY-MM-DDTHH:MM:SS` with required `Z` or `±HH:MM` suffix.
+
+Anything else raises `DeadlineParseError`. Public surface:
+`parse_deadline`, `is_overdue`, `check_deadline_lines`.
+
+**`crumb lint --check-deadlines`** — new opt-in flag. Walks `[handoff]`
+lines; emits `WARN malformed_deadline` for non-ISO-8601 values and
+`WARN overdue_deadline` for past-due deadlines. Off by default.
+`--strict` promotes to exit 1 (matching the existing strict-warning
+convention; exit 2 stays reserved for parse failures, per the v0.7.0
+unification).
+
+**Backward compat.** Free-form `deadline=` values continue to validate.
+Receivers that don't pass `--check-deadlines` see no behavior change.
+
+**Tests.** 28 new cases in `tests/test_deadlines.py`. Each Codex-found
+defect from PR #23's review (10 across 6 rounds) plus PR #24's review
+(naive-`now` comparison crash) maps to a dedicated test. 500 tests
+passing (was 472).
+
+**Out of scope.** JS validator mirror, SPEC.md amendment, wire-format
+bump. v1.4 is still scoping; ship a Python-side reference impl now
+and mirror to JS in a follow-up.
+
 ## v0.8.0
 
 ### Guardrails bridge, MCP v1.3 surface, CI bench fix
