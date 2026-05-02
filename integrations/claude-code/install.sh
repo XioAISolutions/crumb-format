@@ -65,15 +65,34 @@ mkdir -p "$COMMANDS_DIR"
 
 # ── 1. Slash commands ──────────────────────────────────────────────
 echo "==> Installing slash commands to ${COMMANDS_DIR}/"
+CRUMB_MANAGED_MARKER="<!-- managed by crumb-format/integrations/claude-code/install.sh - safe to overwrite -->"
+
 for cmd in crumb-export crumb-import; do
     src="${ASSETS}/commands/${cmd}.md"
     dst="${COMMANDS_DIR}/${cmd}.md"
-    if [[ -f "$dst" ]] && cmp -s "$src" "$dst"; then
+    # Compare against the EXACT bytes we'd write (marker + src body).
+    # Comparing against $src alone would always trigger "differs"
+    # because dst has the marker prepended.
+    if [[ -f "$dst" ]] && cmp -s <(printf '%s\n' "$CRUMB_MANAGED_MARKER"; cat "$src") "$dst"; then
         echo "  =  ${cmd} already up to date"
-    else
-        cp "$src" "$dst"
-        echo "  +  ${cmd}"
+        continue
     fi
+    if [[ -f "$dst" ]] && ! grep -qF "$CRUMB_MANAGED_MARKER" "$dst" 2>/dev/null; then
+        # File exists, differs from ours, and doesn't carry the
+        # "managed by us" marker — assume the user customized it.
+        # Back it up before overwriting. (Codex P2: previous version
+        # silently clobbered user edits.)
+        backup="${dst}.bak.$(date +%Y%m%d-%H%M%S)"
+        cp "$dst" "$backup"
+        echo "  !  ${cmd} appears user-modified; backed up to $(basename "$backup")"
+    fi
+    # Prepend the marker comment to the installed file so subsequent
+    # runs recognize it as ours and overwrite cleanly.
+    {
+        echo "$CRUMB_MANAGED_MARKER"
+        cat "$src"
+    } > "$dst"
+    echo "  +  ${cmd}"
 done
 
 # ── 2. MCP server registration ────────────────────────────────────
@@ -82,18 +101,53 @@ done
 # let the user paste it.
 echo "==> Registering MCP server in ${MCP_FILE}"
 MCP_TEMPLATE="${ASSETS}/mcp.json.template"
-# crumb_cli.py sits at the repo/package root (next to mcp/, cli/, validators/),
-# so dirname(crumb_cli.__file__) IS the install root. Walking up twice — as
-# the previous version did — pointed one directory above and produced a
-# non-existent path in .mcp.json. (Codex P1 found this.)
-CRUMB_INSTALL_PATH="$(python3 -c 'import crumb_cli, os; print(os.path.dirname(crumb_cli.__file__))' 2>/dev/null || echo "")"
 
+# Resolution strategy for the install path of mcp/server.py, in order:
+#
+#   1. Ask `crumb` itself which interpreter it uses, then import via
+#      that interpreter. Handles pipx and venv installs where system
+#      python3 doesn't have crumb_cli on its sys.path. (Codex P1.)
+#   2. Fall back to `pip show crumb-format` parsing. Works whenever pip
+#      can see the package, even without crumb_cli being importable
+#      from system python3.
+#   3. Fall back to system `python3 -c 'import crumb_cli'`. Works in
+#      typical pip-installed environments.
+#   4. Fall back to walking up from $SCRIPT_DIR. Only valid when
+#      running from a real local checkout (not curl-pipe).
+#   5. Existence-check on mcp/server.py catches every miss; loud error
+#      if all four strategies produced a wrong path.
+
+CRUMB_INSTALL_PATH=""
+
+# Strategy 1: invoke crumb's own interpreter.
+if command -v crumb >/dev/null 2>&1; then
+    CRUMB_BIN="$(command -v crumb)"
+    # Read the shebang from the entry-point script. Shebang is line 1.
+    CRUMB_PY="$(head -1 "$CRUMB_BIN" 2>/dev/null | sed -n 's|^#!\(.*\)|\1|p')"
+    if [[ -n "$CRUMB_PY" && -x "$CRUMB_PY" ]]; then
+        CRUMB_INSTALL_PATH="$("$CRUMB_PY" -c 'import crumb_cli, os; print(os.path.dirname(crumb_cli.__file__))' 2>/dev/null || echo "")"
+    fi
+fi
+
+# Strategy 2: pip show crumb-format.
+if [[ -z "$CRUMB_INSTALL_PATH" ]] && command -v pip >/dev/null 2>&1; then
+    PIP_LOC="$(pip show crumb-format 2>/dev/null | sed -n 's|^Location: ||p' | head -1)"
+    if [[ -n "$PIP_LOC" && -d "${PIP_LOC}" ]]; then
+        CRUMB_INSTALL_PATH="$PIP_LOC"
+    fi
+fi
+
+# Strategy 3: system python3.
 if [[ -z "$CRUMB_INSTALL_PATH" ]]; then
-    # Fallback when crumb_cli isn't importable (e.g. running from a
-    # source checkout without `pip install -e .`). $SCRIPT_DIR is
-    # <repo>/integrations/claude-code, so we need TWO dirnames to
-    # reach <repo>. One dirname lands at <repo>/integrations.
-    CRUMB_INSTALL_PATH="$(dirname "$(dirname "$SCRIPT_DIR")")"
+    CRUMB_INSTALL_PATH="$(python3 -c 'import crumb_cli, os; print(os.path.dirname(crumb_cli.__file__))' 2>/dev/null || echo "")"
+fi
+
+# Strategy 4: walk up from a real script dir (only valid when not curl-piped).
+if [[ -z "$CRUMB_INSTALL_PATH" && -n "$SCRIPT_DIR" && -d "$SCRIPT_DIR" ]]; then
+    candidate="$(dirname "$(dirname "$SCRIPT_DIR")")"
+    if [[ -f "${candidate}/mcp/server.py" ]]; then
+        CRUMB_INSTALL_PATH="$candidate"
+    fi
 fi
 
 # Sanity check: the path must actually contain mcp/server.py. Without
