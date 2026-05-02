@@ -68,53 +68,36 @@ class TestTemplatesEmitV13:
         assert parsed["headers"]["v"] == "1.3"
 
 
-class TestDeprecatedAliases:
-    def test_todo_add_alias_prints_hint(self, tmp_path):
-        target = tmp_path / "t.crumb"
-        out, err, rc = _run_cli(
-            "todo-add", str(target), "first", "--title", "x", "--source", "t",
-        )
-        assert rc == 0
-        assert "[deprecated]" in err
-        assert "crumb todo add" in err
-        assert target.exists()
+class TestRemovedAliases:
+    """v0.11: the v0.7 deprecation aliases are gone for real now.
 
-    def test_todo_add_new_form_silent(self, tmp_path):
-        target = tmp_path / "t2.crumb"
+    Each removed name should now be rejected by argparse as an unknown
+    subcommand (exit 2). The replacement command (e.g. `crumb todo add`)
+    should continue to work.
+    """
+
+    @pytest.mark.parametrize("removed", [
+        "todo-add", "todo-done", "todo-list", "todo-dream",
+        "compact", "compress", "squeeze",
+        "share", "dashboard",
+    ])
+    def test_removed_alias_rejected(self, removed):
+        out, err, rc = _run_cli(removed, "--help")
+        # argparse exits 2 on invalid subcommand
+        assert rc == 2, f"{removed!r} should be unknown but exited {rc}"
+        assert "invalid choice" in err.lower() or removed in err
+
+    def test_canonical_replacements_still_work(self, tmp_path):
+        # The canonical names that replaced the deprecated aliases.
+        target = tmp_path / "t.crumb"
         out, err, rc = _run_cli(
             "todo", "add", str(target), "first", "--title", "x", "--source", "t",
         )
         assert rc == 0
-        assert "[deprecated]" not in err
-
-    def test_compress_alias_prints_hint(self, tmp_path):
-        src = tmp_path / "in.crumb"
-        src.write_text(
-            "BEGIN CRUMB\nv=1.3\nkind=mem\nsource=t\n---\n"
-            "[consolidated]\n- a\nEND CRUMB\n",
-            encoding="utf-8",
-        )
-        out, err, rc = _run_cli("compress", str(src), "-o", "-")
-        assert "[deprecated]" in err
-        assert "crumb optimize --mode signal" in err
-
-    def test_share_alias_prints_hint(self, tmp_path):
-        src = tmp_path / "x.crumb"
-        src.write_text(
-            "BEGIN CRUMB\nv=1.3\nkind=mem\nsource=t\n---\n"
-            "[consolidated]\n- a\nEND CRUMB\n",
-            encoding="utf-8",
-        )
-        # share command requires `gh` or generates a data URI; we just need
-        # to confirm the deprecation hint fires before any external dep.
-        out, err, rc = _run_cli("share", str(src))
-        assert "[deprecated]" in err
-        assert "crumb handoff" in err
-
-    def test_dashboard_alias_prints_hint(self, tmp_path):
-        out, err, rc = _run_cli("dashboard", "-o", str(tmp_path / "d.html"))
-        assert "[deprecated]" in err
-        assert "audit export --format html" in err
+        assert target.exists()
+        # Plain `crumb optimize --mode minimal/signal/budget` is the
+        # surviving path for the old compact/compress/squeeze trio
+        # (smoked elsewhere in TestOptimizeModes).
 
 
 class TestOptimizeModes:
@@ -209,9 +192,154 @@ class TestAgentAuthFirstUseNotice:
         assert "AgentAuth storage initialized" not in captured.err
 
 
-class TestGroupedHelp:
-    def test_help_contains_grouped_index(self):
+class TestMempalaceBridgeShim:
+    """v0.11: cli/mempalace_bridge.py was renamed to cli/memory_bridge.py.
+    The old import path stays as a wildcard re-export shim for one
+    release. Codex caught a P1 in the first draft of this shim where
+    it explicitly imported names that don't exist on the new module
+    (cmd_mempalace, adapters) and crashed on import.
+    """
+
+    def test_shim_imports_without_error(self):
+        # The literal regression: `import cli.mempalace_bridge` must not
+        # raise. (Codex finding P1 — broke outright in the first draft.)
+        import importlib
+        import cli.mempalace_bridge
+        importlib.reload(cli.mempalace_bridge)
+
+    def test_shim_reexports_public_surface(self):
+        import cli.mempalace_bridge as old
+        import cli.memory_bridge as new
+        # Each public name reachable through the new module must be
+        # reachable through the shim, AND they must be the same object
+        # (the shim isn't holding stale copies).
+        for name in ("MempalaceAdapter", "BridgeAdapter", "ADAPTERS",
+                     "get_adapter", "run_bridge_export", "run_bridge_import"):
+            assert hasattr(new, name), f"{name} missing from new module"
+            assert hasattr(old, name), f"{name} not re-exported by shim"
+            assert getattr(old, name) is getattr(new, name), (
+                f"{name} on shim is a different object than on the new module"
+            )
+
+
+class TestFromHaloHidden:
+    """v0.11: `from-halo` is a hidden alias of `from-otel`. Codex P2:
+    `help=argparse.SUPPRESS` doesn't drop the entry from the
+    subparsers listing — it just renders the literal "==SUPPRESS=="
+    text. The fix removes the entry from `sub._choices_actions`.
+    """
+
+    def test_from_halo_not_in_default_help(self):
         out, err, rc = _run_cli("--help")
+        assert rc == 0
+        assert "from-halo" not in out
+        assert "SUPPRESS" not in out
+
+    def test_from_halo_not_in_help_all(self):
+        out, err, rc = _run_cli("--help-all")
+        assert rc == 0
+        assert "from-halo" not in out
+        assert "SUPPRESS" not in out
+
+    def test_from_halo_still_parses(self, tmp_path):
+        # The alias is hidden but functional — scripts that pinned
+        # `crumb from-halo` continue to work.
+        from pathlib import Path
+        fixture = (Path(__file__).resolve().parent / "fixtures" / "halo-traces.jsonl")
+        out, err, rc = _run_cli("from-halo", str(fixture))
+        assert rc == 0
+        assert "BEGIN CRUMB" in out
+        assert "kind=log" in out
+
+
+class TestHelpAllScopedToTopLevel:
+    """v0.11 P2: `--help-all` interception must only fire as a top-level
+    flag, not as a positional inside subcommand args. Codex caught the
+    first version doing `if "--help-all" in argv` unconditionally, which
+    hijacked any invocation with the literal token anywhere.
+    """
+
+    def test_help_all_as_literal_task_text(self, tmp_path):
+        # `crumb todo add` with --help-all as part of a task name should
+        # add the task verbatim, not print help.
+        target = tmp_path / "t.crumb"
+        out, err, rc = _run_cli(
+            "todo", "add", str(target), "do --help-all stuff",
+            "--title", "x", "--source", "t",
+        )
+        assert rc == 0
+        assert target.exists()
+        body = target.read_text(encoding="utf-8")
+        assert "do --help-all stuff" in body
+
+    def test_help_all_as_literal_in_goal(self, tmp_path):
+        # `crumb new task --goal "explain --help-all"` should NOT trigger
+        # the top-level help-all path.
+        out_path = tmp_path / "g.crumb"
+        out, err, rc = _run_cli(
+            "new", "task", "--title", "x", "--source", "s",
+            "--goal", "explain --help-all",
+            "--context", "c", "--constraints", "x",
+            "-o", str(out_path),
+        )
+        assert rc == 0
+        assert out_path.exists()
+        assert "explain --help-all" in out_path.read_text(encoding="utf-8")
+
+    def test_help_all_after_double_dash(self, tmp_path):
+        # `crumb todo add file -- --help-all task1` should treat
+        # --help-all as a positional task name, not trigger help.
+        target = tmp_path / "t.crumb"
+        out, err, rc = _run_cli(
+            "todo", "add", str(target), "--title", "x", "--source", "t",
+            "--", "--help-all",
+        )
+        assert rc == 0
+        assert target.exists()
+
+
+class TestGroupedHelp:
+    def test_help_shows_core_commands(self):
+        # v0.11: default --help shows only the core 5 commands plus a
+        # pointer to --help-all. The full grouped index moved behind
+        # --help-all.
+        out, err, rc = _run_cli("--help")
+        assert rc == 0
+        assert "Core commands" in out
+        for cmd in ("new", "validate", "handoff", "receive", "lint"):
+            assert cmd in out
+        assert "--help-all" in out
+
+    def test_help_does_not_dump_all_subcommands(self):
+        # Codex P2: argparse's auto-rendered subcommand table under
+        # "positional arguments:" was leaking the full ~40-command
+        # list into --help, defeating the two-tier flow. We clear
+        # sub._choices_actions to suppress that table.
+        out, err, rc = _run_cli("--help")
+        assert rc == 0
+        # The subcommand table renders each command on its own indented
+        # line. Look for that signature on non-core names that don't
+        # also appear in our description prose.
+        import re
+        for non_core in ("palace", "guardrails", "passport",
+                         "metalk", "from-chat", "from-otel",
+                         "audit", "policy", "comply", "webhook",
+                         "delta", "apply", "seen", "hash", "resolve"):
+            # Pattern: 2+ spaces, name, then spaces or newline (the
+            # argparse table format). Doesn't match prose like "format
+            # bridges" or "audit trail".
+            pattern = r"^ {2,}" + re.escape(non_core) + r"(?:\s|$)"
+            assert not re.search(pattern, out, re.MULTILINE), (
+                f"non-core command {non_core!r} leaked into --help table"
+            )
+        # And the output should be short — sanity-check ~40 lines or
+        # less so we don't silently regrow.
+        assert out.count("\n") < 40, (
+            f"--help is {out.count(chr(10))} lines; should be ~30 or less"
+        )
+
+    def test_help_all_contains_grouped_index(self):
+        out, err, rc = _run_cli("--help-all")
         assert rc == 0
         # one group label per concern from build_parser()
         for label in ("Create:", "Inspect:", "Edit:", "Optimize:",

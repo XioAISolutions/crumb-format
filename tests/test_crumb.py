@@ -193,7 +193,7 @@ class TestCliVersion:
         with pytest.raises(SystemExit) as exc:
             crumb.main(["--version"])
         assert exc.value.code == 0
-        assert capsys.readouterr().out.strip() == "crumb 0.10.0"
+        assert capsys.readouterr().out.strip() == "crumb 0.11.0"
 
 
 class TestCmdNew:
@@ -483,7 +483,7 @@ class TestCmdCompact:
         f = tmp_path / "mem.crumb"
         f.write_text(VALID_MEM)
         out = tmp_path / "compact.crumb"
-        crumb.main(["compact", str(f), "-o", str(out)])
+        crumb.main(["optimize", "--mode", "minimal", str(f), "-o", str(out)])
         result = crumb.parse_crumb(out.read_text())
         # Should keep v, kind, source, title but not extras
         assert "v" in result["headers"]
@@ -497,7 +497,7 @@ class TestCmdCompact:
         f = tmp_path / "mem.crumb"
         f.write_text(text)
         out = tmp_path / "compact.crumb"
-        crumb.main(["compact", str(f), "-o", str(out)])
+        crumb.main(["optimize", "--mode", "minimal", str(f), "-o", str(out)])
         result = crumb.parse_crumb(out.read_text())
         assert "consolidated" in result["sections"]
         assert "notes" not in result["sections"]
@@ -508,7 +508,7 @@ class TestCmdCompact:
         dogfood = (Path(__file__).resolve().parent.parent / "crumbs" / "mem.crumb").read_text()
         f.write_text(dogfood)
         out = tmp_path / "compact.crumb"
-        crumb.main(["compact", str(f), "-o", str(out)])
+        crumb.main(["optimize", "--mode", "minimal", str(f), "-o", str(out)])
         output = capsys.readouterr().out
         assert "reduction" in output
         original_tokens = crumb.estimate_tokens(dogfood)
@@ -518,7 +518,7 @@ class TestCmdCompact:
     def test_compact_stdout(self, tmp_path, capsys):
         f = tmp_path / "mem.crumb"
         f.write_text(VALID_MEM)
-        crumb.main(["compact", str(f)])
+        crumb.main(["optimize", "--mode", "minimal", str(f)])
         output = capsys.readouterr().out
         assert "BEGIN CRUMB" in output
 
@@ -526,7 +526,7 @@ class TestCmdCompact:
         f = tmp_path / "map.crumb"
         f.write_text(VALID_MAP)
         out = tmp_path / "compact.crumb"
-        crumb.main(["compact", str(f), "-o", str(out)])
+        crumb.main(["optimize", "--mode", "minimal", str(f), "-o", str(out)])
         result = crumb.parse_crumb(out.read_text())
         assert result["headers"].get("project") == "myapp"
 
@@ -726,7 +726,7 @@ class TestCmdLog:
 class TestCmdTodo:
     def test_todo_add_creates_file(self, tmp_path, capsys):
         f = tmp_path / "tasks.crumb"
-        crumb.main(["todo-add", str(f), "Build feature", "Write tests"])
+        crumb.main(["todo", "add", str(f), "Build feature", "Write tests"])
         result = crumb.parse_crumb(f.read_text())
         tasks = [l.strip() for l in result["sections"]["tasks"] if l.strip()]
         assert sum(1 for t in tasks if t.startswith("- [ ]")) == 2
@@ -734,7 +734,7 @@ class TestCmdTodo:
     def test_todo_done(self, tmp_path, capsys):
         f = tmp_path / "tasks.crumb"
         f.write_text(VALID_TODO)
-        crumb.main(["todo-done", str(f), "auth"])
+        crumb.main(["todo", "done", str(f), "auth"])
         result = crumb.parse_crumb(f.read_text())
         tasks = [l.strip() for l in result["sections"]["tasks"] if l.strip()]
         # "Fix auth bug" should now be [x]
@@ -744,14 +744,14 @@ class TestCmdTodo:
     def test_todo_done_no_match(self, tmp_path, capsys):
         f = tmp_path / "tasks.crumb"
         f.write_text(VALID_TODO)
-        crumb.main(["todo-done", str(f), "nonexistent_xyz"])
+        crumb.main(["todo", "done", str(f), "nonexistent_xyz"])
         output = capsys.readouterr().out
         assert "No open tasks" in output
 
     def test_todo_list(self, tmp_path, capsys):
         f = tmp_path / "tasks.crumb"
         f.write_text(VALID_TODO)
-        crumb.main(["todo-list", str(f)])
+        crumb.main(["todo", "list", str(f)])
         output = capsys.readouterr().out
         assert "2 open" in output
         assert "1 done" in output
@@ -759,14 +759,14 @@ class TestCmdTodo:
     def test_todo_list_all(self, tmp_path, capsys):
         f = tmp_path / "tasks.crumb"
         f.write_text(VALID_TODO)
-        crumb.main(["todo-list", str(f), "--all"])
+        crumb.main(["todo", "list", str(f), "--all"])
         output = capsys.readouterr().out
         assert "[x] Write spec" in output
 
     def test_todo_dream_archives(self, tmp_path, capsys):
         f = tmp_path / "tasks.crumb"
         f.write_text(VALID_TODO)
-        crumb.main(["todo-dream", str(f)])
+        crumb.main(["todo", "dream", str(f)])
         result = crumb.parse_crumb(f.read_text())
         # [x] Write spec should be in [archived]
         assert "archived" in result["sections"]
@@ -780,7 +780,7 @@ class TestCmdTodo:
         todo = VALID_TODO.replace("- [x] Write spec\n", "")
         f = tmp_path / "tasks.crumb"
         f.write_text(todo)
-        crumb.main(["todo-dream", str(f)])
+        crumb.main(["todo", "dream", str(f)])
         output = capsys.readouterr().out
         assert "No completed tasks" in output
 

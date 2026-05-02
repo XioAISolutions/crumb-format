@@ -1,20 +1,33 @@
 # CRUMB
 
-The copy-paste AI handoff format.
+**The copy-paste AI handoff format. No install required.**
 
 ![CRUMB CLI overview](docs/assets/crumb-banner.svg)
 
 ---
 
-Ever been deep into a task with one AI, then need to switch to another? You either paste an enormous chat log and hope it picks up the thread, or you start over and re-explain everything from scratch.
+Switching AI tools mid-task? Paste a CRUMB. The next AI gets the goal, the context, and the constraints — without the chat-log noise. CRUMB is just structured text; you don't need any tool to use it.
 
-CRUMB is a third option. It's a small, structured text block you copy-paste between AI tools. The next AI gets exactly what it needs to continue your work -- the goal, the context, and the constraints -- without the noise.
+## Step 1 — Add "crumb it" to your AI (30 seconds, no install)
 
-> **v0.6.0** — First release on the v1.3 wire format. New `kind=agent` for reusable agent personas; `[handoff]` lines now carry optional `id=`/`after=` dependencies with cycle detection; new sections `[workflow]`, `[checks]`, `[guardrails]`, `[capabilities]`, `[script]`. `[invariants]` extends from `kind=map` to `kind=task`. Structured `deny=`/`require=`/`prefer=` lines inside `[constraints]`. Normative ref resolution (bare id → local dir, `sha256:` → content store, URL opt-in) and normative size-greedy fold selection with optional `fold_priority=` writer override. All additive — a v1.2 parser accepts a v1.3 file by ignoring unknown headers and sections. v0.5.0's efficiency layers (squeeze, sha256 refs, delta crumbs, priority folds) and the full 0.3.0 surface (Palace, Reflect, MeTalk, pack/lint, MemPalace bridge, REST/A2A, AgentAuth, MCP servers, ~45 CLI commands grouped by concern) ship unchanged. `pip install crumb-format`.
+Paste this into ChatGPT custom instructions, Claude Projects, Cursor rules, or any AI's system prompt:
 
-## Try it right now
+```text
+When I say "crumb it", generate a CRUMB summarizing the current state.
 
-Copy this and paste it into any AI:
+For tasks: kind=task with [goal], [context], [constraints]
+For memory: kind=mem with [consolidated]
+For repos: kind=map with [project], [modules]
+For agent personas: kind=agent with [identity], [rules], [knowledge]
+
+Format: BEGIN CRUMB / v=1.3 / headers / --- / sections / END CRUMB
+```
+
+That's the entire setup. Now any time you say `crumb it`, your AI emits a paste-able handoff block you can drop into any other AI.
+
+## Step 2 — Try it (no install, no signup)
+
+Paste this into any AI to see one in action:
 
 ```text
 BEGIN CRUMB
@@ -22,7 +35,6 @@ v=1.3
 kind=task
 title=Fix login redirect bug
 source=cursor.agent
-project=web-app
 ---
 [goal]
 Fix the bug where authenticated users are redirected back to /login after refresh.
@@ -39,11 +51,11 @@ Fix the bug where authenticated users are redirected back to /login after refres
 END CRUMB
 ```
 
-That's it. The next AI knows what to fix, what it can't change, and why. The `v=1.1`, `v=1.2`, and `v=1.3` formats are all accepted by every CRUMB validator — pick whichever your tool emits.
+The next AI knows what to fix, what it can't change, and why. `v=1.1`, `v=1.2`, and `v=1.3` are all accepted — pick whichever your tool emits.
 
 ## Two real-world scenarios
 
-**Found the bug in Cursor, need Claude to write the test.** Generate a task crumb from Cursor with `crumb it`, paste it into Claude. Claude sees the goal, the surrounding code context, and the constraints -- and writes the test without asking you to re-explain anything.
+**Found the bug in Cursor, need Claude to write the test.** Generate a task crumb from Cursor with `crumb it`, paste it into Claude. Claude sees the goal, code context, and constraints — and writes the test without asking you to re-explain anything.
 
 **Re-explaining your preferences every session?** A mem crumb stores your working style once:
 
@@ -64,24 +76,29 @@ END CRUMB
 
 Paste it at the start of any session. No more "I like concise answers, don't use emojis, prefer TypeScript..." every time.
 
-Five kinds: `task` (what to do next), `mem` (long-term memory), `map` (repo overview), `log` (session transcript), `todo` (work items). v1.3 adds a sixth: `agent` (reusable persona).
+Six kinds: `task` (what to do next), `mem` (long-term memory), `map` (repo overview), `log` (session transcript), `todo` (work items), `agent` (reusable persona).
 
-## Add "crumb it" to your AI (no install needed)
+## Optional — install the CLI for power tooling
 
-Most users start here. Paste this into ChatGPT custom instructions, Claude Projects, Cursor rules, or any AI with a system prompt and it can generate CRUMBs on command:
+Everything above works with no install. The CLI is for power users who want to validate, search, lint, pack, or pipeline CRUMBs at scale.
 
-```text
-When I say "crumb it", generate a CRUMB summarizing the current state.
-
-For tasks: kind=task with [goal], [context], [constraints]
-For memory: kind=mem with [consolidated]
-For repos: kind=map with [project], [modules]
-For agent personas: kind=agent with [identity], [rules], [knowledge]
-
-Format: BEGIN CRUMB / v=1.3 / headers / --- / sections / END CRUMB
+```bash
+pip install crumb-format
+crumb --help        # 5 core commands
+crumb --help-all    # full surface (~40 commands grouped by concern)
 ```
 
-The format works without the CLI — copy-paste handoffs travel by themselves. The CLI (`pip install crumb-format`, see below) only adds tooling: validation, search, palace memory, packing, governance.
+The five core commands cover most workflows:
+
+```bash
+crumb new task --title "Fix auth" --goal "Fix token refresh"   # create
+crumb validate handoff.crumb                                   # check well-formed
+crumb handoff handoff.crumb                                    # copy to clipboard
+crumb receive                                                  # read from clipboard
+crumb lint handoff.crumb --check-deadlines                     # safety + freshness
+```
+
+Run `crumb --help-all` for the full surface (search, palace memory, governance, format bridges, v1.4 draft features).
 
 ## How it compares
 
@@ -197,7 +214,7 @@ END CRUMB
 
 See the [v1.3 examples](examples/) (`v13-agent.crumb`, `v13-handoff-deps.crumb`, `v13-checks.crumb`, `v13-guardrails.crumb`, `v13-workflow.crumb`, `v13-script.crumb`, `v13-fold-priority.crumb`) and the full [SPEC](SPEC.md) §§17–23.
 
-## New in v0.6.0 — CLI commands
+## v1.3 CLI examples
 
 ```bash
 # Create a reusable agent persona
@@ -217,13 +234,7 @@ crumb lint handoff.crumb --check-refs          # warn on unresolved refs
 crumb lint handoff.crumb --check-refs --strict # non-zero on any warning
 ```
 
-## Install
-
-```bash
-pip install crumb-format
-```
-
-### Configuration
+## CLI configuration
 
 Environment variables (all optional, sane defaults):
 
