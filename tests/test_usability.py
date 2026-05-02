@@ -222,6 +222,36 @@ class TestMempalaceBridgeShim:
             )
 
 
+class TestFromHaloHidden:
+    """v0.11: `from-halo` is a hidden alias of `from-otel`. Codex P2:
+    `help=argparse.SUPPRESS` doesn't drop the entry from the
+    subparsers listing — it just renders the literal "==SUPPRESS=="
+    text. The fix removes the entry from `sub._choices_actions`.
+    """
+
+    def test_from_halo_not_in_default_help(self):
+        out, err, rc = _run_cli("--help")
+        assert rc == 0
+        assert "from-halo" not in out
+        assert "SUPPRESS" not in out
+
+    def test_from_halo_not_in_help_all(self):
+        out, err, rc = _run_cli("--help-all")
+        assert rc == 0
+        assert "from-halo" not in out
+        assert "SUPPRESS" not in out
+
+    def test_from_halo_still_parses(self, tmp_path):
+        # The alias is hidden but functional — scripts that pinned
+        # `crumb from-halo` continue to work.
+        from pathlib import Path
+        fixture = (Path(__file__).resolve().parent / "fixtures" / "halo-traces.jsonl")
+        out, err, rc = _run_cli("from-halo", str(fixture))
+        assert rc == 0
+        assert "BEGIN CRUMB" in out
+        assert "kind=log" in out
+
+
 class TestHelpAllScopedToTopLevel:
     """v0.11 P2: `--help-all` interception must only fire as a top-level
     flag, not as a positional inside subcommand args. Codex caught the

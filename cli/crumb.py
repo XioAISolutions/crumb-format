@@ -5530,6 +5530,14 @@ def build_parser() -> argparse.ArgumentParser:
     from_halo.add_argument('--project', help='Optional project= header.')
     from_halo.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
     from_halo.set_defaults(func=cmd_from_halo)
+    # argparse's _SubParsersAction always lists every choice in its
+    # help output, even ones registered with `help=argparse.SUPPRESS` —
+    # they show up as the literal string "==SUPPRESS==". To hide
+    # `from-halo` cleanly, drop its entry from the choices-actions
+    # list while leaving it in `sub.choices` so it still parses.
+    sub._choices_actions = [
+        a for a in sub._choices_actions if getattr(a, "dest", "") != "from-halo"
+    ]
 
     # from-git
     from_git = sub.add_parser('from-git', help='Generate a task crumb from recent git activity.')
