@@ -352,6 +352,31 @@ class TestSpansToLogCrumb:
         assert parsed["headers"]["span_count"] == "5"
         assert parsed["headers"]["error_count"] == "2"
 
+    def test_error_count_emitted_when_zero(self):
+        # Codex finding: omitting error_count when it equals 0 means
+        # consumers can't distinguish "all-OK trace" from "field missing".
+        # Always emit it for stable header schema.
+        from cli.halo_bridge import Span as SpanCls
+        all_ok = [
+            SpanCls(name="ok-1", status_code="OK",
+                    start_unix_nano=1700000000000000000,
+                    end_unix_nano=1700000001000000000),
+            SpanCls(name="ok-2", status_code="OK",
+                    start_unix_nano=1700000001000000000,
+                    end_unix_nano=1700000002000000000),
+        ]
+        text = spans_to_log_crumb(all_ok)
+        parsed = crumb_cli.parse_crumb(text)
+        assert parsed["headers"]["error_count"] == "0"
+        assert parsed["headers"]["span_count"] == "2"
+
+    def test_error_count_emitted_when_empty(self):
+        # An empty trace also gets error_count=0 in the header schema.
+        text = spans_to_log_crumb([])
+        parsed = crumb_cli.parse_crumb(text)
+        assert parsed["headers"]["error_count"] == "0"
+        assert parsed["headers"]["span_count"] == "0"
+
     def test_entries_ordered_by_start_time(self):
         spans = list(read_otel_jsonl(FIXTURE))
         text = spans_to_log_crumb(spans)

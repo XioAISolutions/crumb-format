@@ -346,8 +346,10 @@ def spans_to_log_crumb(
     if summary.total_duration_ms:
         headers.append(f"total_duration_ms={summary.total_duration_ms}")
     headers.append(f"span_count={summary.span_count}")
-    if summary.error_count:
-        headers.append(f"error_count={summary.error_count}")
+    # Always emit error_count, even when zero. Consumers parsing the
+    # header schema need to distinguish "all-OK trace" from "field
+    # missing/unknown"; conditional emission breaks that contract.
+    headers.append(f"error_count={summary.error_count}")
 
     if spans:
         entries = [_format_span_bullet(s) for s in spans]
