@@ -222,6 +222,52 @@ class TestMempalaceBridgeShim:
             )
 
 
+class TestHelpAllScopedToTopLevel:
+    """v0.11 P2: `--help-all` interception must only fire as a top-level
+    flag, not as a positional inside subcommand args. Codex caught the
+    first version doing `if "--help-all" in argv` unconditionally, which
+    hijacked any invocation with the literal token anywhere.
+    """
+
+    def test_help_all_as_literal_task_text(self, tmp_path):
+        # `crumb todo add` with --help-all as part of a task name should
+        # add the task verbatim, not print help.
+        target = tmp_path / "t.crumb"
+        out, err, rc = _run_cli(
+            "todo", "add", str(target), "do --help-all stuff",
+            "--title", "x", "--source", "t",
+        )
+        assert rc == 0
+        assert target.exists()
+        body = target.read_text(encoding="utf-8")
+        assert "do --help-all stuff" in body
+
+    def test_help_all_as_literal_in_goal(self, tmp_path):
+        # `crumb new task --goal "explain --help-all"` should NOT trigger
+        # the top-level help-all path.
+        out_path = tmp_path / "g.crumb"
+        out, err, rc = _run_cli(
+            "new", "task", "--title", "x", "--source", "s",
+            "--goal", "explain --help-all",
+            "--context", "c", "--constraints", "x",
+            "-o", str(out_path),
+        )
+        assert rc == 0
+        assert out_path.exists()
+        assert "explain --help-all" in out_path.read_text(encoding="utf-8")
+
+    def test_help_all_after_double_dash(self, tmp_path):
+        # `crumb todo add file -- --help-all task1` should treat
+        # --help-all as a positional task name, not trigger help.
+        target = tmp_path / "t.crumb"
+        out, err, rc = _run_cli(
+            "todo", "add", str(target), "--title", "x", "--source", "t",
+            "--", "--help-all",
+        )
+        assert rc == 0
+        assert target.exists()
+
+
 class TestGroupedHelp:
     def test_help_shows_core_commands(self):
         # v0.11: default --help shows only the core 5 commands plus a

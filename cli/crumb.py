@@ -6082,13 +6082,24 @@ def main(argv: list[str] | None = None) -> None:
     # Intercept `--help-all` before argparse triggers its default help
     # path. We render the stashed full-help index ourselves so the
     # default `--help` stays minimal.
+    #
+    # Scan only the leading top-level option block — stop at the first
+    # non-option token (the subcommand name) or at `--`. Otherwise a
+    # positional like `crumb todo add file -- --help-all` would
+    # incorrectly print help instead of running the command. (Codex P2
+    # found this regression on PR #28.)
     if argv is None:
         argv = sys.argv[1:]
-    if "--help-all" in argv:
-        print(parser.format_usage().rstrip())
-        print()
-        print(getattr(parser, "_full_help", ""))
-        sys.exit(0)
+    for token in argv:
+        if token == "--help-all":
+            print(parser.format_usage().rstrip())
+            print()
+            print(getattr(parser, "_full_help", ""))
+            sys.exit(0)
+        if token == "--":
+            break  # everything after is positional, not a top-level flag
+        if not token.startswith("-"):
+            break  # subcommand name reached; --help-all afterward is not ours
     args = parser.parse_args(argv)
     if not getattr(args, "command", None):
         # No subcommand and no recognized top-level flag — show core help.
