@@ -119,13 +119,21 @@ def parse_span(record: dict) -> Span:
         or ""
     )
 
-    status = record.get("status") or {}
-    if isinstance(status, str):
-        raw_code = status
+    # Real-world OTEL JSONL has scattered the `status` field across at
+    # least three shapes: a dict ({"code": ..., "message": ...}), a bare
+    # string ("OK"/"ERROR"), and a bare scalar (the int enum, e.g. 2).
+    # Permissive parsing handles all of them; anything else collapses
+    # to "" so we don't AttributeError on .get for non-dicts.
+    raw_status = record.get("status")
+    if isinstance(raw_status, dict):
+        raw_code = raw_status.get("code", "")
+        status_message = str(raw_status.get("message", ""))
+    elif isinstance(raw_status, (str, int, float)) and not isinstance(raw_status, bool):
+        raw_code = raw_status
         status_message = ""
     else:
-        raw_code = status.get("code", "")
-        status_message = str(status.get("message", ""))
+        raw_code = ""
+        status_message = ""
     status_code = _canonicalize_status_code(raw_code)
 
     return Span(

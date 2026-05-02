@@ -76,6 +76,21 @@ class TestParseSpan:
         s4 = parse_span({"status": {"code": 0}})
         assert s4.status_code == ""  # UNSET → empty (not counted as error)
 
+    def test_scalar_status_payload(self):
+        # Codex finding: some flattened JSONL exports emit `"status": 2`
+        # (a bare scalar, not a dict and not a string). Previously
+        # parse_span called .get on that and crashed with AttributeError,
+        # breaking the permissive-parsing contract.
+        assert parse_span({"status": 2}).status_code == "ERROR"
+        assert parse_span({"status": 1}).status_code == "OK"
+        assert parse_span({"status": 0}).status_code == ""
+        assert parse_span({"status": "ERROR"}).status_code == "ERROR"
+        # Truly weird shapes (list, None) collapse to empty rather than crash.
+        assert parse_span({"status": [1, 2]}).status_code == ""
+        assert parse_span({"status": None}).status_code == ""
+        # Bool is technically int-shaped in Python; explicitly treat as not-a-code.
+        assert parse_span({"status": True}).status_code == ""
+
     def test_otlp_attribute_list_shape(self):
         # OTLP wire format: attributes are a list of {key, value: {stringValue: ...}}
         s = parse_span({
