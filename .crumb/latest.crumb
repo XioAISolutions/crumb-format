@@ -1,7 +1,7 @@
---- task: Release 0.10.0 — lint --check-failure-modes + JS deadline parser
+--- task: Release 0.11.0 — simplification + neutral naming
 source: github.pr
-pr: #27
-generated: 2026-05-02T15:16:41Z
+pr: #28
+generated: 2026-05-02T18:17:47Z
 ---
 
 [goal]
@@ -10,14 +10,13 @@ generated: 2026-05-02T15:16:41Z
 [context]
 Changed files in this PR:
 - CHANGELOG.md
+- README.md
 - cli/crumb.py
-- cli/failure_modes.py
-- cli/linting.py
+- cli/memory_bridge.py
+- cli/mempalace_bridge.py
 - pyproject.toml
 - tests/test_crumb.py
-- tests/test_failure_modes.py
-- tests/test_validate_js_deadlines.py
-- validators/validate.js
+- tests/test_usability.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
