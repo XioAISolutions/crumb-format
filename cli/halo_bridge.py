@@ -186,6 +186,14 @@ def _expand_otlp_envelope(record: dict) -> Iterator[dict]:
             if isinstance(ss, dict):
                 yield from _expand_otlp_envelope(ss)
         return
+    # OTLP renamed "instrumentationLibrarySpans" → "scopeSpans" at v1.0,
+    # but older SDKs (and traces archived before the rename) still emit
+    # the legacy name. Same nested shape; just a different key.
+    if "instrumentationLibrarySpans" in record and isinstance(record["instrumentationLibrarySpans"], list):
+        for ils in record["instrumentationLibrarySpans"]:
+            if isinstance(ils, dict):
+                yield from _expand_otlp_envelope(ils)
+        return
     if "spans" in record and isinstance(record["spans"], list):
         for span in record["spans"]:
             if isinstance(span, dict):

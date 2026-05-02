@@ -207,6 +207,28 @@ class TestReadJsonl:
         spans = list(read_otel_jsonl(path))
         assert [s.name for s in spans] == ["scoped"]
 
+    def test_otlp_instrumentation_library_spans_envelope(self, tmp_path):
+        # Codex finding: OTLP renamed instrumentationLibrarySpans →
+        # scopeSpans at v1.0, but older SDKs and archived traces still
+        # emit the legacy key. Without this branch, the envelope was
+        # treated as a single unnamed span and all real spans dropped.
+        path = tmp_path / "legacy.jsonl"
+        path.write_text(
+            json.dumps({
+                "resourceSpans": [{
+                    "instrumentationLibrarySpans": [{
+                        "spans": [
+                            {"name": "legacy-1"},
+                            {"name": "legacy-2"},
+                        ],
+                    }],
+                }],
+            }) + "\n",
+            encoding="utf-8",
+        )
+        spans = list(read_otel_jsonl(path))
+        assert [s.name for s in spans] == ["legacy-1", "legacy-2"]
+
     def test_bare_spans_batch(self, tmp_path):
         path = tmp_path / "batch.jsonl"
         path.write_text(
