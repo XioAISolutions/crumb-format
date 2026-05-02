@@ -44,6 +44,33 @@ class Span:
     raw: dict = field(default_factory=dict)
 
 
+def _canonicalize_status_code(raw) -> str:
+    """Normalize an OTEL status code to ``""``, ``"OK"``, or ``"ERROR"``.
+
+    OTLP spec encodes status as an enum: 0=UNSET, 1=OK, 2=ERROR. Real-world
+    exporters emit any of: the integer, the string of the integer, the
+    short name (``"OK"``/``"ERROR"``), or the prefixed form
+    (``"STATUS_CODE_ERROR"``). Anything else collapses to ``""`` so
+    ``summarize`` doesn't double-count an unknown shape as an error.
+    """
+    if raw is None or raw == "":
+        return ""
+    # Numeric path (int, or a string of digits).
+    try:
+        as_int = int(raw)
+    except (TypeError, ValueError):
+        as_int = None
+    if as_int is not None:
+        return {0: "", 1: "OK", 2: "ERROR"}.get(as_int, "")
+    # String path.
+    text = str(raw).upper().replace("STATUS_CODE_", "")
+    if text in ("UNSET", ""):
+        return ""
+    if text in ("OK", "ERROR"):
+        return text
+    return text  # unknown short string — pass through, conservative
+
+
 def _coerce_int(value) -> int:
     """OTEL nano timestamps come as int, str, or float depending on the SDK."""
     if value is None:
@@ -94,11 +121,12 @@ def parse_span(record: dict) -> Span:
 
     status = record.get("status") or {}
     if isinstance(status, str):
-        status_code = status.upper()
+        raw_code = status
         status_message = ""
     else:
-        status_code = str(status.get("code", "")).upper().replace("STATUS_CODE_", "")
+        raw_code = status.get("code", "")
         status_message = str(status.get("message", ""))
+    status_code = _canonicalize_status_code(raw_code)
 
     return Span(
         name=str(name),

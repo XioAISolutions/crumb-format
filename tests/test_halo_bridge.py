@@ -62,6 +62,20 @@ class TestParseSpan:
         s = parse_span({"status": "OK"})
         assert s.status_code == "OK"
 
+    def test_numeric_status_code_canonicalizes_to_error(self):
+        # OTLP wire format encodes status.code as an enum: 2 = ERROR.
+        # Real-world exporters often emit the integer (or its string form).
+        # Codex finding: a stringified "2" was missing the ERROR branch
+        # downstream, so traces with real failures looked healthy.
+        s = parse_span({"status": {"code": 2, "message": "boom"}})
+        assert s.status_code == "ERROR"
+        s2 = parse_span({"status": {"code": "2"}})
+        assert s2.status_code == "ERROR"
+        s3 = parse_span({"status": {"code": 1}})
+        assert s3.status_code == "OK"
+        s4 = parse_span({"status": {"code": 0}})
+        assert s4.status_code == ""  # UNSET → empty (not counted as error)
+
     def test_otlp_attribute_list_shape(self):
         # OTLP wire format: attributes are a list of {key, value: {stringValue: ...}}
         s = parse_span({
