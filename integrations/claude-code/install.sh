@@ -48,11 +48,27 @@ done
 # let the user paste it.
 echo "==> Registering MCP server in ${MCP_FILE}"
 MCP_TEMPLATE="${SCRIPT_DIR}/mcp.json.template"
-CRUMB_INSTALL_PATH="$(python3 -c 'import crumb_cli, os; print(os.path.dirname(os.path.dirname(crumb_cli.__file__)))' 2>/dev/null || echo "")"
+# crumb_cli.py sits at the repo/package root (next to mcp/, cli/, validators/),
+# so dirname(crumb_cli.__file__) IS the install root. Walking up twice — as
+# the previous version did — pointed one directory above and produced a
+# non-existent path in .mcp.json. (Codex P1 found this.)
+CRUMB_INSTALL_PATH="$(python3 -c 'import crumb_cli, os; print(os.path.dirname(crumb_cli.__file__))' 2>/dev/null || echo "")"
 
 if [[ -z "$CRUMB_INSTALL_PATH" ]]; then
-    # Fallback: use the source path of this script's parent.
-    CRUMB_INSTALL_PATH="$(dirname "$SCRIPT_DIR")"
+    # Fallback when crumb_cli isn't importable (e.g. running from a
+    # source checkout without `pip install -e .`). $SCRIPT_DIR is
+    # <repo>/integrations/claude-code, so we need TWO dirnames to
+    # reach <repo>. One dirname lands at <repo>/integrations.
+    CRUMB_INSTALL_PATH="$(dirname "$(dirname "$SCRIPT_DIR")")"
+fi
+
+# Sanity check: the path must actually contain mcp/server.py. Without
+# this, a wrong CRUMB_INSTALL_PATH silently writes a broken .mcp.json
+# and the user only finds out when Claude Code can't start the server.
+if [[ ! -f "${CRUMB_INSTALL_PATH}/mcp/server.py" ]]; then
+    echo "ERROR: could not locate mcp/server.py under ${CRUMB_INSTALL_PATH}." >&2
+    echo "       Confirm crumb-format is installed and reachable, then re-run." >&2
+    exit 1
 fi
 
 if command -v jq >/dev/null 2>&1; then
@@ -77,7 +93,12 @@ fi
 
 # ── 3. CLAUDE.md verbal-trigger block (optional, prompted) ─────────
 if [[ -f "./CLAUDE.md" ]]; then
-    if grep -q "When I say \"crumb it\"" ./CLAUDE.md 2>/dev/null; then
+    # Use the HTML-comment marker the install appends, not the prose,
+    # as the duplicate-detection signal. The prose can drift across
+    # template revisions (and previously DID — the v1.0.0 template
+    # uses `**"crumb it"**` with bold asterisks while the prior check
+    # looked for `"crumb it"` without). The marker is stable.
+    if grep -qF "<!-- Added by crumb-format/integrations/claude-code/install.sh -->" ./CLAUDE.md 2>/dev/null; then
         echo "==> ./CLAUDE.md already has the 'crumb it' block — skipping"
     else
         echo "==> ./CLAUDE.md exists. Append the 'crumb it' verbal-trigger block? [y/N]"
