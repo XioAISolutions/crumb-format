@@ -5136,6 +5136,13 @@ def cmd_delta(args: argparse.Namespace) -> None:
             title=args.title,
         )
     except ValueError as exc:
+        # "No content differences" is a soft no-op (base == target), not
+        # a failure. Exit 0 with a "Note:" prefix so CI scripts that
+        # diff for change detection don't get a false alarm. Other
+        # ValueError paths (malformed base/target) stay exit 1.
+        if "no content differences" in str(exc):
+            print(f"Note: {exc}", file=sys.stderr)
+            sys.exit(0)
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
     write_text(args.output, rendered)
@@ -5434,7 +5441,7 @@ def build_parser() -> argparse.ArgumentParser:
           Todo:      todo (add | done | list | dream)
           Other:     init   hooks   context   pack
 
-        Deprecated (removal scheduled for v0.9): compress, compact, squeeze,
+        Deprecated (removal scheduled for v0.10): compress, compact, squeeze,
         share, dashboard, todo-add, todo-done, todo-list, todo-dream.
     """).strip()
 
@@ -5590,7 +5597,7 @@ def build_parser() -> argparse.ArgumentParser:
     compact = sub.add_parser('compact', help='[deprecated] use `crumb optimize --mode minimal`.')
     compact.add_argument('file', nargs='?', help='.crumb file to compact (default: stdin).')
     compact.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
-    compact.set_defaults(func=_deprecated(cmd_compact, "`crumb compact` is deprecated; use `crumb optimize --mode minimal` instead. Removal scheduled for v0.9."))
+    compact.set_defaults(func=_deprecated(cmd_compact, "`crumb compact` is deprecated; use `crumb optimize --mode minimal` instead. Removal scheduled for v0.10."))
 
     # diff
     diff = sub.add_parser('diff', help='Compare two .crumb files.')
@@ -5659,21 +5666,21 @@ def build_parser() -> argparse.ArgumentParser:
     todo_add_cmd.add_argument('tasks', nargs='+', help='Tasks to add.')
     todo_add_cmd.add_argument('--title', '-t', help='Title (for new todo crumbs).')
     todo_add_cmd.add_argument('--source', '-s', help='Source label.')
-    todo_add_cmd.set_defaults(func=_deprecated(cmd_todo_add, "`crumb todo-add` is deprecated; use `crumb todo add` instead. Removal scheduled for v0.9."))
+    todo_add_cmd.set_defaults(func=_deprecated(cmd_todo_add, "`crumb todo-add` is deprecated; use `crumb todo add` instead. Removal scheduled for v0.10."))
 
     todo_done_cmd = sub.add_parser('todo-done', help='[deprecated] use `crumb todo done`.')
     todo_done_cmd.add_argument('file', help='Path to a todo crumb.')
     todo_done_cmd.add_argument('query', help='Substring to match against open tasks.')
-    todo_done_cmd.set_defaults(func=_deprecated(cmd_todo_done, "`crumb todo-done` is deprecated; use `crumb todo done` instead. Removal scheduled for v0.9."))
+    todo_done_cmd.set_defaults(func=_deprecated(cmd_todo_done, "`crumb todo-done` is deprecated; use `crumb todo done` instead. Removal scheduled for v0.10."))
 
     todo_list_cmd = sub.add_parser('todo-list', help='[deprecated] use `crumb todo list`.')
     todo_list_cmd.add_argument('file', nargs='?', help='Path to a todo crumb.')
     todo_list_cmd.add_argument('--all', '-a', dest='show_all', action='store_true', help='Show completed tasks too.')
-    todo_list_cmd.set_defaults(func=_deprecated(cmd_todo_list, "`crumb todo-list` is deprecated; use `crumb todo list` instead. Removal scheduled for v0.9."))
+    todo_list_cmd.set_defaults(func=_deprecated(cmd_todo_list, "`crumb todo-list` is deprecated; use `crumb todo list` instead. Removal scheduled for v0.10."))
 
     todo_dream_cmd = sub.add_parser('todo-dream', help='[deprecated] use `crumb todo dream`.')
     todo_dream_cmd.add_argument('file', help='Path to a todo crumb.')
-    todo_dream_cmd.set_defaults(func=_deprecated(cmd_todo_dream, "`crumb todo-dream` is deprecated; use `crumb todo dream` instead. Removal scheduled for v0.9."))
+    todo_dream_cmd.set_defaults(func=_deprecated(cmd_todo_dream, "`crumb todo-dream` is deprecated; use `crumb todo dream` instead. Removal scheduled for v0.10."))
 
     # watch
     watch_cmd = sub.add_parser('watch', help='Watch crumbs and auto-dream when raw exceeds threshold.')
@@ -5722,7 +5729,7 @@ def build_parser() -> argparse.ArgumentParser:
                               help='Apply MeTalk caveman compression as Stage 3.')
     compress_cmd.add_argument('--metalk-level', type=int, choices=[1, 2, 3], default=2,
                               help='MeTalk level (default: 2).')
-    compress_cmd.set_defaults(func=_deprecated(cmd_compress, "`crumb compress` is deprecated; use `crumb optimize --mode signal` instead. Removal scheduled for v0.9."))
+    compress_cmd.set_defaults(func=_deprecated(cmd_compress, "`crumb compress` is deprecated; use `crumb optimize --mode signal` instead. Removal scheduled for v0.10."))
 
     # bench
     bench_cmd = sub.add_parser('bench', help='Benchmark compression efficiency and information density.')
@@ -5731,7 +5738,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     share_cmd = sub.add_parser('share', help='[deprecated] use `crumb handoff` (clipboard) or paste the file directly.')
     share_cmd.add_argument('file', help='.crumb file to share.')
-    share_cmd.set_defaults(func=_deprecated(cmd_share, "`crumb share` is deprecated and will be removed in v0.9. Use `crumb handoff` (clipboard) or paste the file content directly."))
+    share_cmd.set_defaults(func=_deprecated(cmd_share, "`crumb share` is deprecated and will be removed in v0.10. Use `crumb handoff` (clipboard) or paste the file content directly."))
 
     # handoff
     handoff_cmd = sub.add_parser('handoff', help='Copy a .crumb to clipboard for pasting into an AI tool.')
@@ -5835,7 +5842,7 @@ def build_parser() -> argparse.ArgumentParser:
     # --- Dashboard ---
     dash_cmd = sub.add_parser('dashboard', help='[deprecated] use `crumb audit export --format html`.')
     dash_cmd.add_argument('-o', '--output', default='agentauth-dashboard.html')
-    dash_cmd.set_defaults(func=_deprecated(cmd_dashboard, "`crumb dashboard` is deprecated and will be removed in v0.9. Use `crumb audit export --format html -o dashboard.html` instead."))
+    dash_cmd.set_defaults(func=_deprecated(cmd_dashboard, "`crumb dashboard` is deprecated and will be removed in v0.10. Use `crumb audit export --format html -o dashboard.html` instead."))
 
     # --- Format Bridges ---
     bridge_cmd = sub.add_parser('bridge', help='Convert between CRUMB and other AI formats.')
@@ -5923,7 +5930,7 @@ def build_parser() -> argparse.ArgumentParser:
     squeeze_cmd.add_argument('--dry-run', action='store_true',
                              help='Print the compression report without writing output.')
     squeeze_cmd.add_argument('-o', '--output', default='-', help='Output file or - for stdout.')
-    squeeze_cmd.set_defaults(func=_deprecated(cmd_squeeze, "`crumb squeeze` is deprecated; use `crumb optimize --mode budget --budget N` instead. Removal scheduled for v0.9."))
+    squeeze_cmd.set_defaults(func=_deprecated(cmd_squeeze, "`crumb squeeze` is deprecated; use `crumb optimize --mode budget --budget N` instead. Removal scheduled for v0.10."))
 
     # --- Hash (content-addressed digest) ---
     hash_cmd = sub.add_parser('hash', help='Print the sha256 content digest of a CRUMB.')
