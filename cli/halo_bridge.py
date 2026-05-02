@@ -342,8 +342,10 @@ def summarize(spans: List[Span]) -> TraceSummary:
     return TraceSummary(
         span_count=len(spans),
         error_count=sum(1 for s in spans if s.status_code == "ERROR"),
-        # First span's traceId is canonical when all spans share one.
-        trace_id=spans[0].trace_id,
+        # First non-empty trace_id wins. Mixed-quality exports
+        # sometimes drop trace_id on the earliest span; we still want
+        # to correlate the trace if any later span has the ID.
+        trace_id=next((s.trace_id for s in spans if s.trace_id), ""),
         started_at=_iso(start_min),
         ended_at=_iso(end_max),
         total_duration_ms=(end_max - start_min) // 1_000_000 if end_max > start_min else 0,

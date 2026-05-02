@@ -343,6 +343,27 @@ class TestSummarize:
         spans = list(read_otel_jsonl(FIXTURE))
         assert summarize(spans).trace_id == "trace-abc123"
 
+    def test_trace_id_from_first_non_empty(self):
+        # Codex finding: if the earliest span is missing trace_id (common
+        # in mixed-quality OTEL exports), summarize used to drop the
+        # trace_id header entirely even when later spans had the ID.
+        # Now scans for the first non-empty value to preserve correlation.
+        from cli.halo_bridge import Span as SpanCls
+        spans = [
+            SpanCls(name="early-no-trace", trace_id="",
+                    start_unix_nano=1700000000000000000, end_unix_nano=1700000001000000000),
+            SpanCls(name="later-has-trace", trace_id="real-trace-xyz",
+                    start_unix_nano=1700000002000000000, end_unix_nano=1700000003000000000),
+        ]
+        assert summarize(spans).trace_id == "real-trace-xyz"
+
+    def test_trace_id_empty_when_no_span_has_one(self):
+        # If no span carries a trace_id at all, the summary leaves it
+        # empty (which means the header isn't emitted).
+        from cli.halo_bridge import Span as SpanCls
+        spans = [SpanCls(name="x", trace_id="", start_unix_nano=1, end_unix_nano=2)]
+        assert summarize(spans).trace_id == ""
+
     def test_iso_timestamps(self):
         spans = list(read_otel_jsonl(FIXTURE))
         s = summarize(spans)
