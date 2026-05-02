@@ -1,7 +1,7 @@
---- task: feat(halo): from-halo + from-otel bridges + agent failure-mode taxonomy
+--- task: Release 0.10.0 — lint --check-failure-modes + JS deadline parser
 source: github.pr
-pr: #25
-generated: 2026-05-02T02:31:28Z
+pr: #27
+generated: 2026-05-02T15:16:41Z
 ---
 
 [goal]
@@ -11,12 +11,13 @@ generated: 2026-05-02T02:31:28Z
 Changed files in this PR:
 - CHANGELOG.md
 - cli/crumb.py
-- cli/halo_bridge.py
-- docs/integrations/halo.md
-- docs/v1.4/agent-failure-modes.md
-- examples/halo-trace-to-log.crumb
-- tests/fixtures/halo-traces.jsonl
-- tests/test_halo_bridge.py
+- cli/failure_modes.py
+- cli/linting.py
+- pyproject.toml
+- tests/test_crumb.py
+- tests/test_failure_modes.py
+- tests/test_validate_js_deadlines.py
+- validators/validate.js
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
