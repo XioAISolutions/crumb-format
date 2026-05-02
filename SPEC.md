@@ -1,14 +1,16 @@
-# .crumb Specification (v1.3)
+# .crumb Specification (v1.4)
 
-**Status:** Draft  
-**Category:** AI handoff format  
+**Status:** Stable
+**Category:** AI handoff format
 **Goal:** A tiny, human-readable protocol for portable AI context handoffs between tools and memory systems.
 
-**Version compatibility:** v1.3 is backward-compatible with v1.1 and v1.2. A v1.2 parser accepts a v1.3 file by ignoring unknown headers and sections (per §8). A v1.3 parser accepts `v ∈ {1.1, 1.2, 1.3}`. Every v1.3 addition is optional and purely additive.
+**Version compatibility:** v1.4 is backward-compatible with v1.1, v1.2, and v1.3. A v1.3 parser accepts a v1.4 file by ignoring unknown headers and sections (per §8). A v1.4 parser accepts `v ∈ {1.1, 1.2, 1.3, 1.4}`. Every v1.4 addition is optional and purely additive.
 
 **Efficiency layers (§§13–16):** content-addressed refs, priority annotations, delta crumbs, and budget-aware packing. All additive — a v1.2 consumer that ignores them is still a compliant consumer.
 
 **v1.3 additions (§§17–23):** normative ref resolution, normative fold selection, `[handoff]` dependencies, structured `[constraints]`, new optional sections (`[checks]`, `[guardrails]`, `[capabilities]`, `[script]`, `[workflow]`), `[invariants]` extended to `kind=task`, and a new `kind=agent` for reusable personas.
+
+**v1.4 additions (§§11.4 and 21.1.1–21.1.2):** normative ISO-8601 format for `[handoff] deadline=`, normative typed `[checks]` thresholds (`value=`/`threshold=`/`op=`/`unit=` with sender consistency rule), and a closed-list canonical vocabulary for common agent failure-mode names. All three are warn-not-reject — sender freedom preserved, receivers gain a stable contract.
 
 ---
 
@@ -346,6 +348,19 @@ Earlier lines have priority over later lines. A consumer SHOULD execute top-down
 
 A line starting with `- [x]` is treated as already completed context, not pending work — same convention as `[tasks]` in `kind=todo`.
 
+### 11.4 Normative `deadline=` format (v1.4)
+
+When a `[handoff]` line carries a `deadline=` annotation, the value MUST be ISO-8601 in one of two forms:
+
+- **Date-only:** `YYYY-MM-DD` (e.g. `2026-04-30`). Implicit timezone is the receiver's local zone. Use when time-of-day doesn't matter.
+- **Datetime:** `YYYY-MM-DDTHH:MM:SS<tz>` where `<tz>` is `Z` or `±HH:MM` (e.g. `2026-04-30T17:00:00Z`, `2026-04-30T15:00:00+02:00`). The timezone suffix is REQUIRED — bare datetimes like `2026-04-30T15:00:00` are malformed.
+
+Other ISO-8601 variants (no-seconds `HH:MM`, fractional seconds, second-precision offsets) are explicitly NOT permitted; the format is intentionally narrow so cross-language parsers behave identically.
+
+**Validator behavior.** A v1.4 validator MUST emit a `WARN` for malformed `deadline=` values; it MUST NOT raise a parse error. Free-form `deadline=` values (the v1.3 behavior) continue to validate, just with a warning. `crumb lint --strict` MAY promote the warning to a non-zero exit.
+
+**Past-due is not malformed.** A `deadline=` in the past is a valid handoff with an overdue annotation. Surfacing it is `crumb lint --check-deadlines`'s job, not the validator's.
+
 ---
 
 ## 12. Typed content annotations (v1.2)
@@ -620,6 +635,54 @@ Verification results at handoff time. One check per line in `name :: status` for
 - coverage :: 87%      threshold=85
 - lint :: fail         note=unused import in auth.py:12
 ```
+
+#### 21.1.1 Typed thresholds (v1.4 normative)
+
+Four annotations are reserved with normative semantics:
+
+| Annotation | Type | Meaning |
+|---|---|---|
+| `value=` | numeric or string | Observed value of the check. |
+| `threshold=` | numeric or string | Sender-declared bound. |
+| `op=` | one of `>=`, `<=`, `==`, `!=`, `>`, `<` | Comparison applied between `value` and `threshold`. Default: `>=`. |
+| `unit=` | string | Documentation only; no semantic. Examples: `%`, `ms`, `MB`. |
+
+`value=` and `threshold=` are numeric when both match `^-?\d+(\.\d+)?$`; otherwise they are strings (and `op=` is restricted to `==`/`!=`).
+
+**Sender consistency rule.** When all of `value=`, `threshold=`, and a usable `op=` are present, the line's `<status>` MUST be:
+
+- `pass` when `value <op> threshold` evaluates true,
+- `fail` when it evaluates false.
+
+`warn`, `skip`, and `pending` opt out of this rule (the sender can still observe a value but elect not to gate on it).
+
+```text
+[checks]
+- coverage     :: pass    value=87       threshold=85    op=>=    unit=%
+- latency_p99  :: warn    value=120      threshold=100   op=<=    unit=ms     note=regressed since main
+- bundle_size  :: fail    value=1840     threshold=1500  op=<=    unit=KB
+```
+
+**Validator behavior.** A v1.4 validator MUST emit a `WARN` when status disagrees with the comparison; it MUST NOT raise a parse error. Other ISO-8601-style annotations on the same line are unaffected.
+
+#### 21.1.2 Canonical failure-mode names (v1.4 normative-by-convention)
+
+A closed-list vocabulary is defined for common agent failure modes so cross-tool consumers can act on `[checks]` lines without string heuristics:
+
+| Name | When to use |
+|---|---|
+| `hallucinated_tool_call` | Tool name doesn't exist in the harness. |
+| `refusal_loop` | Model refused N+ consecutive turns. |
+| `tool_error_unhandled` | Tool returned an error and the model didn't recover. |
+| `semantic_drift` | Output stopped addressing the stated goal. |
+| `token_budget_exceeded` | Output exceeded a declared token budget. |
+| `invalid_handoff_target` | A `[handoff]` line targets an unknown receiver. |
+| `circular_reference` | A `refs=` chain or `[handoff] after=` graph contains a cycle. |
+| `truncated_output` | Model output was cut off by max_tokens. |
+| `prompt_injection_suspected` | Tool output contained instructions overriding the system prompt. |
+| `unauthorized_tool_call` | Tool invocation violated the `[guardrails]` policy. |
+
+Senders MAY use other names (validators continue to accept any). Receivers SHOULD recognize these canonical names when they appear. The list is closed for v1.4; future additions need a new spec amendment.
 
 ### 21.2 `[guardrails]`
 
