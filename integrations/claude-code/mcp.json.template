@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "crumb": {
+      "command": "python3",
+      "args": ["__CRUMB_INSTALL_PATH__/mcp/server.py"],
+      "description": "CRUMB format tools — create, validate, lint, search, palace memory, governance."
+    }
+  }
+}
