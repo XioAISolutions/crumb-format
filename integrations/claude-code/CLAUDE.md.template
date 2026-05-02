@@ -1,0 +1,17 @@
+## CRUMB handoff (no install needed)
+
+When I say **"crumb it"**, generate a CRUMB summarizing the current session and either:
+- Print it inline so I can copy-paste, OR
+- Call the `crumb_export` MCP tool to write it to `~/.claude/handoffs/`.
+
+Pick the right kind:
+- For tasks: `kind=task` with `[goal]`, `[context]`, `[constraints]`
+- For memory: `kind=mem` with `[consolidated]`
+- For repos: `kind=map` with `[project]`, `[modules]`
+- For agent personas: `kind=agent` with `[identity]`, `[rules]`, `[knowledge]`
+
+Format: `BEGIN CRUMB / v=1.4 / headers / --- / sections / END CRUMB`. The format is described in detail at https://github.com/XioAISolutions/crumb-format. v=1.1, v=1.2, v=1.3 also validate.
+
+When I paste a `BEGIN CRUMB ... END CRUMB` block, treat it as imported context and continue the work — don't re-explain, don't re-ask. If a `[handoff]` section is present, the topmost unfinished line is the next thing to do.
+
+Slash commands `/crumb-export <path>` and `/crumb-import <path>` are also available.

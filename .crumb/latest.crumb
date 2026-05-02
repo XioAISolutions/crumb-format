@@ -1,7 +1,7 @@
---- task: Release 0.11.0 — simplification + neutral naming
+--- task: feat(integrations): Claude Code + briefs for Cursor/Aider/OpenCode + RELEASING.md
 source: github.pr
-pr: #28
-generated: 2026-05-02T18:17:47Z
+pr: #30
+generated: 2026-05-02T19:54:15Z
 ---
 
 [goal]
@@ -9,14 +9,17 @@ generated: 2026-05-02T18:17:47Z
 
 [context]
 Changed files in this PR:
-- CHANGELOG.md
-- README.md
-- cli/crumb.py
-- cli/memory_bridge.py
-- cli/mempalace_bridge.py
-- pyproject.toml
-- tests/test_crumb.py
-- tests/test_usability.py
+- docs/RELEASING.md
+- docs/integrations/aider.md
+- docs/integrations/cursor.md
+- docs/integrations/opencode.md
+- integrations/claude-code/CLAUDE.md.template
+- integrations/claude-code/README.md
+- integrations/claude-code/commands/crumb-export.md
+- integrations/claude-code/commands/crumb-import.md
+- integrations/claude-code/install.sh
+- integrations/claude-code/mcp.json.template
+- integrations/claude-code/uninstall.sh
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
