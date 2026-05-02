@@ -162,6 +162,67 @@ class TestReadJsonl:
         assert "agent.session.start" in names
         assert "agent.refusal" in names
 
+    def test_otlp_resourcespans_envelope(self, tmp_path):
+        # Codex finding: standard OTLP JSONL wraps spans in
+        # resourceSpans → scopeSpans → spans envelopes. Without
+        # expansion, the bridge produced one unnamed span per envelope
+        # line and dropped all real spans.
+        path = tmp_path / "otlp.jsonl"
+        path.write_text(
+            json.dumps({
+                "resourceSpans": [{
+                    "scopeSpans": [{
+                        "spans": [
+                            {"name": "first",  "spanId": "s1"},
+                            {"name": "second", "spanId": "s2"},
+                            {"name": "third",  "spanId": "s3"},
+                        ],
+                    }],
+                }],
+            }) + "\n",
+            encoding="utf-8",
+        )
+        spans = list(read_otel_jsonl(path))
+        assert [s.name for s in spans] == ["first", "second", "third"]
+
+    def test_otlp_scopespans_envelope(self, tmp_path):
+        path = tmp_path / "otlp.jsonl"
+        path.write_text(
+            json.dumps({
+                "scopeSpans": [{
+                    "spans": [{"name": "scoped"}],
+                }],
+            }) + "\n",
+            encoding="utf-8",
+        )
+        spans = list(read_otel_jsonl(path))
+        assert [s.name for s in spans] == ["scoped"]
+
+    def test_bare_spans_batch(self, tmp_path):
+        path = tmp_path / "batch.jsonl"
+        path.write_text(
+            json.dumps({"spans": [{"name": "a"}, {"name": "b"}]}) + "\n",
+            encoding="utf-8",
+        )
+        spans = list(read_otel_jsonl(path))
+        assert [s.name for s in spans] == ["a", "b"]
+
+    def test_mixed_envelope_and_flat_lines(self, tmp_path):
+        # A real-world export might mix shapes line-to-line.
+        path = tmp_path / "mixed.jsonl"
+        path.write_text(
+            json.dumps({"name": "flat-1"}) + "\n"
+            + json.dumps({
+                "resourceSpans": [{"scopeSpans": [{"spans": [
+                    {"name": "envelope-1"}, {"name": "envelope-2"},
+                ]}]}],
+            }) + "\n"
+            + json.dumps({"name": "flat-2"}) + "\n",
+            encoding="utf-8",
+        )
+        names = [s.name for s in read_otel_jsonl(path)]
+        assert names == ["flat-1", "envelope-1", "envelope-2", "flat-2"]
+
 
 # ── summarize ──────────────────────────────────────────────────────────
 
@@ -188,6 +249,21 @@ class TestSummarize:
         s = summarize(spans)
         assert s.started_at.startswith("2023-")
         assert s.ended_at.startswith("2023-")
+
+    def test_out_of_range_timestamp_doesnt_crash(self):
+        # Codex finding: datetime.fromtimestamp raises ValueError /
+        # OverflowError / OSError on nano timestamps that are negative
+        # or absurdly large. A single bad span shouldn't abort the
+        # whole conversion — _iso swallows the exception.
+        from cli.halo_bridge import Span as SpanCls
+        bad = [
+            SpanCls(name="huge",   start_unix_nano=10**30, end_unix_nano=10**30 + 1),
+            SpanCls(name="ok",     start_unix_nano=1700000000000000000, end_unix_nano=1700000001000000000),
+        ]
+        s = summarize(bad)
+        assert s.span_count == 2
+        # Bad timestamps collapse to "" rather than raise.
+        assert s.started_at == "" or s.ended_at == ""
 
 
 # ── spans_to_log_crumb ─────────────────────────────────────────────────

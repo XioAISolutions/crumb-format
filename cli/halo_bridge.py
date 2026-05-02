@@ -157,12 +157,48 @@ def parse_span(record: dict) -> Span:
     )
 
 
+def _expand_otlp_envelope(record: dict) -> Iterator[dict]:
+    """Yield individual span dicts from an OTLP-shaped envelope record.
+
+    Standard OTLP JSONL often wraps spans in nested envelopes — anywhere
+    from one line per span (HALO-style flat JSONL) up to one line per
+    *batch* per *resource* per *scope*. The shapes we accept:
+
+      - ``{"resourceSpans": [{"scopeSpans": [{"spans": [...]}, ...]}, ...]}``
+      - ``{"scopeSpans": [{"spans": [...]}, ...]}``
+      - ``{"spans": [...]}``  (a bare batch)
+      - ``{"name": "...", ...}``  (already a single span — no envelope)
+
+    Anything that doesn't match a known envelope shape is yielded as-is
+    (treated as a single span). This keeps backward compat with the
+    HALO flat form while correctly handling OTLP-spec exporters.
+    """
+    if "resourceSpans" in record and isinstance(record["resourceSpans"], list):
+        for rs in record["resourceSpans"]:
+            if isinstance(rs, dict):
+                yield from _expand_otlp_envelope(rs)
+        return
+    if "scopeSpans" in record and isinstance(record["scopeSpans"], list):
+        for ss in record["scopeSpans"]:
+            if isinstance(ss, dict):
+                yield from _expand_otlp_envelope(ss)
+        return
+    if "spans" in record and isinstance(record["spans"], list):
+        for span in record["spans"]:
+            if isinstance(span, dict):
+                yield span
+        return
+    # Plain span (HALO-flat or already-flattened export).
+    yield record
+
+
 def read_otel_jsonl(path: str | Path) -> Iterator[Span]:
     """Yield :class:`Span` objects from a JSONL trace file.
 
     Skips blank lines and lines that don't parse as JSON objects (HALO
     occasionally emits debug log lines mixed in with trace records;
-    we don't crash on those).
+    we don't crash on those). OTLP envelope records are expanded to
+    their nested spans before parsing.
     """
     with open(path, "r", encoding="utf-8") as fh:
         for line in fh:
@@ -173,8 +209,11 @@ def read_otel_jsonl(path: str | Path) -> Iterator[Span]:
                 record = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            if isinstance(record, dict):
-                yield parse_span(record)
+            if not isinstance(record, dict):
+                continue
+            for span_dict in _expand_otlp_envelope(record):
+                if isinstance(span_dict, dict):
+                    yield parse_span(span_dict)
 
 
 def _format_duration_ms(span: Span) -> str:
@@ -221,11 +260,19 @@ def summarize(spans: List[Span]) -> TraceSummary:
     end_max = max((s.end_unix_nano for s in spans if s.end_unix_nano), default=0)
 
     def _iso(ns: int) -> str:
+        # datetime.fromtimestamp raises ValueError or OverflowError on
+        # nano timestamps that are negative, far in the past, or far in
+        # the future. A single bad timestamp shouldn't abort the whole
+        # summary — return an empty string instead, matching the same
+        # permissive posture as the rest of the bridge.
         if not ns:
             return ""
-        return datetime.fromtimestamp(ns / 1_000_000_000, tz=timezone.utc).isoformat(
-            timespec="seconds"
-        )
+        try:
+            return datetime.fromtimestamp(
+                ns / 1_000_000_000, tz=timezone.utc
+            ).isoformat(timespec="seconds")
+        except (ValueError, OverflowError, OSError):
+            return ""
 
     return TraceSummary(
         span_count=len(spans),
