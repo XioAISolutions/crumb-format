@@ -1,5 +1,51 @@
 # Changelog
 
+## v0.11.0
+
+### Simplification + neutral naming
+
+No wire-format change. This release removes accumulated complexity
+and external-product affiliations from the user-facing CLI.
+
+**Removed: 9 deprecated aliases.** The v0.7 deprecations are gone:
+`compress`, `compact`, `squeeze`, `share`, `dashboard`, `todo-add`,
+`todo-done`, `todo-list`, `todo-dream`. Their replacements have been
+shipping for 4 releases:
+- `compress` / `compact` / `squeeze` → `crumb optimize --mode {signal,minimal,budget}`
+- `share` → `crumb handoff` (clipboard) or paste directly
+- `dashboard` → `crumb audit export --format html`
+- `todo-*` → `crumb todo {add,done,list,dream}`
+
+**Renamed: `cli/mempalace_bridge.py` → `cli/memory_bridge.py`** to
+match the actual scope (a memory-bridge framework with adapter
+registry; MemPalace is just one adapter). `cli/mempalace_bridge.py`
+remains as a one-line compat shim that re-exports from the new
+location; remove in v0.12.
+
+**Demoted: `crumb from-halo` is now a hidden alias of `crumb from-otel`.**
+HALO traces are standard OTEL JSONL — `from-otel` is the canonical
+name. `from-halo` still works but is hidden from `--help` and the
+grouped command index. The bridge code is unchanged; only the surface
+naming is now neutral.
+
+**Two-tier `--help`.** Default `crumb --help` now shows only the
+five core commands a new user reaches for (`new`, `validate`,
+`handoff`, `receive`, `lint`) plus a pointer to `--help-all`. The
+full grouped command index (~40 commands) moved behind
+`crumb --help-all`. Surface-area complexity is opt-in.
+
+**README rewrite.** Front-loads "Add crumb it to your AI" as Step 1
+(no install required) and "Try it" as Step 2 (paste-only). The CLI
+install moves to "Optional — install the CLI for power tooling"
+much further down. Tagline becomes "The copy-paste AI handoff
+format. No install required." Stale v0.6.0 release banner removed.
+
+**Tests.** 604 passing. Updated `TestRemovedAliases` to confirm the
+deprecated names now reject as unknown subcommands (exit 2).
+Updated `TestGroupedHelp` to assert the new core-vs-all tier split.
+
+CLI_VERSION → 0.11.0.
+
 ## v0.10.0
 
 ### HALO/OTEL bridge, v1.4 surface completion, release fix-ups

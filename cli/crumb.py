@@ -43,7 +43,7 @@ REQUIRED_SECTIONS = {
     "delta": ["changes"],
     "agent": ["identity"],
 }
-CLI_VERSION = "0.10.0"
+CLI_VERSION = "0.11.0"
 SUPPORTED_VERSIONS = {"1.1", "1.2", "1.3"}
 FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
 CONTENT_REF_RE = re.compile(r"^sha256:[0-9a-f]{16,64}$")
@@ -4835,7 +4835,7 @@ def cmd_bridge(args: argparse.Namespace) -> None:
             print(f"  {k}")
 
     elif action == 'mempalace':
-        from cli import mempalace_bridge
+        from cli import memory_bridge as mempalace_bridge
         sub_action = getattr(args, 'bridge_action2', None) or getattr(args, 'mempalace_action', None)
         try:
             if sub_action == 'export':
@@ -5423,14 +5423,32 @@ def cmd_palace_wiki(root, args_output: str) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    # Group the command index by concern instead of dumping alphabetically.
-    # Argparse can't express subcommand groups directly, so we render the
-    # grouped index in the parser description (visible in `crumb --help`)
-    # and suppress the auto-generated subparser list with metavar=''.
-    grouped_help = dedent("""\
+    # Two-tier help. Default `crumb --help` shows only the core
+    # commands a new user reaches for. Everything else lives under
+    # `crumb --help-all`. The format itself is six lines of plain text;
+    # most users never need a CLI at all.
+    core_help = dedent("""\
+        The CRUMB wire format is plain text — anyone can write one by
+        adding a `crumb it` instruction to their AI's system prompt
+        (no install required). The CLI is optional power tooling.
+
+        Core commands:
+
+          new        Create a new .crumb file.
+          validate   Check that a .crumb file is well-formed.
+          handoff    Copy a .crumb to clipboard for pasting into an AI.
+          receive    Read a .crumb from clipboard or file.
+          lint       Run safety / quality / deadline checks.
+
+        Run `crumb --help-all` to see the full surface (~40 commands
+        for searching, packing, memory, governance, format bridges,
+        and v1.4 draft features).
+    """).strip()
+
+    full_help = dedent("""\
         Commands (use `crumb <cmd> --help` for details):
 
-          Create:    new   from-chat   from-git   from-otel   from-halo   import   template
+          Create:    new   from-chat   from-git   from-otel   import   template
           Inspect:   validate   inspect   diff   search   bench
           Edit:      append   dream   merge   watch
           Optimize:  optimize   lint   metalk
@@ -5440,18 +5458,21 @@ def build_parser() -> argparse.ArgumentParser:
           Governance:passport   policy   audit   scan   comply   webhook   guardrails
           Todo:      todo (add | done | list | dream)
           Other:     init   hooks   context   pack
-
-        Deprecated (removal scheduled for v0.10): compress, compact, squeeze,
-        share, dashboard, todo-add, todo-done, todo-list, todo-dream.
     """).strip()
 
+    # `--help-all` is intercepted before argparse sees it (see main()),
+    # so the value here is just the default-help description text.
     parser = argparse.ArgumentParser(
         prog='crumb',
-        description='Create, validate, inspect, and manage .crumb handoff files.\n\n' + grouped_help,
+        description='The copy-paste AI handoff format.\n\n' + core_help,
+        epilog='Run `crumb --help-all` for the full command list.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument('--version', action='version', version=f'crumb {CLI_VERSION}')
-    sub = parser.add_subparsers(dest='command', required=True, metavar='<command>')
+    parser.add_argument('--help-all', action='store_true',
+                        help='Show all commands grouped by concern.')
+    parser._full_help = full_help  # stash for main() to render on --help-all
+    sub = parser.add_subparsers(dest='command', required=False, metavar='<command>')
 
     # new
     new = sub.add_parser('new', help='Create a new .crumb file.')
@@ -5497,9 +5518,13 @@ def build_parser() -> argparse.ArgumentParser:
     from_otel.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
     from_otel.set_defaults(func=cmd_from_otel)
 
-    # from-halo (alias-of-sorts: same parser, HALO-friendly defaults)
-    from_halo = sub.add_parser('from-halo', help='Convert a HALO trace JSONL (https://github.com/context-labs/halo) into a kind=log crumb.')
-    from_halo.add_argument('file', help='Path to the HALO traces.jsonl file.')
+    # from-halo: hidden alias of from-otel with HALO-friendly defaults.
+    # HALO traces ARE standard OTEL JSONL; the canonical command is
+    # `from-otel`. The alias is kept for users who already have it in
+    # scripts. Hidden from --help so the surface stays neutral
+    # (argparse SUPPRESS skips it from listings but it still parses).
+    from_halo = sub.add_parser('from-halo', help=argparse.SUPPRESS)
+    from_halo.add_argument('file', help='Path to the trace JSONL file.')
     from_halo.add_argument('--title', help='Override the auto-generated title.')
     from_halo.add_argument('--source', default='halo', help='Source label (default: halo).')
     from_halo.add_argument('--project', help='Optional project= header.')
@@ -5593,12 +5618,6 @@ def build_parser() -> argparse.ArgumentParser:
                               help='[budget] print the report without writing the squeezed file.')
     optimize_cmd.set_defaults(func=cmd_optimize)
 
-    # Deprecated alias: `crumb compact` → `crumb optimize --mode minimal`
-    compact = sub.add_parser('compact', help='[deprecated] use `crumb optimize --mode minimal`.')
-    compact.add_argument('file', nargs='?', help='.crumb file to compact (default: stdin).')
-    compact.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
-    compact.set_defaults(func=_deprecated(cmd_compact, "`crumb compact` is deprecated; use `crumb optimize --mode minimal` instead. Removal scheduled for v0.10."))
-
     # diff
     diff = sub.add_parser('diff', help='Compare two .crumb files.')
     diff.add_argument('file_a', help='First .crumb file.')
@@ -5661,27 +5680,6 @@ def build_parser() -> argparse.ArgumentParser:
     todo_dream_new.add_argument('file', help='Path to a todo crumb.')
     todo_dream_new.set_defaults(func=cmd_todo_dream)
 
-    todo_add_cmd = sub.add_parser('todo-add', help='[deprecated] use `crumb todo add`.')
-    todo_add_cmd.add_argument('file', help='Path to a todo crumb (created if missing).')
-    todo_add_cmd.add_argument('tasks', nargs='+', help='Tasks to add.')
-    todo_add_cmd.add_argument('--title', '-t', help='Title (for new todo crumbs).')
-    todo_add_cmd.add_argument('--source', '-s', help='Source label.')
-    todo_add_cmd.set_defaults(func=_deprecated(cmd_todo_add, "`crumb todo-add` is deprecated; use `crumb todo add` instead. Removal scheduled for v0.10."))
-
-    todo_done_cmd = sub.add_parser('todo-done', help='[deprecated] use `crumb todo done`.')
-    todo_done_cmd.add_argument('file', help='Path to a todo crumb.')
-    todo_done_cmd.add_argument('query', help='Substring to match against open tasks.')
-    todo_done_cmd.set_defaults(func=_deprecated(cmd_todo_done, "`crumb todo-done` is deprecated; use `crumb todo done` instead. Removal scheduled for v0.10."))
-
-    todo_list_cmd = sub.add_parser('todo-list', help='[deprecated] use `crumb todo list`.')
-    todo_list_cmd.add_argument('file', nargs='?', help='Path to a todo crumb.')
-    todo_list_cmd.add_argument('--all', '-a', dest='show_all', action='store_true', help='Show completed tasks too.')
-    todo_list_cmd.set_defaults(func=_deprecated(cmd_todo_list, "`crumb todo-list` is deprecated; use `crumb todo list` instead. Removal scheduled for v0.10."))
-
-    todo_dream_cmd = sub.add_parser('todo-dream', help='[deprecated] use `crumb todo dream`.')
-    todo_dream_cmd.add_argument('file', help='Path to a todo crumb.')
-    todo_dream_cmd.set_defaults(func=_deprecated(cmd_todo_dream, "`crumb todo-dream` is deprecated; use `crumb todo dream` instead. Removal scheduled for v0.10."))
-
     # watch
     watch_cmd = sub.add_parser('watch', help='Watch crumbs and auto-dream when raw exceeds threshold.')
     watch_cmd.add_argument('target', help='File or directory to watch.')
@@ -5718,27 +5716,10 @@ def build_parser() -> argparse.ArgumentParser:
     template_cmd.add_argument('--output', '-o', default='-', help='Output file (for use).')
     template_cmd.set_defaults(func=cmd_template)
 
-    # share
-    # compress
-    compress_cmd = sub.add_parser('compress', help='[deprecated] use `crumb optimize --mode signal`.')
-    compress_cmd.add_argument('file', help='.crumb file to compress.')
-    compress_cmd.add_argument('-o', '--output', default='-', help='Output path (default: stdout).')
-    compress_cmd.add_argument('--target', type=float, default=0.5,
-                              help='Target retention ratio 0.0-1.0 (default: 0.5 = keep top 50%%).')
-    compress_cmd.add_argument('--metalk', action='store_true',
-                              help='Apply MeTalk caveman compression as Stage 3.')
-    compress_cmd.add_argument('--metalk-level', type=int, choices=[1, 2, 3], default=2,
-                              help='MeTalk level (default: 2).')
-    compress_cmd.set_defaults(func=_deprecated(cmd_compress, "`crumb compress` is deprecated; use `crumb optimize --mode signal` instead. Removal scheduled for v0.10."))
-
     # bench
     bench_cmd = sub.add_parser('bench', help='Benchmark compression efficiency and information density.')
     bench_cmd.add_argument('file', help='.crumb file to benchmark.')
     bench_cmd.set_defaults(func=cmd_bench)
-
-    share_cmd = sub.add_parser('share', help='[deprecated] use `crumb handoff` (clipboard) or paste the file directly.')
-    share_cmd.add_argument('file', help='.crumb file to share.')
-    share_cmd.set_defaults(func=_deprecated(cmd_share, "`crumb share` is deprecated and will be removed in v0.10. Use `crumb handoff` (clipboard) or paste the file content directly."))
 
     # handoff
     handoff_cmd = sub.add_parser('handoff', help='Copy a .crumb to clipboard for pasting into an AI tool.')
@@ -5839,11 +5820,6 @@ def build_parser() -> argparse.ArgumentParser:
     comply_cmd.add_argument('--framework', choices=['general', 'eu-ai-act', 'soc2'], default='general')
     comply_cmd.set_defaults(func=cmd_comply)
 
-    # --- Dashboard ---
-    dash_cmd = sub.add_parser('dashboard', help='[deprecated] use `crumb audit export --format html`.')
-    dash_cmd.add_argument('-o', '--output', default='agentauth-dashboard.html')
-    dash_cmd.set_defaults(func=_deprecated(cmd_dashboard, "`crumb dashboard` is deprecated and will be removed in v0.10. Use `crumb audit export --format html -o dashboard.html` instead."))
-
     # --- Format Bridges ---
     bridge_cmd = sub.add_parser('bridge', help='Convert between CRUMB and other AI formats.')
     bridge_sub = bridge_cmd.add_subparsers(dest='bridge_action', required=True)
@@ -5913,24 +5889,6 @@ def build_parser() -> argparse.ArgumentParser:
                           help='Local Ollama model to use when --ollama is set (default: llama3.2:3b).')
     pack_cmd.add_argument('--output', '-o', required=True, help='Output .crumb file path.')
     pack_cmd.set_defaults(func=cmd_pack)
-
-    # --- Squeeze (budget-aware packer) ---
-    squeeze_cmd = sub.add_parser('squeeze',
-                                 help='[deprecated] use `crumb optimize --mode budget --budget N`.')
-    squeeze_cmd.add_argument('file', help='.crumb file to squeeze.')
-    squeeze_cmd.add_argument('--budget', type=int, required=True,
-                             help='Target estimated token budget.')
-    squeeze_cmd.add_argument('--seen', help='Path to a seen-set file (defaults to ~/.crumb/seen or $CRUMB_SEEN_FILE).')
-    squeeze_cmd.add_argument('--seen-hash', action='append', default=[],
-                             help='Extra sha256:<hex> digests to treat as already-seen. Repeatable.')
-    squeeze_cmd.add_argument('--no-seen', action='store_true',
-                             help='Ignore any persisted seen set.')
-    squeeze_cmd.add_argument('--metalk-max-level', type=int, choices=[1, 2, 3], default=3,
-                             help='Highest MeTalk level to apply if folds + priorities are not enough (default: 3).')
-    squeeze_cmd.add_argument('--dry-run', action='store_true',
-                             help='Print the compression report without writing output.')
-    squeeze_cmd.add_argument('-o', '--output', default='-', help='Output file or - for stdout.')
-    squeeze_cmd.set_defaults(func=_deprecated(cmd_squeeze, "`crumb squeeze` is deprecated; use `crumb optimize --mode budget --budget N` instead. Removal scheduled for v0.10."))
 
     # --- Hash (content-addressed digest) ---
     hash_cmd = sub.add_parser('hash', help='Print the sha256 content digest of a CRUMB.')
@@ -6121,7 +6079,21 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
+    # Intercept `--help-all` before argparse triggers its default help
+    # path. We render the stashed full-help index ourselves so the
+    # default `--help` stays minimal.
+    if argv is None:
+        argv = sys.argv[1:]
+    if "--help-all" in argv:
+        print(parser.format_usage().rstrip())
+        print()
+        print(getattr(parser, "_full_help", ""))
+        sys.exit(0)
     args = parser.parse_args(argv)
+    if not getattr(args, "command", None):
+        # No subcommand and no recognized top-level flag — show core help.
+        parser.print_help()
+        sys.exit(0)
     args.func(args)
 
 

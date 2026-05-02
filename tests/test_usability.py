@@ -68,53 +68,36 @@ class TestTemplatesEmitV13:
         assert parsed["headers"]["v"] == "1.3"
 
 
-class TestDeprecatedAliases:
-    def test_todo_add_alias_prints_hint(self, tmp_path):
-        target = tmp_path / "t.crumb"
-        out, err, rc = _run_cli(
-            "todo-add", str(target), "first", "--title", "x", "--source", "t",
-        )
-        assert rc == 0
-        assert "[deprecated]" in err
-        assert "crumb todo add" in err
-        assert target.exists()
+class TestRemovedAliases:
+    """v0.11: the v0.7 deprecation aliases are gone for real now.
 
-    def test_todo_add_new_form_silent(self, tmp_path):
-        target = tmp_path / "t2.crumb"
+    Each removed name should now be rejected by argparse as an unknown
+    subcommand (exit 2). The replacement command (e.g. `crumb todo add`)
+    should continue to work.
+    """
+
+    @pytest.mark.parametrize("removed", [
+        "todo-add", "todo-done", "todo-list", "todo-dream",
+        "compact", "compress", "squeeze",
+        "share", "dashboard",
+    ])
+    def test_removed_alias_rejected(self, removed):
+        out, err, rc = _run_cli(removed, "--help")
+        # argparse exits 2 on invalid subcommand
+        assert rc == 2, f"{removed!r} should be unknown but exited {rc}"
+        assert "invalid choice" in err.lower() or removed in err
+
+    def test_canonical_replacements_still_work(self, tmp_path):
+        # The canonical names that replaced the deprecated aliases.
+        target = tmp_path / "t.crumb"
         out, err, rc = _run_cli(
             "todo", "add", str(target), "first", "--title", "x", "--source", "t",
         )
         assert rc == 0
-        assert "[deprecated]" not in err
-
-    def test_compress_alias_prints_hint(self, tmp_path):
-        src = tmp_path / "in.crumb"
-        src.write_text(
-            "BEGIN CRUMB\nv=1.3\nkind=mem\nsource=t\n---\n"
-            "[consolidated]\n- a\nEND CRUMB\n",
-            encoding="utf-8",
-        )
-        out, err, rc = _run_cli("compress", str(src), "-o", "-")
-        assert "[deprecated]" in err
-        assert "crumb optimize --mode signal" in err
-
-    def test_share_alias_prints_hint(self, tmp_path):
-        src = tmp_path / "x.crumb"
-        src.write_text(
-            "BEGIN CRUMB\nv=1.3\nkind=mem\nsource=t\n---\n"
-            "[consolidated]\n- a\nEND CRUMB\n",
-            encoding="utf-8",
-        )
-        # share command requires `gh` or generates a data URI; we just need
-        # to confirm the deprecation hint fires before any external dep.
-        out, err, rc = _run_cli("share", str(src))
-        assert "[deprecated]" in err
-        assert "crumb handoff" in err
-
-    def test_dashboard_alias_prints_hint(self, tmp_path):
-        out, err, rc = _run_cli("dashboard", "-o", str(tmp_path / "d.html"))
-        assert "[deprecated]" in err
-        assert "audit export --format html" in err
+        assert target.exists()
+        # Plain `crumb optimize --mode minimal/signal/budget` is the
+        # surviving path for the old compact/compress/squeeze trio
+        # (smoked elsewhere in TestOptimizeModes).
 
 
 class TestOptimizeModes:
@@ -210,8 +193,19 @@ class TestAgentAuthFirstUseNotice:
 
 
 class TestGroupedHelp:
-    def test_help_contains_grouped_index(self):
+    def test_help_shows_core_commands(self):
+        # v0.11: default --help shows only the core 5 commands plus a
+        # pointer to --help-all. The full grouped index moved behind
+        # --help-all.
         out, err, rc = _run_cli("--help")
+        assert rc == 0
+        assert "Core commands" in out
+        for cmd in ("new", "validate", "handoff", "receive", "lint"):
+            assert cmd in out
+        assert "--help-all" in out
+
+    def test_help_all_contains_grouped_index(self):
+        out, err, rc = _run_cli("--help-all")
         assert rc == 0
         # one group label per concern from build_parser()
         for label in ("Create:", "Inspect:", "Edit:", "Optimize:",
