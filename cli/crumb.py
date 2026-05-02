@@ -741,6 +741,40 @@ source={source}
     write_text(args.output, crumb_text)
 
 
+# ── from-otel / from-halo ────────────────────────────────────────────
+# Convert an OpenTelemetry-style JSONL trace into a kind=log crumb.
+# `from-halo` is a sibling alias with HALO-friendly defaults
+# (https://github.com/context-labs/halo). HALO traces are standard OTEL
+# JSONL; the underlying parser is shared.
+
+def cmd_from_otel(args: argparse.Namespace) -> None:
+    from cli import halo_bridge
+    text = halo_bridge.jsonl_to_log_crumb(
+        args.file,
+        title=args.title or f"OTEL trace from {Path(args.file).name}",
+        source=args.source,
+        project=args.project or "",
+    )
+    if args.output and args.output != "-":
+        Path(args.output).write_text(text, encoding="utf-8")
+    else:
+        sys.stdout.write(text)
+
+
+def cmd_from_halo(args: argparse.Namespace) -> None:
+    from cli import halo_bridge
+    text = halo_bridge.jsonl_to_log_crumb(
+        args.file,
+        title=args.title or f"HALO trace from {Path(args.file).name}",
+        source=args.source,
+        project=args.project or "",
+    )
+    if args.output and args.output != "-":
+        Path(args.output).write_text(text, encoding="utf-8")
+    else:
+        sys.stdout.write(text)
+
+
 # ── from-git ────────────────────────────────────────────────────────
 
 def _git_run(*cmd: str) -> str:
@@ -5102,6 +5136,13 @@ def cmd_delta(args: argparse.Namespace) -> None:
             title=args.title,
         )
     except ValueError as exc:
+        # "No content differences" is a soft no-op (base == target), not
+        # a failure. Exit 0 with a "Note:" prefix so CI scripts that
+        # diff for change detection don't get a false alarm. Other
+        # ValueError paths (malformed base/target) stay exit 1.
+        if "no content differences" in str(exc):
+            print(f"Note: {exc}", file=sys.stderr)
+            sys.exit(0)
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
     write_text(args.output, rendered)
@@ -5389,7 +5430,7 @@ def build_parser() -> argparse.ArgumentParser:
     grouped_help = dedent("""\
         Commands (use `crumb <cmd> --help` for details):
 
-          Create:    new   from-chat   from-git   import   template
+          Create:    new   from-chat   from-git   from-otel   from-halo   import   template
           Inspect:   validate   inspect   diff   search   bench
           Edit:      append   dream   merge   watch
           Optimize:  optimize   lint   metalk
@@ -5400,7 +5441,7 @@ def build_parser() -> argparse.ArgumentParser:
           Todo:      todo (add | done | list | dream)
           Other:     init   hooks   context   pack
 
-        Deprecated (removal scheduled for v0.9): compress, compact, squeeze,
+        Deprecated (removal scheduled for v0.10): compress, compact, squeeze,
         share, dashboard, todo-add, todo-done, todo-list, todo-dream.
     """).strip()
 
@@ -5446,6 +5487,24 @@ def build_parser() -> argparse.ArgumentParser:
                            help='Output kind: task (default) or mem (extracts decisions).')
     from_chat.add_argument('--constraints', '-c', nargs='*', help='Constraints as separate arguments.')
     from_chat.set_defaults(func=cmd_from_chat)
+
+    # from-otel
+    from_otel = sub.add_parser('from-otel', help='Convert an OpenTelemetry trace JSONL into a kind=log crumb.')
+    from_otel.add_argument('file', help='Path to the JSONL trace file.')
+    from_otel.add_argument('--title', help='Override the auto-generated title.')
+    from_otel.add_argument('--source', default='otel', help='Source label (default: otel).')
+    from_otel.add_argument('--project', help='Optional project= header.')
+    from_otel.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
+    from_otel.set_defaults(func=cmd_from_otel)
+
+    # from-halo (alias-of-sorts: same parser, HALO-friendly defaults)
+    from_halo = sub.add_parser('from-halo', help='Convert a HALO trace JSONL (https://github.com/context-labs/halo) into a kind=log crumb.')
+    from_halo.add_argument('file', help='Path to the HALO traces.jsonl file.')
+    from_halo.add_argument('--title', help='Override the auto-generated title.')
+    from_halo.add_argument('--source', default='halo', help='Source label (default: halo).')
+    from_halo.add_argument('--project', help='Optional project= header.')
+    from_halo.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
+    from_halo.set_defaults(func=cmd_from_halo)
 
     # from-git
     from_git = sub.add_parser('from-git', help='Generate a task crumb from recent git activity.')
@@ -5538,7 +5597,7 @@ def build_parser() -> argparse.ArgumentParser:
     compact = sub.add_parser('compact', help='[deprecated] use `crumb optimize --mode minimal`.')
     compact.add_argument('file', nargs='?', help='.crumb file to compact (default: stdin).')
     compact.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
-    compact.set_defaults(func=_deprecated(cmd_compact, "`crumb compact` is deprecated; use `crumb optimize --mode minimal` instead. Removal scheduled for v0.9."))
+    compact.set_defaults(func=_deprecated(cmd_compact, "`crumb compact` is deprecated; use `crumb optimize --mode minimal` instead. Removal scheduled for v0.10."))
 
     # diff
     diff = sub.add_parser('diff', help='Compare two .crumb files.')
@@ -5607,21 +5666,21 @@ def build_parser() -> argparse.ArgumentParser:
     todo_add_cmd.add_argument('tasks', nargs='+', help='Tasks to add.')
     todo_add_cmd.add_argument('--title', '-t', help='Title (for new todo crumbs).')
     todo_add_cmd.add_argument('--source', '-s', help='Source label.')
-    todo_add_cmd.set_defaults(func=_deprecated(cmd_todo_add, "`crumb todo-add` is deprecated; use `crumb todo add` instead. Removal scheduled for v0.9."))
+    todo_add_cmd.set_defaults(func=_deprecated(cmd_todo_add, "`crumb todo-add` is deprecated; use `crumb todo add` instead. Removal scheduled for v0.10."))
 
     todo_done_cmd = sub.add_parser('todo-done', help='[deprecated] use `crumb todo done`.')
     todo_done_cmd.add_argument('file', help='Path to a todo crumb.')
     todo_done_cmd.add_argument('query', help='Substring to match against open tasks.')
-    todo_done_cmd.set_defaults(func=_deprecated(cmd_todo_done, "`crumb todo-done` is deprecated; use `crumb todo done` instead. Removal scheduled for v0.9."))
+    todo_done_cmd.set_defaults(func=_deprecated(cmd_todo_done, "`crumb todo-done` is deprecated; use `crumb todo done` instead. Removal scheduled for v0.10."))
 
     todo_list_cmd = sub.add_parser('todo-list', help='[deprecated] use `crumb todo list`.')
     todo_list_cmd.add_argument('file', nargs='?', help='Path to a todo crumb.')
     todo_list_cmd.add_argument('--all', '-a', dest='show_all', action='store_true', help='Show completed tasks too.')
-    todo_list_cmd.set_defaults(func=_deprecated(cmd_todo_list, "`crumb todo-list` is deprecated; use `crumb todo list` instead. Removal scheduled for v0.9."))
+    todo_list_cmd.set_defaults(func=_deprecated(cmd_todo_list, "`crumb todo-list` is deprecated; use `crumb todo list` instead. Removal scheduled for v0.10."))
 
     todo_dream_cmd = sub.add_parser('todo-dream', help='[deprecated] use `crumb todo dream`.')
     todo_dream_cmd.add_argument('file', help='Path to a todo crumb.')
-    todo_dream_cmd.set_defaults(func=_deprecated(cmd_todo_dream, "`crumb todo-dream` is deprecated; use `crumb todo dream` instead. Removal scheduled for v0.9."))
+    todo_dream_cmd.set_defaults(func=_deprecated(cmd_todo_dream, "`crumb todo-dream` is deprecated; use `crumb todo dream` instead. Removal scheduled for v0.10."))
 
     # watch
     watch_cmd = sub.add_parser('watch', help='Watch crumbs and auto-dream when raw exceeds threshold.')
@@ -5670,7 +5729,7 @@ def build_parser() -> argparse.ArgumentParser:
                               help='Apply MeTalk caveman compression as Stage 3.')
     compress_cmd.add_argument('--metalk-level', type=int, choices=[1, 2, 3], default=2,
                               help='MeTalk level (default: 2).')
-    compress_cmd.set_defaults(func=_deprecated(cmd_compress, "`crumb compress` is deprecated; use `crumb optimize --mode signal` instead. Removal scheduled for v0.9."))
+    compress_cmd.set_defaults(func=_deprecated(cmd_compress, "`crumb compress` is deprecated; use `crumb optimize --mode signal` instead. Removal scheduled for v0.10."))
 
     # bench
     bench_cmd = sub.add_parser('bench', help='Benchmark compression efficiency and information density.')
@@ -5679,7 +5738,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     share_cmd = sub.add_parser('share', help='[deprecated] use `crumb handoff` (clipboard) or paste the file directly.')
     share_cmd.add_argument('file', help='.crumb file to share.')
-    share_cmd.set_defaults(func=_deprecated(cmd_share, "`crumb share` is deprecated and will be removed in v0.9. Use `crumb handoff` (clipboard) or paste the file content directly."))
+    share_cmd.set_defaults(func=_deprecated(cmd_share, "`crumb share` is deprecated and will be removed in v0.10. Use `crumb handoff` (clipboard) or paste the file content directly."))
 
     # handoff
     handoff_cmd = sub.add_parser('handoff', help='Copy a .crumb to clipboard for pasting into an AI tool.')
@@ -5783,7 +5842,7 @@ def build_parser() -> argparse.ArgumentParser:
     # --- Dashboard ---
     dash_cmd = sub.add_parser('dashboard', help='[deprecated] use `crumb audit export --format html`.')
     dash_cmd.add_argument('-o', '--output', default='agentauth-dashboard.html')
-    dash_cmd.set_defaults(func=_deprecated(cmd_dashboard, "`crumb dashboard` is deprecated and will be removed in v0.9. Use `crumb audit export --format html -o dashboard.html` instead."))
+    dash_cmd.set_defaults(func=_deprecated(cmd_dashboard, "`crumb dashboard` is deprecated and will be removed in v0.10. Use `crumb audit export --format html -o dashboard.html` instead."))
 
     # --- Format Bridges ---
     bridge_cmd = sub.add_parser('bridge', help='Convert between CRUMB and other AI formats.')
@@ -5871,7 +5930,7 @@ def build_parser() -> argparse.ArgumentParser:
     squeeze_cmd.add_argument('--dry-run', action='store_true',
                              help='Print the compression report without writing output.')
     squeeze_cmd.add_argument('-o', '--output', default='-', help='Output file or - for stdout.')
-    squeeze_cmd.set_defaults(func=_deprecated(cmd_squeeze, "`crumb squeeze` is deprecated; use `crumb optimize --mode budget --budget N` instead. Removal scheduled for v0.9."))
+    squeeze_cmd.set_defaults(func=_deprecated(cmd_squeeze, "`crumb squeeze` is deprecated; use `crumb optimize --mode budget --budget N` instead. Removal scheduled for v0.10."))
 
     # --- Hash (content-addressed digest) ---
     hash_cmd = sub.add_parser('hash', help='Print the sha256 content digest of a CRUMB.')

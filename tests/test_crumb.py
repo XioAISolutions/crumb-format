@@ -359,6 +359,22 @@ class TestCmdMerge:
 
 # ── cmd_diff ─────────────────────────────────────────────────────────
 
+class TestCmdDelta:
+    def test_delta_same_file_exits_zero(self, tmp_path, capsys):
+        # No content differences is a soft no-op, not an error. Exit
+        # 0 with a "Note:" so CI scripts that diff for change detection
+        # don't get a false alarm.
+        f = tmp_path / "m.crumb"
+        f.write_text(VALID_MEM)
+        with pytest.raises(SystemExit) as exc:
+            crumb.main(["delta", str(f), str(f)])
+        assert exc.value.code == 0
+        captured = capsys.readouterr()
+        assert "Note:" in captured.err
+        assert "no content differences" in captured.err
+        assert "Error:" not in captured.err
+
+
 class TestCmdDiff:
     def test_diff_identical(self, tmp_path, capsys):
         f1 = tmp_path / "a.crumb"

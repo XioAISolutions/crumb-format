@@ -1,7 +1,7 @@
---- task: feat(v1.4): cli/deadlines.py + lint --check-deadlines + 27 tests
+--- task: feat(halo): from-halo + from-otel bridges + agent failure-mode taxonomy
 source: github.pr
-pr: #24
-generated: 2026-04-30T18:45:19Z
+pr: #25
+generated: 2026-05-02T02:31:28Z
 ---
 
 [goal]
@@ -11,9 +11,12 @@ generated: 2026-04-30T18:45:19Z
 Changed files in this PR:
 - CHANGELOG.md
 - cli/crumb.py
-- cli/deadlines.py
-- cli/linting.py
-- tests/test_deadlines.py
+- cli/halo_bridge.py
+- docs/integrations/halo.md
+- docs/v1.4/agent-failure-modes.md
+- examples/halo-trace-to-log.crumb
+- tests/fixtures/halo-traces.jsonl
+- tests/test_halo_bridge.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions

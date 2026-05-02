@@ -18,7 +18,7 @@ Copy this and paste it into any AI:
 
 ```text
 BEGIN CRUMB
-v=1.1
+v=1.3
 kind=task
 title=Fix login redirect bug
 source=cursor.agent
@@ -39,7 +39,7 @@ Fix the bug where authenticated users are redirected back to /login after refres
 END CRUMB
 ```
 
-That's it. The next AI knows what to fix, what it can't change, and why.
+That's it. The next AI knows what to fix, what it can't change, and why. The `v=1.1`, `v=1.2`, and `v=1.3` formats are all accepted by every CRUMB validator — pick whichever your tool emits.
 
 ## Two real-world scenarios
 
@@ -49,7 +49,7 @@ That's it. The next AI knows what to fix, what it can't change, and why.
 
 ```text
 BEGIN CRUMB
-v=1.1
+v=1.3
 kind=mem
 title=Builder preferences
 source=human.notes
