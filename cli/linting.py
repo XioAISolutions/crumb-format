@@ -205,6 +205,19 @@ def lint_text(path: str, text: str, args: argparse.Namespace) -> tuple[list[Lint
                 )
             )
 
+    if getattr(args, "check_failure_modes", False):
+        from cli import failure_modes
+        checks_lines = parsed.get("sections", {}).get("checks", [])
+        for finding in failure_modes.check_failure_mode_lines(checks_lines):
+            findings.append(
+                LintFinding(
+                    "INFO",
+                    finding.code,
+                    f"[checks] line {finding.line_no}: {finding.message}",
+                    path,
+                )
+            )
+
     return findings, redacted
 
 

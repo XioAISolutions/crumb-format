@@ -43,7 +43,7 @@ REQUIRED_SECTIONS = {
     "delta": ["changes"],
     "agent": ["identity"],
 }
-CLI_VERSION = "0.9.0"
+CLI_VERSION = "0.10.0"
 SUPPORTED_VERSIONS = {"1.1", "1.2", "1.3"}
 FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
 CONTENT_REF_RE = re.compile(r"^sha256:[0-9a-f]{16,64}$")
@@ -6021,6 +6021,8 @@ def build_parser() -> argparse.ArgumentParser:
                           help='Warn when refs= entries do not resolve via SPEC v1.3 §17 rules.')
     lint_cmd.add_argument('--check-deadlines', action='store_true',
                           help='Warn when [handoff] deadline= values are malformed (per docs/v1.4/handoff-deadlines.md) or in the past.')
+    lint_cmd.add_argument('--check-failure-modes', action='store_true',
+                          help='Surface canonical agent failure-mode names in [checks] (per docs/v1.4/agent-failure-modes.md); suggest canonical replacements for ad-hoc names.')
     lint_cmd.set_defaults(func=cmd_lint)
 
     # --- Webhooks ---

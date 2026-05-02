@@ -1,18 +1,57 @@
 # Changelog
 
-## Unreleased
+## v0.10.0
 
-### HALO bridge: `crumb from-halo` and `crumb from-otel`
+### HALO/OTEL bridge, v1.4 surface completion, release fix-ups
 
-- New module `cli/halo_bridge.py`: parses OpenTelemetry-style trace JSONL and produces a `kind=log` crumb summarizing the trace. Permissive parser handles both flat-dict and OTLP `{key, value: {stringValue}}` attribute shapes, snake_case and camelCase keys, status codes with or without the `STATUS_CODE_` prefix, and string-typed nano timestamps. Garbage and non-object lines are skipped silently.
-- New CLI subcommands `crumb from-halo <file>` and `crumb from-otel <file>`. Same parser; HALO version sets `source=halo`, generic version sets `source=otel`. Both accept `--title`, `--project`, and `-o/--output`.
-- Worked example checked in at `examples/halo-trace-to-log.crumb` (generated from the synthetic fixture in `tests/fixtures/halo-traces.jsonl`).
-- Integration documentation at `docs/integrations/halo.md` covering the pipeline pattern, what the bridge surfaces, and why we don't grow a `kind=trace` primitive.
-- Companion v1.4 draft `docs/v1.4/agent-failure-modes.md`: canonical `[checks]` names for common agent failure modes (`hallucinated_tool_call`, `refusal_loop`, `tool_error_unhandled`, `semantic_drift`, `token_budget_exceeded`, `invalid_handoff_target`, `circular_reference`, `truncated_output`, `prompt_injection_suspected`, `unauthorized_tool_call`). Normative-by-convention; validators continue to accept any name.
-- 25 new tests in `tests/test_halo_bridge.py` covering parse permissiveness, OTLP attribute shapes, summary aggregation, end-to-end CLI for both subcommands, and round-trip validation.
-- 528 tests passing (was 500). 38 examples/fixtures validate clean against both Python and Node validators.
+No wire-format change. No new dependencies. Format stays at v=1.3.
 
-No wire-format change. No new dependencies.
+**HALO/OTEL bridge** (landed via #25)
+
+- `cli/halo_bridge.py` — permissive OTEL JSONL parser. Handles flat-dict
+  and OTLP attribute shapes, snake_case/camelCase keys, OTLP enum status
+  codes (numeric + string), out-of-range timestamps, scalar status
+  payloads, scalar `events` values, missing fields, and 4 envelope
+  shapes (`resourceSpans` / `scopeSpans` / legacy
+  `instrumentationLibrarySpans` / bare `spans` batches). Skips
+  non-span objects (debug logs) via a `_looks_like_span` gate. 20
+  Codex-caught defects, every one a real corner case from real OTEL
+  exporters.
+- `crumb from-halo <file>` and `crumb from-otel <file>` — same
+  parser, two entry points. Listed under Create in grouped `--help`.
+- `examples/halo-trace-to-log.crumb` — worked example.
+- `docs/integrations/halo.md` — pipeline pattern doc.
+- `docs/v1.4/agent-failure-modes.md` — 10 canonical `[checks]`
+  names for common agent failure modes.
+
+**v1.4 surface completion**
+
+- `cli/failure_modes.py` + `crumb lint --check-failure-modes` —
+  wires the canonical vocabulary into runtime. Emits INFO findings
+  for canonical names; suggests canonical replacements for ad-hoc
+  names via a 21+ pattern heuristic table.
+- `validators/validate.js` — JS deadline parser mirrors
+  `cli/deadlines.py`. Same form-first dispatch, same calendar
+  round-trip via `Date.UTC`, same explicit `Z`/`±HH:MM` regex.
+  Exported alongside `parseCrumb`.
+
+**Release fix-ups**
+
+- Deprecation calendar bumped v0.9 → v0.10. The v0.7 deprecations
+  (compress, compact, squeeze, share, dashboard, todo-add/-done/
+  -list/-dream) now scheduled for removal in v0.10. All shims still
+  function with `[deprecated]` stderr hints.
+- README "Try it right now" example modernized v=1.1 → v=1.3 with
+  a back-compat note that all three versions validate.
+- `crumb delta` same-file is now exit 0 with `Note:` instead of
+  exit 1 with `Error:`. No-op is not a failure for CI scripts
+  diffing for change detection.
+
+**Tests.** 595 passing (was 500 at v0.9.0). New: 40 halo_bridge,
+33 failure_modes, 16 JS deadline harness, 1 delta-no-op. All four
+new modules ship in the wheel.
+
+CLI_VERSION → 0.10.0.
 
 ## v0.9.0
 
