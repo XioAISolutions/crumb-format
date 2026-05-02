@@ -741,6 +741,40 @@ source={source}
     write_text(args.output, crumb_text)
 
 
+# ── from-otel / from-halo ────────────────────────────────────────────
+# Convert an OpenTelemetry-style JSONL trace into a kind=log crumb.
+# `from-halo` is a sibling alias with HALO-friendly defaults
+# (https://github.com/context-labs/halo). HALO traces are standard OTEL
+# JSONL; the underlying parser is shared.
+
+def cmd_from_otel(args: argparse.Namespace) -> None:
+    from cli import halo_bridge
+    text = halo_bridge.jsonl_to_log_crumb(
+        args.file,
+        title=args.title or f"OTEL trace from {Path(args.file).name}",
+        source=args.source,
+        project=args.project or "",
+    )
+    if args.output and args.output != "-":
+        Path(args.output).write_text(text, encoding="utf-8")
+    else:
+        sys.stdout.write(text)
+
+
+def cmd_from_halo(args: argparse.Namespace) -> None:
+    from cli import halo_bridge
+    text = halo_bridge.jsonl_to_log_crumb(
+        args.file,
+        title=args.title or f"HALO trace from {Path(args.file).name}",
+        source=args.source,
+        project=args.project or "",
+    )
+    if args.output and args.output != "-":
+        Path(args.output).write_text(text, encoding="utf-8")
+    else:
+        sys.stdout.write(text)
+
+
 # ── from-git ────────────────────────────────────────────────────────
 
 def _git_run(*cmd: str) -> str:
@@ -5389,7 +5423,7 @@ def build_parser() -> argparse.ArgumentParser:
     grouped_help = dedent("""\
         Commands (use `crumb <cmd> --help` for details):
 
-          Create:    new   from-chat   from-git   import   template
+          Create:    new   from-chat   from-git   from-otel   from-halo   import   template
           Inspect:   validate   inspect   diff   search   bench
           Edit:      append   dream   merge   watch
           Optimize:  optimize   lint   metalk
@@ -5446,6 +5480,24 @@ def build_parser() -> argparse.ArgumentParser:
                            help='Output kind: task (default) or mem (extracts decisions).')
     from_chat.add_argument('--constraints', '-c', nargs='*', help='Constraints as separate arguments.')
     from_chat.set_defaults(func=cmd_from_chat)
+
+    # from-otel
+    from_otel = sub.add_parser('from-otel', help='Convert an OpenTelemetry trace JSONL into a kind=log crumb.')
+    from_otel.add_argument('file', help='Path to the JSONL trace file.')
+    from_otel.add_argument('--title', help='Override the auto-generated title.')
+    from_otel.add_argument('--source', default='otel', help='Source label (default: otel).')
+    from_otel.add_argument('--project', help='Optional project= header.')
+    from_otel.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
+    from_otel.set_defaults(func=cmd_from_otel)
+
+    # from-halo (alias-of-sorts: same parser, HALO-friendly defaults)
+    from_halo = sub.add_parser('from-halo', help='Convert a HALO trace JSONL (https://github.com/context-labs/halo) into a kind=log crumb.')
+    from_halo.add_argument('file', help='Path to the HALO traces.jsonl file.')
+    from_halo.add_argument('--title', help='Override the auto-generated title.')
+    from_halo.add_argument('--source', default='halo', help='Source label (default: halo).')
+    from_halo.add_argument('--project', help='Optional project= header.')
+    from_halo.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
+    from_halo.set_defaults(func=cmd_from_halo)
 
     # from-git
     from_git = sub.add_parser('from-git', help='Generate a task crumb from recent git activity.')

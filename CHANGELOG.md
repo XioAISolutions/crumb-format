@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### HALO bridge: `crumb from-halo` and `crumb from-otel`
+
+- New module `cli/halo_bridge.py`: parses OpenTelemetry-style trace JSONL and produces a `kind=log` crumb summarizing the trace. Permissive parser handles both flat-dict and OTLP `{key, value: {stringValue}}` attribute shapes, snake_case and camelCase keys, status codes with or without the `STATUS_CODE_` prefix, and string-typed nano timestamps. Garbage and non-object lines are skipped silently.
+- New CLI subcommands `crumb from-halo <file>` and `crumb from-otel <file>`. Same parser; HALO version sets `source=halo`, generic version sets `source=otel`. Both accept `--title`, `--project`, and `-o/--output`.
+- Worked example checked in at `examples/halo-trace-to-log.crumb` (generated from the synthetic fixture in `tests/fixtures/halo-traces.jsonl`).
+- Integration documentation at `docs/integrations/halo.md` covering the pipeline pattern, what the bridge surfaces, and why we don't grow a `kind=trace` primitive.
+- Companion v1.4 draft `docs/v1.4/agent-failure-modes.md`: canonical `[checks]` names for common agent failure modes (`hallucinated_tool_call`, `refusal_loop`, `tool_error_unhandled`, `semantic_drift`, `token_budget_exceeded`, `invalid_handoff_target`, `circular_reference`, `truncated_output`, `prompt_injection_suspected`, `unauthorized_tool_call`). Normative-by-convention; validators continue to accept any name.
+- 25 new tests in `tests/test_halo_bridge.py` covering parse permissiveness, OTLP attribute shapes, summary aggregation, end-to-end CLI for both subcommands, and round-trip validation.
+- 528 tests passing (was 500). 38 examples/fixtures validate clean against both Python and Node validators.
+
+No wire-format change. No new dependencies.
+
 ## v0.9.0
 
 ### v1.4 deadlines — first implementation behind opt-in flag
