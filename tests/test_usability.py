@@ -192,6 +192,36 @@ class TestAgentAuthFirstUseNotice:
         assert "AgentAuth storage initialized" not in captured.err
 
 
+class TestMempalaceBridgeShim:
+    """v0.11: cli/mempalace_bridge.py was renamed to cli/memory_bridge.py.
+    The old import path stays as a wildcard re-export shim for one
+    release. Codex caught a P1 in the first draft of this shim where
+    it explicitly imported names that don't exist on the new module
+    (cmd_mempalace, adapters) and crashed on import.
+    """
+
+    def test_shim_imports_without_error(self):
+        # The literal regression: `import cli.mempalace_bridge` must not
+        # raise. (Codex finding P1 — broke outright in the first draft.)
+        import importlib
+        import cli.mempalace_bridge
+        importlib.reload(cli.mempalace_bridge)
+
+    def test_shim_reexports_public_surface(self):
+        import cli.mempalace_bridge as old
+        import cli.memory_bridge as new
+        # Each public name reachable through the new module must be
+        # reachable through the shim, AND they must be the same object
+        # (the shim isn't holding stale copies).
+        for name in ("MempalaceAdapter", "BridgeAdapter", "ADAPTERS",
+                     "get_adapter", "run_bridge_export", "run_bridge_import"):
+            assert hasattr(new, name), f"{name} missing from new module"
+            assert hasattr(old, name), f"{name} not re-exported by shim"
+            assert getattr(old, name) is getattr(new, name), (
+                f"{name} on shim is a different object than on the new module"
+            )
+
+
 class TestGroupedHelp:
     def test_help_shows_core_commands(self):
         # v0.11: default --help shows only the core 5 commands plus a

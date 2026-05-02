@@ -8,9 +8,9 @@ just the only adapter currently implemented. Code importing
 this shim in v0.12.
 """
 
+# Re-export every public name. We use a wildcard import so the shim
+# doesn't go stale when memory_bridge gains or loses helpers; explicit
+# import lists in a previous draft of this shim referenced names that
+# don't exist on the new module (cmd_mempalace, adapters) and broke
+# `import cli.mempalace_bridge` outright.
 from cli.memory_bridge import *  # noqa: F401,F403
-from cli.memory_bridge import (  # noqa: F401
-    MempalaceAdapter,
-    cmd_mempalace,
-    adapters,
-)
