@@ -118,6 +118,7 @@ MCP_TEMPLATE="${ASSETS}/mcp.json.template"
 #      if all four strategies produced a wrong path.
 
 CRUMB_INSTALL_PATH=""
+CRUMB_PYTHON=""  # path to the interpreter the MCP server should use
 
 # Strategy 1: invoke crumb's own interpreter.
 if command -v crumb >/dev/null 2>&1; then
@@ -126,6 +127,9 @@ if command -v crumb >/dev/null 2>&1; then
     CRUMB_PY="$(head -1 "$CRUMB_BIN" 2>/dev/null | sed -n 's|^#!\(.*\)|\1|p')"
     if [[ -n "$CRUMB_PY" && -x "$CRUMB_PY" ]]; then
         CRUMB_INSTALL_PATH="$("$CRUMB_PY" -c 'import crumb_cli, os; print(os.path.dirname(crumb_cli.__file__))' 2>/dev/null || echo "")"
+        if [[ -n "$CRUMB_INSTALL_PATH" ]]; then
+            CRUMB_PYTHON="$CRUMB_PY"
+        fi
     fi
 fi
 
@@ -134,12 +138,21 @@ if [[ -z "$CRUMB_INSTALL_PATH" ]] && command -v pip >/dev/null 2>&1; then
     PIP_LOC="$(pip show crumb-format 2>/dev/null | sed -n 's|^Location: ||p' | head -1)"
     if [[ -n "$PIP_LOC" && -d "${PIP_LOC}" ]]; then
         CRUMB_INSTALL_PATH="$PIP_LOC"
+        # If pip itself is on the same interpreter, use its python.
+        # Resolve via `pip --version` which prints the python it's bound to.
+        PIP_PY="$(python3 -c 'import sys; print(sys.executable)' 2>/dev/null || echo "")"
+        if [[ -n "$PIP_PY" && -x "$PIP_PY" ]]; then
+            CRUMB_PYTHON="$PIP_PY"
+        fi
     fi
 fi
 
 # Strategy 3: system python3.
 if [[ -z "$CRUMB_INSTALL_PATH" ]]; then
     CRUMB_INSTALL_PATH="$(python3 -c 'import crumb_cli, os; print(os.path.dirname(crumb_cli.__file__))' 2>/dev/null || echo "")"
+    if [[ -n "$CRUMB_INSTALL_PATH" ]]; then
+        CRUMB_PYTHON="$(command -v python3)"
+    fi
 fi
 
 # Strategy 4: walk up from a real script dir (only valid when not curl-piped).
@@ -147,6 +160,7 @@ if [[ -z "$CRUMB_INSTALL_PATH" && -n "$SCRIPT_DIR" && -d "$SCRIPT_DIR" ]]; then
     candidate="$(dirname "$(dirname "$SCRIPT_DIR")")"
     if [[ -f "${candidate}/mcp/server.py" ]]; then
         CRUMB_INSTALL_PATH="$candidate"
+        # No interpreter signal here; fall through to the default below.
     fi
 fi
 
@@ -159,23 +173,35 @@ if [[ ! -f "${CRUMB_INSTALL_PATH}/mcp/server.py" ]]; then
     exit 1
 fi
 
+# If no interpreter was identified (Strategy 4 only), fall back to
+# system python3. We'd rather record a path that's close-enough and
+# fail visibly than refuse to install. (Codex P1: hardcoded `python3`
+# in the template broke pipx/venv users; now it's resolved.)
+if [[ -z "$CRUMB_PYTHON" ]]; then
+    CRUMB_PYTHON="$(command -v python3 || echo python3)"
+fi
+
 if command -v jq >/dev/null 2>&1; then
     if [[ ! -f "$MCP_FILE" ]]; then
         echo '{"mcpServers": {}}' > "$MCP_FILE"
     fi
-    SERVER_JSON=$(sed "s|__CRUMB_INSTALL_PATH__|${CRUMB_INSTALL_PATH}|g" "$MCP_TEMPLATE")
+    SERVER_JSON=$(sed -e "s|__CRUMB_INSTALL_PATH__|${CRUMB_INSTALL_PATH}|g" \
+                      -e "s|__CRUMB_PYTHON__|${CRUMB_PYTHON}|g" \
+                      "$MCP_TEMPLATE")
     # Merge .mcpServers.crumb from the template into the existing file.
     tmp=$(mktemp)
     jq --argjson new "$(echo "$SERVER_JSON" | jq '.mcpServers')" \
         '.mcpServers = (.mcpServers // {}) * $new' \
         "$MCP_FILE" > "$tmp"
     mv "$tmp" "$MCP_FILE"
-    echo "  +  crumb MCP server registered"
+    echo "  +  crumb MCP server registered (interpreter: ${CRUMB_PYTHON})"
 else
     echo "  !  jq not found; skipping automatic MCP merge."
     echo "     Manually merge this into ${MCP_FILE}:"
     echo "     ----"
-    sed "s|__CRUMB_INSTALL_PATH__|${CRUMB_INSTALL_PATH}|g" "$MCP_TEMPLATE" | sed 's/^/     /'
+    sed -e "s|__CRUMB_INSTALL_PATH__|${CRUMB_INSTALL_PATH}|g" \
+        -e "s|__CRUMB_PYTHON__|${CRUMB_PYTHON}|g" \
+        "$MCP_TEMPLATE" | sed 's/^/     /'
     echo "     ----"
 fi
 
@@ -188,9 +214,21 @@ if [[ -f "./CLAUDE.md" ]]; then
     # looked for `"crumb it"` without). The marker is stable.
     if grep -qF "<!-- Added by crumb-format/integrations/claude-code/install.sh -->" ./CLAUDE.md 2>/dev/null; then
         echo "==> ./CLAUDE.md already has the 'crumb it' block — skipping"
+    elif [[ ! -t 0 ]]; then
+        # Non-interactive stdin (CI, redirected, curl-piped through sh).
+        # Don't prompt — silently skip and tell the user how to do it
+        # manually. Otherwise `read` would either block indefinitely
+        # or hit EOF and (with set -e) abort the install AFTER the
+        # commands+MCP have already been written, leaving a partial
+        # install with exit 1. (Codex P1.)
+        echo "==> ./CLAUDE.md exists; not prompting (non-interactive stdin)."
+        echo "    To append the 'crumb it' verbal-trigger block manually:"
+        echo "    cat ${ASSETS}/CLAUDE.md.template >> ./CLAUDE.md"
     else
         echo "==> ./CLAUDE.md exists. Append the 'crumb it' verbal-trigger block? [y/N]"
-        read -r yn
+        # `|| yn=""` defends against EOF on stdin if it slipped past
+        # the -t 0 check (e.g. tty closed mid-prompt).
+        read -r yn || yn=""
         if [[ "$yn" =~ ^[Yy] ]]; then
             {
                 echo
