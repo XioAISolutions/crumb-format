@@ -6082,6 +6082,14 @@ def build_parser() -> argparse.ArgumentParser:
                              help='Days before a room is considered stale (default: 30).')
     reflect_cmd.set_defaults(func=cmd_reflect)
 
+    # Suppress argparse's auto-generated subcommand table from `--help`.
+    # The five core commands are listed in the parser description; the
+    # full ~40-command index lives behind `--help-all` (rendered from
+    # the stashed `_full_help` string in main()). Without this, argparse
+    # appends every subcommand under "positional arguments:" — exactly
+    # the overwhelming default the two-tier flow exists to remove.
+    sub._choices_actions = []
+
     return parser
 
 

@@ -310,6 +310,34 @@ class TestGroupedHelp:
             assert cmd in out
         assert "--help-all" in out
 
+    def test_help_does_not_dump_all_subcommands(self):
+        # Codex P2: argparse's auto-rendered subcommand table under
+        # "positional arguments:" was leaking the full ~40-command
+        # list into --help, defeating the two-tier flow. We clear
+        # sub._choices_actions to suppress that table.
+        out, err, rc = _run_cli("--help")
+        assert rc == 0
+        # The subcommand table renders each command on its own indented
+        # line. Look for that signature on non-core names that don't
+        # also appear in our description prose.
+        import re
+        for non_core in ("palace", "guardrails", "passport",
+                         "metalk", "from-chat", "from-otel",
+                         "audit", "policy", "comply", "webhook",
+                         "delta", "apply", "seen", "hash", "resolve"):
+            # Pattern: 2+ spaces, name, then spaces or newline (the
+            # argparse table format). Doesn't match prose like "format
+            # bridges" or "audit trail".
+            pattern = r"^ {2,}" + re.escape(non_core) + r"(?:\s|$)"
+            assert not re.search(pattern, out, re.MULTILINE), (
+                f"non-core command {non_core!r} leaked into --help table"
+            )
+        # And the output should be short — sanity-check ~40 lines or
+        # less so we don't silently regrow.
+        assert out.count("\n") < 40, (
+            f"--help is {out.count(chr(10))} lines; should be ~30 or less"
+        )
+
     def test_help_all_contains_grouped_index(self):
         out, err, rc = _run_cli("--help-all")
         assert rc == 0
