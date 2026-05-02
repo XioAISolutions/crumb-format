@@ -125,6 +125,15 @@ class TestParseSpan:
         assert s.name == ""
         assert s.start_unix_nano == 0
 
+    def test_scalar_events_payload(self):
+        # Codex finding: list(record.get("events") or []) raises TypeError
+        # when events is a non-iterable scalar (e.g. {"events": 1} from
+        # flattened or hand-rolled exports). Now collapses to [].
+        assert parse_span({"events": 1}).events == []
+        assert parse_span({"events": "not-a-list"}).events == []
+        assert parse_span({"events": None}).events == []
+        assert parse_span({"events": [{"name": "evt"}]}).events == [{"name": "evt"}]
+
 
 # ── read_otel_jsonl ────────────────────────────────────────────────────
 
@@ -206,6 +215,31 @@ class TestReadJsonl:
         )
         spans = list(read_otel_jsonl(path))
         assert [s.name for s in spans] == ["a", "b"]
+
+    def test_parse_span_failure_doesnt_abort_read(self, tmp_path, monkeypatch):
+        # Belt-and-suspenders: if some future corner case slips past
+        # parse_span's individual hardening, the read loop catches it
+        # and continues to the next span. Simulate by monkey-patching
+        # parse_span to raise on a specific name.
+        from cli import halo_bridge
+
+        original = halo_bridge.parse_span
+
+        def flaky(record):
+            if record.get("name") == "boom":
+                raise ValueError("simulated parse failure")
+            return original(record)
+
+        monkeypatch.setattr(halo_bridge, "parse_span", flaky)
+        path = tmp_path / "t.jsonl"
+        path.write_text(
+            json.dumps({"name": "ok-1"}) + "\n"
+            + json.dumps({"name": "boom"}) + "\n"
+            + json.dumps({"name": "ok-2"}) + "\n",
+            encoding="utf-8",
+        )
+        names = [s.name for s in halo_bridge.read_otel_jsonl(path)]
+        assert names == ["ok-1", "ok-2"]
 
     def test_mixed_envelope_and_flat_lines(self, tmp_path):
         # A real-world export might mix shapes line-to-line.

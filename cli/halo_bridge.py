@@ -152,7 +152,10 @@ def parse_span(record: dict) -> Span:
         status_code=status_code,
         status_message=status_message,
         attributes=_flatten_attributes(record.get("attributes")),
-        events=list(record.get("events") or []),
+        # Guard against non-list `events` payloads (e.g. {"events": 1}
+        # from flattened or hand-rolled exports). list(scalar) raises
+        # TypeError, which would abort the whole read_otel_jsonl pass.
+        events=list(record["events"]) if isinstance(record.get("events"), list) else [],
         raw=record,
     )
 
@@ -212,8 +215,19 @@ def read_otel_jsonl(path: str | Path) -> Iterator[Span]:
             if not isinstance(record, dict):
                 continue
             for span_dict in _expand_otlp_envelope(record):
-                if isinstance(span_dict, dict):
+                if not isinstance(span_dict, dict):
+                    continue
+                # Belt-and-suspenders: parse_span is hardened against
+                # known-bad shapes (scalar status, non-list events,
+                # etc.), but real-world JSONL has surprised us before.
+                # A single span that triggers a new corner case
+                # shouldn't abort the whole file — drop it and
+                # continue, matching the bridge's stated permissive
+                # contract.
+                try:
                     yield parse_span(span_dict)
+                except (TypeError, AttributeError, ValueError):
+                    continue
 
 
 def _format_duration_ms(span: Span) -> str:
