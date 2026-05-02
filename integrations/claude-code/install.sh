@@ -9,9 +9,43 @@ CLAUDE_DIR="${HOME}/.claude"
 COMMANDS_DIR="${CLAUDE_DIR}/commands"
 MCP_FILE="${CLAUDE_DIR}/.mcp.json"
 
-# Resolve this script's directory so the source paths work regardless
-# of where the user invokes it from.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The asset root contains commands/, mcp.json.template, CLAUDE.md.template.
+# It's normally <repo>/integrations/claude-code (the dir containing this
+# script). But the README advertises `bash <(curl ...)` direct install,
+# which runs from /dev/fd/* — there are no sibling files there. In that
+# case (or when BASH_SOURCE points at a tempfile / process-substitution),
+# fetch the assets from GitHub raw to a tmp dir and use that as ASSETS.
+# (Codex P1 caught this: the previous version assumed SCRIPT_DIR worked
+# regardless of invocation mode and aborted on cp.)
+SCRIPT_SOURCE="${BASH_SOURCE[0]:-$0}"
+SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_SOURCE")" 2>/dev/null && pwd || echo "")"
+
+CRUMB_INSTALL_BRANCH="${CRUMB_INSTALL_BRANCH:-main}"
+ASSETS_BASE_URL="${CRUMB_ASSETS_BASE_URL:-https://raw.githubusercontent.com/XioAISolutions/crumb-format/${CRUMB_INSTALL_BRANCH}/integrations/claude-code}"
+
+if [[ -n "$SCRIPT_DIR" && -f "${SCRIPT_DIR}/commands/crumb-export.md" ]]; then
+    # Local checkout — use the script's own directory.
+    ASSETS="$SCRIPT_DIR"
+else
+    # Process-substitution / curl-pipe / oddly-relocated install. Fetch
+    # the assets to a tmp dir.
+    if ! command -v curl >/dev/null 2>&1; then
+        echo "ERROR: cannot locate integration assets locally and curl isn't available to fetch them." >&2
+        echo "       Either clone the repo and run integrations/claude-code/install.sh from there," >&2
+        echo "       or install curl and re-run." >&2
+        exit 1
+    fi
+    ASSETS="$(mktemp -d)"
+    trap 'rm -rf "$ASSETS"' EXIT
+    echo "==> Fetching install assets from ${ASSETS_BASE_URL}"
+    mkdir -p "${ASSETS}/commands"
+    for path in commands/crumb-export.md commands/crumb-import.md mcp.json.template CLAUDE.md.template; do
+        if ! curl -fsSL "${ASSETS_BASE_URL}/${path}" -o "${ASSETS}/${path}"; then
+            echo "ERROR: failed to fetch ${path} from ${ASSETS_BASE_URL}" >&2
+            exit 1
+        fi
+    done
+fi
 
 # ── Prereq: crumb-format must be on PATH ──────────────────────────
 if ! command -v crumb >/dev/null 2>&1; then
@@ -32,7 +66,7 @@ mkdir -p "$COMMANDS_DIR"
 # ── 1. Slash commands ──────────────────────────────────────────────
 echo "==> Installing slash commands to ${COMMANDS_DIR}/"
 for cmd in crumb-export crumb-import; do
-    src="${SCRIPT_DIR}/commands/${cmd}.md"
+    src="${ASSETS}/commands/${cmd}.md"
     dst="${COMMANDS_DIR}/${cmd}.md"
     if [[ -f "$dst" ]] && cmp -s "$src" "$dst"; then
         echo "  =  ${cmd} already up to date"
@@ -47,7 +81,7 @@ done
 # is naive (jq required) — if jq isn't present, print the snippet and
 # let the user paste it.
 echo "==> Registering MCP server in ${MCP_FILE}"
-MCP_TEMPLATE="${SCRIPT_DIR}/mcp.json.template"
+MCP_TEMPLATE="${ASSETS}/mcp.json.template"
 # crumb_cli.py sits at the repo/package root (next to mcp/, cli/, validators/),
 # so dirname(crumb_cli.__file__) IS the install root. Walking up twice — as
 # the previous version did — pointed one directory above and produced a
@@ -107,11 +141,11 @@ if [[ -f "./CLAUDE.md" ]]; then
             {
                 echo
                 echo "<!-- Added by crumb-format/integrations/claude-code/install.sh -->"
-                cat "${SCRIPT_DIR}/CLAUDE.md.template"
+                cat "${ASSETS}/CLAUDE.md.template"
             } >> ./CLAUDE.md
             echo "  +  appended"
         else
-            echo "  =  skipped (you can append manually from ${SCRIPT_DIR}/CLAUDE.md.template)"
+            echo "  =  skipped (you can append manually from ${ASSETS}/CLAUDE.md.template)"
         fi
     fi
 fi
