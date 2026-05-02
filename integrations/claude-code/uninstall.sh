@@ -38,11 +38,21 @@ done
 
 if [[ -f "$MCP_FILE" ]] && command -v jq >/dev/null 2>&1; then
     if jq -e '.mcpServers.crumb' "$MCP_FILE" >/dev/null 2>&1; then
-        tmp=$(mktemp)
-        jq 'del(.mcpServers.crumb)' "$MCP_FILE" > "$tmp"
-        mv "$tmp" "$MCP_FILE"
-        echo "  -  crumb MCP server entry"
-        removed=$((removed+1))
+        # Only delete the entry if install.sh wrote it. install.sh
+        # tags every entry it creates with `_managed_by`. An entry
+        # without that marker either pre-dates install.sh or was
+        # hand-edited by the user — deleting it would violate the
+        # "removes only what install.sh added" contract. (Codex P1.)
+        if jq -e '.mcpServers.crumb._managed_by == "crumb-format/integrations/claude-code/install.sh"' "$MCP_FILE" >/dev/null 2>&1; then
+            tmp=$(mktemp)
+            jq 'del(.mcpServers.crumb)' "$MCP_FILE" > "$tmp"
+            mv "$tmp" "$MCP_FILE"
+            echo "  -  crumb MCP server entry"
+            removed=$((removed+1))
+        else
+            echo "  !  crumb MCP server entry has no install.sh marker; preserved"
+            preserved=$((preserved+1))
+        fi
     fi
 fi
 
