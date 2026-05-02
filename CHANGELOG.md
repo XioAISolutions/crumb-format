@@ -1,5 +1,68 @@
 # Changelog
 
+## v1.0.0
+
+### v1.4 wire format normative + 1.0 release marker
+
+The wire format is now stable. v=1.4 lands normatively, the SPEC is
+labeled "Stable" rather than "Draft", and the project moves to its
+first 1.0 release.
+
+**Wire-format additions** (all backward-compatible per SPEC §8 — a
+v1.3 parser accepts a v1.4 file by ignoring unknown semantics):
+
+- **§11.4 — `[handoff] deadline=` ISO-8601 normative.** Two accepted
+  forms: date-only `YYYY-MM-DD` (receiver-local) or datetime
+  `YYYY-MM-DDTHH:MM:SS<tz>` with required `Z` or `±HH:MM` suffix.
+  Other ISO-8601 variants explicitly NOT permitted (no fractional
+  seconds, no second-precision offsets, no missing seconds).
+  Validator emits WARN on malformed values, never raises.
+- **§21.1.1 — typed `[checks]` thresholds.** Four annotations
+  reserved with normative semantics: `value=`, `threshold=`, `op=`
+  (default `>=`), `unit=`. When all of value/threshold/op are
+  present, status MUST agree with the comparison (`pass` for true,
+  `fail` for false). `warn`/`skip`/`pending` opt out.
+- **§21.1.2 — canonical failure-mode names.** Ten closed-list names
+  (`hallucinated_tool_call`, `refusal_loop`, `tool_error_unhandled`,
+  `semantic_drift`, `token_budget_exceeded`, `invalid_handoff_target`,
+  `circular_reference`, `truncated_output`, `prompt_injection_suspected`,
+  `unauthorized_tool_call`) are normative-by-convention. Validators
+  continue to accept any name; receivers SHOULD recognize these.
+
+**Validators**
+
+- `validators/validate.py` and `validators/validate.js` both add
+  `"1.4"` to `SUPPORTED_VERSIONS`. v=1.5+ continues to reject
+  (whitelist enforced; sanity test added).
+- `cli/crumb.py` matches.
+
+**Templates**
+
+- `crumb new <kind>` defaults to emitting `v=1.4` for all 6 kinds.
+- v=1.1, v=1.2, v=1.3 continue to validate on the parser side.
+
+**Examples**
+
+- `examples/v14-release-gate.crumb` — worked example combining
+  normative deadlines, typed checks, and canonical failure-mode
+  names. Validates clean against both validators.
+
+**Tests**
+
+- New `tests/test_v14_normative.py` (20 cases): version acceptance
+  whitelist, template emission, SPEC.md amendments cross-checked
+  against the runtime canonical-names list, Node validator parity.
+- 637 tests passing total (was 614 at v0.11.0).
+
+**1.0 commitment**
+
+Post-1.0, the wire-format spec is treated as stable. Future
+additions must be backward-compatible (additive headers and
+sections only, per §8) or wait for a v2.0. CLI surface continues
+to evolve under semver minor bumps.
+
+CLI_VERSION → 1.0.0. pyproject.toml version → 1.0.0.
+
 ## v0.11.0
 
 ### Simplification + neutral naming

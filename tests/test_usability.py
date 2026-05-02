@@ -33,9 +33,15 @@ def _run_cli(*args, env=None, cwd=None):
     return proc.stdout, proc.stderr, proc.returncode
 
 
-class TestTemplatesEmitV13:
+class TestTemplatesEmitCurrentVersion:
+    """Templates emit the current normative wire-format version
+    (`v=1.4` since the 1.0.0 release). Backward compat with v=1.1,
+    v=1.2, v=1.3 is preserved on the parser side but not on the
+    emitter — new files default to the current normative version.
+    """
+
     @pytest.mark.parametrize("kind", ["task", "mem", "map", "log", "todo"])
-    def test_default_template_emits_v13(self, kind, tmp_path, capsys):
+    def test_default_template_emits_v14(self, kind, tmp_path, capsys):
         out_path = tmp_path / f"x.crumb"
         argv = [
             "new", kind, "--title", "smoke", "--source", "test",
@@ -54,9 +60,9 @@ class TestTemplatesEmitV13:
         crumb.main(argv)
         text = out_path.read_text(encoding="utf-8")
         parsed = crumb.parse_crumb(text)
-        assert parsed["headers"]["v"] == "1.3", f"{kind} template not bumped"
+        assert parsed["headers"]["v"] == "1.4", f"{kind} template not bumped"
 
-    def test_agent_template_still_emits_v13(self, tmp_path):
+    def test_agent_template_emits_v14(self, tmp_path):
         out_path = tmp_path / "agent.crumb"
         crumb.main([
             "new", "agent",
@@ -65,7 +71,7 @@ class TestTemplatesEmitV13:
             "-o", str(out_path),
         ])
         parsed = crumb.parse_crumb(out_path.read_text(encoding="utf-8"))
-        assert parsed["headers"]["v"] == "1.3"
+        assert parsed["headers"]["v"] == "1.4"
 
 
 class TestRemovedAliases:

@@ -12,7 +12,7 @@ const REQUIRED_SECTIONS = {
   delta: ["changes"],
   agent: ["identity"],
 };
-const SUPPORTED_VERSIONS = new Set(["1.1", "1.2", "1.3"]);
+const SUPPORTED_VERSIONS = new Set(["1.1", "1.2", "1.3", "1.4"]);
 const FOLD_SECTION_RE = /^fold:([^/]+)\/(summary|full)$/;
 const HANDOFF_ID_RE = /^[a-zA-Z0-9_-]+$/;
 const WORKFLOW_LINE_RE = /^\s*-?\s*(\d+)[.)]\s*(.+)$/;
