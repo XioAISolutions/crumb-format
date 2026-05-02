@@ -2,6 +2,45 @@
 
 ## Unreleased
 
+### v1.4 surface completion: `lint --check-failure-modes` + JS deadline mirror
+
+Two follow-ons that pay off the v0.9 deadlines work and the HALO bridge by
+making both runnable in tooling, not just documented.
+
+**`cli/failure_modes.py` + `crumb lint --check-failure-modes`** — wires the
+canonical failure-mode vocabulary from `docs/v1.4/agent-failure-modes.md`
+into the lint pass. Walks `[checks]` lines:
+- Canonical names (e.g. `hallucinated_tool_call :: detected`) emit an
+  INFO finding so consumers can grep them.
+- Ad-hoc names that heuristically map to canonical ones (e.g.
+  `hallucination`, `cycle`, `jailbreak`) emit an INFO suggestion with
+  the canonical replacement. Heuristics use case-insensitive,
+  separator-insensitive substring matching against a hand-curated table.
+- Names that don't match any canonical pattern stay silent — the lint
+  doesn't false-correct.
+
+INFO level intentionally — failure-mode surfacing is informational, not
+an error. `--strict` still only escalates WARN-level findings.
+
+**JS validator deadline parser** — mirrors `cli/deadlines.py` in
+`validators/validate.js`. Same form-first dispatch (date-only vs
+datetime), same calendar round-trip via `Date.UTC` to dodge offset
+ambiguity, same explicit `Z` / `±HH:MM` requirement. Exported alongside
+`parseCrumb` so downstream Node consumers (lint scripts, IDE plugins)
+get parity with the Python implementation.
+
+**Tests**
+- 33 new cases in `tests/test_failure_modes.py` covering canonical lookup,
+  21 ad-hoc-to-canonical mappings, line-walker behavior, and lint-flag
+  integration. Includes a sanity check that the in-code list matches
+  the doc.
+- 16 new cases in `tests/test_validate_js_deadlines.py` shelling out to
+  Node to confirm cross-language parity — happy paths for date/datetime
+  forms, 9 reject cases, overdue checks, and confirmation that
+  `parseCrumb` still works alongside the new exports.
+- 579 tests passing total (was 528). Both validators clean on 38/38
+  example/fixture files.
+
 ### HALO bridge: `crumb from-halo` and `crumb from-otel`
 
 - New module `cli/halo_bridge.py`: parses OpenTelemetry-style trace JSONL and produces a `kind=log` crumb summarizing the trace. Permissive parser handles both flat-dict and OTLP `{key, value: {stringValue}}` attribute shapes, snake_case and camelCase keys, status codes with or without the `STATUS_CODE_` prefix, and string-typed nano timestamps. Garbage and non-object lines are skipped silently.

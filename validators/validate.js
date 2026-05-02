@@ -290,6 +290,105 @@ function main() {
   process.exit(exitCode);
 }
 
+// ── deadlines (v1.4 draft) ────────────────────────────────────────
+// Mirrors cli/deadlines.py per docs/v1.4/handoff-deadlines.md. Two
+// accepted forms, form-first dispatch, calendar round-trip. Public so
+// downstream Node consumers (lint scripts, IDE plugins) can call it.
+
+const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const DATETIME_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(Z|[+-]\d{2}:\d{2})$/;
+
+class DeadlineParseError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "DeadlineParseError";
+  }
+}
+
+function parseDeadline(value) {
+  if (typeof value !== "string" || value === "") {
+    throw new DeadlineParseError("deadline value must be a non-empty string");
+  }
+  if (value.includes("T")) {
+    return _parseDeadlineDatetime(value);
+  }
+  return _parseDeadlineDate(value);
+}
+
+function _parseDeadlineDate(value) {
+  const m = value.match(DATE_ONLY_RE);
+  if (!m) {
+    throw new DeadlineParseError(`date-only deadline must be YYYY-MM-DD; got ${JSON.stringify(value)}`);
+  }
+  const [_, y, mo, d] = m;
+  const year = +y, month = +mo, day = +d;
+  // Construct local-midnight Date matching receiver-local semantics.
+  // Do NOT use `new Date(value)` or `value + "T00:00:00Z"` — both
+  // shift the date by the local offset in non-UTC zones.
+  const dt = new Date(year, month - 1, day);
+  // Round-trip: new Date(2026, 12, 1) does NOT throw — it rolls over to
+  // January 2027. Compare components back against input; mismatch means
+  // the input was out of range.
+  if (
+    dt.getFullYear() !== year ||
+    dt.getMonth() !== month - 1 ||
+    dt.getDate() !== day
+  ) {
+    throw new DeadlineParseError(`date-only deadline ${JSON.stringify(value)} is not a real calendar date`);
+  }
+  return { kind: "date", value: dt };
+}
+
+function _parseDeadlineDatetime(value) {
+  const m = value.match(DATETIME_RE);
+  if (!m) {
+    throw new DeadlineParseError(`datetime deadline must be YYYY-MM-DDTHH:MM:SS with Z or ±HH:MM; got ${JSON.stringify(value)}`);
+  }
+  const [_, y, mo, d, h, mi, s] = m;
+  const year = +y, month = +mo, day = +d, hour = +h, minute = +mi, second = +s;
+  // Calendar round-trip via Date.UTC. Using getHours/getMonth on a
+  // parsed instant returns local-converted wall time, not the original
+  // offset's wall time, so a +02:00 deadline would falsely mismatch.
+  // Pretending the captured Y/M/D/h/m/s came from UTC, then comparing
+  // getUTC* of the resulting Date back, validates calendar correctness
+  // independently of the offset (which the regex already enforced).
+  const tsUtc = Date.UTC(year, month - 1, day, hour, minute, second);
+  const back = new Date(tsUtc);
+  if (
+    back.getUTCFullYear() !== year ||
+    back.getUTCMonth() !== month - 1 ||
+    back.getUTCDate() !== day ||
+    back.getUTCHours() !== hour ||
+    back.getUTCMinutes() !== minute ||
+    back.getUTCSeconds() !== second
+  ) {
+    throw new DeadlineParseError(`datetime deadline ${JSON.stringify(value)} is not a real timestamp`);
+  }
+  // Build the final aware Date by parsing the original string (which
+  // includes the offset). At this point the regex + round-trip have
+  // proven the value is well-formed and calendar-valid.
+  const finalTs = Date.parse(value);
+  return { kind: "datetime", value: new Date(finalTs) };
+}
+
+function isOverdueDeadline(parsed, now) {
+  // Defensively normalize naive `now` to current UTC instant.
+  const nowDate = (now instanceof Date) ? now : new Date();
+  if (parsed.kind === "date") {
+    // Receiver-local: compare against today in local time.
+    const today = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+    return parsed.value < today;
+  }
+  return parsed.value < nowDate;
+}
+
+module.exports = {
+  parseCrumb,
+  parseDeadline,
+  isOverdueDeadline,
+  DeadlineParseError,
+};
+
 if (require.main === module) {
   main();
 }
