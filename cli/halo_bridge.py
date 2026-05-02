@@ -72,15 +72,21 @@ def _canonicalize_status_code(raw) -> str:
 
 
 def _coerce_int(value) -> int:
-    """OTEL nano timestamps come as int, str, or float depending on the SDK."""
+    """OTEL nano timestamps come as int, str, or float depending on the SDK.
+
+    Returns 0 on any failure — including OverflowError, which fires when
+    a string like ``"1e309"`` parses as ``float('inf')`` and then fails
+    ``int(inf)``. Permissive contract: a single malformed timestamp
+    shouldn't abort the whole read pass.
+    """
     if value is None:
         return 0
     try:
         return int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         try:
             return int(float(value))
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):
             return 0
 
 
@@ -234,7 +240,7 @@ def read_otel_jsonl(path: str | Path) -> Iterator[Span]:
                 # contract.
                 try:
                     yield parse_span(span_dict)
-                except (TypeError, AttributeError, ValueError):
+                except (TypeError, AttributeError, ValueError, OverflowError):
                     continue
 
 

@@ -120,6 +120,16 @@ class TestParseSpan:
         s = parse_span({"startTimeUnixNano": "1700000000000000000"})
         assert s.start_unix_nano == 1700000000000000000
 
+    def test_overflow_string_nano_timestamp_collapses_to_zero(self):
+        # Codex finding: float("1e309") returns inf, and int(inf) raises
+        # OverflowError. _coerce_int must catch that and return 0 to
+        # preserve the permissive-parsing contract.
+        s = parse_span({"startTimeUnixNano": "1e309"})
+        assert s.start_unix_nano == 0
+        # Even "1e500" → inf → fall back to 0; doesn't propagate.
+        s2 = parse_span({"startTimeUnixNano": "1e500"})
+        assert s2.start_unix_nano == 0
+
     def test_missing_fields_are_empty_not_crash(self):
         s = parse_span({})
         assert s.name == ""
