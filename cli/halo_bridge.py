@@ -71,6 +71,36 @@ def _canonicalize_status_code(raw) -> str:
     return text  # unknown short string — pass through, conservative
 
 
+# Keys that strongly indicate a JSON object is an OTEL span. We don't
+# require all of them — single-field synthetic spans like {"name": "x"}
+# from hand-rolled fixtures should still parse — but at least one must
+# be present, otherwise the object is mixed-in noise (debug log lines,
+# config metadata, etc.) and gets skipped silently.
+_SPAN_SHAPE_KEYS = frozenset({
+    "name", "operation", "operationName",
+    "spanId", "span_id",
+    "traceId", "trace_id",
+    "parentSpanId", "parent_span_id",
+    "startTimeUnixNano", "start_time_unix_nano",
+    "endTimeUnixNano", "end_time_unix_nano",
+    "kind", "status",
+    "attributes", "events", "links",
+})
+
+
+def _looks_like_span(record: dict) -> bool:
+    """Cheap heuristic for "this dict is an OTEL span, not a debug log."
+
+    Returns True if the dict has any of the well-known span fields.
+    Used by ``read_otel_jsonl`` to drop mixed-in non-span objects like
+    ``{"level": "debug", "msg": "..."}`` rather than rendering them as
+    ``- (unnamed span)`` and corrupting the summary counts.
+    """
+    if not isinstance(record, dict):
+        return False
+    return any(key in record for key in _SPAN_SHAPE_KEYS)
+
+
 def _coerce_int(value) -> int:
     """OTEL nano timestamps come as int, str, or float depending on the SDK.
 
@@ -230,6 +260,13 @@ def read_otel_jsonl(path: str | Path) -> Iterator[Span]:
                 continue
             for span_dict in _expand_otlp_envelope(record):
                 if not isinstance(span_dict, dict):
+                    continue
+                # Skip JSON objects that don't look like spans — mixed-in
+                # debug logs ({"level":"debug","msg":"..."}), config
+                # metadata, etc. Without this gate they'd parse to an
+                # empty Span and inflate span_count with `(unnamed span)`
+                # entries, corrupting the summary.
+                if not _looks_like_span(span_dict):
                     continue
                 # Belt-and-suspenders: parse_span is hardened against
                 # known-bad shapes (scalar status, non-list events,

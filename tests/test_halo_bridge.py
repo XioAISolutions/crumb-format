@@ -149,6 +149,39 @@ class TestParseSpan:
 
 
 class TestReadJsonl:
+    def test_skips_json_objects_that_arent_spans(self, tmp_path):
+        # Codex finding: mixed-in debug log lines like {"level":"debug","msg":"..."}
+        # are valid JSON objects but aren't spans. Previously they parsed to
+        # empty Span()s and inflated span_count with "(unnamed span)" entries,
+        # corrupting the summary. The _looks_like_span gate skips them silently.
+        path = tmp_path / "mixed.jsonl"
+        path.write_text(
+            json.dumps({"name": "real-1", "spanId": "s1"}) + "\n"
+            + json.dumps({"level": "debug", "msg": "starting export"}) + "\n"
+            + json.dumps({"config": {"k": "v"}}) + "\n"           # config metadata
+            + json.dumps({}) + "\n"                                # empty object
+            + json.dumps({"name": "real-2", "spanId": "s2"}) + "\n"
+            + json.dumps({"timestamp": 12345, "msg": "noise"}) + "\n",
+            encoding="utf-8",
+        )
+        spans = list(read_otel_jsonl(path))
+        assert [s.name for s in spans] == ["real-1", "real-2"]
+
+    def test_minimal_span_shapes_still_pass_gate(self, tmp_path):
+        # The gate is permissive — a span with just one well-known field
+        # still parses. Don't reject hand-rolled minimal fixtures.
+        path = tmp_path / "minimal.jsonl"
+        path.write_text(
+            json.dumps({"name": "name-only"}) + "\n"
+            + json.dumps({"spanId": "id-only"}) + "\n"
+            + json.dumps({"traceId": "trace-only"}) + "\n"
+            + json.dumps({"attributes": {}}) + "\n"
+            + json.dumps({"status": {"code": "OK"}}) + "\n",
+            encoding="utf-8",
+        )
+        spans = list(read_otel_jsonl(path))
+        assert len(spans) == 5
+
     def test_skips_blank_and_garbage_lines(self, tmp_path):
         path = tmp_path / "t.jsonl"
         path.write_text(
