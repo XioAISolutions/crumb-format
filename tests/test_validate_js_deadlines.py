@@ -89,6 +89,10 @@ class TestJsParseDeadlineRejects:
         "Friday",                       # garbage
         "",                             # empty
         "20260430",                     # loose YYYYMMDD form
+        "2026-04-30T12:00:00+24:00",    # offset hour 24 (max is 23)
+        "2026-04-30T12:00:00+99:99",    # offset hour 99 + minute 99
+        "2026-04-30T12:00:00-24:00",    # negative offset out of range
+        "2026-04-30T12:00:00+12:60",    # offset minute 60 (max is 59)
     ])
     def test_each_rejected(self, js_runner, bad):
         out, _, rc = js_runner(

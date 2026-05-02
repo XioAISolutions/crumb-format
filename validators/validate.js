@@ -296,7 +296,11 @@ function main() {
 // downstream Node consumers (lint scripts, IDE plugins) can call it.
 
 const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
-const DATETIME_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(Z|[+-]\d{2}:\d{2})$/;
+// Tightened ranges: hour 00-23, minute 00-59 in both the time-of-day
+// component AND the offset suffix. Without these bounds, "+24:00",
+// "+99:99", "T25:00:00", etc. passed the regex but Date.parse returned
+// NaN, leaving the function returning {kind:"datetime", value: Invalid Date}.
+const DATETIME_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
 
 class DeadlineParseError extends Error {
   constructor(message) {
@@ -366,8 +370,14 @@ function _parseDeadlineDatetime(value) {
   }
   // Build the final aware Date by parsing the original string (which
   // includes the offset). At this point the regex + round-trip have
-  // proven the value is well-formed and calendar-valid.
+  // proven the value is well-formed and calendar-valid; Date.parse
+  // should never return NaN here. We assert it explicitly anyway —
+  // any future regex drift that lets a malformed offset slip through
+  // surfaces as a DeadlineParseError instead of a silent Invalid Date.
   const finalTs = Date.parse(value);
+  if (Number.isNaN(finalTs)) {
+    throw new DeadlineParseError(`datetime deadline ${JSON.stringify(value)} did not parse to a real instant`);
+  }
   return { kind: "datetime", value: new Date(finalTs) };
 }
 
