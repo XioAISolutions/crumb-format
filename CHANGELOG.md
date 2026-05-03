@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased
+
+### User-friendly surface
+
+No wire-format change. Three additions aimed at first-touch friction:
+
+- **`crumb hello`** — 30-second walkthrough. Prints a working sample
+  task crumb (kind=task, v=1.3), validates it, copies it to the
+  clipboard if a clipboard tool is available, then lists three concrete
+  next steps. Lands a brand-new install at "I have a working crumb in
+  my clipboard" without any flags. `--no-clipboard` skips the copy.
+- **`crumb doctor`** — install diagnostic. Reports Python version,
+  validator presence (Python and Node), clipboard tool availability,
+  Palace state in the current dir, Claude Code integration status, and
+  MCP server registration. Always exits 0; warnings are advisory so it
+  can run in CI without flaking.
+- **Friendlier argparse errors.** Missing required arguments and
+  invalid choices now append a one-line pointer to
+  `crumb <cmd> --help` and `crumb hello`. Implementation is a single
+  `_FriendlyArgumentParser` subclass propagated to all subparsers via
+  `parser_class=`; subcommand wiring is unchanged.
+
+Help text on the top-level `--help` now leads with `hello` and
+`doctor` so a new user sees the walkthrough as the obvious first step.
+
 ## v0.11.0
 
 ### Simplification + neutral naming
