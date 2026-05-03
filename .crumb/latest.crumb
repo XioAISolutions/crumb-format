@@ -1,7 +1,7 @@
---- task: Release 0.11.0 — simplification + neutral naming
+--- task: feat(cli): user-friendly first-run — hello, doctor, friendlier errors
 source: github.pr
-pr: #28
-generated: 2026-05-02T18:17:47Z
+pr: #31
+generated: 2026-05-03T23:52:43Z
 ---
 
 [goal]
@@ -10,13 +10,8 @@ generated: 2026-05-02T18:17:47Z
 [context]
 Changed files in this PR:
 - CHANGELOG.md
-- README.md
 - cli/crumb.py
-- cli/memory_bridge.py
-- cli/mempalace_bridge.py
-- pyproject.toml
-- tests/test_crumb.py
-- tests/test_usability.py
+- tests/test_user_friendly.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions

@@ -5422,6 +5422,186 @@ def cmd_palace_wiki(root, args_output: str) -> None:
         print(wiki_text, end='')
 
 
+# ── hello: 30-second first-run walkthrough ──────────────────────────
+
+def cmd_hello(args: argparse.Namespace) -> None:
+    """Friendly first-run: build a sample task crumb, validate it, copy it.
+
+    Designed to take a brand-new install from "what is this?" to "I have
+    a working crumb in my clipboard" in one command, no flags required.
+    """
+    no_clipboard = getattr(args, 'no_clipboard', False)
+
+    sample_goal = "Switch AIs without losing context"
+    sample = TEMPLATES["task"].format(
+        title="My first crumb",
+        source="crumb hello",
+        goal=sample_goal,
+        context="- I just installed crumb-format\n- I want to see what a crumb looks like",
+        constraints="- Keep it short\n- Make sure it validates",
+    )
+
+    try:
+        parse_crumb(sample)
+        validated = True
+    except ValueError as exc:
+        validated = False
+        print(f"warning: sample crumb failed to validate: {exc}", file=sys.stderr)
+
+    print("Welcome to CRUMB — the copy-paste AI handoff format.")
+    print()
+    print("Here's a working crumb (kind=task, v=1.3):")
+    print()
+    for line in sample.splitlines():
+        print(f"  {line}")
+    print()
+
+    if not validated:
+        print("(skipping clipboard step because validation failed)")
+        sys.exit(1)
+
+    copied = False
+    if not no_clipboard:
+        copied = _copy_to_clipboard(sample)
+
+    if copied:
+        print("Copied to clipboard. Paste it into Claude / ChatGPT / Cursor / Gemini.")
+    elif no_clipboard:
+        print("(clipboard skipped: --no-clipboard)")
+    else:
+        print("(clipboard tool not found; install pbcopy / xclip / xsel / clip.exe to enable)")
+
+    print()
+    print("Next steps:")
+    print("  crumb new task --goal \"<your real goal>\"   # make your own")
+    print("  crumb handoff <file.crumb>                  # send via clipboard")
+    print("  crumb doctor                                # check your install")
+    print("  crumb --help-all                            # see every command")
+
+
+# ── doctor: install diagnostic ──────────────────────────────────────
+
+def _doctor_check(label: str, ok: bool, detail: str = "") -> bool:
+    mark = "ok  " if ok else "WARN"
+    line = f"  [{mark}] {label}"
+    if detail:
+        line += f"  — {detail}"
+    print(line)
+    return ok
+
+
+def cmd_doctor(args: argparse.Namespace) -> None:
+    """Diagnose the user's install. Always exits 0; warnings are advisory."""
+    print(f"crumb doctor — version {CLI_VERSION}")
+    print()
+
+    print("Runtime:")
+    py_ok = sys.version_info >= (3, 10)
+    _doctor_check(
+        f"Python {sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
+        py_ok,
+        "" if py_ok else "crumb requires Python 3.10+",
+    )
+
+    repo_root = Path(__file__).resolve().parent.parent
+    validate_py = repo_root / "validators" / "validate.py"
+    validate_js = repo_root / "validators" / "validate.js"
+    _doctor_check(
+        "Python validator",
+        validate_py.exists(),
+        str(validate_py) if validate_py.exists() else "missing — reinstall crumb-format",
+    )
+    _doctor_check(
+        "Node validator (optional)",
+        validate_js.exists(),
+        str(validate_js) if validate_js.exists() else "missing — Python validator still works",
+    )
+
+    print()
+    print("Clipboard:")
+    system = platform.system()
+    is_wsl = system == "Linux" and "microsoft" in platform.uname().release.lower()
+    if system == "Darwin":
+        candidates = ["pbcopy"]
+    elif is_wsl or system == "Windows":
+        candidates = ["clip.exe"]
+    elif system == "Linux":
+        candidates = ["xclip", "xsel", "wl-copy"]
+    else:
+        candidates = []
+    found = [c for c in candidates if shutil.which(c)]
+    _doctor_check(
+        "clipboard tool",
+        bool(found),
+        ", ".join(found) if found else f"install one of: {', '.join(candidates)}",
+    )
+
+    print()
+    print("Optional integrations:")
+    palace = Path.cwd() / ".crumb-palace"
+    _doctor_check(
+        "Palace (this directory)",
+        palace.exists(),
+        "initialized" if palace.exists() else "run `crumb palace init` to enable memory",
+    )
+
+    claude_dir = Path.home() / ".claude"
+    claude_commands = claude_dir / "commands"
+    has_export = (claude_commands / "crumb-export.md").exists() if claude_commands.exists() else False
+    has_import = (claude_commands / "crumb-import.md").exists() if claude_commands.exists() else False
+    if claude_dir.exists():
+        if has_export and has_import:
+            _doctor_check("Claude Code integration", True, "/crumb-export and /crumb-import installed")
+        else:
+            _doctor_check(
+                "Claude Code integration",
+                False,
+                "Claude found but slash commands missing — run integrations/claude-code/install.sh",
+            )
+    else:
+        _doctor_check("Claude Code integration", True, "not installed (~/.claude not present)")
+
+    mcp_file = claude_dir / ".mcp.json"
+    has_mcp = False
+    if mcp_file.exists():
+        try:
+            mcp_data = json.loads(mcp_file.read_text(encoding="utf-8"))
+            has_mcp = "crumb" in (mcp_data.get("mcpServers") or {})
+        except (json.JSONDecodeError, OSError):
+            pass
+    _doctor_check(
+        "MCP server entry",
+        True,
+        "registered" if has_mcp else "not registered (optional)",
+    )
+
+    print()
+    print("Run `crumb hello` for a 30-second walkthrough.")
+
+
+class _FriendlyArgumentParser(argparse.ArgumentParser):
+    """ArgumentParser that appends a one-line hint to argparse errors.
+
+    argparse's default `error()` prints usage + a terse message + exits 2.
+    For a new user, "the following arguments are required: files" is true
+    but unhelpful. This subclass appends a pointer to `crumb hello` and
+    `crumb <cmd> --help` so a confused user has somewhere to go next.
+    """
+
+    def error(self, message: str) -> None:  # type: ignore[override]
+        self.print_usage(sys.stderr)
+        prog = self.prog
+        hint_lines = [f"{prog}: error: {message}"]
+        if "required" in message or "invalid choice" in message:
+            hint_lines.append("")
+            hint_lines.append(
+                f"  try `{prog} --help` for this command's options, "
+                "or `crumb hello` for a 30-second walkthrough."
+            )
+        sys.stderr.write("\n".join(hint_lines) + "\n")
+        sys.exit(2)
+
+
 def build_parser() -> argparse.ArgumentParser:
     # Two-tier help. Default `crumb --help` shows only the core
     # commands a new user reaches for. Everything else lives under
@@ -5432,8 +5612,12 @@ def build_parser() -> argparse.ArgumentParser:
         adding a `crumb it` instruction to their AI's system prompt
         (no install required). The CLI is optional power tooling.
 
+        First time? Run `crumb hello` for a 30-second walkthrough.
+
         Core commands:
 
+          hello      30-second walkthrough — copies a working sample crumb.
+          doctor     Check your install and surface missing dependencies.
           new        Create a new .crumb file.
           validate   Check that a .crumb file is well-formed.
           handoff    Copy a .crumb to clipboard for pasting into an AI.
@@ -5457,12 +5641,12 @@ def build_parser() -> argparse.ArgumentParser:
           Format:    bridge   resolve   hash   delta   apply   seen
           Governance:passport   policy   audit   scan   comply   webhook   guardrails
           Todo:      todo (add | done | list | dream)
-          Other:     init   hooks   context   pack
+          Setup:     hello   doctor   init   hooks   context   pack
     """).strip()
 
     # `--help-all` is intercepted before argparse sees it (see main()),
     # so the value here is just the default-help description text.
-    parser = argparse.ArgumentParser(
+    parser = _FriendlyArgumentParser(
         prog='crumb',
         description='The copy-paste AI handoff format.\n\n' + core_help,
         epilog='Run `crumb --help-all` for the full command list.',
@@ -5472,7 +5656,29 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('--help-all', action='store_true',
                         help='Show all commands grouped by concern.')
     parser._full_help = full_help  # stash for main() to render on --help-all
-    sub = parser.add_subparsers(dest='command', required=False, metavar='<command>')
+    # parser_class= propagates _FriendlyArgumentParser to every subparser
+    # registered via sub.add_parser(...), so subcommand errors get the
+    # same one-line hint without per-subcommand wiring.
+    sub = parser.add_subparsers(
+        dest='command', required=False, metavar='<command>',
+        parser_class=_FriendlyArgumentParser,
+    )
+
+    # hello — first-run walkthrough
+    hello_cmd = sub.add_parser(
+        'hello',
+        help='30-second first-run walkthrough; copies a sample crumb to the clipboard.',
+    )
+    hello_cmd.add_argument('--no-clipboard', action='store_true',
+                           help='Skip the clipboard copy step.')
+    hello_cmd.set_defaults(func=cmd_hello)
+
+    # doctor — install diagnostic
+    doctor_cmd = sub.add_parser(
+        'doctor',
+        help='Check your install and surface missing dependencies.',
+    )
+    doctor_cmd.set_defaults(func=cmd_doctor)
 
     # new
     new = sub.add_parser('new', help='Create a new .crumb file.')
