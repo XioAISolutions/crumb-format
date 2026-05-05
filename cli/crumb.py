@@ -43,8 +43,8 @@ REQUIRED_SECTIONS = {
     "delta": ["changes"],
     "agent": ["identity"],
 }
-CLI_VERSION = "0.11.0"
-SUPPORTED_VERSIONS = {"1.1", "1.2", "1.3"}
+CLI_VERSION = "1.0.0"
+SUPPORTED_VERSIONS = {"1.1", "1.2", "1.3", "1.4"}
 FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
 CONTENT_REF_RE = re.compile(r"^sha256:[0-9a-f]{16,64}$")
 DELTA_CHANGE_RE = re.compile(r"^\s*-\s*([+\-~])\[(@?[a-z0-9_:/-]+)\]\s*(.*)$", re.IGNORECASE)
@@ -448,7 +448,7 @@ def score_entry(entry: str, all_entries: list, entry_keywords: dict) -> float:
 TEMPLATES = {
     "task": dedent("""\
         BEGIN CRUMB
-        v=1.3
+        v=1.4
         kind=task
         title={title}
         source={source}
@@ -465,7 +465,7 @@ TEMPLATES = {
     """),
     "mem": dedent("""\
         BEGIN CRUMB
-        v=1.3
+        v=1.4
         kind=mem
         title={title}
         source={source}
@@ -476,7 +476,7 @@ TEMPLATES = {
     """),
     "map": dedent("""\
         BEGIN CRUMB
-        v=1.3
+        v=1.4
         kind=map
         title={title}
         source={source}
@@ -491,7 +491,7 @@ TEMPLATES = {
     """),
     "log": dedent("""\
         BEGIN CRUMB
-        v=1.3
+        v=1.4
         kind=log
         title={title}
         source={source}
@@ -502,7 +502,7 @@ TEMPLATES = {
     """),
     "todo": dedent("""\
         BEGIN CRUMB
-        v=1.3
+        v=1.4
         kind=todo
         title={title}
         source={source}
@@ -513,7 +513,7 @@ TEMPLATES = {
     """),
     "agent": dedent("""\
         BEGIN CRUMB
-        v=1.3
+        v=1.4
         kind=agent
         id={agent_id}
         title={title}

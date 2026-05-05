@@ -1,7 +1,7 @@
---- task: Release 0.11.0 — simplification + neutral naming
+--- task: Release 1.0.0 — v1.4 wire format normative + stable spec
 source: github.pr
-pr: #28
-generated: 2026-05-02T18:17:47Z
+pr: #29
+generated: 2026-05-02T19:48:42Z
 ---
 
 [goal]
@@ -10,13 +10,15 @@ generated: 2026-05-02T18:17:47Z
 [context]
 Changed files in this PR:
 - CHANGELOG.md
-- README.md
+- SPEC.md
 - cli/crumb.py
-- cli/memory_bridge.py
-- cli/mempalace_bridge.py
+- examples/v14-release-gate.crumb
 - pyproject.toml
 - tests/test_crumb.py
 - tests/test_usability.py
+- tests/test_v14_normative.py
+- validators/validate.js
+- validators/validate.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
