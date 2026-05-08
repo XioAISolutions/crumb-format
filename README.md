@@ -84,8 +84,10 @@ Everything above works with no install. The CLI is for power users who want to v
 
 ```bash
 pip install crumb-format
-crumb --help        # 5 core commands
-crumb --help-all    # full surface (~40 commands grouped by concern)
+crumb hello         # 30-second walkthrough — copies a working sample to clipboard
+crumb doctor        # check your install
+crumb --help        # core commands
+crumb --help-all    # full surface (~46 commands grouped by concern)
 ```
 
 The five core commands cover most workflows:
@@ -98,7 +100,31 @@ crumb receive                                                  # read from clipb
 crumb lint handoff.crumb --check-deadlines                     # safety + freshness
 ```
 
-Run `crumb --help-all` for the full surface (search, palace memory, governance, format bridges, v1.4 draft features).
+Run `crumb --help-all` for the full surface (search, palace memory, governance, format bridges, v1.4 features).
+
+## Native integrations — `crumb it` inside your AI tool
+
+Two integrations ship today. Each is a one-line install and gives you a slash command (or rule), MCP server access to all 24 `crumb_*` tools, and the "crumb it" verbal trigger.
+
+**Claude Code:**
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/XioAISolutions/crumb-format/main/integrations/claude-code/install.sh)
+```
+
+Adds `/crumb-export` and `/crumb-import` slash commands to your Claude Code sessions. Full doc: [`integrations/claude-code/README.md`](integrations/claude-code/README.md).
+
+**Cursor:**
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/XioAISolutions/crumb-format/main/integrations/cursor/install.sh)
+```
+
+Adds CRUMB rule files to your project's `.cursor/rules/` and registers the MCP server globally. Full doc: [`integrations/cursor/README.md`](integrations/cursor/README.md).
+
+Both installers support `--dry-run` to preview every change before writing.
+
+Briefs for Aider and OpenCode integrations live in [`docs/integrations/`](docs/integrations/).
 
 ## How it compares
 

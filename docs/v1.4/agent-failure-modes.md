@@ -1,6 +1,6 @@
-# v1.4 candidate — Canonical `[checks]` names for agent failure modes
+# v1.4 candidate — Canonical `[checks]` names for agent failure modes (historical)
 
-**Status:** Draft. Non-normative. Companion to [`typed-checks.md`](typed-checks.md): once the threshold grammar is settled, the *names* on the left side of `::` should also have a normative vocabulary so cross-tool consumers can act on them. Inspired by the failure-mode taxonomy that [HALO](https://github.com/context-labs/halo) and similar agent-introspection tools surface from execution traces.
+**Status: shipped in v=1.4 (see SPEC.md §21.1.2).** This file is the original design draft and is kept for provenance.
 
 ## Why
 

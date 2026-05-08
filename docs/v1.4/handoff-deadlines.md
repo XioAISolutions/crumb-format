@@ -1,6 +1,6 @@
-# v1.4 candidate — `[handoff]` `deadline=` deadlines normative
+# v1.4 candidate — `[handoff]` `deadline=` deadlines normative (historical)
 
-**Status:** Draft. Non-normative. Successor of [`typed-checks.md`](typed-checks.md). The narrowest of the v1.4 candidates from the scoping doc — pure additive convention with no schema change. The current SPEC permits a free-form `deadline=` on `[handoff]` lines but says nothing about format; v1.4 fixes that.
+**Status: shipped in v=1.4 (see SPEC.md §11.4).** This file is the original design draft and is kept for provenance.
 
 ## Why
 

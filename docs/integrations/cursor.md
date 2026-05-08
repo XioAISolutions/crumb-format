@@ -1,6 +1,12 @@
 # Cursor integration brief
 
-**Status:** Plan only. No code yet. Same shape as the Claude Code integration in `integrations/claude-code/`.
+**Status: shipping.** Code lives in [`integrations/cursor/`](../../integrations/cursor/). Install with:
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/XioAISolutions/crumb-format/main/integrations/cursor/install.sh)
+```
+
+This page is kept as the design brief that produced the integration. Below is the original plan for posterity; the implementation followed it directly.
 
 Cursor supports MCP servers, custom rules, and rule files in `.cursor/`. CRUMB integration follows the same three-artifact pattern that Claude Code uses.
 
