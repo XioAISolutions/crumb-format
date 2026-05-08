@@ -1,7 +1,7 @@
---- task: feat(integrations): Cursor + install.sh --dry-run + stale-doc sweep
+--- task: Release 1.1.0 — Cursor integration + first-touch UX
 source: github.pr
-pr: #32
-generated: 2026-05-08T16:22:59Z
+pr: #33
+generated: 2026-05-08T16:31:59Z
 ---
 
 [goal]
@@ -10,24 +10,9 @@ generated: 2026-05-08T16:22:59Z
 [context]
 Changed files in this PR:
 - CHANGELOG.md
-- README.md
-- docs/integrations/cursor.md
-- docs/v1.2-fold-heuristic.md
-- docs/v1.2-ref-resolution.md
-- docs/v1.3-DRAFT.md
-- docs/v1.4-scoping.md
-- docs/v1.4/agent-failure-modes.md
-- docs/v1.4/handoff-deadlines.md
-- docs/v1.4/typed-checks.md
-- integrations/claude-code/install.sh
-- integrations/cursor/README.md
-- integrations/cursor/install.sh
-- integrations/cursor/mcp.json.template
-- integrations/cursor/rules/crumb-export.mdc
-- integrations/cursor/rules/crumb-import.mdc
-- integrations/cursor/rules/crumb-it.mdc
-- integrations/cursor/uninstall.sh
-- tests/test_integrations_smoke.py
+- cli/crumb.py
+- pyproject.toml
+- tests/test_crumb.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
