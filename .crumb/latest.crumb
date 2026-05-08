@@ -1,7 +1,7 @@
---- task: Release 1.0.0 — v1.4 wire format normative + stable spec
+--- task: feat(integrations): Cursor + install.sh --dry-run + stale-doc sweep
 source: github.pr
-pr: #29
-generated: 2026-05-02T19:48:42Z
+pr: #32
+generated: 2026-05-08T16:22:59Z
 ---
 
 [goal]
@@ -10,15 +10,24 @@ generated: 2026-05-02T19:48:42Z
 [context]
 Changed files in this PR:
 - CHANGELOG.md
-- SPEC.md
-- cli/crumb.py
-- examples/v14-release-gate.crumb
-- pyproject.toml
-- tests/test_crumb.py
-- tests/test_usability.py
-- tests/test_v14_normative.py
-- validators/validate.js
-- validators/validate.py
+- README.md
+- docs/integrations/cursor.md
+- docs/v1.2-fold-heuristic.md
+- docs/v1.2-ref-resolution.md
+- docs/v1.3-DRAFT.md
+- docs/v1.4-scoping.md
+- docs/v1.4/agent-failure-modes.md
+- docs/v1.4/handoff-deadlines.md
+- docs/v1.4/typed-checks.md
+- integrations/claude-code/install.sh
+- integrations/cursor/README.md
+- integrations/cursor/install.sh
+- integrations/cursor/mcp.json.template
+- integrations/cursor/rules/crumb-export.mdc
+- integrations/cursor/rules/crumb-import.mdc
+- integrations/cursor/rules/crumb-it.mdc
+- integrations/cursor/uninstall.sh
+- tests/test_integrations_smoke.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
