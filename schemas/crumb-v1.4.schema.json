@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/XioAISolutions/crumb-format/schemas/crumb-v1.4.schema.json",
+  "title": "CRUMB v1.4 (parsed)",
+  "description": "Schema for the parsed form of a CRUMB document — the structure returned by parse_crumb in cli/crumb.py. The wire format itself is plain text per SPEC.md; this schema validates the JSON shape downstream tools work with after parsing.",
+  "type": "object",
+  "required": ["headers", "sections"],
+  "properties": {
+    "headers": {
+      "type": "object",
+      "required": ["v", "kind", "source"],
+      "properties": {
+        "v": {
+          "description": "Wire-format version. v=1.1 through v=1.4 are normative. Parsers MUST reject newer versions.",
+          "enum": ["1.1", "1.2", "1.3", "1.4"]
+        },
+        "kind": {
+          "description": "Document kind. Determines which sections are required.",
+          "enum": ["task", "mem", "map", "log", "todo", "passport", "audit", "wake", "delta", "agent"]
+        },
+        "source": {
+          "description": "Origin label, e.g. 'claude.chat', 'cursor.agent', 'human.notes', 'crumb.context'.",
+          "type": "string",
+          "minLength": 1
+        },
+        "title": { "type": "string" },
+        "id": {
+          "description": "Optional stable identifier for cross-crumb refs (SPEC §17). Required when kind=agent.",
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "mt": {
+          "description": "MeTalk compression level (0-5).",
+          "type": "string",
+          "pattern": "^[0-5]$"
+        },
+        "vs": {
+          "description": "Vowelstrip level (0-1).",
+          "type": "string",
+          "pattern": "^[01]$"
+        }
+      }
+    },
+    "sections": {
+      "type": "object",
+      "description": "Map of section names to their bodies. Each body is the array of lines between the section header and the next section header (or END CRUMB). Per-kind required sections are enforced via the allOf clauses below — each may be satisfied by either the bare section or its fold:NAME/summary + fold:NAME/full pair (SPEC §10.3).",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "headers": { "properties": { "kind": { "const": "task" } } } } },
+      "then": {
+        "allOf": [
+          { "anyOf": [
+            { "properties": { "sections": { "required": ["goal"] } } },
+            { "properties": { "sections": { "required": ["fold:goal/summary", "fold:goal/full"] } } }
+          ]},
+          { "anyOf": [
+            { "properties": { "sections": { "required": ["context"] } } },
+            { "properties": { "sections": { "required": ["fold:context/summary", "fold:context/full"] } } }
+          ]},
+          { "anyOf": [
+            { "properties": { "sections": { "required": ["constraints"] } } },
+            { "properties": { "sections": { "required": ["fold:constraints/summary", "fold:constraints/full"] } } }
+          ]}
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "headers": { "properties": { "kind": { "const": "mem" } } } } },
+      "then": {
+        "anyOf": [
+          { "properties": { "sections": { "required": ["consolidated"] } } },
+          { "properties": { "sections": { "required": ["fold:consolidated/summary", "fold:consolidated/full"] } } }
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "headers": { "properties": { "kind": { "const": "map" } } } } },
+      "then": {
+        "allOf": [
+          { "anyOf": [
+            { "properties": { "sections": { "required": ["project"] } } },
+            { "properties": { "sections": { "required": ["fold:project/summary", "fold:project/full"] } } }
+          ]},
+          { "anyOf": [
+            { "properties": { "sections": { "required": ["modules"] } } },
+            { "properties": { "sections": { "required": ["fold:modules/summary", "fold:modules/full"] } } }
+          ]}
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "headers": { "properties": { "kind": { "const": "log" } } } } },
+      "then": { "properties": { "sections": { "required": ["entries"] } } }
+    },
+    {
+      "if": { "properties": { "headers": { "properties": { "kind": { "const": "todo" } } } } },
+      "then": { "properties": { "sections": { "required": ["tasks"] } } }
+    },
+    {
+      "if": { "properties": { "headers": { "properties": { "kind": { "const": "agent" } } } } },
+      "then": {
+        "properties": {
+          "sections": { "required": ["identity"] },
+          "headers": { "required": ["id"] }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "headers": { "properties": { "kind": { "const": "delta" } } } } },
+      "then": { "properties": { "sections": { "required": ["changes"] } } }
+    },
+    {
+      "if": { "properties": { "headers": { "properties": { "kind": { "const": "wake" } } } } },
+      "then": { "properties": { "sections": { "required": ["identity"] } } }
+    }
+  ]
+}
