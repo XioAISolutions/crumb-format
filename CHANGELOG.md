@@ -1,6 +1,16 @@
 # Changelog
 
-## Unreleased
+## v1.1.0
+
+First post-1.0 minor. No wire-format change — format stays at v=1.4.
+Semver-minor since it adds a shipping integration (Cursor) and three
+new top-level CLI commands (`hello`, `doctor`, plus friendlier
+argparse errors). Two themes: **adoption** (Cursor + dry-run installers
++ stale-doc cleanup) and **first-touch UX** (`crumb hello`, `crumb doctor`).
+
+CLI_VERSION → 1.1.0. pyproject.toml version → 1.1.0.
+
+**673 tests passing** (was 614 at v1.0.0).
 
 ### Cursor integration + dry-run + stale-doc sweep
 
