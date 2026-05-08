@@ -3333,18 +3333,35 @@ def cmd_context(args: argparse.Namespace) -> None:
     if not constraint_lines:
         constraint_lines.append('- Review context before continuing')
 
+    # --- Build the [handoff] block ---
+    # The handoff is the concrete next-step pointer. If we have an open
+    # todo, that's the most useful "first thing to do". Otherwise fall
+    # back to the goal itself, framed as an action line. This gives the
+    # receiving AI a single unblocked starting point instead of forcing
+    # it to pick from the goal/context blocks.
+    handoff_lines = []
+    if open_todos:
+        handoff_lines.append(f'- next: {open_todos[0]}')
+        for t in open_todos[1:3]:
+            handoff_lines.append(f'- after {open_todos[0][:40]!r}: {t}')
+    else:
+        handoff_lines.append(f'- next: {goal}')
+
+    sections = {
+        'goal': [goal],
+        'context': context_lines or ['- No project context available'],
+        'constraints': constraint_lines,
+        'handoff': handoff_lines,
+    }
+
     crumb_text = render_crumb(
         headers={
-            'v': '1.1',
+            'v': '1.4',
             'kind': 'task',
             'title': title,
             'source': args.source or 'crumb.context',
         },
-        sections={
-            'goal': [goal],
-            'context': context_lines or ['- No project context available'],
-            'constraints': constraint_lines,
-        },
+        sections=sections,
     )
 
     # Optional MeTalk compression

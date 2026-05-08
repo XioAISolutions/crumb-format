@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased
+
+### Phase 2 — trust + capability
+
+No wire-format change. Phase 2 of the post-1.0 roadmap (trust track).
+
+- **JSON Schema for v=1.4** at `schemas/crumb-v1.4.schema.json`. Describes
+  the parsed form of a CRUMB document (the dict shape `parse_crumb`
+  returns). Per-kind required sections are enforced, including the
+  fold-pair-satisfies-required rule (SPEC §10.3): for each required
+  section, either the bare section or its `fold:NAME/summary` +
+  `fold:NAME/full` pair satisfies the requirement. Pinned to JSON
+  Schema draft 2020-12. Useful for IDE completion, downstream tools,
+  and language ports that don't want to re-implement the spec.
+- **`tests/test_e2e_roundtrip.py`** — 27 cases. For every kind,
+  `crumb new → file → validate (Python) → validate (Node) → inspect`
+  round-trips cleanly. Covers the version whitelist (v=1.1..1.4 accept,
+  v=1.5+ reject), parse → render → parse stability, and the
+  `crumb context` output (must be v=1.4 and include `[handoff]`).
+  Catches the class of regression that the v0.7 audit caught after the
+  fact.
+- **`tests/test_json_schema.py`** — 23 cases. Schema metaschema check,
+  every example crumb validates, and 5 negative cases (unknown kind,
+  unsupported version, missing required section, missing source,
+  agent missing id) confirm the schema rejects bad input.
+- **`crumb context` glow-up.** Now emits `v=1.4` (was v=1.1) and
+  includes a `[handoff]` block with a concrete `next:` action — first
+  open todo if any are present, otherwise the goal as an action line.
+  Receivers no longer have to pick from goal/context to decide what to
+  do first.
+
+750 passing total (was 673 at v1.1.0 cycle; +77).
+
 ## v1.1.0
 
 First post-1.0 minor. No wire-format change — format stays at v=1.4.
