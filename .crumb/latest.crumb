@@ -1,7 +1,7 @@
---- task: Release 1.1.0 — Cursor integration + first-touch UX
+--- task: feat: phase 2 — JSON schema + e2e roundtrip + crumb context glow-up
 source: github.pr
-pr: #33
-generated: 2026-05-08T16:31:59Z
+pr: #34
+generated: 2026-05-08T17:05:56Z
 ---
 
 [goal]
@@ -11,8 +11,9 @@ generated: 2026-05-08T16:31:59Z
 Changed files in this PR:
 - CHANGELOG.md
 - cli/crumb.py
-- pyproject.toml
-- tests/test_crumb.py
+- schemas/crumb-v1.4.schema.json
+- tests/test_e2e_roundtrip.py
+- tests/test_json_schema.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
