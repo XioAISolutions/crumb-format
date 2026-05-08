@@ -1,6 +1,6 @@
-# v1.4 candidate — Typed `[checks]` thresholds
+# v1.4 candidate — Typed `[checks]` thresholds (historical)
 
-**Status:** Draft. Non-normative. This doc is a proposal for what v1.4 of the wire format would say about `[checks]`. It compiles and parses today as v1.3 (annotations a v1.3 parser would ignore), so it can ship in this doc form before any wire-format bump.
+**Status: shipped in v=1.4 (see SPEC.md §21.1.1).** This file is the original design draft and is kept for provenance.
 
 **Lineage:** §44.2 of `docs/v1.4-scoping.md`. Picked up first because it's narrow, additive, and has a clear consumer story (CI integrations).
 

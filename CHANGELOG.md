@@ -2,6 +2,38 @@
 
 ## Unreleased
 
+### Cursor integration + dry-run + stale-doc sweep
+
+No wire-format change. Phase 1 of the post-1.0 roadmap (adoption track).
+
+- **Cursor integration** at `integrations/cursor/`. Installer mirrors the
+  Claude Code shape: registers the global MCP server in `~/.cursor/mcp.json`,
+  optionally drops three rule files (`crumb-export.mdc`, `crumb-import.mdc`,
+  `crumb-it.mdc`) into the current project's `.cursor/rules/`. Idempotent,
+  marker-tracked uninstall, supports `bash <(curl ...)` direct install.
+  Doubles the IDE coverage (Claude Code + Cursor today; Aider/OpenCode
+  briefs remain).
+- **`install.sh --dry-run`** flag on both `claude-code/` and `cursor/`
+  installers. Shows every action — directory creation, file write, MCP
+  merge, prompt — without touching the filesystem. Useful for previewing
+  changes in CI or auditing what the installer wants to do.
+- **Stale design-doc sweep.** `docs/v1.2-ref-resolution.md`,
+  `docs/v1.2-fold-heuristic.md`, `docs/v1.3-DRAFT.md`,
+  `docs/v1.4-scoping.md`, and the three `docs/v1.4/*.md` candidate docs
+  now carry "Status: shipped in v=1.X (see SPEC.md §X)" headers. The
+  drafts produced shipping spec, so they're now historical record. No
+  more `TODO(author)` markers anywhere under `docs/`.
+- **README "Native integrations" section** added. Top-of-funnel install
+  one-liners for both Claude Code and Cursor, alongside the existing
+  no-install AI-prompt path.
+- **`docs/integrations/cursor.md`** updated from "Plan only" to "shipping"
+  with a one-line install pointer.
+- **21 new tests** in `tests/test_integrations_smoke.py`: per-integration
+  installer syntax, --help / --dry-run / unknown-arg behavior, MCP template
+  JSON validity after substitution, frontmatter checks on Cursor rules
+  and Claude Code slash commands, uninstaller marker-check assertion.
+  673 passing total (was 652).
+
 ### User-friendly surface
 
 No wire-format change. Three additions aimed at first-touch friction:

@@ -5,6 +5,30 @@
 # Removes nothing the user added.
 set -euo pipefail
 
+DRY_RUN=0
+for arg in "$@"; do
+    case "$arg" in
+        --dry-run|-n) DRY_RUN=1 ;;
+        --help|-h)
+            cat <<EOF
+Usage: install.sh [--dry-run]
+
+Installs the CRUMB Claude Code integration:
+  - Slash commands at ~/.claude/commands/{crumb-export,crumb-import}.md
+  - MCP server entry at ~/.claude/.mcp.json (merged)
+  - Optional 'crumb it' verbal-trigger block appended to ./CLAUDE.md
+
+--dry-run    Show what would change without writing anything.
+EOF
+            exit 0
+            ;;
+        *)
+            echo "ERROR: unknown argument: $arg" >&2
+            exit 2
+            ;;
+    esac
+done
+
 CLAUDE_DIR="${HOME}/.claude"
 COMMANDS_DIR="${CLAUDE_DIR}/commands"
 MCP_FILE="${CLAUDE_DIR}/.mcp.json"
@@ -61,7 +85,12 @@ if [[ ! -d "$CLAUDE_DIR" ]]; then
     exit 1
 fi
 
-mkdir -p "$COMMANDS_DIR"
+if (( DRY_RUN )); then
+    echo "==> DRY RUN — no files will be written."
+    echo "   [dry-run] mkdir -p ${COMMANDS_DIR}"
+else
+    mkdir -p "$COMMANDS_DIR"
+fi
 
 # ── 1. Slash commands ──────────────────────────────────────────────
 echo "==> Installing slash commands to ${COMMANDS_DIR}/"
@@ -83,15 +112,23 @@ for cmd in crumb-export crumb-import; do
         # Back it up before overwriting. (Codex P2: previous version
         # silently clobbered user edits.)
         backup="${dst}.bak.$(date +%Y%m%d-%H%M%S)"
-        cp "$dst" "$backup"
-        echo "  !  ${cmd} appears user-modified; backed up to $(basename "$backup")"
+        if (( DRY_RUN )); then
+            echo "   [dry-run] would back up ${dst} → $(basename "$backup")"
+        else
+            cp "$dst" "$backup"
+        fi
+        echo "  !  ${cmd} appears user-modified; would back up to $(basename "$backup")"
     fi
     # Prepend the marker comment to the installed file so subsequent
     # runs recognize it as ours and overwrite cleanly.
-    {
-        echo "$CRUMB_MANAGED_MARKER"
-        cat "$src"
-    } > "$dst"
+    if (( DRY_RUN )); then
+        echo "   [dry-run] would write ${dst} (with marker)"
+    else
+        {
+            echo "$CRUMB_MANAGED_MARKER"
+            cat "$src"
+        } > "$dst"
+    fi
     echo "  +  ${cmd}"
 done
 
@@ -183,17 +220,26 @@ fi
 
 if command -v jq >/dev/null 2>&1; then
     if [[ ! -f "$MCP_FILE" ]]; then
-        echo '{"mcpServers": {}}' > "$MCP_FILE"
+        if (( DRY_RUN )); then
+            echo "   [dry-run] would create ${MCP_FILE} with {}"
+        else
+            echo '{"mcpServers": {}}' > "$MCP_FILE"
+        fi
     fi
     SERVER_JSON=$(sed -e "s|__CRUMB_INSTALL_PATH__|${CRUMB_INSTALL_PATH}|g" \
                       -e "s|__CRUMB_PYTHON__|${CRUMB_PYTHON}|g" \
                       "$MCP_TEMPLATE")
-    # Merge .mcpServers.crumb from the template into the existing file.
-    tmp=$(mktemp)
-    jq --argjson new "$(echo "$SERVER_JSON" | jq '.mcpServers')" \
-        '.mcpServers = (.mcpServers // {}) * $new' \
-        "$MCP_FILE" > "$tmp"
-    mv "$tmp" "$MCP_FILE"
+    if (( DRY_RUN )); then
+        echo "   [dry-run] would merge into ${MCP_FILE}:"
+        echo "$SERVER_JSON" | sed 's/^/   [dry-run]   /'
+    else
+        # Merge .mcpServers.crumb from the template into the existing file.
+        tmp=$(mktemp)
+        jq --argjson new "$(echo "$SERVER_JSON" | jq '.mcpServers')" \
+            '.mcpServers = (.mcpServers // {}) * $new' \
+            "$MCP_FILE" > "$tmp"
+        mv "$tmp" "$MCP_FILE"
+    fi
     echo "  +  crumb MCP server registered (interpreter: ${CRUMB_PYTHON})"
 else
     echo "  !  jq not found; skipping automatic MCP merge."
@@ -224,6 +270,9 @@ if [[ -f "./CLAUDE.md" ]]; then
         echo "==> ./CLAUDE.md exists; not prompting (non-interactive stdin)."
         echo "    To append the 'crumb it' verbal-trigger block manually:"
         echo "    cat ${ASSETS}/CLAUDE.md.template >> ./CLAUDE.md"
+    elif (( DRY_RUN )); then
+        echo "==> ./CLAUDE.md exists; dry-run skips the prompt."
+        echo "   [dry-run] would prompt to append 'crumb it' block from ${ASSETS}/CLAUDE.md.template"
     else
         echo "==> ./CLAUDE.md exists. Append the 'crumb it' verbal-trigger block? [y/N]"
         # `|| yn=""` defends against EOF on stdin if it slipped past
@@ -244,6 +293,10 @@ fi
 
 # ── Done ───────────────────────────────────────────────────────────
 echo
-echo "==> Installed."
-echo "    Try /crumb-export in your next Claude Code session."
-echo "    Or say 'crumb it' if you appended the verbal trigger block to CLAUDE.md."
+if (( DRY_RUN )); then
+    echo "==> Dry run complete. Re-run without --dry-run to apply."
+else
+    echo "==> Installed."
+    echo "    Try /crumb-export in your next Claude Code session."
+    echo "    Or say 'crumb it' if you appended the verbal trigger block to CLAUDE.md."
+fi
