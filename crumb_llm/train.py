@@ -4,8 +4,8 @@ Designed to converge to a usable (toy) checkpoint in minutes on a CPU
 for the ``tiny`` config. Larger configs work on a single GPU.
 
 Usage:
-    python -m wave_field_llm.train --config tiny --steps 2000
-    python -m wave_field_llm.train --config small --steps 50000 --data path/to/text
+    python -m crumb_llm.train --config tiny --steps 2000
+    python -m crumb_llm.train --config small --steps 50000 --data path/to/text
 
 The same trainer powers ``crumb wave train`` once the CLI hook is in.
 """
@@ -69,6 +69,9 @@ def build_model(cfg: dict, vocab_size: int):
             kernel_mode=cfg.get("kernel_mode", "freq"),
             dropout=cfg.get("dropout", 0.0),
             tie_embeddings=cfg.get("tie_embeddings", True),
+            boundary=cfg.get("boundary", "periodic"),
+            dispersion=cfg.get("dispersion", False),
+            interference_mixer=cfg.get("interference_mixer", False),
         )
         return WaveFieldLM(mc), mc
     if arch == "transformer":
@@ -209,7 +212,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--config", default="tiny", help="Built-in config name or path to JSON.")
     ap.add_argument("--data", default=None, help="Path to text file or directory.")
     ap.add_argument("--steps", type=int, default=500)
-    ap.add_argument("--out", default="wave_field_llm/checkpoints/run")
+    ap.add_argument("--out", default="crumb_llm/checkpoints/run")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--log-every", type=int, default=50)
     ap.add_argument("--eval-every", type=int, default=500)

@@ -5348,43 +5348,48 @@ def cmd_wake(args: argparse.Namespace) -> None:
         print(wake_text, end='')
 
 
-_WAVE_MISSING_DEPS = (
-    "wave_field_llm requires PyTorch (and numpy). Install with:\n"
-    "    pip install 'crumb-format[wave]'"
+_LLM_MISSING_DEPS = (
+    "crumb_llm requires PyTorch (and numpy). Install with:\n"
+    "    pip install 'crumb-format[llm]'"
 )
 
 
-def cmd_wave(args: argparse.Namespace) -> None:
-    """Wave-Field LLM: train, generate, perplexity, bench, info.
+def cmd_llm(args: argparse.Namespace) -> None:
+    """Crumb LLM: train, generate, perplexity, bench, info.
 
-    All sub-actions live inside the ``wave_field_llm`` subpackage. Importing
+    All sub-actions live inside the ``crumb_llm`` subpackage. Importing
     it raises ImportError if torch is not installed; we catch that and
     print a friendly install hint.
     """
     try:
-        import wave_field_llm  # noqa: F401
+        import crumb_llm  # noqa: F401
     except ImportError as e:
-        print(_WAVE_MISSING_DEPS, file=sys.stderr)
+        print(_LLM_MISSING_DEPS, file=sys.stderr)
         print(f"  (underlying error: {e})", file=sys.stderr)
         sys.exit(1)
 
-    action = args.wave_action
+    action = args.llm_action
 
     if action == 'info':
-        import wave_field_llm
+        import crumb_llm
         import torch
-        print(f"wave_field_llm  {wave_field_llm.__version__}")
+        print(f"Crumb LLM  v{crumb_llm.__version__}")
+        print(f"O(N log N) language modeling via physics-based wave equations")
+        print()
         print(f"torch           {torch.__version__}")
         print(f"cuda available  {torch.cuda.is_available()}")
         print()
-        print("Try:")
-        print("  crumb wave train --config tiny --steps 200 --out /tmp/wave_run")
-        print("  crumb wave generate --ckpt /tmp/wave_run --prompt 'BEGIN CRUMB'")
-        print("  crumb wave bench --lens 256,1024,4096")
+        print("Configs: tiny (CPU), small (GPU), medium (research), physics (all features)")
+        print()
+        print("Quick start:")
+        print("  crumb llm train --config tiny --steps 500 --out /tmp/crumb_run")
+        print("  crumb llm generate --ckpt /tmp/crumb_run --prompt 'BEGIN CRUMB'")
+        print("  crumb llm perplexity --ckpt /tmp/crumb_run examples/task-bug-fix.crumb")
+        print("  crumb llm bench --lens 1024,4096,8192")
         return
 
     if action == 'train':
-        from wave_field_llm.train import load_config, train
+        from crumb_llm.train import load_config, train
         cfg = load_config(args.config)
         if args.arch:
             cfg["arch"] = args.arch
@@ -5401,10 +5406,10 @@ def cmd_wave(args: argparse.Namespace) -> None:
         return
 
     if action == 'generate':
-        from wave_field_llm.sample import generate
+        from crumb_llm.sample import generate
         prompt = args.prompt
         if args.from_crumb:
-            from wave_field_llm.crumb_adapter import CrumbPriorBuilder
+            from crumb_llm.crumb_adapter import CrumbPriorBuilder
             text = read_text(args.from_crumb)
             # Use the parsed body as the prompt; structural priors are
             # passed to forward() in the model.generate path automatically
@@ -5423,7 +5428,7 @@ def cmd_wave(args: argparse.Namespace) -> None:
         return
 
     if action == 'bench':
-        from wave_field_llm.bench import benchmark, format_rows
+        from crumb_llm.bench import benchmark, format_rows
         lens = [int(x) for x in args.lens.split(",") if x.strip()]
         rows = benchmark(
             lens=lens, dim=args.dim, n_layers=args.n_layers, n_heads=args.n_heads,
@@ -5435,7 +5440,7 @@ def cmd_wave(args: argparse.Namespace) -> None:
     if action == 'perplexity':
         import math
         import torch
-        from wave_field_llm.sample import load_checkpoint
+        from crumb_llm.sample import load_checkpoint
         model, tok = load_checkpoint(args.ckpt)
         text = read_text(args.file)
         ids = torch.tensor(tok.encode(text), dtype=torch.long).unsqueeze(0)
@@ -5455,7 +5460,7 @@ def cmd_wave(args: argparse.Namespace) -> None:
         print(f"bpc:       {loss / math.log(2):.3f}")
         return
 
-    raise ValueError(f"unknown wave action: {action!r}")
+    raise ValueError(f"unknown llm action: {action!r}")
 
 
 def cmd_reflect(args: argparse.Namespace) -> None:
@@ -6415,18 +6420,18 @@ def build_parser() -> argparse.ArgumentParser:
                              help='Days before a room is considered stale (default: 30).')
     reflect_cmd.set_defaults(func=cmd_reflect)
 
-    # --- Wave-Field LLM (optional, requires `pip install crumb-format[wave]`) ---
-    wave_cmd = sub.add_parser(
-        'wave',
-        help='Wave-Field LLM: O(N log N) attention via wave-equation dynamics. Requires [wave] extra.',
+    # --- Crumb LLM (optional, requires `pip install crumb-format[llm]`) ---
+    llm_cmd = sub.add_parser(
+        'llm',
+        help='Crumb LLM: O(N log N) physics-based language model. Requires [llm] extra.',
     )
-    wave_sub = wave_cmd.add_subparsers(dest='wave_action', required=True)
+    llm_sub = llm_cmd.add_subparsers(dest='llm_action', required=True)
 
-    wt = wave_sub.add_parser('train', help='Train a Wave-Field LM on a text corpus.')
+    wt = llm_sub.add_parser('train', help='Train a Crumb LLM on a text corpus.')
     wt.add_argument('--config', default='tiny', help='Built-in config or path to JSON.')
     wt.add_argument('--data', default=None, help='Text file or directory of *.txt/*.crumb/*.md.')
     wt.add_argument('--steps', type=int, default=500)
-    wt.add_argument('--out', default='wave_field_llm/checkpoints/run')
+    wt.add_argument('--out', default='crumb_llm/checkpoints/run')
     wt.add_argument('--seed', type=int, default=0)
     wt.add_argument('--log-every', type=int, default=50)
     wt.add_argument('--eval-every', type=int, default=500)
@@ -6434,7 +6439,7 @@ def build_parser() -> argparse.ArgumentParser:
     wt.add_argument('--arch', default=None, choices=['wave_field', 'transformer'],
                     help='Override arch in config.')
 
-    wg = wave_sub.add_parser('generate', help='Sample text from a trained checkpoint.')
+    wg = llm_sub.add_parser('generate', help='Sample text from a trained checkpoint.')
     wg.add_argument('--ckpt', required=True, help='Checkpoint directory.')
     wg.add_argument('--prompt', default='', help='Initial prompt text.')
     wg.add_argument('--max-new-tokens', type=int, default=200)
@@ -6444,7 +6449,7 @@ def build_parser() -> argparse.ArgumentParser:
     wg.add_argument('--from-crumb', default=None,
                     help='Read prompt from a .crumb file (uses CrumbPriorBuilder).')
 
-    wb = wave_sub.add_parser('bench', help='Forward-pass time + memory: wave-field vs transformer baseline.')
+    wb = llm_sub.add_parser('bench', help='Forward-pass time + memory: Crumb LLM vs transformer baseline.')
     wb.add_argument('--lens', default='256,1024,4096', help='Comma-separated sequence lengths.')
     wb.add_argument('--dim', type=int, default=128)
     wb.add_argument('--n-layers', type=int, default=4)
@@ -6452,13 +6457,13 @@ def build_parser() -> argparse.ArgumentParser:
     wb.add_argument('--field-size', type=int, default=4096)
     wb.add_argument('--batch', type=int, default=1)
 
-    wp = wave_sub.add_parser('perplexity', help='Score a crumb (or text file) under a trained model.')
+    wp = llm_sub.add_parser('perplexity', help='Score a crumb (or text file) under a trained model.')
     wp.add_argument('--ckpt', required=True, help='Checkpoint directory.')
     wp.add_argument('file', help='Input .crumb or .txt file to score.')
 
-    wi = wave_sub.add_parser('info', help='Print package version, runtime, and tested capabilities.')
+    wi = llm_sub.add_parser('info', help='Print Crumb LLM version, runtime, and capabilities.')
 
-    wave_cmd.set_defaults(func=cmd_wave)
+    llm_cmd.set_defaults(func=cmd_llm)
 
     # Suppress argparse's auto-generated subcommand table from `--help`.
     # The five core commands are listed in the parser description; the

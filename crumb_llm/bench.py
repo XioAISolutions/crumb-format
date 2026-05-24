@@ -12,7 +12,7 @@ be visible: attention scales O(N²) in time, wave-field scales O(N log N)
 once you saturate the field-size FFT cost.
 
 Usage:
-    python -m wave_field_llm.bench --lens 256,1024,4096
+    python -m crumb_llm.bench --lens 256,1024,4096
 """
 
 from __future__ import annotations

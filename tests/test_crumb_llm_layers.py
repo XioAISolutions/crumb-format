@@ -4,14 +4,14 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from wave_field_llm.layers import (  # noqa: E402
+from crumb_llm.layers import (  # noqa: E402
     RMSNorm,
     SwiGLUFFN,
     WaveFieldHead,
     WaveFieldBlock,
     WaveFieldBlockConfig,
 )
-from wave_field_llm.model import WaveFieldLM, WaveFieldConfig  # noqa: E402
+from crumb_llm.model import WaveFieldLM, WaveFieldConfig  # noqa: E402
 
 
 def test_rmsnorm_preserves_shape():
@@ -57,7 +57,7 @@ def test_causal_kernel_zeros_negative_time():
     """A causal head's time-domain kernel must be zero for t < 0."""
     head = WaveFieldHead(field_size=32, causal=True, kernel_mode="time")
     # Internal reconstruction: time-domain kernel after the causal mask.
-    from wave_field_llm.kernels import wave_kernel_time
+    from crumb_llm.kernels import wave_kernel_time
     k_t = wave_kernel_time(head.alpha, head.omega, head.phi, 32)
     mask = torch.zeros_like(k_t)
     mask[..., 32 // 2 :] = 1.0

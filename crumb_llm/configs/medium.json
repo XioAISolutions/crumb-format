@@ -1,0 +1,21 @@
+{
+  "arch": "wave_field",
+  "tokenizer": "byte",
+  "dim": 512,
+  "n_layers": 8,
+  "n_heads": 8,
+  "field_size": 2048,
+  "block_size": 2048,
+  "ffn_mult": 2.667,
+  "causal": true,
+  "kernel_mode": "freq",
+  "dropout": 0.1,
+  "tie_embeddings": true,
+  "boundary": "periodic",
+  "dispersion": false,
+  "interference_mixer": false,
+  "batch_size": 16,
+  "lr": 0.0003,
+  "weight_decay": 0.1,
+  "warmup": 1000
+}

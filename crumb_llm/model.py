@@ -31,11 +31,13 @@ class WaveFieldConfig:
     kernel_mode: str = "freq"
     dropout: float = 0.0
     tie_embeddings: bool = True
+    # Advanced wave physics.
+    boundary: str = "periodic"             # periodic | absorbing | reflecting
+    dispersion: bool = False               # learnable frequency-dependent phase
+    interference_mixer: bool = False       # complex head interference vs proj_out
     # Crumb-adapter knobs (forwarded by `forward(...)` callers; the model
     # itself only accepts pre-computed tensors).
     use_crumb_priors: bool = False
-    # Names of fields the model will gracefully ignore if missing from
-    # the input dict — kept here for documentation.
     crumb_prior_keys: tuple = field(
         default_factory=lambda: ("scatter_weights", "kernel_bias")
     )
@@ -61,6 +63,9 @@ class WaveFieldLM(nn.Module):
             causal=cfg.causal,
             kernel_mode=cfg.kernel_mode,
             dropout=cfg.dropout,
+            boundary=cfg.boundary,
+            dispersion=cfg.dispersion,
+            interference_mixer=cfg.interference_mixer,
         )
         self.blocks = nn.ModuleList(WaveFieldBlock(block_cfg) for _ in range(cfg.n_layers))
         self.norm_out = RMSNorm(cfg.dim)

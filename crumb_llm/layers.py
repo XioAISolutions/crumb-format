@@ -136,6 +136,9 @@ class WaveFieldBlockConfig:
     causal: bool = True
     kernel_mode: str = "freq"
     dropout: float = 0.0
+    boundary: str = "periodic"       # periodic | absorbing | reflecting
+    dispersion: bool = False         # add learnable frequency-dependent phase shift
+    interference_mixer: bool = False # replace proj_out with complex interference
 
 
 class WaveFieldBlock(nn.Module):
@@ -174,9 +177,19 @@ class WaveFieldBlock(nn.Module):
         self.norm_mix = RMSNorm(cfg.dim)
         self.norm_ffn = RMSNorm(cfg.dim)
         self.proj_in = nn.Linear(cfg.dim, cfg.dim, bias=False)
-        self.proj_out = nn.Linear(cfg.dim, cfg.dim, bias=False)
         self.ffn = SwiGLUFFN(cfg.dim, hidden_mult=cfg.ffn_mult)
         self.drop = nn.Dropout(cfg.dropout)
+
+        # Advanced physics (all optional, off by default).
+        from .physics import BoundaryCondition, DispersionLayer, InterferenceMixer
+        self.bc = BoundaryCondition(cfg.boundary)
+        self.dispersion = DispersionLayer(cfg.n_heads) if cfg.dispersion else None
+        if cfg.interference_mixer:
+            self.mixer = InterferenceMixer(cfg.n_heads)
+            self.proj_out = nn.Identity()
+        else:
+            self.mixer = None
+            self.proj_out = nn.Linear(cfg.dim, cfg.dim, bias=False)
 
     # ── Wave mixing op ───────────────────────────────────────────────
 
@@ -204,10 +217,35 @@ class WaveFieldBlock(nn.Module):
             kernel = kernel + kernel_bias
 
         field = scatter_linear(h, F_, weights=scatter_weights)      # [B,H,F,d]
-        field = fft_convolve(field, kernel, F_)                     # [B,H,F,d]
+
+        from .physics import apply_boundary, unapply_reflecting, BoundaryCondition
+        taper_w = max(1, F_ // 16)
+        field = apply_boundary(field, self.bc, taper_width=taper_w)
+        actual_F = field.shape[-2]
+
+        # FFT convolve with optional dispersion.
+        spec = torch.fft.rfft(field, n=actual_F, dim=-2)
+        kf = kernel.unsqueeze(0).unsqueeze(-1)
+        # Pad/truncate kernel to match if reflecting BC expanded the field.
+        if kf.shape[-2] != spec.shape[-2]:
+            kf_full = torch.zeros(*kf.shape[:-2], spec.shape[-2], kf.shape[-1],
+                                  dtype=kf.dtype, device=kf.device)
+            n_copy = min(kf.shape[-2], spec.shape[-2])
+            kf_full[..., :n_copy, :] = kf[..., :n_copy, :]
+            kf = kf_full
+        spec = spec * kf
+        if self.dispersion is not None:
+            spec = self.dispersion(spec, actual_F)
+        field = torch.fft.irfft(spec, n=actual_F, dim=-2)
+
+        if self.bc == BoundaryCondition.REFLECTING:
+            field = unapply_reflecting(field, taper_width=taper_w)
+
         out = gather_linear(field, N)                               # [B,H,N,d]
 
-        # Re-merge heads, project out.
+        # Interference mixing (if enabled) or standard projection.
+        if self.mixer is not None:
+            out = self.mixer(out)
         out = out.transpose(1, 2).reshape(B, N, D)
         return self.proj_out(out)
 

@@ -499,28 +499,47 @@ repos:
 - [`validators/`](validators/) -- Python and Node reference validators
 - [`tests/`](tests/) -- 291 tests covering the full surface area
 - [`docs/HANDOFF_PATTERNS.md`](docs/HANDOFF_PATTERNS.md) -- practical handoff patterns
-- [`wave_field_llm/`](wave_field_llm/) -- experimental O(N log N) Wave-Field LM that reads CRUMB structure as physical priors ([architecture doc](docs/wave-field-llm.md))
+- [`crumb_llm/`](crumb_llm/) -- **Crumb LLM**: experimental O(N log N) physics-based language model ([architecture doc](docs/crumb-llm-architecture.md))
 
-## Wave-Field LLM (optional)
+## Crumb LLM (experimental)
 
-Experimental subpackage that swaps O(N²) self-attention for an
-O(N log N) wave-equation mixer, then lets CRUMB structure
-(`@priority`, fold pairs, section boundaries) bias the field dynamics.
-Disabled by default; install the `[wave]` extra to use it:
+**Crumb LLM** is an experimental open-source architecture that replaces
+traditional O(N²) transformer attention with physics-based wave equations
+at O(N log N) complexity. It's native to the crumb-format ecosystem —
+CRUMB sections, priorities, and fold pairs become physical priors on the
+wave field rather than being flattened away by a tokenizer.
+
+Each attention head learns three physics scalars (damping α, frequency ω,
+phase φ) that shape a wave kernel. Tokens scatter onto a continuous 1-D
+field, the kernel propagates information via FFT, and tokens gather back.
+Advanced physics include dispersion, boundary conditions (periodic /
+absorbing / reflecting), interference mixing, and Gabor wavelet heads.
 
 ```bash
-pip install 'crumb-format[wave]'
+pip install 'crumb-format[llm]'
 
-# 30-second smoke test on the bundled examples/ corpus
-crumb wave train --config tiny --steps 200 --out /tmp/wave_run
-crumb wave generate --ckpt /tmp/wave_run --prompt "BEGIN CRUMB"
-crumb wave perplexity --ckpt /tmp/wave_run examples/task-bug-fix.crumb
+# Train a tiny model on the bundled crumb corpus (~2 min on CPU)
+crumb llm train --config tiny --steps 500 --out /tmp/crumb_run
 
-# Forward-pass wall-time: wave vs transformer baseline
-crumb wave bench --lens 1024,4096,8192
+# Generate text
+crumb llm generate --ckpt /tmp/crumb_run --prompt "BEGIN CRUMB"
+
+# Score a crumb's perplexity
+crumb llm perplexity --ckpt /tmp/crumb_run examples/task-bug-fix.crumb
+
+# Benchmark: Crumb LLM vs transformer at various sequence lengths
+crumb llm bench --lens 1024,4096,8192
+
+# See all options
+crumb llm info
 ```
 
-Architecture, math, and benchmarks: [`docs/wave-field-llm.md`](docs/wave-field-llm.md).
+**Scaling:** at 4K tokens Crumb LLM is ~1.5× faster than a
+matched-shape transformer; at 8K it's ~2.2× faster. The gap widens
+with context length because the wave-field cost is O(F log F)
+independent of N, while attention is O(N²).
+
+Full architecture, math, and benchmarks: [`docs/crumb-llm-architecture.md`](docs/crumb-llm-architecture.md).
 
 ## License
 

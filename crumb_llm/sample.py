@@ -1,7 +1,7 @@
 """Load a checkpoint and generate text.
 
 Usage:
-    python -m wave_field_llm.sample --ckpt path/to/run \
+    python -m crumb_llm.sample --ckpt path/to/run \
         --prompt "BEGIN CRUMB" --max-new-tokens 200
 """
 

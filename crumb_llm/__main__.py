@@ -1,4 +1,4 @@
-"""``python -m wave_field_llm`` → quick health check.
+"""``python -m crumb_llm`` → quick health check.
 
 Prints a one-line summary of available subcommands and a smoke-test
 result (random weights forward pass on a tiny model). Useful for
@@ -16,11 +16,20 @@ from .model import WaveFieldLM, WaveFieldConfig
 
 
 def main(argv: list[str] | None = None) -> int:
-    print(f"wave_field_llm {__version__}")
-    print("subcommands:")
-    print("  python -m wave_field_llm.train  --help")
-    print("  python -m wave_field_llm.sample --help")
-    print("  python -m wave_field_llm.bench  --help")
+    print(f"Crumb LLM v{__version__}")
+    print("O(N log N) language modeling via physics-based wave equations")
+    print()
+    print("CLI commands:")
+    print("  crumb llm info                                  # runtime info")
+    print("  crumb llm train --config tiny --steps 500       # train")
+    print("  crumb llm generate --ckpt <dir> --prompt '...'  # sample")
+    print("  crumb llm perplexity --ckpt <dir> <file>        # score")
+    print("  crumb llm bench --lens 1024,4096,8192           # benchmark")
+    print()
+    print("Python API:")
+    print("  python -m crumb_llm.train  --help")
+    print("  python -m crumb_llm.sample --help")
+    print("  python -m crumb_llm.bench  --help")
     print()
     cfg = WaveFieldConfig(vocab_size=64, dim=32, n_layers=2, n_heads=2, field_size=32)
     model = WaveFieldLM(cfg)

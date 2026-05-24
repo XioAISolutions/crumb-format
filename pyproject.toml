@@ -36,15 +36,15 @@ packages = [
     "mcp",
     "api",
     "a2a",
-    "wave_field_llm",
-    "wave_field_llm.configs",
+    "crumb_llm",
+    "crumb_llm.configs",
 ]
 
 [tool.setuptools.package-data]
-"wave_field_llm.configs" = ["*.json"]
+"crumb_llm.configs" = ["*.json"]
 
 [project.optional-dependencies]
-wave = [
+llm = [
     "torch>=2.2",
     "numpy>=1.26",
 ]
