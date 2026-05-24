@@ -1,0 +1,15 @@
+{
+  "arch": "transformer",
+  "tokenizer": "char",
+  "dim": 96,
+  "n_layers": 3,
+  "n_heads": 4,
+  "block_size": 128,
+  "ffn_mult": 2.0,
+  "dropout": 0.0,
+  "tie_embeddings": true,
+  "batch_size": 16,
+  "lr": 0.001,
+  "weight_decay": 0.05,
+  "warmup": 50
+}

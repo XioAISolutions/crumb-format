@@ -499,6 +499,28 @@ repos:
 - [`validators/`](validators/) -- Python and Node reference validators
 - [`tests/`](tests/) -- 291 tests covering the full surface area
 - [`docs/HANDOFF_PATTERNS.md`](docs/HANDOFF_PATTERNS.md) -- practical handoff patterns
+- [`wave_field_llm/`](wave_field_llm/) -- experimental O(N log N) Wave-Field LM that reads CRUMB structure as physical priors ([architecture doc](docs/wave-field-llm.md))
+
+## Wave-Field LLM (optional)
+
+Experimental subpackage that swaps O(N²) self-attention for an
+O(N log N) wave-equation mixer, then lets CRUMB structure
+(`@priority`, fold pairs, section boundaries) bias the field dynamics.
+Disabled by default; install the `[wave]` extra to use it:
+
+```bash
+pip install 'crumb-format[wave]'
+
+# 30-second smoke test on the bundled examples/ corpus
+crumb wave train --config tiny --steps 200 --out /tmp/wave_run
+crumb wave generate --ckpt /tmp/wave_run --prompt "BEGIN CRUMB"
+crumb wave perplexity --ckpt /tmp/wave_run examples/task-bug-fix.crumb
+
+# Forward-pass wall-time: wave vs transformer baseline
+crumb wave bench --lens 1024,4096,8192
+```
+
+Architecture, math, and benchmarks: [`docs/wave-field-llm.md`](docs/wave-field-llm.md).
 
 ## License
 

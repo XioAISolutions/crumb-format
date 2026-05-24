@@ -5348,6 +5348,116 @@ def cmd_wake(args: argparse.Namespace) -> None:
         print(wake_text, end='')
 
 
+_WAVE_MISSING_DEPS = (
+    "wave_field_llm requires PyTorch (and numpy). Install with:\n"
+    "    pip install 'crumb-format[wave]'"
+)
+
+
+def cmd_wave(args: argparse.Namespace) -> None:
+    """Wave-Field LLM: train, generate, perplexity, bench, info.
+
+    All sub-actions live inside the ``wave_field_llm`` subpackage. Importing
+    it raises ImportError if torch is not installed; we catch that and
+    print a friendly install hint.
+    """
+    try:
+        import wave_field_llm  # noqa: F401
+    except ImportError as e:
+        print(_WAVE_MISSING_DEPS, file=sys.stderr)
+        print(f"  (underlying error: {e})", file=sys.stderr)
+        sys.exit(1)
+
+    action = args.wave_action
+
+    if action == 'info':
+        import wave_field_llm
+        import torch
+        print(f"wave_field_llm  {wave_field_llm.__version__}")
+        print(f"torch           {torch.__version__}")
+        print(f"cuda available  {torch.cuda.is_available()}")
+        print()
+        print("Try:")
+        print("  crumb wave train --config tiny --steps 200 --out /tmp/wave_run")
+        print("  crumb wave generate --ckpt /tmp/wave_run --prompt 'BEGIN CRUMB'")
+        print("  crumb wave bench --lens 256,1024,4096")
+        return
+
+    if action == 'train':
+        from wave_field_llm.train import load_config, train
+        cfg = load_config(args.config)
+        if args.arch:
+            cfg["arch"] = args.arch
+        train(
+            config=cfg,
+            data_path=args.data,
+            steps=args.steps,
+            out_dir=args.out,
+            seed=args.seed,
+            log_every=args.log_every,
+            eval_every=args.eval_every,
+            grad_accum=args.grad_accum,
+        )
+        return
+
+    if action == 'generate':
+        from wave_field_llm.sample import generate
+        prompt = args.prompt
+        if args.from_crumb:
+            from wave_field_llm.crumb_adapter import CrumbPriorBuilder
+            text = read_text(args.from_crumb)
+            # Use the parsed body as the prompt; structural priors are
+            # passed to forward() in the model.generate path automatically
+            # via the byte sequence (priors are advisory, not required).
+            priors = CrumbPriorBuilder().build(text)
+            prompt = "".join(chr(b) if b < 128 else "" for b in priors.input_ids[0].tolist())
+        text = generate(
+            ckpt_dir=args.ckpt,
+            prompt=prompt,
+            max_new_tokens=args.max_new_tokens,
+            temperature=args.temperature,
+            top_k=args.top_k,
+            seed=args.seed,
+        )
+        print(text)
+        return
+
+    if action == 'bench':
+        from wave_field_llm.bench import benchmark, format_rows
+        lens = [int(x) for x in args.lens.split(",") if x.strip()]
+        rows = benchmark(
+            lens=lens, dim=args.dim, n_layers=args.n_layers, n_heads=args.n_heads,
+            field_size=args.field_size, batch_size=args.batch,
+        )
+        print(format_rows(rows))
+        return
+
+    if action == 'perplexity':
+        import math
+        import torch
+        from wave_field_llm.sample import load_checkpoint
+        model, tok = load_checkpoint(args.ckpt)
+        text = read_text(args.file)
+        ids = torch.tensor(tok.encode(text), dtype=torch.long).unsqueeze(0)
+        N = ids.size(1)
+        # Truncate to fit the field/block size of the loaded model.
+        max_ctx = getattr(model.cfg, "field_size", None) or getattr(model.cfg, "block_size", N)
+        ids = ids[:, : max_ctx]
+        with torch.no_grad():
+            x = ids[:, :-1]
+            y = ids[:, 1:]
+            out = model(x, targets=y) if hasattr(model, 'cfg') else model(x, targets=y)
+        loss = out["loss"].item()
+        print(f"file:      {args.file}")
+        print(f"tokens:    {N}  (scored: {y.size(1)})")
+        print(f"loss:      {loss:.4f}")
+        print(f"perplexity:{math.exp(loss):.2f}")
+        print(f"bpc:       {loss / math.log(2):.3f}")
+        return
+
+    raise ValueError(f"unknown wave action: {action!r}")
+
+
 def cmd_reflect(args: argparse.Namespace) -> None:
     """Analyze palace health and identify knowledge gaps."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -6304,6 +6414,51 @@ def build_parser() -> argparse.ArgumentParser:
     reflect_cmd.add_argument('--stale-days', type=int, default=30,
                              help='Days before a room is considered stale (default: 30).')
     reflect_cmd.set_defaults(func=cmd_reflect)
+
+    # --- Wave-Field LLM (optional, requires `pip install crumb-format[wave]`) ---
+    wave_cmd = sub.add_parser(
+        'wave',
+        help='Wave-Field LLM: O(N log N) attention via wave-equation dynamics. Requires [wave] extra.',
+    )
+    wave_sub = wave_cmd.add_subparsers(dest='wave_action', required=True)
+
+    wt = wave_sub.add_parser('train', help='Train a Wave-Field LM on a text corpus.')
+    wt.add_argument('--config', default='tiny', help='Built-in config or path to JSON.')
+    wt.add_argument('--data', default=None, help='Text file or directory of *.txt/*.crumb/*.md.')
+    wt.add_argument('--steps', type=int, default=500)
+    wt.add_argument('--out', default='wave_field_llm/checkpoints/run')
+    wt.add_argument('--seed', type=int, default=0)
+    wt.add_argument('--log-every', type=int, default=50)
+    wt.add_argument('--eval-every', type=int, default=500)
+    wt.add_argument('--grad-accum', type=int, default=1)
+    wt.add_argument('--arch', default=None, choices=['wave_field', 'transformer'],
+                    help='Override arch in config.')
+
+    wg = wave_sub.add_parser('generate', help='Sample text from a trained checkpoint.')
+    wg.add_argument('--ckpt', required=True, help='Checkpoint directory.')
+    wg.add_argument('--prompt', default='', help='Initial prompt text.')
+    wg.add_argument('--max-new-tokens', type=int, default=200)
+    wg.add_argument('--temperature', type=float, default=1.0)
+    wg.add_argument('--top-k', type=int, default=40)
+    wg.add_argument('--seed', type=int, default=None)
+    wg.add_argument('--from-crumb', default=None,
+                    help='Read prompt from a .crumb file (uses CrumbPriorBuilder).')
+
+    wb = wave_sub.add_parser('bench', help='Forward-pass time + memory: wave-field vs transformer baseline.')
+    wb.add_argument('--lens', default='256,1024,4096', help='Comma-separated sequence lengths.')
+    wb.add_argument('--dim', type=int, default=128)
+    wb.add_argument('--n-layers', type=int, default=4)
+    wb.add_argument('--n-heads', type=int, default=4)
+    wb.add_argument('--field-size', type=int, default=4096)
+    wb.add_argument('--batch', type=int, default=1)
+
+    wp = wave_sub.add_parser('perplexity', help='Score a crumb (or text file) under a trained model.')
+    wp.add_argument('--ckpt', required=True, help='Checkpoint directory.')
+    wp.add_argument('file', help='Input .crumb or .txt file to score.')
+
+    wi = wave_sub.add_parser('info', help='Print package version, runtime, and tested capabilities.')
+
+    wave_cmd.set_defaults(func=cmd_wave)
 
     # Suppress argparse's auto-generated subcommand table from `--help`.
     # The five core commands are listed in the parser description; the
