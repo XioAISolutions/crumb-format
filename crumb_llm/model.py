@@ -41,6 +41,13 @@ class WaveFieldConfig:
     resonance_memory: bool = False         # cross-layer standing-wave amplification
     hybrid_gate: bool = False              # blend wave-field + local attention
     hybrid_window: int = 64               # window for hybrid local attention
+    # V2 block (next-gen with all fixes).
+    use_v2_blocks: bool = False            # use WaveFieldBlockV2 instead of V1
+    v2_learned_scatter: bool = True
+    v2_query_freq_gate: bool = True
+    v2_short_conv: bool = True
+    v2_position_mod: bool = True
+    v2_rotary: bool = True
     # Crumb-adapter knobs (forwarded by `forward(...)` callers; the model
     # itself only accepts pre-computed tensors).
     use_crumb_priors: bool = False
@@ -78,7 +85,20 @@ class WaveFieldLM(nn.Module):
             hybrid_gate=cfg.hybrid_gate,
             hybrid_window=cfg.hybrid_window,
         )
-        self.blocks = nn.ModuleList(WaveFieldBlock(block_cfg) for _ in range(cfg.n_layers))
+        if cfg.use_v2_blocks:
+            from .v2 import WaveFieldBlockV2, WaveFieldBlockV2Config
+            v2_cfg = WaveFieldBlockV2Config(
+                dim=cfg.dim, n_heads=cfg.n_heads, field_size=cfg.field_size,
+                ffn_mult=cfg.ffn_mult, dropout=cfg.dropout,
+                learned_scatter=cfg.v2_learned_scatter,
+                query_freq_gate=cfg.v2_query_freq_gate,
+                short_conv_gate=cfg.v2_short_conv,
+                position_modulation=cfg.v2_position_mod,
+                rotary_encoding=cfg.v2_rotary,
+            )
+            self.blocks = nn.ModuleList(WaveFieldBlockV2(v2_cfg) for _ in range(cfg.n_layers))
+        else:
+            self.blocks = nn.ModuleList(WaveFieldBlock(block_cfg) for _ in range(cfg.n_layers))
         self.norm_out = RMSNorm(cfg.dim)
         if cfg.tie_embeddings:
             self.lm_head = None  # uses self.embed.weight at forward time

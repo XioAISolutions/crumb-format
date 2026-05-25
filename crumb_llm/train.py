@@ -77,6 +77,12 @@ def build_model(cfg: dict, vocab_size: int):
             resonance_memory=cfg.get("resonance_memory", False),
             hybrid_gate=cfg.get("hybrid_gate", False),
             hybrid_window=cfg.get("hybrid_window", 64),
+            use_v2_blocks=cfg.get("use_v2_blocks", False),
+            v2_learned_scatter=cfg.get("v2_learned_scatter", True),
+            v2_query_freq_gate=cfg.get("v2_query_freq_gate", True),
+            v2_short_conv=cfg.get("v2_short_conv", True),
+            v2_position_mod=cfg.get("v2_position_mod", True),
+            v2_rotary=cfg.get("v2_rotary", True),
         )
         return WaveFieldLM(mc), mc
     if arch == "transformer":
