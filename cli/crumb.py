@@ -5460,6 +5460,20 @@ def cmd_llm(args: argparse.Namespace) -> None:
         print(f"bpc:       {loss / math.log(2):.3f}")
         return
 
+    if action == 'demo':
+        from crumb_llm.demo import main as demo_main
+        demo_argv = []
+        if args.ckpt:
+            demo_argv.extend(['--ckpt', args.ckpt])
+        if args.data:
+            demo_argv.extend(['--data', args.data])
+        demo_argv.extend(['--steps', str(args.steps)])
+        demo_argv.extend(['--config', args.config])
+        if args.compare:
+            demo_argv.append('--compare')
+        demo_main(demo_argv)
+        return
+
     if action == 'compare':
         from crumb_llm.compare import compare
         compare(
@@ -6513,6 +6527,13 @@ def build_parser() -> argparse.ArgumentParser:
     wp.add_argument('file', help='Input .crumb or .txt file to score.')
 
     wi = llm_sub.add_parser('info', help='Print Crumb LLM version, runtime, and capabilities.')
+
+    wd = llm_sub.add_parser('demo', help='End-to-end demo: train → generate → context-pull.')
+    wd.add_argument('--ckpt', default=None, help='Skip training, use existing checkpoint.')
+    wd.add_argument('--data', default=None, help='Training corpus path.')
+    wd.add_argument('--steps', type=int, default=2000)
+    wd.add_argument('--config', default='tiny')
+    wd.add_argument('--compare', action='store_true')
 
     wc = llm_sub.add_parser('compare', help='Head-to-head: train wave-field AND transformer, report gap.')
     wc.add_argument('--config', default='tiny')
