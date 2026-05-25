@@ -5460,6 +5460,26 @@ def cmd_llm(args: argparse.Namespace) -> None:
         print(f"bpc:       {loss / math.log(2):.3f}")
         return
 
+    if action == 'compare':
+        from crumb_llm.compare import compare
+        compare(
+            config_name=args.config,
+            data_path=args.data,
+            steps=args.steps,
+            out_dir=args.out,
+            seed=args.seed,
+            log_every=args.log_every,
+        )
+        return
+
+    if action == 'export':
+        from crumb_llm.hub import save_for_hub
+        from crumb_llm.sample import load_checkpoint
+        model, tok = load_checkpoint(args.ckpt)
+        out_dir = args.output or str(Path(args.ckpt) / "hub")
+        save_for_hub(model, tok, out_dir, model_name=args.name)
+        return
+
     raise ValueError(f"unknown llm action: {action!r}")
 
 
@@ -6462,6 +6482,19 @@ def build_parser() -> argparse.ArgumentParser:
     wp.add_argument('file', help='Input .crumb or .txt file to score.')
 
     wi = llm_sub.add_parser('info', help='Print Crumb LLM version, runtime, and capabilities.')
+
+    wc = llm_sub.add_parser('compare', help='Head-to-head: train wave-field AND transformer, report gap.')
+    wc.add_argument('--config', default='tiny')
+    wc.add_argument('--data', default=None)
+    wc.add_argument('--steps', type=int, default=1000)
+    wc.add_argument('--out', default='/tmp/crumb_llm_compare')
+    wc.add_argument('--seed', type=int, default=0)
+    wc.add_argument('--log-every', type=int, default=100)
+
+    we = llm_sub.add_parser('export', help='Export a checkpoint for HuggingFace Hub upload.')
+    we.add_argument('--ckpt', required=True, help='Checkpoint directory.')
+    we.add_argument('--name', default='crumb-llm-tiny', help='Model name for Hub.')
+    we.add_argument('-o', '--output', default=None, help='Output directory (default: <ckpt>/hub).')
 
     llm_cmd.set_defaults(func=cmd_llm)
 

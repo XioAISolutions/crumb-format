@@ -69,6 +69,8 @@ from .layers import (  # noqa: E402
     WaveFieldBlock,
 )
 from .model import WaveFieldLM, WaveFieldConfig  # noqa: E402
+from .cache import FieldStateCache, generate_cached  # noqa: E402
+from .hub import save_for_hub, load_hub_model  # noqa: E402
 
 __all__ = [
     "wave_kernel_time",
@@ -82,6 +84,10 @@ __all__ = [
     "WaveFieldBlock",
     "WaveFieldLM",
     "WaveFieldConfig",
+    "FieldStateCache",
+    "generate_cached",
+    "save_for_hub",
+    "load_hub_model",
 ]
 
 __version__ = "0.2.0"
