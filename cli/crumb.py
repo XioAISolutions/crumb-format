@@ -5480,6 +5480,28 @@ def cmd_llm(args: argparse.Namespace) -> None:
         save_for_hub(model, tok, out_dir, model_name=args.name)
         return
 
+    if action == 'serve':
+        from crumb_llm.serve import serve
+        serve(ckpt_dir=args.ckpt, port=args.port, host=args.host, index_dir=args.index)
+        return
+
+    if action == 'index':
+        from crumb_llm.context_pull import build_index
+        idx = build_index(args.directory, field_size=args.field_size)
+        idx.save(args.output)
+        print(f"Indexed {len(idx.sections)} sections → {args.output}")
+        return
+
+    if action == 'pull':
+        from crumb_llm.context_pull import CrumbIndex, pull_context
+        idx = CrumbIndex.load(args.index_file)
+        pulled = pull_context(args.query, idx, max_tokens=args.max_tokens, top_k=args.top_k)
+        if pulled:
+            print(pulled)
+        else:
+            print("No relevant sections found.")
+        return
+
     raise ValueError(f"unknown llm action: {action!r}")
 
 
@@ -6495,6 +6517,24 @@ def build_parser() -> argparse.ArgumentParser:
     we.add_argument('--ckpt', required=True, help='Checkpoint directory.')
     we.add_argument('--name', default='crumb-llm-tiny', help='Model name for Hub.')
     we.add_argument('-o', '--output', default=None, help='Output directory (default: <ckpt>/hub).')
+
+    ws = llm_sub.add_parser('serve', help='Start HTTP inference server with context pulling.')
+    ws.add_argument('--ckpt', required=True, help='Checkpoint directory.')
+    ws.add_argument('--port', type=int, default=8090)
+    ws.add_argument('--host', default='0.0.0.0')
+    ws.add_argument('--index', default=None,
+                    help='Directory of .crumb files to index for context pulling.')
+
+    wx = llm_sub.add_parser('index', help='Build a context-pulling index from a crumb directory.')
+    wx.add_argument('directory', help='Directory containing .crumb files.')
+    wx.add_argument('-o', '--output', default='crumb_index.json', help='Output index file.')
+    wx.add_argument('--field-size', type=int, default=256)
+
+    wq = llm_sub.add_parser('pull', help='Pull relevant crumb sections for a query (context pulling).')
+    wq.add_argument('query', help='Query text to match against the index.')
+    wq.add_argument('--index-file', required=True, help='Path to a pre-built crumb_index.json.')
+    wq.add_argument('--max-tokens', type=int, default=256)
+    wq.add_argument('--top-k', type=int, default=5)
 
     llm_cmd.set_defaults(func=cmd_llm)
 
