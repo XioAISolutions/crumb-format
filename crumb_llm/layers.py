@@ -139,6 +139,11 @@ class WaveFieldBlockConfig:
     boundary: str = "periodic"       # periodic | absorbing | reflecting
     dispersion: bool = False         # add learnable frequency-dependent phase shift
     interference_mixer: bool = False # replace proj_out with complex interference
+    adaptive_kernels: bool = False   # input-conditioned α/ω/φ
+    spectral_gate: bool = False      # learned per-frequency gate
+    resonance_memory: bool = False   # cross-layer standing-wave amplification
+    hybrid_gate: bool = False        # blend wave-field + local attention
+    hybrid_window: int = 64          # window size for hybrid local attention
 
 
 class WaveFieldBlock(nn.Module):
@@ -191,6 +196,16 @@ class WaveFieldBlock(nn.Module):
             self.mixer = None
             self.proj_out = nn.Linear(cfg.dim, cfg.dim, bias=False)
 
+        # Novel innovations (Crumb LLM originals).
+        from .innovations import AdaptiveKernelHead, SpectralGate, ResonanceMemory, FieldAttentionGate
+        self.adaptive_heads = nn.ModuleList(
+            AdaptiveKernelHead(cfg.dim, cfg.field_size, causal=cfg.causal)
+            for _ in range(cfg.n_heads)
+        ) if cfg.adaptive_kernels else None
+        self.spectral_gate = SpectralGate(cfg.n_heads, cfg.field_size, cfg.dim) if cfg.spectral_gate else None
+        self.resonance = ResonanceMemory(cfg.n_heads, cfg.field_size) if cfg.resonance_memory else None
+        self.hybrid_gate = FieldAttentionGate(cfg.dim, window_size=cfg.hybrid_window) if cfg.hybrid_gate else None
+
     # ── Wave mixing op ───────────────────────────────────────────────
 
     def wave_mix(
@@ -207,12 +222,15 @@ class WaveFieldBlock(nn.Module):
         # Project, then reshape to per-head slabs.
         h = self.proj_in(x).view(B, N, H, d_head).transpose(1, 2)  # [B,H,N,d]
 
-        # Stack each head's [F//2+1] kernel → [H, F//2+1].
-        kfs = [head.kernel_freq() for head in self.heads]
-        kernel = torch.stack(kfs, dim=0)                            # [H, F//2+1]
+        # Build kernels — static or adaptive.
+        if self.adaptive_heads is not None:
+            # Adaptive: kernels are input-conditioned [B, F//2+1] per head.
+            kfs = [ah(x) for ah in self.adaptive_heads]   # list of [B, F//2+1]
+            kernel = torch.stack(kfs, dim=1)               # [B, H, F//2+1]
+        else:
+            kfs = [head.kernel_freq() for head in self.heads]
+            kernel = torch.stack(kfs, dim=0)               # [H, F//2+1]
 
-        # Optional per-head additive bias on the kernel (used by the
-        # crumb-aware adapter to bias damping per request).
         if kernel_bias is not None:
             kernel = kernel + kernel_bias
 
@@ -223,10 +241,15 @@ class WaveFieldBlock(nn.Module):
         field = apply_boundary(field, self.bc, taper_width=taper_w)
         actual_F = field.shape[-2]
 
-        # FFT convolve with optional dispersion.
+        # FFT convolve.
         spec = torch.fft.rfft(field, n=actual_F, dim=-2)
-        kf = kernel.unsqueeze(0).unsqueeze(-1)
-        # Pad/truncate kernel to match if reflecting BC expanded the field.
+        if kernel.dim() == 2:
+            # Static kernel: [H, F//2+1] → broadcast over batch.
+            kf = kernel.unsqueeze(0).unsqueeze(-1)
+        else:
+            # Adaptive kernel: [B, H, F//2+1] → [B, H, F//2+1, 1].
+            kf = kernel.unsqueeze(-1)
+        # Pad kernel if reflecting BC expanded the field.
         if kf.shape[-2] != spec.shape[-2]:
             kf_full = torch.zeros(*kf.shape[:-2], spec.shape[-2], kf.shape[-1],
                                   dtype=kf.dtype, device=kf.device)
@@ -240,6 +263,11 @@ class WaveFieldBlock(nn.Module):
 
         if self.bc == BoundaryCondition.REFLECTING:
             field = unapply_reflecting(field, taper_width=taper_w)
+
+        # Spectral gate (input-conditioned frequency filtering).
+        if self.spectral_gate is not None:
+            x_pooled = x.mean(dim=1)  # [B, D]
+            field = self.spectral_gate(field, x_pooled)
 
         out = gather_linear(field, N)                               # [B,H,N,d]
 
@@ -256,9 +284,26 @@ class WaveFieldBlock(nn.Module):
         x: Tensor,
         scatter_weights: Optional[Tensor] = None,
         kernel_bias: Optional[Tensor] = None,
-    ) -> Tensor:
-        h = x + self.drop(
-            self.wave_mix(self.norm_mix(x), scatter_weights, kernel_bias)
-        )
+        resonance_state: Optional[Tensor] = None,
+    ) -> Tensor | tuple[Tensor, Tensor]:
+        wave_out = self.wave_mix(self.norm_mix(x), scatter_weights, kernel_bias)
+
+        # Hybrid gate: blend wave-field with local attention.
+        if self.hybrid_gate is not None:
+            wave_out = self.hybrid_gate(self.norm_mix(x), wave_out)
+
+        h = x + self.drop(wave_out)
         h = h + self.drop(self.ffn(self.norm_ffn(h)))
+
+        # Resonance memory: update and return new state if enabled.
+        if self.resonance is not None and resonance_state is not None:
+            # Reconstruct the field for resonance (re-scatter the output).
+            H, d_head = self.cfg.n_heads, self.d_head
+            h_proj = self.proj_in(self.norm_mix(h)).view(
+                h.shape[0], h.shape[1], H, d_head
+            ).transpose(1, 2)
+            field_for_res = scatter_linear(h_proj, self.cfg.field_size)
+            new_state, _ = self.resonance(resonance_state, field_for_res)
+            return h, new_state
+
         return h

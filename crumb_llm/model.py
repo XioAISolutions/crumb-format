@@ -35,6 +35,12 @@ class WaveFieldConfig:
     boundary: str = "periodic"             # periodic | absorbing | reflecting
     dispersion: bool = False               # learnable frequency-dependent phase
     interference_mixer: bool = False       # complex head interference vs proj_out
+    # Novel innovations (Crumb LLM originals).
+    adaptive_kernels: bool = False         # input-conditioned α/ω/φ
+    spectral_gate: bool = False            # per-frequency learned gate
+    resonance_memory: bool = False         # cross-layer standing-wave amplification
+    hybrid_gate: bool = False              # blend wave-field + local attention
+    hybrid_window: int = 64               # window for hybrid local attention
     # Crumb-adapter knobs (forwarded by `forward(...)` callers; the model
     # itself only accepts pre-computed tensors).
     use_crumb_priors: bool = False
@@ -66,6 +72,11 @@ class WaveFieldLM(nn.Module):
             boundary=cfg.boundary,
             dispersion=cfg.dispersion,
             interference_mixer=cfg.interference_mixer,
+            adaptive_kernels=cfg.adaptive_kernels,
+            spectral_gate=cfg.spectral_gate,
+            resonance_memory=cfg.resonance_memory,
+            hybrid_gate=cfg.hybrid_gate,
+            hybrid_window=cfg.hybrid_window,
         )
         self.blocks = nn.ModuleList(WaveFieldBlock(block_cfg) for _ in range(cfg.n_layers))
         self.norm_out = RMSNorm(cfg.dim)

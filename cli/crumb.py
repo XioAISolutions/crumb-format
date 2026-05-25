@@ -5481,8 +5481,17 @@ def cmd_llm(args: argparse.Namespace) -> None:
         return
 
     if action == 'serve':
-        from crumb_llm.serve import serve
-        serve(ckpt_dir=args.ckpt, port=args.port, host=args.host, index_dir=args.index)
+        mode = getattr(args, 'mode', 'dev')
+        if mode == 'production':
+            from crumb_llm.production_serve import serve_production
+            serve_production(
+                ckpt_dir=args.ckpt, port=args.port, host=args.host,
+                index_dir=args.index,
+                max_concurrent=getattr(args, 'max_concurrent', 4),
+            )
+        else:
+            from crumb_llm.serve import serve
+            serve(ckpt_dir=args.ckpt, port=args.port, host=args.host, index_dir=args.index)
         return
 
     if action == 'index':
@@ -6524,6 +6533,10 @@ def build_parser() -> argparse.ArgumentParser:
     ws.add_argument('--host', default='0.0.0.0')
     ws.add_argument('--index', default=None,
                     help='Directory of .crumb files to index for context pulling.')
+    ws.add_argument('--mode', choices=['dev', 'production'], default='dev',
+                    help='dev=simple server, production=multi-tenant with auth+rate-limits+tiers.')
+    ws.add_argument('--max-concurrent', type=int, default=4,
+                    help='Max concurrent requests (production mode).')
 
     wx = llm_sub.add_parser('index', help='Build a context-pulling index from a crumb directory.')
     wx.add_argument('directory', help='Directory containing .crumb files.')

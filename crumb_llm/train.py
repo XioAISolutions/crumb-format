@@ -72,6 +72,11 @@ def build_model(cfg: dict, vocab_size: int):
             boundary=cfg.get("boundary", "periodic"),
             dispersion=cfg.get("dispersion", False),
             interference_mixer=cfg.get("interference_mixer", False),
+            adaptive_kernels=cfg.get("adaptive_kernels", False),
+            spectral_gate=cfg.get("spectral_gate", False),
+            resonance_memory=cfg.get("resonance_memory", False),
+            hybrid_gate=cfg.get("hybrid_gate", False),
+            hybrid_window=cfg.get("hybrid_window", 64),
         )
         return WaveFieldLM(mc), mc
     if arch == "transformer":
