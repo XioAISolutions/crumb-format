@@ -141,7 +141,7 @@ def train(
     eval_every: int = 500,
     grad_accum: int = 1,
 ) -> dict:
-    """Run training. Returns a small dict of final metrics."""
+    """Run training with mixed precision and gradient checkpointing."""
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -160,7 +160,26 @@ def train(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"[train] arch={config.get('arch', 'wave_field')} params={n_params:,} device={device}")
+
+    # Gradient checkpointing (saves memory on larger models).
+    use_grad_ckpt = config.get("gradient_checkpointing", False) and hasattr(model, 'blocks')
+    if use_grad_ckpt:
+        for block in model.blocks:
+            block._orig_forward = block.forward
+            from torch.utils.checkpoint import checkpoint
+            def make_ckpt_fn(b):
+                def ckpt_forward(*args, **kwargs):
+                    return checkpoint(b._orig_forward, *args, use_reentrant=False, **kwargs)
+                return ckpt_forward
+            block.forward = make_ckpt_fn(block)
+
+    # Mixed precision (BF16 on CUDA, FP32 on CPU).
+    use_amp = config.get("mixed_precision", True) and device.type == "cuda"
+    scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
+    amp_dtype = torch.bfloat16 if use_amp and torch.cuda.is_bf16_supported() else torch.float16
+
+    print(f"[train] arch={config.get('arch', 'wave_field')} params={n_params:,} device={device}"
+          f" amp={'bf16' if use_amp else 'off'} grad_ckpt={'on' if use_grad_ckpt else 'off'}")
 
     optim = AdamW(
         model.parameters(),
@@ -173,27 +192,44 @@ def train(
     bs = config.get("batch_size", 8)
     t0 = time.time()
     final_loss = float("nan")
+    best_eval = float("inf")
     for step in range(1, steps + 1):
         loss_accum = 0.0
         optim.zero_grad(set_to_none=True)
         for _ in range(grad_accum):
             x, y = train_stream.batch(bs)
             x, y = x.to(device), y.to(device)
-            out = model(x, targets=y)
-            loss = out["loss"] / grad_accum
-            loss.backward()
+            with torch.amp.autocast(device.type, dtype=amp_dtype, enabled=use_amp):
+                out = model(x, targets=y)
+                loss = out["loss"] / grad_accum
+            scaler.scale(loss).backward()
             loss_accum += loss.item()
+        scaler.unscale_(optim)
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-        optim.step()
+        scaler.step(optim)
+        scaler.update()
         sched.step()
         final_loss = loss_accum
         if step % log_every == 0 or step == 1:
             dt = time.time() - t0
+            tok_per_sec = (step * bs * block_size * grad_accum) / max(dt, 0.001)
             print(f"[train] step={step:>6d}  loss={final_loss:.4f}  bpc={final_loss / math.log(2):.3f}  "
-                  f"lr={sched.get_last_lr()[0]:.2e}  elapsed={dt:.1f}s")
+                  f"lr={sched.get_last_lr()[0]:.2e}  tok/s={tok_per_sec:.0f}  elapsed={dt:.1f}s")
         if eval_every and step % eval_every == 0:
-            el = eval_loss(model, eval_stream, batches=4, batch_size=bs)
-            print(f"[eval ] step={step:>6d}  loss={el:.4f}  bpc={el / math.log(2):.3f}")
+            el = eval_loss(model, eval_stream, batches=8, batch_size=bs)
+            ppl = math.exp(min(el, 20))
+            print(f"[eval ] step={step:>6d}  loss={el:.4f}  bpc={el / math.log(2):.3f}  ppl={ppl:.2f}")
+            if el < best_eval:
+                best_eval = el
+                best_ckpt = {
+                    "model_state": model.state_dict(),
+                    "model_config": asdict(mc),
+                    "tokenizer_type": config.get("tokenizer", "byte"),
+                    "arch": config.get("arch", "wave_field"),
+                    "step": step, "eval_loss": el,
+                }
+                torch.save(best_ckpt, out_dir / "best.pt")
+                print(f"[eval ] new best → {out_dir / 'best.pt'}")
 
     # Final save.
     ckpt = {
