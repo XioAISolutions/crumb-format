@@ -69,12 +69,6 @@ def main():
         print("\n\n" + "="*60)
         print("  Generation Demo")
         print("="*60 + "\n")
-        cmd = [
-            sys.executable, "-m", "crumb_llm.demo",
-            "--ckpt", args.out,
-            "--skip-generate",
-        ]
-        # Actually just generate inline
         import torch
         from crumb_llm.sample import load_checkpoint
 

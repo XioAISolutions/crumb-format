@@ -685,7 +685,6 @@ def handle_llm_tool(name, args):
     """Handle crumb_llm_* MCP tool calls."""
     if not _load_llm():
         return "Crumb LLM not configured. Set CRUMB_LLM_CKPT env var to a checkpoint directory."
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     from crumb_llm.mcp_tools import handle_tool
     return handle_tool(name, args, model=_llm_model, tokenizer=_llm_tokenizer, index=_llm_index)
 

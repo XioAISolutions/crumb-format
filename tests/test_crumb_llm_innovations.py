@@ -4,7 +4,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from crumb_llm.innovations import (  # noqa: E402
+from crumb_llm.v2 import (  # noqa: E402
     AdaptiveKernelHead,
     FieldAttentionGate,
     ResonanceMemory,

@@ -71,23 +71,41 @@ from .layers import (  # noqa: E402
 from .model import WaveFieldLM, WaveFieldConfig  # noqa: E402
 from .cache import FieldStateCache, generate_cached  # noqa: E402
 from .hub import save_for_hub, load_hub_model  # noqa: E402
+from .v2 import (  # noqa: E402
+    SmoothCausalKernel,
+    LearnedScatterGather,
+    QueryFrequencyGate,
+    ShortConvGate,
+    RotaryFieldEncoding,
+    WaveFieldBlockV2,
+    WaveFieldBlockV2Config,
+    AdaptiveKernelHead,
+    FieldAttentionGate,
+    ResonanceMemory,
+    SpectralGate,
+)
+from .context_pull import CrumbIndex, ContextPullSession, pull_context  # noqa: E402
 
 __all__ = [
-    "wave_kernel_time",
-    "wave_kernel_freq",
-    "fft_convolve",
-    "scatter_linear",
-    "gather_linear",
-    "RMSNorm",
-    "SwiGLUFFN",
-    "WaveFieldHead",
-    "WaveFieldBlock",
-    "WaveFieldLM",
-    "WaveFieldConfig",
-    "FieldStateCache",
-    "generate_cached",
-    "save_for_hub",
-    "load_hub_model",
+    # Core
+    "wave_kernel_time", "wave_kernel_freq", "fft_convolve",
+    "scatter_linear", "gather_linear",
+    "RMSNorm", "SwiGLUFFN",
+    # V1 blocks
+    "WaveFieldHead", "WaveFieldBlock",
+    # V2 blocks
+    "SmoothCausalKernel", "LearnedScatterGather", "QueryFrequencyGate",
+    "ShortConvGate", "RotaryFieldEncoding",
+    "WaveFieldBlockV2", "WaveFieldBlockV2Config",
+    "AdaptiveKernelHead", "FieldAttentionGate", "ResonanceMemory", "SpectralGate",
+    # Model
+    "WaveFieldLM", "WaveFieldConfig",
+    # Cache
+    "FieldStateCache", "generate_cached",
+    # Hub
+    "save_for_hub", "load_hub_model",
+    # Context pulling
+    "CrumbIndex", "ContextPullSession", "pull_context",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

@@ -197,7 +197,7 @@ class WaveFieldBlock(nn.Module):
             self.proj_out = nn.Linear(cfg.dim, cfg.dim, bias=False)
 
         # Novel innovations (Crumb LLM originals).
-        from .innovations import AdaptiveKernelHead, SpectralGate, ResonanceMemory, FieldAttentionGate
+        from .v2 import AdaptiveKernelHead, SpectralGate, ResonanceMemory, FieldAttentionGate
         self.adaptive_heads = nn.ModuleList(
             AdaptiveKernelHead(cfg.dim, cfg.field_size, causal=cfg.causal)
             for _ in range(cfg.n_heads)

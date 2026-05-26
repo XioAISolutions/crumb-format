@@ -383,7 +383,105 @@ class WaveFieldBlockV2(nn.Module):
         return self.proj_out(out)
 
     def forward(self, x: Tensor, scatter_weights: Optional[Tensor] = None,
-                kernel_bias: Optional[Tensor] = None) -> Tensor:
+                kernel_bias: Optional[Tensor] = None, **kwargs) -> Tensor:
         h = x + self.drop(self.wave_mix(self.norm_mix(x), scatter_weights))
         h = h + self.drop(self.ffn(self.norm_ffn(h)))
         return h
+
+
+# ── V1 Innovation classes (consolidated from innovations.py) ─────────
+
+
+class AdaptiveKernelHead(nn.Module):
+    """Input-conditioned wave kernel: α, ω, φ predicted from context."""
+
+    def __init__(self, dim: int, field_size: int, causal: bool = True):
+        super().__init__()
+        self.field_size = field_size
+        self.causal = causal
+        self.predictor = nn.Sequential(
+            nn.Linear(dim, dim // 4), nn.SiLU(), nn.Linear(dim // 4, 3),
+        )
+        self.alpha_base = nn.Parameter(torch.tensor(0.05))
+        self.omega_base = nn.Parameter(torch.tensor(1.0))
+        self.phi_base = nn.Parameter(torch.tensor(0.0))
+        t = torch.arange(field_size, dtype=torch.float32) - field_size // 2
+        self.register_buffer("t", t)
+
+    def forward(self, x: Tensor) -> Tensor:
+        pooled = x.mean(dim=1)
+        params = self.predictor(pooled)
+        alpha = (self.alpha_base + params[:, 0]).abs()
+        omega = self.omega_base + params[:, 1]
+        phi = self.phi_base + params[:, 2]
+        a, w, p = alpha.unsqueeze(-1), omega.unsqueeze(-1), phi.unsqueeze(-1)
+        k = torch.exp(-a * self.t.abs()) * torch.cos(w * self.t + p)
+        if self.causal:
+            mask = torch.zeros_like(k)
+            mask[:, self.field_size // 2:] = 1.0
+            k = k * mask
+        k = torch.fft.ifftshift(k, dim=-1)
+        return torch.fft.rfft(k, n=self.field_size, dim=-1)
+
+
+class FieldAttentionGate(nn.Module):
+    """Learned gate between wave-field mixing and windowed attention."""
+
+    def __init__(self, dim: int, window_size: int = 64):
+        super().__init__()
+        self.window_size = window_size
+        self.gate_proj = nn.Linear(dim, 1)
+        self.q_proj = nn.Linear(dim, dim, bias=False)
+        self.k_proj = nn.Linear(dim, dim, bias=False)
+        self.v_proj = nn.Linear(dim, dim, bias=False)
+
+    def local_attention(self, x: Tensor) -> Tensor:
+        B, N, D = x.shape
+        W = min(self.window_size, N)
+        q, k, v = self.q_proj(x), self.k_proj(x), self.v_proj(x)
+        scores = torch.bmm(q, k.transpose(-2, -1)) / math.sqrt(D)
+        mask = torch.ones(N, N, device=x.device, dtype=torch.bool).triu(1)
+        window_mask = torch.ones(N, N, device=x.device, dtype=torch.bool).tril(-W)
+        scores = scores.masked_fill((mask | window_mask).unsqueeze(0), float("-inf"))
+        return torch.bmm(torch.softmax(scores, dim=-1), v)
+
+    def forward(self, x: Tensor, wave_output: Tensor) -> Tensor:
+        gate = torch.sigmoid(self.gate_proj(x))
+        return gate * wave_output + (1.0 - gate) * self.local_attention(x)
+
+
+class ResonanceMemory(nn.Module):
+    """Cross-layer field accumulator that reinforces standing waves."""
+
+    def __init__(self, n_heads: int, field_size: int):
+        super().__init__()
+        spec_size = field_size // 2 + 1
+        self.decay = nn.Parameter(torch.full((n_heads, spec_size), 0.9))
+        self.inject = nn.Parameter(torch.full((n_heads, spec_size), 0.1))
+
+    def forward(self, memory_spec: Tensor, new_field: Tensor) -> tuple[Tensor, Tensor]:
+        new_spec = torch.fft.rfft(new_field, dim=-2).abs().mean(dim=-1)
+        decay = self.decay.abs().clamp(0, 0.99).unsqueeze(0)
+        inject = self.inject.abs().clamp(0, 0.5).unsqueeze(0)
+        updated = decay * memory_spec + inject * new_spec
+        gain = 1.0 + torch.tanh(updated)
+        spec = torch.fft.rfft(new_field, dim=-2)
+        amplified = torch.fft.irfft(spec * gain.unsqueeze(-1), n=new_field.shape[-2], dim=-2)
+        return updated, amplified
+
+
+class SpectralGate(nn.Module):
+    """Learned frequency-domain gate: selectively pass/block spectral bands."""
+
+    def __init__(self, n_heads: int, field_size: int, dim: int):
+        super().__init__()
+        spec_size = field_size // 2 + 1
+        self.gate_net = nn.Sequential(nn.Linear(dim, n_heads * spec_size))
+        self.n_heads = n_heads
+        self.spec_size = spec_size
+
+    def forward(self, field: Tensor, x_pooled: Tensor) -> Tensor:
+        B, F_ = field.shape[0], field.shape[-2]
+        gate = torch.sigmoid(self.gate_net(x_pooled)).view(B, self.n_heads, self.spec_size, 1)
+        spec = torch.fft.rfft(field, dim=-2)
+        return torch.fft.irfft(spec * gate, n=F_, dim=-2)

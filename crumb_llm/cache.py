@@ -221,10 +221,19 @@ def generate_cached(
 
         x_tok = model.embed(next_id)
         total_tokens = cache.seq_pos + 1
+
+        # Sliding window: if we've exceeded the field size, shift fields.
+        field_size = getattr(model.cfg, "field_size", 256)
+        if cache.seq_pos >= field_size:
+            from .sliding import shift_field
+            stride = max(1, field_size // 4)
+            for ls in cache.layers:
+                ls.field = shift_field(ls.field, stride)
+
         for layer_idx, block in enumerate(model.blocks):
             x_tok, cache.layers[layer_idx] = forward_cached_block(
                 block, x_tok, cache.layers[layer_idx],
-                token_pos=cache.seq_pos, total_tokens=total_tokens,
+                token_pos=cache.seq_pos % field_size, total_tokens=min(total_tokens, field_size),
             )
         x_tok = model.norm_out(x_tok)
         if model.lm_head is None:

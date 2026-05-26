@@ -38,7 +38,9 @@ Each attention head in Crumb LLM learns exactly three values:
 
 The kernel: **k(t) = exp(-α|t|) · cos(ωt + φ)**
 
-Three parameters. That's it. A standard transformer head has d² + d² = 2d² parameters (Q and K projections alone). At d=128, that's 32,768 parameters per head just for routing. Crumb LLM routes information with 3.
+Three parameters. That's it. A standard transformer head has d² + d² = 2d² parameters (Q and K projections alone). At d=128, that's 32,768 parameters per head just for routing. Crumb LLM V1 routes information with 3.
+
+**V2 blocks** add learned components (smooth causal masking, learned scatter/gather, query-conditioned frequency gating, RoPE, short convolution) that increase per-head parameters but remain O(N log N). V2 is the SOTA variant; V1 is the minimal, fast variant.
 
 ---
 
