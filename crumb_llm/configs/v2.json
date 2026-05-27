@@ -1,0 +1,23 @@
+{
+  "arch": "wave_field",
+  "tokenizer": "byte",
+  "dim": 128,
+  "n_layers": 4,
+  "n_heads": 4,
+  "field_size": 256,
+  "block_size": 256,
+  "ffn_mult": 2.667,
+  "causal": true,
+  "dropout": 0.05,
+  "tie_embeddings": true,
+  "use_v2_blocks": true,
+  "v2_learned_scatter": true,
+  "v2_query_freq_gate": true,
+  "v2_short_conv": true,
+  "v2_position_mod": true,
+  "v2_rotary": true,
+  "batch_size": 16,
+  "lr": 0.0006,
+  "weight_decay": 0.1,
+  "warmup": 100
+}

@@ -6,6 +6,7 @@ Configure in claude_desktop_config.json or .cursor/mcp.json
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -650,6 +651,44 @@ def handle_tool_call(name, args):
         return f"Error: {e}"
 
 
+# ── Crumb LLM tools (optional, loaded if torch is available) ─────────
+
+_llm_model = None
+_llm_tokenizer = None
+_llm_index = None
+
+def _load_llm():
+    """Lazy-load the LLM from CRUMB_LLM_CKPT env var."""
+    global _llm_model, _llm_tokenizer, _llm_index
+    if _llm_model is not None:
+        return True
+    ckpt = os.environ.get("CRUMB_LLM_CKPT")
+    if not ckpt:
+        return False
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+        from crumb_llm.sample import load_checkpoint
+        from crumb_llm.context_pull import build_index
+        _llm_model, _llm_tokenizer = load_checkpoint(ckpt)
+        _llm_model.eval()
+        index_dir = os.environ.get("CRUMB_LLM_INDEX")
+        if index_dir:
+            field_size = getattr(_llm_model.cfg, "field_size", 256)
+            _llm_index = build_index(index_dir, field_size=field_size)
+        return True
+    except Exception as e:
+        print(f"[mcp] failed to load Crumb LLM: {e}", file=sys.stderr)
+        return False
+
+
+def handle_llm_tool(name, args):
+    """Handle crumb_llm_* MCP tool calls."""
+    if not _load_llm():
+        return "Crumb LLM not configured. Set CRUMB_LLM_CKPT env var to a checkpoint directory."
+    from crumb_llm.mcp_tools import handle_tool
+    return handle_tool(name, args, model=_llm_model, tokenizer=_llm_tokenizer, index=_llm_index)
+
+
 def main():
     """Run the MCP server using stdio transport."""
     while True:
@@ -674,12 +713,21 @@ def main():
             pass  # No response needed
 
         elif method == "tools/list":
-            respond(req_id, {"tools": TOOLS})
+            all_tools = list(TOOLS)
+            try:
+                from crumb_llm.mcp_tools import TOOLS as LLM_TOOLS
+                all_tools.extend(LLM_TOOLS)
+            except ImportError:
+                pass
+            respond(req_id, {"tools": all_tools})
 
         elif method == "tools/call":
             tool_name = msg["params"]["name"]
             tool_args = msg["params"].get("arguments", {})
-            result = handle_tool_call(tool_name, tool_args)
+            if tool_name.startswith("crumb_llm_"):
+                result = handle_llm_tool(tool_name, tool_args)
+            else:
+                result = handle_tool_call(tool_name, tool_args)
             respond(req_id, {
                 "content": [{"type": "text", "text": result}],
             })

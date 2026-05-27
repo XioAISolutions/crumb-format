@@ -1,7 +1,7 @@
---- task: Release 1.1.0 — Cursor integration + first-touch UX
+--- task: feat(wave_field_llm): O(N log N) wave-field LM that reads CRUMB structure as physical priors
 source: github.pr
-pr: #33
-generated: 2026-05-08T16:31:59Z
+pr: #35
+generated: 2026-05-24T20:09:50Z
 ---
 
 [goal]
@@ -9,10 +9,32 @@ generated: 2026-05-08T16:31:59Z
 
 [context]
 Changed files in this PR:
-- CHANGELOG.md
+- README.md
 - cli/crumb.py
+- docs/wave-field-llm.md
 - pyproject.toml
-- tests/test_crumb.py
+- tests/test_wave_field_crumb_adapter.py
+- tests/test_wave_field_kernels.py
+- tests/test_wave_field_layers.py
+- tests/test_wave_field_scatter_gather.py
+- tests/test_wave_field_train_smoke.py
+- wave_field_llm/__init__.py
+- wave_field_llm/__main__.py
+- wave_field_llm/baseline.py
+- wave_field_llm/bench.py
+- wave_field_llm/configs/__init__.py
+- wave_field_llm/configs/small.json
+- wave_field_llm/configs/tiny.json
+- wave_field_llm/configs/tiny_transformer.json
+- wave_field_llm/crumb_adapter.py
+- wave_field_llm/data.py
+- wave_field_llm/kernels.py
+- wave_field_llm/layers.py
+- wave_field_llm/model.py
+- wave_field_llm/sample.py
+- wave_field_llm/scatter_gather.py
+- wave_field_llm/tokenizer.py
+- wave_field_llm/train.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions

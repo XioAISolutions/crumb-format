@@ -1,0 +1,17 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install CPU-only torch (smallest image).
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir numpy
+
+COPY . /app
+RUN pip install --no-cache-dir -e .
+
+# Default: serve the tiny checkpoint on port 8090.
+# Override --ckpt and --index at runtime.
+EXPOSE 8090
+
+ENTRYPOINT ["python", "-m", "crumb_llm.serve"]
+CMD ["--ckpt", "/ckpt", "--port", "8090", "--index", "/crumbs"]

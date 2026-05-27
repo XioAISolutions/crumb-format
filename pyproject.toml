@@ -30,7 +30,24 @@ agentauth-mcp = "mcp.agentauth_server:main"
 
 [tool.setuptools]
 py-modules = ["crumb_cli"]
-packages = ["cli", "agentauth", "mcp", "api", "a2a"]
+packages = [
+    "cli",
+    "agentauth",
+    "mcp",
+    "api",
+    "a2a",
+    "crumb_llm",
+    "crumb_llm.configs",
+]
+
+[tool.setuptools.package-data]
+"crumb_llm.configs" = ["*.json"]
+
+[project.optional-dependencies]
+llm = [
+    "torch>=2.2",
+    "numpy>=1.26",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

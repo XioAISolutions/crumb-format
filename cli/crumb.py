@@ -5348,6 +5348,182 @@ def cmd_wake(args: argparse.Namespace) -> None:
         print(wake_text, end='')
 
 
+_LLM_MISSING_DEPS = (
+    "crumb_llm requires PyTorch (and numpy). Install with:\n"
+    "    pip install 'crumb-format[llm]'"
+)
+
+
+def cmd_llm(args: argparse.Namespace) -> None:
+    """Crumb LLM: train, generate, perplexity, bench, info.
+
+    All sub-actions live inside the ``crumb_llm`` subpackage. Importing
+    it raises ImportError if torch is not installed; we catch that and
+    print a friendly install hint.
+    """
+    try:
+        import crumb_llm  # noqa: F401
+    except ImportError as e:
+        print(_LLM_MISSING_DEPS, file=sys.stderr)
+        print(f"  (underlying error: {e})", file=sys.stderr)
+        sys.exit(1)
+
+    action = args.llm_action
+
+    if action == 'info':
+        import crumb_llm
+        import torch
+        print(f"Crumb LLM  v{crumb_llm.__version__}")
+        print(f"O(N log N) language modeling via physics-based wave equations")
+        print()
+        print(f"torch           {torch.__version__}")
+        print(f"cuda available  {torch.cuda.is_available()}")
+        print()
+        print("Configs: tiny (CPU), small (GPU), medium (research), physics (all features)")
+        print()
+        print("Quick start:")
+        print("  crumb llm train --config tiny --steps 500 --out /tmp/crumb_run")
+        print("  crumb llm generate --ckpt /tmp/crumb_run --prompt 'BEGIN CRUMB'")
+        print("  crumb llm perplexity --ckpt /tmp/crumb_run examples/task-bug-fix.crumb")
+        print("  crumb llm bench --lens 1024,4096,8192")
+        return
+
+    if action == 'train':
+        from crumb_llm.train import load_config, train
+        cfg = load_config(args.config)
+        if args.arch:
+            cfg["arch"] = args.arch
+        train(
+            config=cfg,
+            data_path=args.data,
+            steps=args.steps,
+            out_dir=args.out,
+            seed=args.seed,
+            log_every=args.log_every,
+            eval_every=args.eval_every,
+            grad_accum=args.grad_accum,
+        )
+        return
+
+    if action == 'generate':
+        from crumb_llm.sample import generate
+        prompt = args.prompt
+        if args.from_crumb:
+            from crumb_llm.crumb_adapter import CrumbPriorBuilder
+            text = read_text(args.from_crumb)
+            # Use the parsed body as the prompt; structural priors are
+            # passed to forward() in the model.generate path automatically
+            # via the byte sequence (priors are advisory, not required).
+            priors = CrumbPriorBuilder().build(text)
+            prompt = "".join(chr(b) if b < 128 else "" for b in priors.input_ids[0].tolist())
+        text = generate(
+            ckpt_dir=args.ckpt,
+            prompt=prompt,
+            max_new_tokens=args.max_new_tokens,
+            temperature=args.temperature,
+            top_k=args.top_k,
+            seed=args.seed,
+        )
+        print(text)
+        return
+
+    if action == 'bench':
+        from crumb_llm.bench import benchmark, format_rows
+        lens = [int(x) for x in args.lens.split(",") if x.strip()]
+        rows = benchmark(
+            lens=lens, dim=args.dim, n_layers=args.n_layers, n_heads=args.n_heads,
+            field_size=args.field_size, batch_size=args.batch,
+        )
+        print(format_rows(rows))
+        return
+
+    if action == 'perplexity':
+        import math
+        import torch
+        from crumb_llm.sample import load_checkpoint
+        model, tok = load_checkpoint(args.ckpt)
+        text = read_text(args.file)
+        ids = torch.tensor(tok.encode(text), dtype=torch.long).unsqueeze(0)
+        N = ids.size(1)
+        # Truncate to fit the field/block size of the loaded model.
+        max_ctx = getattr(model.cfg, "field_size", None) or getattr(model.cfg, "block_size", N)
+        ids = ids[:, : max_ctx]
+        with torch.no_grad():
+            x = ids[:, :-1]
+            y = ids[:, 1:]
+            out = model(x, targets=y) if hasattr(model, 'cfg') else model(x, targets=y)
+        loss = out["loss"].item()
+        print(f"file:      {args.file}")
+        print(f"tokens:    {N}  (scored: {y.size(1)})")
+        print(f"loss:      {loss:.4f}")
+        print(f"perplexity:{math.exp(loss):.2f}")
+        print(f"bpc:       {loss / math.log(2):.3f}")
+        return
+
+    if action == 'demo':
+        from crumb_llm.demo import main as demo_main
+        demo_argv = []
+        if args.ckpt:
+            demo_argv.extend(['--ckpt', args.ckpt])
+        if args.data:
+            demo_argv.extend(['--data', args.data])
+        demo_argv.extend(['--steps', str(args.steps)])
+        demo_argv.extend(['--config', args.config])
+        if args.compare:
+            demo_argv.append('--compare')
+        demo_main(demo_argv)
+        return
+
+    if action == 'compare':
+        from crumb_llm.compare import compare
+        compare(
+            config_name=args.config,
+            data_path=args.data,
+            steps=args.steps,
+            out_dir=args.out,
+            seed=args.seed,
+            log_every=args.log_every,
+        )
+        return
+
+    if action == 'export':
+        from crumb_llm.hub import save_for_hub
+        from crumb_llm.sample import load_checkpoint
+        model, tok = load_checkpoint(args.ckpt)
+        out_dir = args.output or str(Path(args.ckpt) / "hub")
+        save_for_hub(model, tok, out_dir, model_name=args.name)
+        return
+
+    if action == 'serve':
+        from crumb_llm.serve import serve
+        serve(
+            ckpt_dir=args.ckpt, port=args.port, host=args.host,
+            index_dir=args.index,
+            max_concurrent=getattr(args, 'max_concurrent', 4),
+            production=getattr(args, 'production', False),
+        )
+        return
+
+    if action == 'index':
+        from crumb_llm.context_pull import build_index
+        idx = build_index(args.directory, field_size=args.field_size)
+        idx.save(args.output)
+        print(f"Indexed {len(idx.sections)} sections → {args.output}")
+        return
+
+    if action == 'pull':
+        from crumb_llm.context_pull import CrumbIndex, pull_context
+        idx = CrumbIndex.load(args.index_file)
+        pulled = pull_context(args.query, idx, max_tokens=args.max_tokens, top_k=args.top_k)
+        if pulled:
+            print(pulled)
+        else:
+            print("No relevant sections found.")
+        return
+
+    raise ValueError(f"unknown llm action: {action!r}")
+
+
 def cmd_reflect(args: argparse.Namespace) -> None:
     """Analyze palace health and identify knowledge gaps."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -6304,6 +6480,93 @@ def build_parser() -> argparse.ArgumentParser:
     reflect_cmd.add_argument('--stale-days', type=int, default=30,
                              help='Days before a room is considered stale (default: 30).')
     reflect_cmd.set_defaults(func=cmd_reflect)
+
+    # --- Crumb LLM (optional, requires `pip install crumb-format[llm]`) ---
+    llm_cmd = sub.add_parser(
+        'llm',
+        help='Crumb LLM: O(N log N) physics-based language model. Requires [llm] extra.',
+    )
+    llm_sub = llm_cmd.add_subparsers(dest='llm_action', required=True)
+
+    wt = llm_sub.add_parser('train', help='Train a Crumb LLM on a text corpus.')
+    wt.add_argument('--config', default='tiny', help='Built-in config or path to JSON.')
+    wt.add_argument('--data', default=None, help='Text file or directory of *.txt/*.crumb/*.md.')
+    wt.add_argument('--steps', type=int, default=500)
+    wt.add_argument('--out', default='crumb_llm/checkpoints/run')
+    wt.add_argument('--seed', type=int, default=0)
+    wt.add_argument('--log-every', type=int, default=50)
+    wt.add_argument('--eval-every', type=int, default=500)
+    wt.add_argument('--grad-accum', type=int, default=1)
+    wt.add_argument('--arch', default=None, choices=['wave_field', 'transformer'],
+                    help='Override arch in config.')
+
+    wg = llm_sub.add_parser('generate', help='Sample text from a trained checkpoint.')
+    wg.add_argument('--ckpt', required=True, help='Checkpoint directory.')
+    wg.add_argument('--prompt', default='', help='Initial prompt text.')
+    wg.add_argument('--max-new-tokens', type=int, default=200)
+    wg.add_argument('--temperature', type=float, default=1.0)
+    wg.add_argument('--top-k', type=int, default=40)
+    wg.add_argument('--seed', type=int, default=None)
+    wg.add_argument('--from-crumb', default=None,
+                    help='Read prompt from a .crumb file (uses CrumbPriorBuilder).')
+
+    wb = llm_sub.add_parser('bench', help='Forward-pass time + memory: Crumb LLM vs transformer baseline.')
+    wb.add_argument('--lens', default='256,1024,4096', help='Comma-separated sequence lengths.')
+    wb.add_argument('--dim', type=int, default=128)
+    wb.add_argument('--n-layers', type=int, default=4)
+    wb.add_argument('--n-heads', type=int, default=4)
+    wb.add_argument('--field-size', type=int, default=4096)
+    wb.add_argument('--batch', type=int, default=1)
+
+    wp = llm_sub.add_parser('perplexity', help='Score a crumb (or text file) under a trained model.')
+    wp.add_argument('--ckpt', required=True, help='Checkpoint directory.')
+    wp.add_argument('file', help='Input .crumb or .txt file to score.')
+
+    wi = llm_sub.add_parser('info', help='Print Crumb LLM version, runtime, and capabilities.')
+
+    wd = llm_sub.add_parser('demo', help='End-to-end demo: train → generate → context-pull.')
+    wd.add_argument('--ckpt', default=None, help='Skip training, use existing checkpoint.')
+    wd.add_argument('--data', default=None, help='Training corpus path.')
+    wd.add_argument('--steps', type=int, default=2000)
+    wd.add_argument('--config', default='tiny')
+    wd.add_argument('--compare', action='store_true')
+
+    wc = llm_sub.add_parser('compare', help='Head-to-head: train wave-field AND transformer, report gap.')
+    wc.add_argument('--config', default='tiny')
+    wc.add_argument('--data', default=None)
+    wc.add_argument('--steps', type=int, default=1000)
+    wc.add_argument('--out', default='/tmp/crumb_llm_compare')
+    wc.add_argument('--seed', type=int, default=0)
+    wc.add_argument('--log-every', type=int, default=100)
+
+    we = llm_sub.add_parser('export', help='Export a checkpoint for HuggingFace Hub upload.')
+    we.add_argument('--ckpt', required=True, help='Checkpoint directory.')
+    we.add_argument('--name', default='crumb-llm-tiny', help='Model name for Hub.')
+    we.add_argument('-o', '--output', default=None, help='Output directory (default: <ckpt>/hub).')
+
+    ws = llm_sub.add_parser('serve', help='Start HTTP inference server with context pulling.')
+    ws.add_argument('--ckpt', required=True, help='Checkpoint directory.')
+    ws.add_argument('--port', type=int, default=8090)
+    ws.add_argument('--host', default='0.0.0.0')
+    ws.add_argument('--index', default=None,
+                    help='Directory of .crumb files to index for context pulling.')
+    ws.add_argument('--production', action='store_true',
+                    help='Enable API key auth, rate limiting, and tiered access.')
+    ws.add_argument('--max-concurrent', type=int, default=4,
+                    help='Max concurrent inference requests.')
+
+    wx = llm_sub.add_parser('index', help='Build a context-pulling index from a crumb directory.')
+    wx.add_argument('directory', help='Directory containing .crumb files.')
+    wx.add_argument('-o', '--output', default='crumb_index.json', help='Output index file.')
+    wx.add_argument('--field-size', type=int, default=256)
+
+    wq = llm_sub.add_parser('pull', help='Pull relevant crumb sections for a query (context pulling).')
+    wq.add_argument('query', help='Query text to match against the index.')
+    wq.add_argument('--index-file', required=True, help='Path to a pre-built crumb_index.json.')
+    wq.add_argument('--max-tokens', type=int, default=256)
+    wq.add_argument('--top-k', type=int, default=5)
+
+    llm_cmd.set_defaults(func=cmd_llm)
 
     # Suppress argparse's auto-generated subcommand table from `--help`.
     # The five core commands are listed in the parser description; the

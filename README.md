@@ -499,6 +499,47 @@ repos:
 - [`validators/`](validators/) -- Python and Node reference validators
 - [`tests/`](tests/) -- 291 tests covering the full surface area
 - [`docs/HANDOFF_PATTERNS.md`](docs/HANDOFF_PATTERNS.md) -- practical handoff patterns
+- [`crumb_llm/`](crumb_llm/) -- **Crumb LLM**: experimental O(N log N) physics-based language model ([architecture doc](docs/crumb-llm-architecture.md))
+
+## Crumb LLM (experimental)
+
+**Crumb LLM** is an experimental open-source architecture that replaces
+traditional O(N²) transformer attention with physics-based wave equations
+at O(N log N) complexity. It's native to the crumb-format ecosystem —
+CRUMB sections, priorities, and fold pairs become physical priors on the
+wave field rather than being flattened away by a tokenizer.
+
+Each attention head learns three physics scalars (damping α, frequency ω,
+phase φ) that shape a wave kernel. Tokens scatter onto a continuous 1-D
+field, the kernel propagates information via FFT, and tokens gather back.
+Advanced physics include dispersion, boundary conditions (periodic /
+absorbing / reflecting), interference mixing, and Gabor wavelet heads.
+
+```bash
+pip install 'crumb-format[llm]'
+
+# Train a tiny model on the bundled crumb corpus (~2 min on CPU)
+crumb llm train --config tiny --steps 500 --out /tmp/crumb_run
+
+# Generate text
+crumb llm generate --ckpt /tmp/crumb_run --prompt "BEGIN CRUMB"
+
+# Score a crumb's perplexity
+crumb llm perplexity --ckpt /tmp/crumb_run examples/task-bug-fix.crumb
+
+# Benchmark: Crumb LLM vs transformer at various sequence lengths
+crumb llm bench --lens 1024,4096,8192
+
+# See all options
+crumb llm info
+```
+
+**Scaling:** at 4K tokens Crumb LLM is ~1.5× faster than a
+matched-shape transformer; at 8K it's ~2.2× faster. The gap widens
+with context length because the wave-field cost is O(F log F)
+independent of N, while attention is O(N²).
+
+Full architecture, math, and benchmarks: [`docs/crumb-llm-architecture.md`](docs/crumb-llm-architecture.md).
 
 ## License
 
