@@ -10,6 +10,7 @@ import pytest
 # Add cli/ to path so we can import crumb directly
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cli"))
 import crumb
+import crumb_cli
 
 
 # ── Fixtures ─────────────────────────────────────────────────────────
@@ -194,6 +195,19 @@ class TestCliVersion:
             crumb.main(["--version"])
         assert exc.value.code == 0
         assert capsys.readouterr().out.strip() == "crumb 1.1.0"
+
+    def test_console_version_alias(self, capsys):
+        assert crumb_cli.main(["version"]) == 0
+        assert capsys.readouterr().out.strip() == "0.4.0"
+
+    def test_console_help_lists_operator_commands(self, capsys):
+        assert crumb_cli.main(["--help"]) == 0
+        output = capsys.readouterr().out
+        assert "CRUMB 0.4.0" in output
+        assert "██████╗" in output
+        assert "🍞  CRUMB  🍞" in output
+        assert "crumb update --check" in output
+        assert "crumb version" in output
 
 
 class TestCmdNew:
