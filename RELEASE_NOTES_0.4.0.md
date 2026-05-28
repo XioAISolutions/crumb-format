@@ -1,6 +1,6 @@
 # CRUMB 0.4.0 — v1.2 wire format, standalone
 
-**Status:** draft — under review. Ships the CRUMB format bump from `v=1.1` to `v=1.2` with four fully additive, backward-compatible primitives.
+**Status:** released. Ships the CRUMB format bump from `v=1.1` to `v=1.2` with four fully additive, backward-compatible primitives.
 
 ## Why 0.4.0
 
