@@ -198,12 +198,12 @@ class TestCliVersion:
 
     def test_console_version_alias(self, capsys):
         assert crumb_cli.main(["version"]) == 0
-        assert capsys.readouterr().out.strip() == "0.4.0"
+        assert capsys.readouterr().out.strip() == "1.1.0"
 
     def test_console_help_lists_operator_commands(self, capsys):
         assert crumb_cli.main(["--help"]) == 0
         output = capsys.readouterr().out
-        assert "CRUMB 0.4.0" in output
+        assert "CRUMB 1.1.0" in output
         assert "██████╗" in output
         assert "🍞  CRUMB  🍞" in output
         assert "crumb update --check" in output
