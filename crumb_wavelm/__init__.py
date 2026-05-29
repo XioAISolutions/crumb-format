@@ -29,7 +29,7 @@ Advanced physics features:
     - Interference mixing: multi-head wave superposition with learned coupling
 
 The package is gated behind the ``[llm]`` install extra. Importing
-``crumb_llm`` without torch installed raises a clear ImportError
+``crumb_wavelm`` without torch installed raises a clear ImportError
 pointing at ``pip install crumb-format[llm]``.
 
 Crumb-aware extensions (optional, off by default) let crumb section

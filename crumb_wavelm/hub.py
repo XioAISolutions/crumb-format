@@ -64,7 +64,7 @@ cost stays constant while attention's O(N²) cost grows.
 ## Usage
 
 ```python
-from crumb_llm.hub import load_hub_model
+from crumb_wavelm.hub import load_hub_model
 
 model, tok = load_hub_model("{model_name}")
 ```

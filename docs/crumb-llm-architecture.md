@@ -346,7 +346,7 @@ crumb_llm/
 ├── train.py               # AdamW + cosine schedule + checkpoint save
 ├── sample.py              # load + autoregressive generation
 ├── bench.py               # wave vs transformer wall-time sweep
-├── __main__.py            # `python -m crumb_llm` health check
+├── __main__.py            # `python -m crumb_wavelm` health check
 └── configs/
     ├── tiny.json           # 96-dim 3L CPU-trainable
     ├── small.json          # 256-dim 6L single-GPU

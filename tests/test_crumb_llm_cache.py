@@ -4,12 +4,12 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from crumb_llm.cache import (  # noqa: E402
+from crumb_wavelm.cache import (  # noqa: E402
     FieldStateCache,
     generate_cached,
     forward_cached_block,
 )
-from crumb_llm.model import WaveFieldLM, WaveFieldConfig  # noqa: E402
+from crumb_wavelm.model import WaveFieldLM, WaveFieldConfig  # noqa: E402
 
 
 def _make_tiny_model():
@@ -53,15 +53,15 @@ def test_cached_vs_uncached_logits_close():
     for layer_idx, block in enumerate(model.blocks):
         x_out = block(x)
         # Populate cache.
-        from crumb_llm.cache import _convolve_sparse
-        from crumb_llm.scatter_gather import scatter_linear
+        from crumb_wavelm.cache import _convolve_sparse
+        from crumb_wavelm.scatter_gather import scatter_linear
         H, d_head = block.cfg.n_heads, block.d_head
         h = block.proj_in(block.norm_mix(x)).view(1, 8, H, d_head).transpose(1, 2)
         full_field = scatter_linear(h, block.cfg.field_size)
         kfs = [head.kernel_freq() for head in block.heads]
         kernel = torch.stack(kfs, dim=0)
         full_field = _convolve_sparse(full_field, kernel, block.cfg.field_size)
-        from crumb_llm.cache import LayerFieldState
+        from crumb_wavelm.cache import LayerFieldState
         cache.layers[layer_idx] = LayerFieldState(field=full_field, n_tokens_seen=8)
         x = x_out
     x = model.norm_out(x)

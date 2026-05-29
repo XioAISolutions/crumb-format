@@ -38,7 +38,7 @@ subprocess.run([
 
 # Generate
 import torch
-from crumb_llm.sample import load_checkpoint
+from crumb_wavelm.sample import load_checkpoint
 
 model, tok = load_checkpoint("/tmp/crumb_model")
 model.eval()

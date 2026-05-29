@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.venv/
+venv/
+
+# CrumbLLM: never commit models, checkpoints, or datasets
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+*.gguf
+data/
+datasets/
+*.jsonl
+*.tokens.json
+scratch-model*
+
+# Local config / secrets (secrets are never stored, but be safe)
+config.json
+.env

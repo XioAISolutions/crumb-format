@@ -1,0 +1,6 @@
+{
+  "pack_version": "1",
+  "session": "example-session",
+  "generated_by": "example (not Crumb-Bob)",
+  "files": ["session-01.crumb", "session-02.crumb"]
+}

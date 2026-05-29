@@ -70,7 +70,7 @@ def main():
         print("  Generation Demo")
         print("="*60 + "\n")
         import torch
-        from crumb_llm.sample import load_checkpoint
+        from crumb_wavelm.sample import load_checkpoint
 
         model, tok = load_checkpoint(args.out)
         model.eval()

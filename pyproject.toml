@@ -36,12 +36,12 @@ packages = [
     "mcp",
     "api",
     "a2a",
-    "crumb_llm",
-    "crumb_llm.configs",
+    "crumb_wavelm",
+    "crumb_wavelm.configs",
 ]
 
 [tool.setuptools.package-data]
-"crumb_llm.configs" = ["*.json"]
+"crumb_wavelm.configs" = ["*.json"]
 
 [project.optional-dependencies]
 llm = [

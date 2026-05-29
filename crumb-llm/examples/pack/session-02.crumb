@@ -1,0 +1,26 @@
+BEGIN CRUMB
+v=1.2
+kind=task
+title=Batch tax computation in checkout
+source=session.capture
+project=storefront
+---
+[goal]
+Reduce /checkout p95 latency back under 300ms by batching tax computation.
+
+[context]
+Profiling from session-01 confirmed compute_tax() in src/checkout/tax.py is
+the hotspot — called once per line item. src/checkout/cart.py iterates items
+serially. Batching all items into one compute_tax_batch() call removes N-1
+round trips to the tax provider.
+
+[constraints]
+- Preserve exact per-item tax values (no rounding drift)
+- Add a regression test in tests/test_checkout_latency.py
+- Behind a feature flag for one release
+
+[handoff]
+- to=any   do=add compute_tax_batch() in src/checkout/tax.py
+- to=any   do=switch src/checkout/cart.py to the batched call behind a flag
+- to=human do=approve the feature flag default before rollout
+END CRUMB
