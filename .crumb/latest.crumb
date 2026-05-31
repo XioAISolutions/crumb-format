@@ -1,59 +1,18 @@
---- task: Standalone CrumbLLM analysis package + ecosystem cleanup (free `crumb_llm` name)
+--- task: Free the crumb_llm import name (rename bundled LM to crumb_wavelm); drop duplicated crumb-llm/
 source: github.pr
-pr: #36
-generated: 2026-05-29T17:53:16Z
+pr: #37
+generated: 2026-05-31T22:42:41Z
 ---
 
 [goal]
-## What this is
+## Summary
 
 [context]
 Changed files in this PR:
+- .crumb/latest.crumb
 - Dockerfile.crumb-llm
 - cli/crumb.py
-- crumb-llm/.gitignore
-- crumb-llm/LICENSE
-- crumb-llm/README.md
-- crumb-llm/crumb_llm/__init__.py
-- crumb-llm/crumb_llm/cli.py
-- crumb-llm/crumb_llm/config.py
-- crumb-llm/crumb_llm/crumb/__init__.py
-- crumb-llm/crumb_llm/crumb/loader.py
-- crumb-llm/crumb_llm/crumb/pack_reader.py
-- crumb-llm/crumb_llm/crumb/parser_adapter.py
-- crumb-llm/crumb_llm/crumb/writer.py
-- crumb-llm/crumb_llm/engine.py
-- crumb-llm/crumb_llm/evals/__init__.py
-- crumb-llm/crumb_llm/evals/hallucination_check.py
-- crumb-llm/crumb_llm/evals/json_check.py
-- crumb-llm/crumb_llm/evals/quality_gate.py
-- crumb-llm/crumb_llm/models.py
-- crumb-llm/crumb_llm/prompts/analyze_session.md
-- crumb-llm/crumb_llm/prompts/classify_risks.md
-- crumb-llm/crumb_llm/prompts/improve_handoff.md
-- crumb-llm/crumb_llm/prompts/next_actions.md
-- crumb-llm/crumb_llm/prompts/summarize_memory.md
-- crumb-llm/crumb_llm/providers/__init__.py
-- crumb-llm/crumb_llm/providers/anthropic_provider.py
-- crumb-llm/crumb_llm/providers/base.py
-- crumb-llm/crumb_llm/providers/lmstudio_provider.py
-- crumb-llm/crumb_llm/providers/ollama_provider.py
-- crumb-llm/crumb_llm/providers/openai_provider.py
-- crumb-llm/crumb_llm/providers/scratch_provider.py
-- crumb-llm/crumb_llm/training/__init__.py
-- crumb-llm/crumb_llm/training/export_dataset.py
-- crumb-llm/crumb_llm/training/prepare_sft.py
-- crumb-llm/crumb_llm/training/train_scratch.py
-- crumb-llm/examples/basic.crumb
-- crumb-llm/examples/pack/manifest.json
-- crumb-llm/examples/pack/session-01.crumb
-- crumb-llm/examples/pack/session-02.crumb
-- crumb-llm/pyproject.toml
-- crumb-llm/tests/conftest.py
-- crumb-llm/tests/test_cli.py
-- crumb-llm/tests/test_crumb_layer.py
-- crumb-llm/tests/test_engine.py
-- crumb-llm/tests/test_evals.py
+- crumb_cli.py
 - crumb_wavelm/__init__.py
 - crumb_wavelm/__main__.py
 - crumb_wavelm/baseline.py
@@ -93,6 +52,7 @@ Changed files in this PR:
 - pyproject.toml
 - scripts/colab_quickstart.py
 - scripts/train_gpu.py
+- tests/test_crumb.py
 - tests/test_crumb_llm_cache.py
 - tests/test_crumb_llm_context_pull.py
 - tests/test_crumb_llm_crumb_adapter.py
