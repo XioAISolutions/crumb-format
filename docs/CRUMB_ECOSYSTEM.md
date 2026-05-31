@@ -12,16 +12,18 @@ to finish the cleanup. It exists because responsibilities between
 | **Crumb-Bob**           | IBM Bob session capture; CRUMB **pack** generation                   | The spec; AI reasoning                |
 | **CrumbLLM** (`crumb-llm`) | AI analysis over CRUMB files and packs (summaries, risks, next, handoffs) | The spec; Bob capture; training by default |
 
-Dependency direction is strictly one-way:
+CrumbLLM now lives in its own repository: **XioAISolutions/CrumbLLM**.
 
 ```
-Crumb-Bob ──▶ crumb-format ◀── CrumbLLM
-   (generates packs)            (reads + reasons)
+Crumb-Bob ──▶ crumb-format        CrumbLLM
+   (generates packs)              (reads + reasons)
 ```
 
-Both Crumb-Bob and CrumbLLM depend on `crumb-format`. Neither re-implements the
-spec. CrumbLLM has **no** dependency on Crumb-Bob — it reads packs as plain
-directories of `.crumb` files.
+Crumb-Bob depends on `crumb-format`. **CrumbLLM is standalone**: it bundles its
+own CRUMB reader, so it has *no required runtime dependency* on crumb-format
+(crumb-format remains an optional extra it prefers when installed). CrumbLLM has
+no dependency on Crumb-Bob either — it reads packs as plain directories of
+`.crumb` files. Neither project re-implements the canonical spec.
 
 ## What was messy, and the fix
 
@@ -39,9 +41,10 @@ directories of `.crumb` files.
 2. **AI logic lived inside the format repo.** Analysis prompts, providers, and
    quality gates did not belong in the spec repo.
 
-   **Fix:** the new standalone `crumb-llm` package (this PR's `crumb-llm/`
-   directory) holds all analysis logic. It depends on crumb-format and contains
-   zero spec code.
+   **Fix:** the standalone `crumb-llm` package — now in its own repository,
+   `XioAISolutions/CrumbLLM` — holds all analysis logic and contains zero spec
+   code. It bundles its own CRUMB reader, so it is fully standalone (crumb-format
+   is an optional extra it prefers when present).
 
 3. **No clean import surface for the parser.** Consumers had to reach into
    `cli.crumb.parse_crumb`.
@@ -53,9 +56,10 @@ directories of `.crumb` files.
    from .parser import parse_crumb, validate_crumb
    ```
 
-   CrumbLLM's `parser_adapter.py` already prefers a `crumb_format` import and
-   only falls back to `cli.crumb`, so adding this API is non-breaking and lets
-   CrumbLLM drop the fallback later.
+   CrumbLLM's `parser_adapter.py` already prefers a `crumb_format` import,
+   then `cli.crumb`, then its own bundled reader, so adding this API is
+   non-breaking — it would simply become CrumbLLM's preferred path when a user
+   installs the optional `crumb-format` extra.
 
 ## Boundaries to keep enforced
 
@@ -67,10 +71,16 @@ directories of `.crumb` files.
 
 ## Remaining follow-ups
 
-- [ ] Split `crumb-llm/` out of crumb-format into `XioAISolutions/CrumbLLM`
-      (see the PR description for the `git subtree split` command).
-- [ ] Publish `crumb-format` ≥ 1.1.0 to PyPI so `crumb-llm`'s dependency
-      resolves for end users.
-- [ ] Add the recommended `crumb_format` public parser API.
-- [ ] Reconcile the crumb-format version string (`pyproject` says `1.1.0`,
-      some tests/release notes say `0.4.0`).
+- [x] Split the standalone package out of crumb-format into
+      `XioAISolutions/CrumbLLM`. Done — CrumbLLM is its own repo, and the
+      duplicated `crumb-llm/` directory has been removed from crumb-format.
+- [x] Make CrumbLLM installable without crumb-format on PyPI. Done a different
+      way: CrumbLLM bundles its own CRUMB reader, so `pip install crumb-llm` has
+      zero required dependencies (crumb-format is an optional extra).
+- [ ] Add the recommended `crumb_format` public parser API (`parse_crumb`,
+      `validate_crumb`) so the optional `crumb-llm[crumb-format]` path uses a
+      stable import instead of `cli.crumb`.
+- [ ] Publish `crumb-format` to PyPI (optional now for CrumbLLM, still wanted for
+      Crumb-Bob and for the `crumb-llm[crumb-format]` extra).
+- [ ] Reconcile the crumb-format version string across release notes (resolved
+      in code: `pyproject` and the CLI now both report `1.1.0`).
