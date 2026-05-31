@@ -27,7 +27,7 @@ subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", ".[llm]"], c
 
 # Train (small config: 256-dim, 6 layers, ~3.7M params)
 subprocess.run([
-    sys.executable, "-m", "crumb_llm.train",
+    sys.executable, "-m", "crumb_wavelm.train",
     "--config", "small",
     "--steps", "10000",
     "--data", "/tmp/shakespeare.txt",

@@ -55,7 +55,7 @@ def main():
 """)
 
     cmd = [
-        sys.executable, "-m", "crumb_llm.train",
+        sys.executable, "-m", "crumb_wavelm.train",
         "--config", args.config,
         "--steps", str(args.steps),
         "--data", data,

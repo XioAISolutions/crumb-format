@@ -5349,7 +5349,7 @@ def cmd_wake(args: argparse.Namespace) -> None:
 
 
 _LLM_MISSING_DEPS = (
-    "crumb_llm requires PyTorch (and numpy). Install with:\n"
+    "crumb_wavelm requires PyTorch (and numpy). Install with:\n"
     "    pip install 'crumb-format[llm]'"
 )
 
@@ -6492,7 +6492,7 @@ def build_parser() -> argparse.ArgumentParser:
     wt.add_argument('--config', default='tiny', help='Built-in config or path to JSON.')
     wt.add_argument('--data', default=None, help='Text file or directory of *.txt/*.crumb/*.md.')
     wt.add_argument('--steps', type=int, default=500)
-    wt.add_argument('--out', default='crumb_llm/checkpoints/run')
+    wt.add_argument('--out', default='crumb_wavelm/checkpoints/run')
     wt.add_argument('--seed', type=int, default=0)
     wt.add_argument('--log-every', type=int, default=50)
     wt.add_argument('--eval-every', type=int, default=500)
