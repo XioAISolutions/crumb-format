@@ -5,8 +5,8 @@ corpus and reports the final perplexity gap. This is the experiment
 that validates (or refutes) the "within 5% of transformer" claim.
 
 Usage:
-    python -m crumb_llm.compare --steps 2000 --data examples/
-    python -m crumb_llm.compare --config small --steps 50000 --data /path/to/corpus
+    python -m crumb_wavelm.compare --steps 2000 --data examples/
+    python -m crumb_wavelm.compare --config small --steps 50000 --data /path/to/corpus
 """
 
 from __future__ import annotations

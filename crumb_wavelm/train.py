@@ -4,8 +4,8 @@ Designed to converge to a usable (toy) checkpoint in minutes on a CPU
 for the ``tiny`` config. Larger configs work on a single GPU.
 
 Usage:
-    python -m crumb_llm.train --config tiny --steps 2000
-    python -m crumb_llm.train --config small --steps 50000 --data path/to/text
+    python -m crumb_wavelm.train --config tiny --steps 2000
+    python -m crumb_wavelm.train --config small --steps 50000 --data path/to/text
 
 The same trainer powers ``crumb wave train`` once the CLI hook is in.
 """

@@ -1,4 +1,4 @@
-"""``python -m crumb_llm`` → quick health check.
+"""``python -m crumb_wavelm`` → quick health check.
 
 Prints a one-line summary of available subcommands and a smoke-test
 result (random weights forward pass on a tiny model). Useful for
@@ -27,9 +27,9 @@ def main(argv: list[str] | None = None) -> int:
     print("  crumb llm bench --lens 1024,4096,8192           # benchmark")
     print()
     print("Python API:")
-    print("  python -m crumb_llm.train  --help")
-    print("  python -m crumb_llm.sample --help")
-    print("  python -m crumb_llm.bench  --help")
+    print("  python -m crumb_wavelm.train  --help")
+    print("  python -m crumb_wavelm.sample --help")
+    print("  python -m crumb_wavelm.bench  --help")
     print()
     cfg = WaveFieldConfig(vocab_size=64, dim=32, n_layers=2, n_heads=2, field_size=32)
     model = WaveFieldLM(cfg)

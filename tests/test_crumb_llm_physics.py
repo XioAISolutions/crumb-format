@@ -5,7 +5,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from crumb_llm.physics import (  # noqa: E402
+from crumb_wavelm.physics import (  # noqa: E402
     BoundaryCondition,
     DispersionLayer,
     GaborWaveletKernel,
@@ -14,8 +14,8 @@ from crumb_llm.physics import (  # noqa: E402
     detect_resonances,
     unapply_reflecting,
 )
-from crumb_llm.layers import WaveFieldBlock, WaveFieldBlockConfig  # noqa: E402
-from crumb_llm.model import WaveFieldLM, WaveFieldConfig  # noqa: E402
+from crumb_wavelm.layers import WaveFieldBlock, WaveFieldBlockConfig  # noqa: E402
+from crumb_wavelm.model import WaveFieldLM, WaveFieldConfig  # noqa: E402
 
 
 # ── Boundary conditions ──────────────────────────────────────────────

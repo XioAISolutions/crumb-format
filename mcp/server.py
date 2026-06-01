@@ -667,8 +667,8 @@ def _load_llm():
         return False
     try:
         sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-        from crumb_llm.sample import load_checkpoint
-        from crumb_llm.context_pull import build_index
+        from crumb_wavelm.sample import load_checkpoint
+        from crumb_wavelm.context_pull import build_index
         _llm_model, _llm_tokenizer = load_checkpoint(ckpt)
         _llm_model.eval()
         index_dir = os.environ.get("CRUMB_LLM_INDEX")
@@ -685,7 +685,7 @@ def handle_llm_tool(name, args):
     """Handle crumb_llm_* MCP tool calls."""
     if not _load_llm():
         return "Crumb LLM not configured. Set CRUMB_LLM_CKPT env var to a checkpoint directory."
-    from crumb_llm.mcp_tools import handle_tool
+    from crumb_wavelm.mcp_tools import handle_tool
     return handle_tool(name, args, model=_llm_model, tokenizer=_llm_tokenizer, index=_llm_index)
 
 
@@ -715,7 +715,7 @@ def main():
         elif method == "tools/list":
             all_tools = list(TOOLS)
             try:
-                from crumb_llm.mcp_tools import TOOLS as LLM_TOOLS
+                from crumb_wavelm.mcp_tools import TOOLS as LLM_TOOLS
                 all_tools.extend(LLM_TOOLS)
             except ImportError:
                 pass

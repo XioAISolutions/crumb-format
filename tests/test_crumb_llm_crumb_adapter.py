@@ -6,8 +6,8 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from crumb_llm.crumb_adapter import CrumbPriorBuilder, iter_crumb_files  # noqa: E402
-from crumb_llm.model import WaveFieldLM, WaveFieldConfig  # noqa: E402
+from crumb_wavelm.crumb_adapter import CrumbPriorBuilder, iter_crumb_files  # noqa: E402
+from crumb_wavelm.model import WaveFieldLM, WaveFieldConfig  # noqa: E402
 
 
 SAMPLE_CRUMB = """\

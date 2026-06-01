@@ -1,7 +1,7 @@
---- task: feat(wave_field_llm): O(N log N) wave-field LM that reads CRUMB structure as physical priors
+--- task: Free the crumb_llm import name (rename bundled LM to crumb_wavelm); drop duplicated crumb-llm/
 source: github.pr
-pr: #35
-generated: 2026-05-24T20:09:50Z
+pr: #37
+generated: 2026-05-31T22:42:41Z
 ---
 
 [goal]
@@ -9,32 +9,64 @@ generated: 2026-05-24T20:09:50Z
 
 [context]
 Changed files in this PR:
-- README.md
+- .crumb/latest.crumb
+- Dockerfile.crumb-llm
 - cli/crumb.py
-- docs/wave-field-llm.md
+- crumb_cli.py
+- crumb_wavelm/__init__.py
+- crumb_wavelm/__main__.py
+- crumb_wavelm/baseline.py
+- crumb_wavelm/bench.py
+- crumb_wavelm/cache.py
+- crumb_wavelm/compare.py
+- crumb_wavelm/configs/__init__.py
+- crumb_wavelm/configs/fast.json
+- crumb_wavelm/configs/innovations.json
+- crumb_wavelm/configs/medium.json
+- crumb_wavelm/configs/physics.json
+- crumb_wavelm/configs/small.json
+- crumb_wavelm/configs/tiny.json
+- crumb_wavelm/configs/tiny_transformer.json
+- crumb_wavelm/configs/v2.json
+- crumb_wavelm/context_pull.py
+- crumb_wavelm/crumb_adapter.py
+- crumb_wavelm/data.py
+- crumb_wavelm/demo.py
+- crumb_wavelm/hub.py
+- crumb_wavelm/kernels.py
+- crumb_wavelm/layers.py
+- crumb_wavelm/mcp_tools.py
+- crumb_wavelm/model.py
+- crumb_wavelm/physics.py
+- crumb_wavelm/sample.py
+- crumb_wavelm/scatter_gather.py
+- crumb_wavelm/serve.py
+- crumb_wavelm/setup_standalone.py
+- crumb_wavelm/sliding.py
+- crumb_wavelm/tokenizer.py
+- crumb_wavelm/train.py
+- crumb_wavelm/v2.py
+- docs/CRUMB_ECOSYSTEM.md
+- docs/crumb-llm-architecture.md
+- mcp/server.py
 - pyproject.toml
-- tests/test_wave_field_crumb_adapter.py
-- tests/test_wave_field_kernels.py
-- tests/test_wave_field_layers.py
-- tests/test_wave_field_scatter_gather.py
-- tests/test_wave_field_train_smoke.py
-- wave_field_llm/__init__.py
-- wave_field_llm/__main__.py
-- wave_field_llm/baseline.py
-- wave_field_llm/bench.py
-- wave_field_llm/configs/__init__.py
-- wave_field_llm/configs/small.json
-- wave_field_llm/configs/tiny.json
-- wave_field_llm/configs/tiny_transformer.json
-- wave_field_llm/crumb_adapter.py
-- wave_field_llm/data.py
-- wave_field_llm/kernels.py
-- wave_field_llm/layers.py
-- wave_field_llm/model.py
-- wave_field_llm/sample.py
-- wave_field_llm/scatter_gather.py
-- wave_field_llm/tokenizer.py
-- wave_field_llm/train.py
+- scripts/colab_quickstart.py
+- scripts/train_gpu.py
+- tests/test_crumb.py
+- tests/test_crumb_llm_cache.py
+- tests/test_crumb_llm_context_pull.py
+- tests/test_crumb_llm_crumb_adapter.py
+- tests/test_crumb_llm_hub.py
+- tests/test_crumb_llm_innovations.py
+- tests/test_crumb_llm_kernels.py
+- tests/test_crumb_llm_layers.py
+- tests/test_crumb_llm_misc.py
+- tests/test_crumb_llm_physics.py
+- tests/test_crumb_llm_scatter_gather.py
+- tests/test_crumb_llm_serve.py
+- tests/test_crumb_llm_sliding.py
+- tests/test_crumb_llm_train_smoke.py
+- tests/test_crumb_llm_v2.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions

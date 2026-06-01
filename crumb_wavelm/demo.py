@@ -3,9 +3,9 @@
 Shows Crumb LLM as a working language model, not just a research toy.
 
 Usage:
-    python -m crumb_llm.demo                    # full demo (train + generate)
-    python -m crumb_llm.demo --ckpt /path       # skip training, just demo
-    python -m crumb_llm.demo --compare           # include transformer comparison
+    python -m crumb_wavelm.demo                    # full demo (train + generate)
+    python -m crumb_wavelm.demo --ckpt /path       # skip training, just demo
+    python -m crumb_wavelm.demo --compare           # include transformer comparison
 """
 
 from __future__ import annotations

@@ -1,15 +1,19 @@
-"""Standalone PyPI package configuration generator for crumb-llm.
+"""Standalone PyPI package configuration generator for crumb-wavelm.
 
-Run this to generate a standalone pyproject.toml for publishing
-crumb-llm as its own PyPI package (separate from crumb-format).
+Run this to generate a standalone pyproject.toml for publishing the wave-field
+language model (`crumb_wavelm`) as its own PyPI package, separate from both
+crumb-format and the CrumbLLM analysis product.
 
-    python -m crumb_llm.setup_standalone --output /tmp/crumb-llm-pkg
+    python -m crumb_wavelm.setup_standalone --output /tmp/crumb-wavelm-pkg
 
 The generated package:
-  - Imports crumb_llm as the top-level package
+  - Imports crumb_wavelm as the top-level package
   - Depends on torch, numpy
   - Optionally depends on crumb-format (for crumb_adapter)
   - Includes all configs, the CLI entry point, and docs
+
+NOTE: this is the physics/wave-field research model. The `crumb-llm` name now
+belongs to the CrumbLLM analysis product (XioAISolutions/CrumbLLM).
 """
 
 from __future__ import annotations
@@ -25,9 +29,9 @@ requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "crumb-llm"
+name = "crumb-wavelm"
 version = "0.2.0"
-description = "Crumb LLM: O(N log N) language modeling via physics-based wave equations. Replaces transformer attention with scatter → FFT-convolve → gather."
+description = "Crumb WaveLM: O(N log N) language modeling via physics-based wave equations. Replaces transformer attention with scatter → FFT-convolve → gather."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -56,13 +60,13 @@ Repository = "https://github.com/XioAISolutions/crumb-format"
 Documentation = "https://github.com/XioAISolutions/crumb-format/blob/main/CRUMB_LLM.md"
 
 [project.scripts]
-crumb-llm = "crumb_llm.__main__:main"
+crumb-wavelm = "crumb_wavelm.__main__:main"
 
 [tool.setuptools]
-packages = ["crumb_llm", "crumb_llm.configs"]
+packages = ["crumb_wavelm", "crumb_wavelm.configs"]
 
 [tool.setuptools.package-data]
-"crumb_llm.configs" = ["*.json"]
+"crumb_wavelm.configs" = ["*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -76,9 +80,9 @@ def generate_standalone(output_dir: str | Path) -> None:
     # pyproject.toml
     (out / "pyproject.toml").write_text(PYPROJECT)
 
-    # Copy the crumb_llm package
+    # Copy the crumb_wavelm package
     src = Path(__file__).resolve().parent
-    dst = out / "crumb_llm"
+    dst = out / "crumb_wavelm"
     if dst.exists():
         shutil.rmtree(dst)
     shutil.copytree(src, dst, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
@@ -111,8 +115,8 @@ def generate_standalone(output_dir: str | Path) -> None:
 
 
 def main(argv: list[str] | None = None) -> None:
-    ap = argparse.ArgumentParser(description="Generate standalone crumb-llm PyPI package.")
-    ap.add_argument("--output", default="/tmp/crumb-llm-pkg")
+    ap = argparse.ArgumentParser(description="Generate standalone crumb-wavelm PyPI package.")
+    ap.add_argument("--output", default="/tmp/crumb-wavelm-pkg")
     args = ap.parse_args(argv)
     generate_standalone(args.output)
 

@@ -27,7 +27,7 @@ subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-e", ".[llm]"], c
 
 # Train (small config: 256-dim, 6 layers, ~3.7M params)
 subprocess.run([
-    sys.executable, "-m", "crumb_llm.train",
+    sys.executable, "-m", "crumb_wavelm.train",
     "--config", "small",
     "--steps", "10000",
     "--data", "/tmp/shakespeare.txt",
@@ -38,7 +38,7 @@ subprocess.run([
 
 # Generate
 import torch
-from crumb_llm.sample import load_checkpoint
+from crumb_wavelm.sample import load_checkpoint
 
 model, tok = load_checkpoint("/tmp/crumb_model")
 model.eval()

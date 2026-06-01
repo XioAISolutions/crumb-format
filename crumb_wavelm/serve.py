@@ -24,7 +24,7 @@ Features:
     - OpenAI-compatible /v1/completions endpoint
 
 Deploy:
-    python -m crumb_llm.production_serve --ckpt /model --index /crumbs
+    python -m crumb_wavelm.production_serve --ckpt /model --index /crumbs
     # → ready for Stripe webhook integration
 """
 

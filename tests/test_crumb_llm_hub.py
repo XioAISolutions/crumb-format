@@ -7,9 +7,9 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from crumb_llm.hub import save_for_hub, load_hub_model  # noqa: E402
-from crumb_llm.model import WaveFieldLM, WaveFieldConfig  # noqa: E402
-from crumb_llm.tokenizer import ByteTokenizer  # noqa: E402
+from crumb_wavelm.hub import save_for_hub, load_hub_model  # noqa: E402
+from crumb_wavelm.model import WaveFieldLM, WaveFieldConfig  # noqa: E402
+from crumb_wavelm.tokenizer import ByteTokenizer  # noqa: E402
 
 
 def test_save_and_load_roundtrip(tmp_path):

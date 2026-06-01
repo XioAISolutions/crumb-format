@@ -5349,7 +5349,7 @@ def cmd_wake(args: argparse.Namespace) -> None:
 
 
 _LLM_MISSING_DEPS = (
-    "crumb_llm requires PyTorch (and numpy). Install with:\n"
+    "crumb_wavelm requires PyTorch (and numpy). Install with:\n"
     "    pip install 'crumb-format[llm]'"
 )
 
@@ -5357,12 +5357,12 @@ _LLM_MISSING_DEPS = (
 def cmd_llm(args: argparse.Namespace) -> None:
     """Crumb LLM: train, generate, perplexity, bench, info.
 
-    All sub-actions live inside the ``crumb_llm`` subpackage. Importing
+    All sub-actions live inside the ``crumb_wavelm`` subpackage. Importing
     it raises ImportError if torch is not installed; we catch that and
     print a friendly install hint.
     """
     try:
-        import crumb_llm  # noqa: F401
+        import crumb_wavelm  # noqa: F401
     except ImportError as e:
         print(_LLM_MISSING_DEPS, file=sys.stderr)
         print(f"  (underlying error: {e})", file=sys.stderr)
@@ -5371,9 +5371,9 @@ def cmd_llm(args: argparse.Namespace) -> None:
     action = args.llm_action
 
     if action == 'info':
-        import crumb_llm
+        import crumb_wavelm
         import torch
-        print(f"Crumb LLM  v{crumb_llm.__version__}")
+        print(f"Crumb LLM  v{crumb_wavelm.__version__}")
         print(f"O(N log N) language modeling via physics-based wave equations")
         print()
         print(f"torch           {torch.__version__}")
@@ -5389,7 +5389,7 @@ def cmd_llm(args: argparse.Namespace) -> None:
         return
 
     if action == 'train':
-        from crumb_llm.train import load_config, train
+        from crumb_wavelm.train import load_config, train
         cfg = load_config(args.config)
         if args.arch:
             cfg["arch"] = args.arch
@@ -5406,10 +5406,10 @@ def cmd_llm(args: argparse.Namespace) -> None:
         return
 
     if action == 'generate':
-        from crumb_llm.sample import generate
+        from crumb_wavelm.sample import generate
         prompt = args.prompt
         if args.from_crumb:
-            from crumb_llm.crumb_adapter import CrumbPriorBuilder
+            from crumb_wavelm.crumb_adapter import CrumbPriorBuilder
             text = read_text(args.from_crumb)
             # Use the parsed body as the prompt; structural priors are
             # passed to forward() in the model.generate path automatically
@@ -5428,7 +5428,7 @@ def cmd_llm(args: argparse.Namespace) -> None:
         return
 
     if action == 'bench':
-        from crumb_llm.bench import benchmark, format_rows
+        from crumb_wavelm.bench import benchmark, format_rows
         lens = [int(x) for x in args.lens.split(",") if x.strip()]
         rows = benchmark(
             lens=lens, dim=args.dim, n_layers=args.n_layers, n_heads=args.n_heads,
@@ -5440,7 +5440,7 @@ def cmd_llm(args: argparse.Namespace) -> None:
     if action == 'perplexity':
         import math
         import torch
-        from crumb_llm.sample import load_checkpoint
+        from crumb_wavelm.sample import load_checkpoint
         model, tok = load_checkpoint(args.ckpt)
         text = read_text(args.file)
         ids = torch.tensor(tok.encode(text), dtype=torch.long).unsqueeze(0)
@@ -5461,7 +5461,7 @@ def cmd_llm(args: argparse.Namespace) -> None:
         return
 
     if action == 'demo':
-        from crumb_llm.demo import main as demo_main
+        from crumb_wavelm.demo import main as demo_main
         demo_argv = []
         if args.ckpt:
             demo_argv.extend(['--ckpt', args.ckpt])
@@ -5475,7 +5475,7 @@ def cmd_llm(args: argparse.Namespace) -> None:
         return
 
     if action == 'compare':
-        from crumb_llm.compare import compare
+        from crumb_wavelm.compare import compare
         compare(
             config_name=args.config,
             data_path=args.data,
@@ -5487,15 +5487,15 @@ def cmd_llm(args: argparse.Namespace) -> None:
         return
 
     if action == 'export':
-        from crumb_llm.hub import save_for_hub
-        from crumb_llm.sample import load_checkpoint
+        from crumb_wavelm.hub import save_for_hub
+        from crumb_wavelm.sample import load_checkpoint
         model, tok = load_checkpoint(args.ckpt)
         out_dir = args.output or str(Path(args.ckpt) / "hub")
         save_for_hub(model, tok, out_dir, model_name=args.name)
         return
 
     if action == 'serve':
-        from crumb_llm.serve import serve
+        from crumb_wavelm.serve import serve
         serve(
             ckpt_dir=args.ckpt, port=args.port, host=args.host,
             index_dir=args.index,
@@ -5505,14 +5505,14 @@ def cmd_llm(args: argparse.Namespace) -> None:
         return
 
     if action == 'index':
-        from crumb_llm.context_pull import build_index
+        from crumb_wavelm.context_pull import build_index
         idx = build_index(args.directory, field_size=args.field_size)
         idx.save(args.output)
         print(f"Indexed {len(idx.sections)} sections → {args.output}")
         return
 
     if action == 'pull':
-        from crumb_llm.context_pull import CrumbIndex, pull_context
+        from crumb_wavelm.context_pull import CrumbIndex, pull_context
         idx = CrumbIndex.load(args.index_file)
         pulled = pull_context(args.query, idx, max_tokens=args.max_tokens, top_k=args.top_k)
         if pulled:
@@ -6492,7 +6492,7 @@ def build_parser() -> argparse.ArgumentParser:
     wt.add_argument('--config', default='tiny', help='Built-in config or path to JSON.')
     wt.add_argument('--data', default=None, help='Text file or directory of *.txt/*.crumb/*.md.')
     wt.add_argument('--steps', type=int, default=500)
-    wt.add_argument('--out', default='crumb_llm/checkpoints/run')
+    wt.add_argument('--out', default='crumb_wavelm/checkpoints/run')
     wt.add_argument('--seed', type=int, default=0)
     wt.add_argument('--log-every', type=int, default=50)
     wt.add_argument('--eval-every', type=int, default=500)
