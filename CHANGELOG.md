@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### turbovec-accelerated retrieval
+
+No wire-format change. Optional, behind the `[llm]` extra.
+
+- **turbovec backend for context pulling.** Crumb LLM's spectral
+  signatures (`|rFFT(scatter(tokens))|`) are now indexed in
+  [turbovec](https://github.com/RyanCodrai/turbovec), a local
+  TurboQuant vector index, replacing the O(N) cosine scan in
+  `context_pull.score_sections` with a compressed, sub-linear lookup.
+  Signatures are L2-normalized (inner product → cosine) and zero-padded
+  to turbovec's multiple-of-8 dim requirement (lossless for cosine).
+  `crumb llm index` now reports which backend it used. When turbovec is
+  not installed the pure-Python cosine scan is used unchanged, so the
+  core `crumb-format` install is untouched.
+- **`crumb search --method semantic`.** New search mode that ranks
+  `.crumb` sections by wave-field spectral relevance instead of
+  keyword/TF-IDF overlap, backed by turbovec when available. Requires
+  the `[llm]` extra; prints an install hint otherwise.
+- **`turbovec_index.py`** — thin wrapper over `turbovec.IdMapIndex`
+  with a numpy-only dependency surface and graceful absence handling.
+
 ### Phase 2 — trust + capability
 
 No wire-format change. Phase 2 of the post-1.0 roadmap (trust track).

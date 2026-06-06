@@ -1427,6 +1427,53 @@ def _search_ranked(query_terms: list, crumb_files: list) -> list:
     return results
 
 
+def _search_semantic(query: str, search_dir: Path) -> list:
+    """Semantic search via wave-field spectral signatures.
+
+    Indexes every crumb section in ``search_dir``, scores them against the
+    query with the spectral matcher, and (when turbovec is installed) uses
+    its compressed vector index for the lookup. Requires the ``[llm]``
+    extra; exits with a friendly message if it is missing."""
+    try:
+        from crumb_wavelm.context_pull import build_index, score_sections
+    except Exception:
+        print(
+            "Semantic search needs the LLM extra. Install it with:\n"
+            "    pip install 'crumb-format[llm]'\n"
+            "(turbovec, included in that extra, gives compressed vector search.)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    index = build_index(search_dir)
+    backend = index.ensure_backend()
+    if backend is None:
+        print(
+            "note: turbovec not installed — using numpy cosine scan. "
+            "`pip install turbovec` for compressed sub-linear search.",
+            file=sys.stderr,
+        )
+    scored = score_sections(query, index, top_k=50)
+
+    # Collapse per-section hits to one result row per file, keeping the
+    # best score and the sections that matched — mirrors the other methods.
+    by_file: dict = {}
+    for score, section in scored:
+        row = by_file.get(section.source_file)
+        if row is None:
+            row = {
+                'path': Path(section.source_file),
+                'score': int(score * 100),
+                'kind': '', 'title': '',
+                'matched_terms': [], 'matching_sections': [],
+            }
+            by_file[section.source_file] = row
+        row['score'] = max(row['score'], int(score * 100))
+        if section.section_name not in row['matching_sections']:
+            row['matching_sections'].append(section.section_name)
+    return list(by_file.values())
+
+
 def cmd_search(args: argparse.Namespace) -> None:
     """Search across .crumb files by keyword, fuzzy match, or ranked relevance."""
     query_terms = args.query.lower().split()
@@ -1442,7 +1489,9 @@ def cmd_search(args: argparse.Namespace) -> None:
         print(f"No .crumb files found in {args.dir}")
         return
 
-    if method == 'fuzzy':
+    if method == 'semantic':
+        results = _search_semantic(args.query, search_dir)
+    elif method == 'fuzzy':
         results = _search_fuzzy(query_terms, crumb_files)
     elif method == 'ranked':
         results = _search_ranked(query_terms, crumb_files)
@@ -5508,7 +5557,11 @@ def cmd_llm(args: argparse.Namespace) -> None:
         from crumb_wavelm.context_pull import build_index
         idx = build_index(args.directory, field_size=args.field_size)
         idx.save(args.output)
+        backend = idx.ensure_backend()
+        engine = "turbovec (compressed vector index)" if backend is not None \
+            else "numpy cosine scan"
         print(f"Indexed {len(idx.sections)} sections → {args.output}")
+        print(f"Search backend: {engine}")
         return
 
     if action == 'pull':
@@ -5976,8 +6029,9 @@ def build_parser() -> argparse.ArgumentParser:
     search = sub.add_parser('search', help='Search .crumb files by keyword, fuzzy, or ranked.')
     search.add_argument('query', help='Search query (space-separated terms).')
     search.add_argument('--dir', default='.', help='Directory to search (default: current).')
-    search.add_argument('--method', '-m', choices=['keyword', 'fuzzy', 'ranked'], default='keyword',
-                        help='Search method: keyword (exact), fuzzy (approximate), ranked (TF-IDF).')
+    search.add_argument('--method', '-m', choices=['keyword', 'fuzzy', 'ranked', 'semantic'], default='keyword',
+                        help='Search method: keyword (exact), fuzzy (approximate), ranked (TF-IDF), '
+                             'semantic (spectral vector match via turbovec; needs the [llm] extra).')
     search.add_argument('--limit', '-n', type=int, help='Max results to show.')
     search.set_defaults(func=cmd_search)
 

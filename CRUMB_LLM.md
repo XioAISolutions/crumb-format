@@ -218,6 +218,8 @@ Crumb LLM:   query → spectral match → pull top-k sections → model → answ
 
 The spectral matcher uses the same FFT-based fingerprints as the model itself. Retrieval and generation share a mathematical basis — they "think" the same way.
 
+**Fast index (optional).** The spectral fingerprints are just vectors, so when [turbovec](https://github.com/RyanCodrai/turbovec) is installed (it ships with the `[llm]` extra) the index is backed by its compressed TurboQuant store instead of a linear cosine scan — sub-linear search with ~8× smaller memory, still fully local, no external embedding service. `crumb llm index` reports which backend it used; retrieval falls back to the pure-Python scan when turbovec is absent. The same engine powers `crumb search --method semantic`.
+
 ---
 
 ## The Numbers
