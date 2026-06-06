@@ -78,6 +78,34 @@ class CrumbIndex:
     sections: list[IndexedSection]
     field_size: int
     vocab_size: int
+    # Lazily-built turbovec backend (not serialized). When present,
+    # score_sections searches it instead of scanning every section.
+    _backend: object = field(default=None, repr=False, compare=False)
+    _backend_tried: bool = field(default=False, repr=False, compare=False)
+
+    def ensure_backend(self):
+        """Build and cache a turbovec vector index over the section
+        signatures, if turbovec is installed. Returns the backend or
+        ``None`` when unavailable (callers then use the cosine fallback)."""
+        if self._backend is not None or self._backend_tried:
+            return self._backend
+        self._backend_tried = True
+        try:
+            from .turbovec_index import turbovec_available, TurbovecVectorIndex
+        except Exception:
+            return None
+        if not turbovec_available() or not self.sections:
+            return None
+        sigs = [s.spectral_signature for s in self.sections]
+        # All signatures must share a length for a fixed-dim index.
+        dim = len(sigs[0])
+        if any(len(s) != dim for s in sigs):
+            return None
+        try:
+            self._backend = TurbovecVectorIndex.from_signatures(sigs)
+        except Exception:
+            self._backend = None
+        return self._backend
 
     def save(self, path: str | Path) -> None:
         data = {
@@ -201,10 +229,25 @@ def score_sections(
     """
     tok = ByteTokenizer()
     query_ids = tok.encode(query_text)
-    query_sig = torch.tensor(
-        _spectral_signature(query_ids, index.field_size),
-        dtype=torch.float32,
-    )
+    query_sig_list = _spectral_signature(query_ids, index.field_size)
+
+    backend = index.ensure_backend()
+    if backend is not None:
+        # turbovec path: pull a wider candidate set by raw cosine, then
+        # apply the priority boost and re-rank. The boost (<= 0.1) can
+        # only nudge neighbours, so an over-fetch of 4x covers it while
+        # staying sub-linear in the corpus size.
+        candidate_k = min(max(top_k * 4, top_k + 5), len(index.sections))
+        scored = []
+        for sec_idx, cosine in backend.search(query_sig_list, candidate_k):
+            section = index.sections[sec_idx]
+            score = cosine + priority_boost * (section.priority / 10.0)
+            scored.append((score, section))
+        scored.sort(key=lambda x: -x[0])
+        return scored[:top_k]
+
+    # Pure-Python fallback: cosine scan over every section.
+    query_sig = torch.tensor(query_sig_list, dtype=torch.float32)
     query_norm = query_sig.norm() + 1e-8
 
     scored = []

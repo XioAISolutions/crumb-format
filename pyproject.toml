@@ -47,6 +47,7 @@ packages = [
 llm = [
     "torch>=2.2",
     "numpy>=1.26",
+    "turbovec>=0.7",
 ]
 
 [tool.pytest.ini_options]

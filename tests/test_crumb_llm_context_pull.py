@@ -86,6 +86,58 @@ def test_index_save_load(tmp_path):
     assert loaded.field_size == 4
 
 
+def test_turbovec_backend_recall_matches_cosine():
+    """turbovec is an approximate (quantized) index, so its top hit need
+    not be the exact argmax — but it should land inside the exact top-K
+    and score within quantization noise of it."""
+    pytest.importorskip("turbovec")
+    from crumb_wavelm.turbovec_index import turbovec_available
+    if not turbovec_available():
+        pytest.skip("turbovec not available")
+
+    repo_root = Path(__file__).resolve().parent.parent
+    examples = repo_root / "examples"
+    if not examples.exists():
+        pytest.skip("examples/ not present")
+
+    idx = build_index(examples, field_size=256)
+    assert idx.ensure_backend() is not None  # turbovec engaged
+
+    query = "Fix the login redirect bug"
+    tv_score, tv_top = score_sections(query, idx, top_k=5)[0]
+
+    # Force the pure-Python fallback on a fresh index for ground truth.
+    idx2 = build_index(examples, field_size=256)
+    idx2.ensure_backend = lambda: None
+    exact = score_sections(query, idx2, top_k=5)
+    exact_keys = {(s.source_file, s.section_name) for _, s in exact}
+    exact_best = exact[0][0]
+
+    # Recall@5: turbovec's top pick is among the exact top-5.
+    assert (tv_top.source_file, tv_top.section_name) in exact_keys
+    # And its score is within quantization noise of the true best.
+    assert abs(tv_score - exact_best) < 0.05
+
+
+def test_turbovec_wrapper_pads_non_multiple_of_8_dims():
+    """Signatures whose length isn't a multiple of 8 are zero-padded."""
+    pytest.importorskip("turbovec")
+    from crumb_wavelm.turbovec_index import turbovec_available, TurbovecVectorIndex
+    if not turbovec_available():
+        pytest.skip("turbovec not available")
+
+    # dim=3 (not a multiple of 8) — must be padded internally to 8.
+    sigs = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.9, 0.1, 0.0], [0.0, 0.0, 1.0]]
+    vidx = TurbovecVectorIndex.from_signatures(sigs)
+    assert vidx.dim == 3 and vidx.padded_dim == 8
+    assert len(vidx) == 4
+
+    hits = vidx.search([1.0, 0.05, 0.0], k=2)
+    assert len(hits) == 2
+    # The nearest signatures to [1, .05, 0] are sections 0 and 2.
+    assert {i for i, _ in hits} == {0, 2}
+
+
 def test_context_pull_session_avoids_duplicates():
     sections = [
         IndexedSection("a.crumb", "goal", "Fix bug", [70], 1, 5, [1.0, 0.5], "hash1"),
