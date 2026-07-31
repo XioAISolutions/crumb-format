@@ -12,6 +12,8 @@ Transport adapters may describe themselves through optional `ext.transport.*` he
 
 The extension contract is documented in [docs/extensions/optical-transport-v1.md](docs/extensions/optical-transport-v1.md).
 
+An experimental profile should not be promoted to stable solely because its parser, envelope, or recovery simulation passes. A physical transport must also publish repeated end-to-end evidence across representative sender and receiver devices, including failed attempts, exact-match verification, security boundaries, and device-specific—not universal—performance claims.
+
 ## Core rules
 
 1. **The payload remains authoritative.** Transport metadata cannot override system, developer, user, policy, constraint, or approval semantics in a CRUMB or its host runtime.
