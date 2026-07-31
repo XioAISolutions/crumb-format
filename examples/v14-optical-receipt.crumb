@@ -1,0 +1,25 @@
+BEGIN CRUMB
+v=1.4
+kind=log
+id=receipt-isolated-deployment-review
+source=crumbbeam.receiver
+refs=isolated-deployment-review
+extensions=transport.optical
+---
+[entries]
+- [2026-07-31T16:00:00Z] receive started
+- [2026-07-31T16:00:04Z] payload reconstructed
+- [2026-07-31T16:00:04Z] SHA-256 and CRUMB validation passed
+
+[transport]
+profile=optical-fountain-qr-v1
+status=verified
+payload_sha256=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+envelope_version=CBM1
+encrypted=true
+session_id=7f31a2c9
+unique_frames=14
+duplicate_frames=2
+started_at=2026-07-31T16:00:00Z
+completed_at=2026-07-31T16:00:04Z
+END CRUMB
