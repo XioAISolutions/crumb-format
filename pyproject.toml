@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crumb-format"
-version = "1.1.0"
+version = "1.2.0"
 description = "The copy-paste AI handoff format — v1.4 wire format (stable). Native Claude Code and Cursor integrations, MCP servers (24 tools), validators (Python + JS), AgentAuth identity/governance/audit, palace memory, MeTalk compression, OTEL bridge, and ~46 CLI commands."
 readme = "README.md"
 license = "MIT"

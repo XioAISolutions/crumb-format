@@ -446,8 +446,8 @@ crumb metalk task.crumb --level 1
 # Aggressive condensing (~50-60% savings)
 crumb metalk task.crumb --level 3
 
-# Chain with compress for maximum density
-crumb compress task.crumb --metalk
+# Chain with signal compression for maximum density
+crumb optimize task.crumb --mode signal --metalk
 ```
 
 Output shows live stats: `MeTalk: 127 → 68 tokens (46.5% saved, 1.87x ratio)`.
@@ -561,9 +561,9 @@ repos:
 - [`api/`](api/) -- REST API server with OpenAPI 3.1 spec
 - [`a2a/`](a2a/) -- Google A2A protocol bridge (agent card, task handler, server)
 - [`validators/`](validators/) -- Python and Node reference validators
-- [`tests/`](tests/) -- 291 tests covering the full surface area
+- [`tests/`](tests/) -- 757 tests covering the full surface area
 - [`docs/HANDOFF_PATTERNS.md`](docs/HANDOFF_PATTERNS.md) -- practical handoff patterns
-- [`crumb_llm/`](crumb_llm/) -- **Crumb LLM**: experimental O(N log N) physics-based language model ([architecture doc](docs/crumb-llm-architecture.md))
+- [`crumb_wavelm/`](crumb_wavelm/) -- experimental O(N log N) physics-based language model ([architecture doc](docs/crumb-llm-architecture.md))
 
 ## Crumb LLM (experimental)
 

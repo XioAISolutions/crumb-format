@@ -43,7 +43,7 @@ REQUIRED_SECTIONS = {
     "delta": ["changes"],
     "agent": ["identity"],
 }
-CLI_VERSION = "1.1.0"
+CLI_VERSION = "1.2.0"
 SUPPORTED_VERSIONS = {"1.1", "1.2", "1.3", "1.4"}
 # Mirrors cli.transcripts.FORMATS. Duplicated as a literal so building the
 # argument parser doesn't pull in the transcript readers on every CLI start;

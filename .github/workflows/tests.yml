@@ -31,5 +31,10 @@ jobs:
           pip install pytest
           pip install -e .
 
+      # Runs on every PR, not only at release time. This is the check that was
+      # missing while PyPI served a four-month-stale wheel.
+      - name: Verify release metadata and that the docs match the CLI
+        run: python scripts/release_check.py
+
       - name: Run tests
         run: python -m pytest tests/ -v --tb=short

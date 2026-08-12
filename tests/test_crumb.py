@@ -194,16 +194,16 @@ class TestCliVersion:
         with pytest.raises(SystemExit) as exc:
             crumb.main(["--version"])
         assert exc.value.code == 0
-        assert capsys.readouterr().out.strip() == "crumb 1.1.0"
+        assert capsys.readouterr().out.strip() == f"crumb {crumb.CLI_VERSION}"
 
     def test_console_version_alias(self, capsys):
         assert crumb_cli.main(["version"]) == 0
-        assert capsys.readouterr().out.strip() == "1.1.0"
+        assert capsys.readouterr().out.strip() == crumb.CLI_VERSION
 
     def test_console_help_lists_operator_commands(self, capsys):
         assert crumb_cli.main(["--help"]) == 0
         output = capsys.readouterr().out
-        assert "CRUMB 1.1.0" in output
+        assert f"CRUMB {crumb.CLI_VERSION}" in output
         assert "██████╗" in output
         assert "🍞  CRUMB  🍞" in output
         assert "crumb update --check" in output

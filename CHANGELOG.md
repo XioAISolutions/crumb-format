@@ -1,6 +1,54 @@
 # Changelog
 
-## Unreleased
+## v1.2.0
+
+**First PyPI release since 0.2.0 (April 2026).** Everything between 0.3.0 and
+1.1.0 shipped to the repository but never to the index, so this release carries
+four months of accumulated work to anyone installing from PyPI.
+
+### Phase 4 — release pipeline repair
+
+The publish path was broken in three compounding ways, all fixed here.
+
+- **`publish-pypi.yml` is now tag-triggered.** It previously fired on
+  `release: published`, which required a hand-created GitHub Release. Between
+  the workflow landing (2026-05-28) and 2026-08-12 nobody created one, so it
+  never ran a single time. Pushing `vX.Y.Z` is now sufficient, and the workflow
+  creates the GitHub Release itself.
+- **Publishing uses Trusted Publishing** (OIDC) instead of a `PYPI_API_TOKEN`
+  secret. The old workflow declared `id-token: write` and then passed an API
+  token anyway; if the secret was unset the publish step simply failed.
+- **The release now has to run its own documentation.** Before publishing, the
+  built wheel is installed into a clean venv outside the source tree and the
+  README quickstart is executed against it — `crumb doctor`, `from-messages`,
+  `validate`, `measure`. A wheel that cannot run its own README cannot ship.
+- **`scripts/release_check.py`** enforces three invariants, and runs on every
+  PR via `tests.yml` rather than only at release time:
+  1. `pyproject.toml`, `cli.crumb.CLI_VERSION`, the `CHANGELOG.md` heading and
+     the git tag all agree.
+  2. Every `crumb <subcommand>` shown in a code block in README, QUICKSTART,
+     SPEC, PROTOCOL or PACKS is a subcommand the CLI actually registers.
+  3. The publish workflow is still tag-triggered.
+- **`verify-pypi.yml`** reinstalls from the public index on 3.10/3.11/3.12
+  after a release and re-runs the quickstart, and separately runs a weekly
+  `detect-drift` job comparing the published version against the working tree.
+  That job is what turns a silently stale index into a red build.
+
+**Documentation drift caught by the new check on its first run** — three
+commands were documented but had been folded into `crumb optimize` and no
+longer existed:
+- `crumb compress` in `README.md` and `docs/QUICKSTART.md` → `crumb optimize --mode signal`
+- `crumb squeeze` in `SPEC.md` → `crumb optimize --mode budget`
+
+Also corrected: `README.md` linked `crumb_llm/`, renamed to `crumb_wavelm/` in
+`8c38846`; the test count claim (291 → 757); and `TRANSPORTS.md` listed
+CrumbBeam as an `experimental` optical transport when the repository contains
+no implementation — now marked `specified, unimplemented`.
+
+`docs/RELEASING.md` previously listed the tag push as **"(Optional)"**, noting
+that tag pushes "have historically 403'd" and naming the merge commit the
+"canonical release marker." Nothing downstream reads merge commits. The tag is
+now documented as the release mechanism.
 
 ### Phase 3 — real conversation ingest + honest measurement
 
