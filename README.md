@@ -102,6 +102,70 @@ crumb lint handoff.crumb --check-deadlines                     # safety + freshn
 
 Run `crumb --help-all` for the full surface (search, palace memory, governance, format bridges, v1.4 features).
 
+## Compress a real conversation — with receipts
+
+`crumb from-messages` reads the formats conversations are actually stored in and turns one into a handoff:
+
+| Input | Shape |
+| --- | --- |
+| OpenAI Chat Completions | `{"messages": [...]}`, a bare array, or a response with `choices` |
+| Anthropic Messages API | content blocks — `text`, `tool_use`, `tool_result`, `thinking` |
+| ChatGPT data export | `conversations.json` (mapping tree) |
+| Claude.ai data export | `chat_messages` |
+| Any of the above | as JSONL |
+
+Run it against the transcript committed in `examples/` — every number below reproduces:
+
+```bash
+crumb from-messages -i examples/transcript-checkout-openai.json -o handoff.crumb --stats
+```
+
+```text
+Read 40 messages as openai-messages.
+  3,560 → 394 tokens (89% smaller, 9.0x) via heuristic:chars/4
+  Fact retention: 92% (11/12 load-bearing tokens kept)
+```
+
+You get a v1.4 task crumb with the goal, what was diagnosed, the decisions that were reached, the files and tools touched, the constraints stated along the way, and the open threads as `[handoff]` items — see [`examples/transcript-checkout.crumb`](examples/transcript-checkout.crumb). Reasoning traces are dropped; they're the most expensive and least reusable part of any transcript. Extraction is deterministic and calls no model, so the same conversation always produces the same crumb.
+
+**And you can check the claim.** `crumb measure` compares a crumb against the source it came from:
+
+```bash
+crumb measure examples/transcript-checkout.crumb \
+  --source examples/transcript-checkout-openai.json
+```
+
+```text
+  Tokenizer:         heuristic:chars/4  (approximate — pip install tiktoken for exact counts)
+  Source:            3,560 tokens
+  CRUMB:             394 tokens
+  Saved:             88.9%  (9.0x smaller)
+----------------------------------------------------------
+  Fact retention:    91.7%  (11/12 load-bearing tokens kept)
+    urls           100.0%  (1/1)
+    paths           80.0%  (4/5)  lost: next.js
+    errors         100.0%  (1/1)
+    identifiers    100.0%  (4/4)
+    numbers        100.0%  (1/1)
+```
+
+That output is the tool working as intended, including the miss. The first run of this fixture scored 58%: it was dropping the diagnosis (`sessionStorage is cleared by the redirect`), the latency, the error code, and the spec URL — carrying the *fix* but not the *why*, so the next model would have had to re-derive it. The extractor was fixed because the measurement showed the loss.
+
+Two numbers, both reproducible. Token counts come from `tiktoken` when it's installed (`pip install crumb-format[measure]`) and from a `chars/4` heuristic when it isn't — and the report always names which one it used, because a compression ratio computed from `len(text) // 4` isn't a measurement.
+
+Retention is a **lexical proxy**: it checks whether load-bearing tokens (paths, URLs, identifiers, error codes, numbers with units) survive compression. It answers "what got dropped", not "does the next model still succeed" — treat it as a regression guard, not a benchmark. The per-category breakdown is the useful part: it tells you *what kind* of information your packing drops.
+
+Wire it into CI so a packing change can't silently start losing context:
+
+```bash
+crumb measure handoff.crumb --source conversation.json \
+  --min-saved 80 --min-retention 85 --json
+```
+
+Exits non-zero when either threshold is missed.
+
+> Compression is not free and the numbers say so. On a short conversation the crumb is *larger* than the source — structure has a fixed cost that only pays back across a long session. `crumb measure` reports that as negative savings rather than hiding it.
+
 ## Native integrations — `crumb it` inside your AI tool
 
 Two integrations ship today. Each is a one-line install and gives you a slash command (or rule), MCP server access to all 24 `crumb_*` tools, and the "crumb it" verbal trigger.

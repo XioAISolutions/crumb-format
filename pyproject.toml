@@ -48,6 +48,11 @@ llm = [
     "torch>=2.2",
     "numpy>=1.26",
 ]
+# Exact token counting for `crumb measure`. Without it the CLI falls back to
+# a chars/4 heuristic and labels every number it prints as approximate.
+measure = [
+    "tiktoken>=0.7",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

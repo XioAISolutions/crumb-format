@@ -1,0 +1,32 @@
+BEGIN CRUMB
+v=1.4
+kind=task
+title=Users lose their cart when they refresh on /checkout/payment. It only…
+source=transcript.openai-messages
+---
+[goal]
+Make sure we keep the existing cart_v2 cookie name and never store PII in the payload.
+
+[context]
+- What was diagnosed:
+  - Found it. sessionStorage is cleared by the cross-origin redirect back from Stripe, so CartService.hydrate() reads null on the first paint.
+  - The hydrate call currently costs 450ms and the edge returns a 503 when it misses.
+- Decisions reached:
+  - We're going with a signed cookie instead: move hydration into src/middleware.ts so it runs before React mounts.
+  - Decision: read the cart from a signed cookie in middleware, keeping CartService.hydrate() as the public entry point so the API is unchanged.
+- Files in play: src/api/stripe-webhook.ts, src/checkout/CartService.ts, src/middleware.ts, tests/checkout_refresh.spec.ts
+- References:
+  - https://example.com/docs/signed-cart
+
+[constraints]
+- You must not change the public CartService API, and don't touch the webhook handler in src/api/stripe-webhook.ts — that's owned by another team.
+- Make sure we keep the existing cart_v2 cookie name and never store PII in the payload.
+
+[handoff]
+- to=any    do=The next step is to add a regression test in tests/checkout_refresh.spec.ts covering the post-redirect refresh path.
+
+[notes]
+- Derived from openai-messages transcript: 39 turns, 40 messages, 0 code blocks.
+- Reasoning traces and turn-by-turn phrasing were dropped; decisions, artifacts, constraints, and open threads were kept.
+
+END CRUMB

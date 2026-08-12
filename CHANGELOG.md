@@ -2,6 +2,59 @@
 
 ## Unreleased
 
+### Phase 3 — real conversation ingest + honest measurement
+
+No wire-format change. Two commands that close the gap between what CRUMB
+claims (compress and hand off conversation context) and what it could
+previously demonstrate.
+
+- **`crumb from-messages`** — reads the shapes conversations are actually
+  stored in, rather than the ad-hoc `User:` / `AI:` text `from-chat`
+  expects:
+  - OpenAI Chat Completions — `{"messages": [...]}`, a bare array, or a
+    response envelope with `choices`. `tool_calls` and `role=tool` turns
+    are understood.
+  - Anthropic Messages API — content-block arrays with `text`,
+    `tool_use`, `tool_result`, and `thinking`.
+  - ChatGPT data export — `conversations.json`, the mapping-tree form,
+    replayed in creation order.
+  - Claude.ai data export — `chat_messages` arrays.
+  - JSONL of any of the above.
+
+  Output is a v1.4 `kind=task` handoff: derived goal, decisions reached,
+  files and tools touched, constraints stated along the way, and open
+  threads as `[handoff]` items. `thinking` blocks are dropped — the most
+  expensive and least reusable part of a transcript. Extraction is
+  deterministic and model-free, so the same transcript always yields the
+  same crumb and the output can be diffed in CI.
+
+- **`crumb measure`** — compares a crumb against the source it was
+  compressed from and reports two numbers:
+  - **Token savings**, counted with `tiktoken` when available and with an
+    explicitly labelled `chars/4` heuristic when not. The report always
+    names which one produced the number; a ratio computed from
+    `len(text) // 4` is presented as approximate, never as a measurement.
+  - **Fact retention**, the share of load-bearing tokens (paths, URLs,
+    identifiers, error codes, numbers with units, quoted strings) that
+    survive into the compressed form — broken down by category so you can
+    see *what kind* of information the packer drops. Documented as a
+    lexical proxy for fidelity, not a task-success measure.
+
+  `--json` emits a machine-readable report; `--min-saved` and
+  `--min-retention` turn it into a CI gate that exits non-zero.
+
+  Install exact counting with `pip install crumb-format[measure]`.
+
+- **Sentence splitting no longer truncates dotted identifiers.** The
+  extractors split on `[.!?]` followed by whitespace *and* a capitalised
+  opener, so `tests/checkout_refresh.spec.ts` and `v1.4` stay intact —
+  previously a naive split cut exactly the filenames a handoff needs most.
+
+- **`tests/test_transcripts.py`** (23 cases) and **`tests/test_measure.py`**
+  (14 cases). Every provider shape is asserted to yield identical extracted
+  signal; the tokenizer tests stub `tiktoken` both ways so they pass with or
+  without it installed.
+
 ### Phase 2 — trust + capability
 
 No wire-format change. Phase 2 of the post-1.0 roadmap (trust track).
