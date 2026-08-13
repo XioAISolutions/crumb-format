@@ -6,16 +6,19 @@
 set -euo pipefail
 
 DRY_RUN=0
+NO_HOOK=0
 for arg in "$@"; do
     case "$arg" in
         --dry-run|-n) DRY_RUN=1 ;;
+        --no-hook) NO_HOOK=1 ;;
         --help|-h)
             cat <<EOF
-Usage: install.sh [--dry-run]
+Usage: install.sh [--dry-run] [--no-hook]
 
 Installs the CRUMB Claude Code integration:
   - Slash commands at ~/.claude/commands/{crumb-export,crumb-import}.md
   - MCP server entry at ~/.claude/.mcp.json (merged)
+  - SessionEnd auto-capture hook in ~/.claude/settings.json (skip with --no-hook)
   - Optional 'crumb it' verbal-trigger block appended to ./CLAUDE.md
 
 --dry-run    Show what would change without writing anything.
@@ -249,6 +252,59 @@ else
         -e "s|__CRUMB_PYTHON__|${CRUMB_PYTHON}|g" \
         "$MCP_TEMPLATE" | sed 's/^/     /'
     echo "     ----"
+fi
+
+
+# ── 2b. SessionEnd hook — automatic capture ────────────────────────
+# `crumb it` only works if the user remembers to say it. A session-end hook
+# captures the handoff whether or not anyone thinks to ask, which is the
+# difference between a format people try once and one they keep using.
+#
+# The hook is opt-out: --no-hook skips it. It never fails the session —
+# `crumb capture` exits 0 when a transcript cannot be read (see --strict).
+SETTINGS_FILE="${CLAUDE_DIR}/settings.json"
+if (( NO_HOOK )); then
+    echo "==> Skipping SessionEnd hook (--no-hook)"
+else
+    echo "==> Registering SessionEnd auto-capture hook in ${SETTINGS_FILE}"
+    HOOK_CMD="${CRUMB_INSTALL_PATH} capture --dir .crumb"
+    if (( DRY_RUN )); then
+        echo "   [dry-run] would add SessionEnd hook: ${HOOK_CMD}"
+    else
+        "$CRUMB_PYTHON" - "$SETTINGS_FILE" "$HOOK_CMD" <<'HOOKPY'
+import json, sys
+from pathlib import Path
+
+settings_path, command = Path(sys.argv[1]), sys.argv[2]
+try:
+    settings = json.loads(settings_path.read_text(encoding="utf-8")) if settings_path.is_file() else {}
+except json.JSONDecodeError:
+    print(f"  !  {settings_path} is not valid JSON; leaving it alone.", file=sys.stderr)
+    print("     Add this hook manually under hooks.SessionEnd:", file=sys.stderr)
+    print(f"       {command}", file=sys.stderr)
+    raise SystemExit(0)
+if not isinstance(settings, dict):
+    print(f"  !  {settings_path} is not a JSON object; leaving it alone.", file=sys.stderr)
+    raise SystemExit(0)
+
+hooks = settings.setdefault("hooks", {})
+session_end = hooks.setdefault("SessionEnd", [])
+# Idempotent: replace our own entry rather than appending a duplicate on
+# every re-run, and never touch hooks somebody else registered.
+existing = [
+    group for group in session_end
+    if any("crumb" in str(h.get("command", "")) and "capture" in str(h.get("command", ""))
+           for h in group.get("hooks", []) if isinstance(h, dict))
+]
+for group in existing:
+    session_end.remove(group)
+session_end.append({"hooks": [{"type": "command", "command": command}]})
+
+settings_path.parent.mkdir(parents=True, exist_ok=True)
+settings_path.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
+print("  +  SessionEnd hook registered" if not existing else "  =  SessionEnd hook updated")
+HOOKPY
+    fi
 fi
 
 # ── 3. CLAUDE.md verbal-trigger block (optional, prompted) ─────────

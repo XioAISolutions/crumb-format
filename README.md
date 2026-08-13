@@ -1,12 +1,44 @@
 # CRUMB
 
-**The copy-paste AI handoff format. No install required.**
+**Quit Claude Code mid-task, open Cursor or ChatGPT, and keep going — without re-explaining the architecture, the failed approaches, or the open questions.**
 
 ![CRUMB CLI overview](docs/assets/crumb-banner.svg)
 
 ---
 
-Switching AI tools mid-task? Paste a CRUMB. The next AI gets the goal, the context, and the constraints — without the chat-log noise. CRUMB is just structured text; you don't need any tool to use it.
+A raw transcript is the worst possible way to move context between tools: it is optimised for a human replaying a conversation, not for an agent picking up work. CRUMB is a small structured block that carries what the next tool actually needs — the goal, what was diagnosed, the decisions, the files touched, the constraints, and what is still open.
+
+```bash
+# Capture the session you just finished
+crumb from-messages -i ~/.claude/projects/*/session.jsonl -o handoff.crumb --stats
+#   49,489 → 2,403 tokens (95% smaller, 20.6x)
+
+# Then paste handoff.crumb into whatever you open next.
+```
+
+Or let it happen on its own — `install.sh` registers a `SessionEnd` hook, so every session leaves a handoff in `.crumb/` without anyone remembering to ask.
+
+## Where it reads from
+
+| Source | How |
+| --- | --- |
+| **Claude Code** | `SessionEnd` hook (automatic) or `crumb capture --transcript <session>.jsonl` |
+| **OpenAI Chat Completions** | `crumb from-messages` — `messages[]`, a bare array, or a response with `choices` |
+| **Anthropic Messages API** | content blocks: `text`, `tool_use`, `tool_result`, `thinking` |
+| **ChatGPT data export** | `conversations.json` |
+| **Claude.ai data export** | `chat_messages` |
+| **Cursor** | rules + MCP server (`integrations/cursor/install.sh`) |
+| **Anything else** | it is just text — paste it, or hand-write it |
+
+And unlike every other tool in this space, **you can check what it cost you**:
+
+```bash
+crumb measure handoff.crumb --source session.jsonl
+#   Saved: 88.9% (9.0x smaller)
+#   Fact retention: 91.7% (11/12) — broken down by paths, identifiers, urls, error codes
+```
+
+Retention is a **lexical** proxy — it reports which load-bearing tokens survived, not whether the next model succeeds. It also falls on very long sessions: a 40-message conversation retains ~92%, while a 1,000-message one retains ~18%, because a 50k-token session genuinely cannot be carried losslessly in a 2.4k handoff. The number is reported as measured rather than tuned, so you can see the trade instead of taking it on trust.
 
 ## Step 1 — Add "crumb it" to your AI (30 seconds, no install)
 

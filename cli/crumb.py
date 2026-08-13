@@ -53,7 +53,10 @@ CLI_VERSION = "1.2.0"
 # Mirrors cli.transcripts.FORMATS. Duplicated as a literal so building the
 # argument parser doesn't pull in the transcript readers on every CLI start;
 # tests assert the two stay in sync.
-_TRANSCRIPT_FORMATS = ("openai-messages", "anthropic-messages", "chatgpt-export", "claude-export")
+_TRANSCRIPT_FORMATS = (
+    "openai-messages", "anthropic-messages", "chatgpt-export", "claude-export",
+    "claude-code-transcript",
+)
 FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
 
 
@@ -476,6 +479,84 @@ def cmd_from_messages(args: argparse.Namespace) -> None:
               f"({result.saved_pct:.0f}% smaller, {result.ratio:.1f}x) via {result.tokenizer}")
         print(f"  Fact retention: {result.retention * 100:.0f}% "
               f"({result.facts_retained}/{result.facts_total} load-bearing tokens kept)")
+
+
+# ── capture ──────────────────────────────────────────────────────────
+# Zero-friction auto-capture. `crumb it` requires the user to remember; a
+# session-end hook does not. Reads an agent hook payload on stdin, finds the
+# session transcript, and writes a handoff crumb.
+
+def cmd_capture(args: argparse.Namespace) -> None:
+    """Capture an agent session as a crumb, driven by a lifecycle hook.
+
+    Claude Code's SessionEnd hook delivers a JSON payload on stdin containing
+    ``transcript_path`` (a JSONL of the session), ``session_id`` and ``cwd``.
+    Other agents can drive this the same way, or pass ``--transcript``
+    directly.
+    """
+    from cli import measure as measure_mod
+    from cli import transcripts
+
+    transcript_path = args.transcript
+    session_id = ""
+    if not transcript_path:
+        raw = sys.stdin.read().strip()
+        if not raw:
+            print(
+                "error: no hook payload on stdin and no --transcript given.\n"
+                "       Pipe a SessionEnd hook payload, or pass --transcript <file>.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            print(f"error: hook payload is not JSON: {exc}", file=sys.stderr)
+            sys.exit(2)
+        transcript_path = payload.get("transcript_path") or ""
+        session_id = str(payload.get("session_id") or "")
+        if not transcript_path:
+            print(
+                "error: hook payload has no 'transcript_path'. Keys present: "
+                f"{sorted(payload)}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+
+    source_file = Path(transcript_path)
+    if not source_file.is_file():
+        print(f"error: transcript not found: {source_file}", file=sys.stderr)
+        sys.exit(2)
+
+    try:
+        fmt, messages = transcripts.load_messages(source_file.read_text(encoding="utf-8"))
+    except transcripts.TranscriptError as exc:
+        # A hook must never fail the thing it is attached to. Report and exit 0
+        # unless the caller explicitly asked for strictness.
+        print(f"crumb capture: skipped ({exc})", file=sys.stderr)
+        sys.exit(1 if args.strict else 0)
+
+    crumb_text = transcripts.to_crumb(
+        messages, fmt=fmt, title=args.title, goal=args.goal,
+        project=args.project, source=args.source,
+    )
+
+    output = args.output
+    if not output:
+        stem = session_id[:12] or source_file.stem[:12] or "session"
+        out_dir = Path(args.dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        output = str(out_dir / f"session-{stem}.crumb")
+
+    write_text(output, crumb_text)
+    if output != '-':
+        result = measure_mod.measure(transcripts.transcript_text(messages), crumb_text)
+        print(
+            f"crumb capture: {output} — {result.source_tokens:,} → "
+            f"{result.crumb_tokens:,} tokens ({result.saved_pct:.0f}% smaller), "
+            f"{result.retention * 100:.0f}% fact retention",
+            file=sys.stderr,
+        )
 
 
 # ── measure ──────────────────────────────────────────────────────────
@@ -5601,15 +5682,16 @@ def build_parser() -> argparse.ArgumentParser:
     full_help = dedent("""\
         Commands (use `crumb <cmd> --help` for details):
 
-          Create:    new   from-chat   from-messages   from-git   from-otel   import   template
+          Create:    new   capture   from-chat   from-messages   from-git   from-otel   import   template
           Inspect:   validate   inspect   diff   search   bench   measure
-          Edit:      append   dream   merge   watch
+          Edit:      append   log   dream   merge   watch
           Optimize:  optimize   lint   metalk
           Handoff:   handoff   receive   export
           Memory:    palace   wake   reflect   classify
           Format:    bridge   resolve   hash   delta   apply   seen
           Governance:passport   policy   audit   scan   comply   webhook   guardrails
           Todo:      todo (add | done | list | dream)
+          Research:  llm  — experimental crumb_wavelm model; not part of the format
           Setup:     hello   doctor   init   hooks   context   pack
     """).strip()
 
@@ -5700,6 +5782,21 @@ def build_parser() -> argparse.ArgumentParser:
     from_messages.add_argument('--stats', action='store_true',
                                help='Print token savings and fact retention after writing.')
     from_messages.set_defaults(func=cmd_from_messages)
+
+    # capture
+    capture_cmd = sub.add_parser(
+        'capture',
+        help='Capture an agent session as a crumb (drive from a SessionEnd hook).')
+    capture_cmd.add_argument('--transcript', help='Transcript file. Default: read a hook payload on stdin.')
+    capture_cmd.add_argument('--output', '-o', help='Output file, or - for stdout. Default: <dir>/session-<id>.crumb')
+    capture_cmd.add_argument('--dir', default='.crumb', help='Directory for the default output path (default: .crumb).')
+    capture_cmd.add_argument('--title', help='Title for the crumb.')
+    capture_cmd.add_argument('--goal', help='Override the derived goal.')
+    capture_cmd.add_argument('--project', help='Optional project= header.')
+    capture_cmd.add_argument('--source', help='Source label (default: transcript.<format>).')
+    capture_cmd.add_argument('--strict', action='store_true',
+                             help='Exit non-zero if the transcript cannot be read (default: exit 0 so a hook never breaks the session).')
+    capture_cmd.set_defaults(func=cmd_capture)
 
     # measure
     measure_cmd = sub.add_parser(

@@ -70,12 +70,37 @@ def _looks_like_claude_export(obj: Any) -> bool:
     return False
 
 
+def _looks_like_claude_code_transcript(obj: Any) -> bool:
+    """Claude Code writes JSONL where each record wraps a Messages-API turn.
+
+    Records carry session metadata at the top level (``type``, ``sessionId``,
+    ``cwd``, ``gitBranch``) and the actual turn under ``message``. Detecting on
+    that nesting matters: without it the generic reader sees records with no
+    top-level ``role`` and produces an empty transcript rather than an error.
+    """
+    if not isinstance(obj, list):
+        return False
+    for item in obj[:20]:
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") in {"user", "assistant"} and isinstance(item.get("message"), dict):
+            message = item["message"]
+            if "role" in message and "content" in message:
+                return True
+    return False
+
+
 def _messages_of(obj: Any) -> List[Any] | None:
     """Pull a messages array out of the common API envelopes."""
     if isinstance(obj, list):
         return obj
     if not isinstance(obj, dict):
         return None
+    # A single-line JSONL file is itself valid JSON, so it arrives here as a
+    # bare message dict rather than a list and would otherwise be reported as
+    # "no messages found". One turn is a legitimate transcript.
+    if "role" in obj and "content" in obj:
+        return [obj]
     for key in ("messages", "input", "conversation"):
         value = obj.get(key)
         if isinstance(value, list):
@@ -102,6 +127,8 @@ def detect_format(obj: Any) -> str:
         return "chatgpt-export"
     if _looks_like_claude_export(obj):
         return "claude-export"
+    if _looks_like_claude_code_transcript(obj):
+        return "claude-code-transcript"
     messages = _messages_of(obj)
     if messages is None:
         raise TranscriptError(
@@ -118,6 +145,7 @@ FORMATS = (
     "anthropic-messages",
     "chatgpt-export",
     "claude-export",
+    "claude-code-transcript",
 )
 
 
@@ -291,11 +319,39 @@ def _read_claude_export(obj: Any) -> List[Message]:
     return out
 
 
+def _read_claude_code_transcript(obj: Any) -> List[Message]:
+    """Read a Claude Code session transcript (``~/.claude/projects/**/*.jsonl``).
+
+    Each record's ``message`` is an Anthropic Messages turn, so the existing
+    content-block reader does the real work. Two kinds of record are dropped:
+
+    * anything that is not a ``user`` or ``assistant`` turn — the file also
+      carries ``queue-operation``, ``attachment``, ``last-prompt``, ``mode`` and
+      ``system`` bookkeeping that is not conversation;
+    * sidechains (``isSidechain``), which are subagent transcripts. A handoff
+      describes the main thread; splicing a subagent's internal turns into it
+      would misrepresent who did what.
+    """
+    out: List[Message] = []
+    for record in obj:
+        if not isinstance(record, dict):
+            continue
+        if record.get("type") not in {"user", "assistant"}:
+            continue
+        if record.get("isSidechain"):
+            continue
+        raw = record.get("message")
+        if isinstance(raw, dict):
+            out.append(_read_api_message(raw))
+    return out
+
+
 _READERS = {
     "openai-messages": _read_api_messages,
     "anthropic-messages": _read_api_messages,
     "chatgpt-export": _read_chatgpt_export,
     "claude-export": _read_claude_export,
+    "claude-code-transcript": _read_claude_code_transcript,
 }
 
 
@@ -386,6 +442,13 @@ _NOISE_PREFIXES = (
     "sure", "certainly", "of course", "great", "thanks", "thank you",
     "let me know", "happy to", "no problem", "you're welcome", "i'd be happy",
     "here's", "here is", "absolutely",
+    # Narration about the conversation rather than content from it. An
+    # assistant saying "Let me check the logs" is describing its own next tool
+    # call, not stating a decision or an open thread — but it matches the same
+    # keyword patterns, so long agent transcripts fill up with it.
+    "let me", "let's start", "now let", "continuing", "next up", "first,",
+    "i'll ", "i've ", "i am going", "i will ", "looking at", "checking",
+    "one moment", "on it", "done —", "that's the", "so far",
 )
 
 
@@ -402,10 +465,36 @@ def _strip_code(text: str) -> str:
 
 def _is_noise(sentence: str) -> bool:
     low = sentence.strip().lower()
-    return (not low) or low.startswith(_NOISE_PREFIXES) or len(low) < 12
+    if (not low) or low.startswith(_NOISE_PREFIXES) or len(low) < 12:
+        return True
+    return _looks_like_serialized_data(sentence)
 
 
-def _dedupe(items: Iterable[str], limit: int) -> List[str]:
+def _looks_like_serialized_data(sentence: str) -> bool:
+    """True for JSON/log payloads that happen to sit inside a message.
+
+    Agent transcripts embed webhook bodies, API responses and tool output as
+    plain text. Those blobs match the same keyword patterns as prose, so
+    without this a ``[handoff]`` item can end up being a serialized GitHub
+    comment rather than an action.
+    """
+    stripped = sentence.strip()
+    if stripped[:1] in "{[" and stripped.count('"') >= 4:
+        return True
+    punctuation = sum(stripped.count(ch) for ch in '{}[]":,\\')
+    return len(stripped) > 40 and punctuation / len(stripped) > 0.12
+
+
+def _dedupe(items: Iterable[str], limit: int, *, prefer: str = "tail") -> List[str]:
+    """Deduplicate, keeping chronological order, capped at ``limit``.
+
+    ``prefer="tail"`` keeps the *last* ``limit`` survivors rather than the
+    first. That is the right default for a handoff: in a long session the most
+    recent decisions supersede the early ones, and the files touched in the
+    last hour matter more than the ones touched at the start. Truncating from
+    the head is what made a 1,037-message session retain 7% of its
+    load-bearing tokens while a 40-message one retained 92%.
+    """
     seen = set()
     out: List[str] = []
     for item in items:
@@ -415,14 +504,40 @@ def _dedupe(items: Iterable[str], limit: int) -> List[str]:
             continue
         seen.add(key)
         out.append(item)
-        if len(out) >= limit:
-            break
-    return out
+    if len(out) <= limit:
+        return out
+    return out[-limit:] if prefer == "tail" else out[:limit]
+
+
+def _budget(message_count: int, base: int, ceiling: int) -> int:
+    """Scale a section's item cap with transcript length.
+
+    A fixed cap silently discards most of a long session. Growing roughly with
+    the square root of the turn count keeps a short handoff tight while letting
+    a thousand-message session carry proportionally more of its own detail.
+    """
+    scaled = int(base * max(1.0, (message_count / 40.0) ** 0.5))
+    return max(base, min(scaled, ceiling))
+
+
+# Markdown structure carries no handoff content on its own. A heading like
+# "## Remaining queue" matches the open-thread keywords and would otherwise be
+# emitted as a [handoff] item with no action in it.
+MARKDOWN_NOISE_RE = re.compile(r"^\s*(?:#{1,6}\s|[-*_]{3,}\s*$|\||>\s)")
 
 
 def sentences(text: str) -> List[str]:
-    """Split prose into sentences without breaking dotted identifiers."""
-    return [s.strip() for s in SENTENCE_SPLIT_RE.split(_strip_code(text or "")) if s.strip()]
+    """Split prose into sentences without breaking dotted identifiers.
+
+    Markdown headings, rules, tables and block quotes are dropped: they are
+    layout, not statements, and they match the same keyword patterns the
+    extractors look for.
+    """
+    cleaned = "\n".join(
+        line for line in _strip_code(text or "").splitlines()
+        if not MARKDOWN_NOISE_RE.match(line)
+    )
+    return [s.strip(" *_`") for s in SENTENCE_SPLIT_RE.split(cleaned) if s.strip(" *_`")]
 
 
 def _sentences_matching(
@@ -526,15 +641,24 @@ def collect(messages: Sequence[Message]) -> Dict[str, List[str]]:
     findings += [s for s in _sentences_matching(MEASUREMENT_RE, messages, ("assistant", "user"))
                  if not s.rstrip().endswith("?")]
 
+    n = len(messages)
     return {
-        "decisions": _dedupe(_drop_contained(decisions), 8),
-        "findings": _dedupe((_truncate(f, 200) for f in _drop_contained(findings)), 5),
-        "paths": _dedupe(paths, 12),
-        "links": _dedupe(links, 4),
-        "tools": _dedupe(tools, 8),
+        "decisions": _dedupe(_drop_contained(decisions), _budget(n, 8, 24)),
+        "findings": _dedupe((_truncate(f, 200) for f in _drop_contained(findings)), _budget(n, 5, 16)),
+        # Paths are the cheapest high-value fact in a handoff — a filename costs
+        # a few tokens and saves the next model a search — so they get the most
+        # generous ceiling.
+        "paths": _dedupe(paths, _budget(n, 12, 60)),
+        "links": _dedupe(links, _budget(n, 4, 12)),
+        "tools": _dedupe(tools, _budget(n, 8, 20)),
         "languages": _dedupe(languages, 6),
-        "constraints": _dedupe((_truncate(c, 200) for c in _drop_contained(constraints)), 6),
-        "open": _dedupe((_truncate(o, 200) for o in _drop_contained(open_threads)), 5),
+        # Constraints bind for the whole session, so early ones are kept
+        # alongside late ones rather than being pushed out by recency.
+        "constraints": _dedupe(
+            (_truncate(c, 200) for c in _drop_contained(constraints)),
+            _budget(n, 6, 20), prefer="head",
+        ),
+        "open": _dedupe((_truncate(o, 200) for o in _drop_contained(open_threads)), _budget(n, 5, 15)),
         "questions": _dedupe((_truncate(q, 160) for q in questions), 3),
     }
 

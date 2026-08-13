@@ -85,8 +85,18 @@ def test_release_check_script_runs_clean():
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_every_readme_command_is_reachable_from_help_all():
-    """`--help-all` is the documented index; it must not omit shipped commands."""
+# Commands deliberately kept out of the index. `from-halo` is a hidden alias of
+# `from-otel`, retained for scripts that already call it.
+HIDDEN_COMMANDS = {"from-halo"}
+
+
+def test_every_shipped_command_appears_in_help_all():
+    """`--help-all` is the documented index; it must not omit shipped commands.
+
+    Asserting a hand-written list of a few names is what let `crumb capture`
+    ship without appearing in the index at all. This compares the index against
+    every subcommand the parser actually registers.
+    """
     result = subprocess.run(
         [sys.executable, str(REPO_ROOT / "crumb_cli.py"), "--help-all"],
         capture_output=True,
@@ -95,5 +105,11 @@ def test_every_readme_command_is_reachable_from_help_all():
     )
     assert result.returncode == 0, result.stderr
     listed = result.stdout
-    for command in ("from-messages", "measure", "validate", "handoff", "receive"):
-        assert command in listed, f"{command} missing from --help-all"
+
+    registered = release_check.registered_subcommands() - HIDDEN_COMMANDS
+    missing = sorted(name for name in registered if name not in listed)
+    assert not missing, (
+        f"commands ship but are absent from `crumb --help-all`: {missing}. "
+        "Either add them to a group in build_parser's full_help, or add them "
+        "to HIDDEN_COMMANDS with a reason."
+    )
