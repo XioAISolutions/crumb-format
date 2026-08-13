@@ -1,6 +1,12 @@
 # =============================================================================
-# CRUMB Bench — Copy-Paste Template for Any Repo
+# CRUMB file inventory — Copy-Paste Template for Any Repo
 # =============================================================================
+#
+# NOTE: this file lives in docs/ on purpose. It used to sit in
+# .github/workflows/, where GitHub ran it *in this repository* — so every pull
+# request got two identical bench comments, and the template's copy called
+# `bench-pr.yml@main`, meaning it always ran main's logic rather than the
+# version under review. A template meant to be copied should not also execute.
 #
 # HOW TO USE:
 #   1. Copy this file into your repo at: .github/workflows/crumb-bench.yml
