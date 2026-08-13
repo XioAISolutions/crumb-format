@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "crumb-format"
 version = "1.2.0"
-description = "The copy-paste AI handoff format — v1.4 wire format (stable). Native Claude Code and Cursor integrations, MCP servers (24 tools), validators (Python + JS), AgentAuth identity/governance/audit, palace memory, MeTalk compression, OTEL bridge, and ~46 CLI commands."
+description = "Move AI session context between tools. Capture a conversation from Claude Code, OpenAI, Anthropic or ChatGPT into a compact handoff — and measure what the compression cost."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -37,14 +37,18 @@ packages = [
     "mcp",
     "api",
     "a2a",
-    "crumb_wavelm",
-    "crumb_wavelm.configs",
 ]
-
-[tool.setuptools.package-data]
-"crumb_wavelm.configs" = ["*.json"]
+# crumb_wavelm — the experimental wave-field language model — is deliberately
+# NOT packaged here. It is ~4,600 lines of PyTorch research code with nothing
+# to do with the wire format, and shipping it inside the format's wheel made
+# `pip install crumb-format` carry a homegrown LM. The source stays in this
+# repository and `python -m crumb_wavelm.setup_standalone` builds it as its own
+# distribution.
 
 [project.optional-dependencies]
+# Kept so `pip install 'crumb-format[llm]'` still resolves for anyone with it
+# pinned, but the model itself is no longer bundled — see the packages note
+# above and run crumb_wavelm.setup_standalone to build it separately.
 llm = [
     "torch>=2.2",
     "numpy>=1.26",
