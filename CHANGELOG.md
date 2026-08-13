@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## v1.2.0
+
+1.2.0 was never published — PyPI still serves 0.2.0 — so the parser extraction
+lands in the same release rather than a later one. This matters for the
+dependency contract: CrumbContext and CrumbLLM both require
+`crumb-format>=1.2.0` for `crumb_core`, and a 1.2.0 without it would satisfy
+that constraint while failing on import.
 
 ### Phase 5 — one parser, one spec version
 
@@ -33,8 +39,6 @@ the same cases.** `validators/validate.js` accepted a malformed `sha256:`
 content ref, and accepted a `kind=delta` crumb with no `base` header — a delta
 that cannot be applied to anything. The reference parser rejects both. The JS
 validator now enforces both rules, and both are permanent cases.
-
-## v1.2.0
 
 **First PyPI release since 0.2.0 (April 2026).** Everything between 0.3.0 and
 1.1.0 shipped to the repository but never to the index, so this release carries
