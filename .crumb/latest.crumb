@@ -1,18 +1,25 @@
---- task: Document optical transport extension and CrumbBeam profile
+--- task: Real conversation ingest (`from-messages`) + honest compression measurement (`measure`)
 source: github.pr
-pr: #39
-generated: 2026-07-31T16:11:17Z
+pr: #40
+generated: 2026-08-12T17:14:03Z
 ---
 
 [goal]
-## Summary
+## What changed
 
 [context]
 Changed files in this PR:
-- TRANSPORTS.md
-- docs/extensions/optical-transport-v1.md
-- examples/v14-optical-receipt.crumb
-- examples/v14-optical-transport.crumb
+- CHANGELOG.md
+- README.md
+- cli/crumb.py
+- cli/measure.py
+- cli/transcripts.py
+- examples/README.md
+- examples/transcript-checkout-openai.json
+- examples/transcript-checkout.crumb
+- pyproject.toml
+- tests/test_measure.py
+- tests/test_transcripts.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions

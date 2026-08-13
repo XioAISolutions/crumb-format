@@ -8,7 +8,7 @@ Transport adapters may describe themselves through optional `ext.transport.*` he
 
 | Profile | Adapter | Purpose | Status |
 |---|---|---|---|
-| `optical-fountain-qr-v1` | [CrumbBeam](https://github.com/XioAISolutions/CrumbBeam) | screen-to-camera CRUMB delivery through loss-tolerant animated QR frames | experimental |
+| `optical-fountain-qr-v1` | CrumbBeam _(reserved — no implementation yet)_ | screen-to-camera CRUMB delivery through loss-tolerant animated QR frames | specified, unimplemented |
 
 The extension contract is documented in [docs/extensions/optical-transport-v1.md](docs/extensions/optical-transport-v1.md).
 

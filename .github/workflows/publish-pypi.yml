@@ -1,26 +1,132 @@
 name: Publish to PyPI
 
-on:
-  release:
-    types: [published]
+# Tag-triggered on purpose.
+#
+# The previous version of this workflow fired on `release: published`, which
+# required a human to create a GitHub Release by hand. Between May 2026 (when
+# the workflow was added) and August 2026 nobody did, so it never ran once —
+# PyPI stayed on 0.2.0 from April while the repository moved to 1.1.0 and
+# gained ~40 commands. Pushing a tag must be sufficient to publish, and the
+# release itself is created here rather than being a precondition.
 
-permissions:
-  id-token: write
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Exact release tag, for example v1.2.0
+        required: true
+        type: string
+
+env:
+  RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+
+concurrency:
+  group: publish-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
-  publish:
+  build:
+    if: github.repository == 'XioAISolutions/crumb-format'
     runs-on: ubuntu-latest
-    environment: pypi
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-      - name: Install build tools
-        run: pip install build
-      - name: Build package
-        run: python -m build
+          python-version: "3.12"
+      - name: Install release tooling
+        run: python -m pip install --upgrade build twine pytest
+
+      # Preflight: versions agree, docs only promise commands that exist, and
+      # this workflow is still tag-triggered.
+      - name: Verify release metadata
+        run: python scripts/release_check.py --tag "$RELEASE_TAG"
+
+      - name: Run the test suite
+        run: python -m pytest tests/ -q
+
+      - name: Build wheel and source distribution
+        run: python -m build --outdir dist
+
+      - name: Validate distribution metadata
+        run: python -m twine check dist/*
+
+      # The gate that would have caught the stale-wheel failure: install the
+      # artifact outside the source tree and run the README's own quickstart.
+      # A release that cannot execute its own documentation must not ship.
+      - name: Smoke-test the built wheel outside the source tree
+        run: |
+          python -m venv /tmp/crumb-release-venv
+          /tmp/crumb-release-venv/bin/python -m pip install --upgrade pip
+          /tmp/crumb-release-venv/bin/python -m pip install dist/*.whl
+          CRUMB=/tmp/crumb-release-venv/bin/crumb
+          "$CRUMB" --version
+          "$CRUMB" doctor
+          "$CRUMB" --help-all > /dev/null
+          cp examples/transcript-checkout-openai.json /tmp/transcript.json
+          cd /tmp
+          "$CRUMB" from-messages -i transcript.json -o handoff.crumb --stats
+          "$CRUMB" validate handoff.crumb
+          "$CRUMB" measure handoff.crumb --source transcript.json --json > measure.json
+          python -c "import json; d=json.load(open('measure.json')); assert d['tokens']['saved_pct'] > 80, d"
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-${{ env.RELEASE_TAG }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  release:
+    needs: build
+    if: github.repository == 'XioAISolutions/crumb-format'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-package-${{ env.RELEASE_TAG }}
+          path: dist/
+      - name: Create the GitHub release and attach the distributions
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: CRUMB ${{ env.RELEASE_TAG }}
+          generate_release_notes: true
+          files: dist/*
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: false
+
+  publish:
+    needs: [build, release]
+    if: github.repository == 'XioAISolutions/crumb-format'
+    runs-on: ubuntu-latest
+    permissions:
+      # Trusted Publishing: PyPI verifies this workflow's OIDC identity, so no
+      # long-lived PYPI_API_TOKEN secret is needed. The previous workflow
+      # declared id-token: write and then passed an API token anyway — if the
+      # secret was ever unset the publish step failed with nothing to show.
+      id-token: write
+    environment:
+      name: pypi
+      url: https://pypi.org/p/crumb-format
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-package-${{ env.RELEASE_TAG }}
+          path: dist/
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: dist/
+          print-hash: true

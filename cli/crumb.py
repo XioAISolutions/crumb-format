@@ -43,8 +43,12 @@ REQUIRED_SECTIONS = {
     "delta": ["changes"],
     "agent": ["identity"],
 }
-CLI_VERSION = "1.1.0"
+CLI_VERSION = "1.2.0"
 SUPPORTED_VERSIONS = {"1.1", "1.2", "1.3", "1.4"}
+# Mirrors cli.transcripts.FORMATS. Duplicated as a literal so building the
+# argument parser doesn't pull in the transcript readers on every CLI start;
+# tests assert the two stay in sync.
+_TRANSCRIPT_FORMATS = ("openai-messages", "anthropic-messages", "chatgpt-export", "claude-export")
 FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
 CONTENT_REF_RE = re.compile(r"^sha256:[0-9a-f]{16,64}$")
 DELTA_CHANGE_RE = re.compile(r"^\s*-\s*([+\-~])\[(@?[a-z0-9_:/-]+)\]\s*(.*)$", re.IGNORECASE)
@@ -739,6 +743,78 @@ source={source}
         crumb_text += '\n'.join(constraints) + '\nEND CRUMB\n'
 
     write_text(args.output, crumb_text)
+
+
+# ── from-messages ────────────────────────────────────────────────────
+# Real conversation ingest. `from-chat` reads ad-hoc "User:/AI:" text;
+# `from-messages` reads the shapes conversations are actually stored in
+# (OpenAI/Anthropic messages arrays, ChatGPT and Claude.ai exports).
+
+def cmd_from_messages(args: argparse.Namespace) -> None:
+    from cli import measure as measure_mod
+    from cli import transcripts
+
+    raw = read_text(args.input)
+    try:
+        fmt, messages = transcripts.load_messages(raw, fmt=args.format)
+    except transcripts.TranscriptError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    crumb_text = transcripts.to_crumb(
+        messages,
+        fmt=fmt,
+        title=args.title,
+        source=args.source,
+        goal=args.goal,
+        project=args.project,
+        extra_constraints=args.constraints or [],
+    )
+    write_text(args.output, crumb_text)
+
+    if args.stats and args.output != '-':
+        result = measure_mod.measure(transcripts.transcript_text(messages), crumb_text)
+        print(f"Read {len(messages)} messages as {fmt}.")
+        print(f"  {result.source_tokens:,} → {result.crumb_tokens:,} tokens "
+              f"({result.saved_pct:.0f}% smaller, {result.ratio:.1f}x) via {result.tokenizer}")
+        print(f"  Fact retention: {result.retention * 100:.0f}% "
+              f"({result.facts_retained}/{result.facts_total} load-bearing tokens kept)")
+
+
+# ── measure ──────────────────────────────────────────────────────────
+
+def cmd_measure(args: argparse.Namespace) -> None:
+    """Measure a CRUMB against the source it was compressed from."""
+    from cli import measure as measure_mod
+    from cli import transcripts
+
+    crumb_text = read_text(args.crumb)
+    source_raw = read_text(args.source)
+    source_label = args.source if args.source != '-' else '<stdin>'
+
+    # A transcript source is compared on its flattened text, so tokens spent
+    # on JSON punctuation don't inflate the savings.
+    source_text = source_raw
+    try:
+        _, messages = transcripts.load_messages(source_raw)
+        source_text = transcripts.transcript_text(messages)
+    except transcripts.TranscriptError:
+        pass  # plain text or a .crumb source — measure it as-is
+
+    result = measure_mod.measure(source_text, crumb_text, encoding=args.encoding)
+
+    if args.json:
+        print(measure_mod.format_json(result, source_label=source_label, crumb_label=args.crumb))
+    else:
+        print(measure_mod.format_report(result, source_label=source_label, crumb_label=args.crumb))
+
+    failures = measure_mod.check_thresholds(
+        result, min_saved_pct=args.min_saved, min_retention=args.min_retention
+    )
+    if failures:
+        for failure in failures:
+            print(f"FAIL: {failure}", file=sys.stderr)
+        sys.exit(1)
 
 
 # ── from-otel / from-halo ────────────────────────────────────────────
@@ -5825,8 +5901,8 @@ def build_parser() -> argparse.ArgumentParser:
     full_help = dedent("""\
         Commands (use `crumb <cmd> --help` for details):
 
-          Create:    new   from-chat   from-git   from-otel   import   template
-          Inspect:   validate   inspect   diff   search   bench
+          Create:    new   from-chat   from-messages   from-git   from-otel   import   template
+          Inspect:   validate   inspect   diff   search   bench   measure
           Edit:      append   dream   merge   watch
           Optimize:  optimize   lint   metalk
           Handoff:   handoff   receive   export
@@ -5907,6 +5983,39 @@ def build_parser() -> argparse.ArgumentParser:
                            help='Output kind: task (default) or mem (extracts decisions).')
     from_chat.add_argument('--constraints', '-c', nargs='*', help='Constraints as separate arguments.')
     from_chat.set_defaults(func=cmd_from_chat)
+
+    # from-messages
+    from_messages = sub.add_parser(
+        'from-messages',
+        help='Convert a real conversation (OpenAI/Anthropic messages, ChatGPT or Claude export) into a task crumb.')
+    from_messages.add_argument('--input', '-i', default='-', help='JSON/JSONL transcript file, or - for stdin.')
+    from_messages.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
+    from_messages.add_argument('--format', '-f', choices=list(_TRANSCRIPT_FORMATS),
+                               help='Force an input format instead of auto-detecting.')
+    from_messages.add_argument('--title', help='Title for the crumb (default: derived from the first user turn).')
+    from_messages.add_argument('--source', help='Source label (default: transcript.<format>).')
+    from_messages.add_argument('--goal', help='Override the derived goal.')
+    from_messages.add_argument('--project', help='Optional project= header.')
+    from_messages.add_argument('--constraints', '-c', nargs='*', help='Extra constraints to append.')
+    from_messages.add_argument('--stats', action='store_true',
+                               help='Print token savings and fact retention after writing.')
+    from_messages.set_defaults(func=cmd_from_messages)
+
+    # measure
+    measure_cmd = sub.add_parser(
+        'measure',
+        help='Measure a crumb against its source: token savings + fact retention.')
+    measure_cmd.add_argument('crumb', help='The .crumb file to measure.')
+    measure_cmd.add_argument('--source', '-s', required=True,
+                             help='The transcript or text it was compressed from (- for stdin).')
+    measure_cmd.add_argument('--json', action='store_true', help='Emit machine-readable JSON.')
+    measure_cmd.add_argument('--encoding', default='o200k_base',
+                             help='tiktoken encoding name (default: o200k_base).')
+    measure_cmd.add_argument('--min-saved', type=float, dest='min_saved',
+                             help='Exit non-zero if token savings fall below this percentage.')
+    measure_cmd.add_argument('--min-retention', type=float, dest='min_retention',
+                             help='Exit non-zero if fact retention falls below this percentage.')
+    measure_cmd.set_defaults(func=cmd_measure)
 
     # from-otel
     from_otel = sub.add_parser('from-otel', help='Convert an OpenTelemetry trace JSONL into a kind=log crumb.')

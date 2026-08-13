@@ -1,6 +1,107 @@
 # Changelog
 
-## Unreleased
+## v1.2.0
+
+**First PyPI release since 0.2.0 (April 2026).** Everything between 0.3.0 and
+1.1.0 shipped to the repository but never to the index, so this release carries
+four months of accumulated work to anyone installing from PyPI.
+
+### Phase 4 — release pipeline repair
+
+The publish path was broken in three compounding ways, all fixed here.
+
+- **`publish-pypi.yml` is now tag-triggered.** It previously fired on
+  `release: published`, which required a hand-created GitHub Release. Between
+  the workflow landing (2026-05-28) and 2026-08-12 nobody created one, so it
+  never ran a single time. Pushing `vX.Y.Z` is now sufficient, and the workflow
+  creates the GitHub Release itself.
+- **Publishing uses Trusted Publishing** (OIDC) instead of a `PYPI_API_TOKEN`
+  secret. The old workflow declared `id-token: write` and then passed an API
+  token anyway; if the secret was unset the publish step simply failed.
+- **The release now has to run its own documentation.** Before publishing, the
+  built wheel is installed into a clean venv outside the source tree and the
+  README quickstart is executed against it — `crumb doctor`, `from-messages`,
+  `validate`, `measure`. A wheel that cannot run its own README cannot ship.
+- **`scripts/release_check.py`** enforces three invariants, and runs on every
+  PR via `tests.yml` rather than only at release time:
+  1. `pyproject.toml`, `cli.crumb.CLI_VERSION`, the `CHANGELOG.md` heading and
+     the git tag all agree.
+  2. Every `crumb <subcommand>` shown in a code block in README, QUICKSTART,
+     SPEC, PROTOCOL or PACKS is a subcommand the CLI actually registers.
+  3. The publish workflow is still tag-triggered.
+- **`verify-pypi.yml`** reinstalls from the public index on 3.10/3.11/3.12
+  after a release and re-runs the quickstart, and separately runs a weekly
+  `detect-drift` job comparing the published version against the working tree.
+  That job is what turns a silently stale index into a red build.
+
+**Documentation drift caught by the new check on its first run** — three
+commands were documented but had been folded into `crumb optimize` and no
+longer existed:
+- `crumb compress` in `README.md` and `docs/QUICKSTART.md` → `crumb optimize --mode signal`
+- `crumb squeeze` in `SPEC.md` → `crumb optimize --mode budget`
+
+Also corrected: `README.md` linked `crumb_llm/`, renamed to `crumb_wavelm/` in
+`8c38846`; the test count claim (291 → 757); and `TRANSPORTS.md` listed
+CrumbBeam as an `experimental` optical transport when the repository contains
+no implementation — now marked `specified, unimplemented`.
+
+`docs/RELEASING.md` previously listed the tag push as **"(Optional)"**, noting
+that tag pushes "have historically 403'd" and naming the merge commit the
+"canonical release marker." Nothing downstream reads merge commits. The tag is
+now documented as the release mechanism.
+
+### Phase 3 — real conversation ingest + honest measurement
+
+No wire-format change. Two commands that close the gap between what CRUMB
+claims (compress and hand off conversation context) and what it could
+previously demonstrate.
+
+- **`crumb from-messages`** — reads the shapes conversations are actually
+  stored in, rather than the ad-hoc `User:` / `AI:` text `from-chat`
+  expects:
+  - OpenAI Chat Completions — `{"messages": [...]}`, a bare array, or a
+    response envelope with `choices`. `tool_calls` and `role=tool` turns
+    are understood.
+  - Anthropic Messages API — content-block arrays with `text`,
+    `tool_use`, `tool_result`, and `thinking`.
+  - ChatGPT data export — `conversations.json`, the mapping-tree form,
+    replayed in creation order.
+  - Claude.ai data export — `chat_messages` arrays.
+  - JSONL of any of the above.
+
+  Output is a v1.4 `kind=task` handoff: derived goal, decisions reached,
+  files and tools touched, constraints stated along the way, and open
+  threads as `[handoff]` items. `thinking` blocks are dropped — the most
+  expensive and least reusable part of a transcript. Extraction is
+  deterministic and model-free, so the same transcript always yields the
+  same crumb and the output can be diffed in CI.
+
+- **`crumb measure`** — compares a crumb against the source it was
+  compressed from and reports two numbers:
+  - **Token savings**, counted with `tiktoken` when available and with an
+    explicitly labelled `chars/4` heuristic when not. The report always
+    names which one produced the number; a ratio computed from
+    `len(text) // 4` is presented as approximate, never as a measurement.
+  - **Fact retention**, the share of load-bearing tokens (paths, URLs,
+    identifiers, error codes, numbers with units, quoted strings) that
+    survive into the compressed form — broken down by category so you can
+    see *what kind* of information the packer drops. Documented as a
+    lexical proxy for fidelity, not a task-success measure.
+
+  `--json` emits a machine-readable report; `--min-saved` and
+  `--min-retention` turn it into a CI gate that exits non-zero.
+
+  Install exact counting with `pip install crumb-format[measure]`.
+
+- **Sentence splitting no longer truncates dotted identifiers.** The
+  extractors split on `[.!?]` followed by whitespace *and* a capitalised
+  opener, so `tests/checkout_refresh.spec.ts` and `v1.4` stay intact —
+  previously a naive split cut exactly the filenames a handoff needs most.
+
+- **`tests/test_transcripts.py`** (23 cases) and **`tests/test_measure.py`**
+  (14 cases). Every provider shape is asserted to yield identical extracted
+  signal; the tokenizer tests stub `tiktoken` both ways so they pass with or
+  without it installed.
 
 ### Phase 2 — trust + capability
 

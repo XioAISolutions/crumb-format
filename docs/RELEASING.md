@@ -1,6 +1,48 @@
 # Releasing crumb-format
 
-The release path. Run from your local machine (PyPI credentials don't ship in the sandbox).
+**Pushing a tag is the release.** Everything else is automation.
+
+```bash
+git checkout main && git pull origin main
+python scripts/release_check.py          # versions, docs, publish path
+git tag -a v1.2.0 -m "v1.2.0"
+git push origin v1.2.0                   # this publishes
+```
+
+That tag push triggers `.github/workflows/publish-pypi.yml`, which verifies the
+release metadata, runs the tests, builds the wheel, **installs it into a clean
+venv outside the source tree and runs the README's own quickstart against it**,
+creates the GitHub Release, and publishes to PyPI via Trusted Publishing (no
+API token required). `.github/workflows/verify-pypi.yml` then reinstalls from
+the public index on 3.10/3.11/3.12 and re-runs the quickstart.
+
+## Why this document changed
+
+crumb-format served **0.2.0 on PyPI from April to August 2026** while the
+repository moved to 1.1.0 and gained ~40 commands. Anyone who ran
+`pip install crumb-format` in that window got a package where the README's own
+first command did not exist.
+
+Three compounding causes, all now fixed:
+
+1. The publish workflow triggered on `release: published`, requiring a
+   hand-created GitHub Release. Between the workflow landing (May 28) and
+   August, nobody created one, so it never ran. It is now tag-triggered.
+2. This very checklist listed the tag push as **"(Optional)"**, noting that
+   tag pushes "have historically 403'd" and declaring the merge commit the
+   "canonical release marker." Nothing downstream reads merge commits. The tag
+   is now the mechanism, not a marker. If the push 403s, fix the permission —
+   do not skip it.
+3. Nothing compared the published version to the working tree. A weekly
+   `detect-drift` job now does, and `scripts/release_check.py --check-pypi`
+   does it on demand.
+
+## Manual fallback
+
+`scripts/publish.sh` still works for a local upload if CI is unavailable, and
+needs PyPI credentials in `~/.pypirc`. Prefer the tag path — the manual script
+skips the out-of-tree install proof, which is the check that catches a wheel
+that cannot run its own documentation.
 
 ## One-time setup
 
@@ -67,11 +109,11 @@ Reject paths:
 | 5 | `python3 -m pytest tests/ -q` is green |
 | 6 | `python3 validators/validate.py examples/*.crumb fixtures/valid/*.crumb fixtures/extensions/*.crumb` is OK on every file |
 | 7 | `node validators/validate.js <files>` is OK on every file |
-| 8 | `scripts/publish.sh --test` succeeds on TestPyPI |
-| 9 | `pip install -i https://test.pypi.org/simple/ crumb-format==X.Y.Z` works in a clean venv |
-| 10 | `scripts/publish.sh` succeeds on real PyPI |
-| 11 | Tag locally: `git tag -a vX.Y.Z -m "vX.Y.Z" <merge-commit>` |
-| 12 | (Optional) `git push origin vX.Y.Z` — note: tag pushes have historically 403'd in this repo's sandbox; the merge commit named `Release X.Y.Z` is the canonical release marker |
+| 8 | `python scripts/release_check.py` exits 0 |
+| 9 | Tag: `git tag -a vX.Y.Z -m "vX.Y.Z"` |
+| 10 | **`git push origin vX.Y.Z`** — this is the release. Not optional. If it 403s, fix the token or branch protection; skipping it is why PyPI sat four months stale |
+| 11 | Watch `publish-pypi.yml` go green; confirm the GitHub Release was created |
+| 12 | Confirm `pip install crumb-format==X.Y.Z` resolves from public PyPI, and that `verify-pypi.yml` passed on all three Python versions |
 
 ## Version policy
 
