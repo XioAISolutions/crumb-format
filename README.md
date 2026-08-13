@@ -593,9 +593,9 @@ repos:
 - [`api/`](api/) -- REST API server with OpenAPI 3.1 spec
 - [`a2a/`](a2a/) -- Google A2A protocol bridge (agent card, task handler, server)
 - [`validators/`](validators/) -- Python and Node reference validators
-- [`tests/`](tests/) -- 757 tests covering the full surface area
+- [`tests/`](tests/) -- 916 tests covering the full surface area
 - [`docs/HANDOFF_PATTERNS.md`](docs/HANDOFF_PATTERNS.md) -- practical handoff patterns
-- [`crumb_wavelm/`](crumb_wavelm/) -- experimental O(N log N) physics-based language model ([architecture doc](docs/crumb-llm-architecture.md))
+- [`crumb_wavelm/`](crumb_wavelm/) -- experimental O(N log N) physics-based language model, **not shipped in the `crumb-format` wheel** ([architecture doc](docs/crumb-llm-architecture.md))
 
 ## Crumb LLM (experimental)
 
@@ -611,8 +611,15 @@ field, the kernel propagates information via FFT, and tokens gather back.
 Advanced physics include dispersion, boundary conditions (periodic /
 absorbing / reflecting), interference mixing, and Gabor wavelet heads.
 
+> **Not part of the format, and not installed with it.** This is research code
+> with no bearing on the CRUMB wire format, so it is no longer bundled in the
+> `crumb-format` wheel — `pip install crumb-format` does not carry a PyTorch
+> model. Build it from a checkout:
+
 ```bash
-pip install 'crumb-format[llm]'
+git clone https://github.com/XioAISolutions/crumb-format
+cd crumb-format && pip install torch numpy
+python -m crumb_wavelm.setup_standalone --output ./crumb-wavelm-pkg
 
 # Train a tiny model on the bundled crumb corpus (~2 min on CPU)
 crumb llm train --config tiny --steps 500 --out /tmp/crumb_run

@@ -5206,8 +5206,17 @@ def cmd_wake(args: argparse.Namespace) -> None:
 
 
 _LLM_MISSING_DEPS = (
-    "crumb_wavelm requires PyTorch (and numpy). Install with:\n"
-    "    pip install 'crumb-format[llm]'"
+    "crumb_wavelm is not bundled with crumb-format.\n"
+    "\n"
+    "It is an experimental wave-field language model — research code, unrelated\n"
+    "to the CRUMB wire format — so it is no longer shipped inside this wheel.\n"
+    "The source lives in the crumb-format repository:\n"
+    "\n"
+    "    git clone https://github.com/XioAISolutions/crumb-format\n"
+    "    cd crumb-format && pip install torch numpy\n"
+    "    python -m crumb_wavelm.setup_standalone --output ./crumb-wavelm-pkg\n"
+    "\n"
+    "Nothing else in crumb-format depends on it."
 )
 
 

@@ -113,3 +113,20 @@ def test_every_shipped_command_appears_in_help_all():
         "Either add them to a group in build_parser's full_help, or add them "
         "to HIDDEN_COMMANDS with a reason."
     )
+
+
+def test_the_wheel_does_not_ship_the_research_language_model():
+    """`pip install crumb-format` must not carry a PyTorch model.
+
+    crumb_wavelm is ~4,600 lines of wave-field research code with nothing to do
+    with the wire format. Shipping it inside the format's distribution is a
+    liability for anyone evaluating CRUMB as a format, and it inflates the
+    install for everyone. The source stays in the repository; only the packaging
+    excludes it.
+    """
+    pyproject = release_check.read("pyproject.toml")
+    packages_block = pyproject.split("packages = [", 1)[1].split("]", 1)[0]
+    assert "crumb_wavelm" not in packages_block, (
+        "crumb_wavelm is back in the wheel's package list — build it as its own "
+        "distribution with crumb_wavelm.setup_standalone instead."
+    )
