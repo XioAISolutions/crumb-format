@@ -1,0 +1,7 @@
+BEGIN CRUMB
+v=1.4
+kind=mem
+---
+[consolidated]
+- x
+END CRUMB

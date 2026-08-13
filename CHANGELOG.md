@@ -2,6 +2,44 @@
 
 ## v1.2.0
 
+1.2.0 was never published — PyPI still serves 0.2.0 — so the parser extraction
+lands in the same release rather than a later one. This matters for the
+dependency contract: CrumbContext and CrumbLLM both require
+`crumb-format>=1.2.0` for `crumb_core`, and a 1.2.0 without it would satisfy
+that constraint while failing on import.
+
+### Phase 5 — one parser, one spec version
+
+CRUMB called itself a standard while carrying three independent parsers across
+three repositories, with no shared code and no test comparing them:
+`crumb-format` emitted `v=1.4`, `CrumbContext` hand-wrote `v=1.3` as a string
+literal, `CrumbLLM` forked a 334-line copy of the validation logic and ran a CI
+job asserting it could *not* import `crumb-format`, and `CrumbLLM`'s EJA
+schemas required `crumb_version: "1.5"` — a version no spec defines. Nothing
+detected the drift, because nothing compared them.
+
+- **`crumb_core`** is now the single normative parser: `parse_crumb`,
+  `render_crumb`, the additive v1.2/v1.3 validators, and the shared constants
+  and regexes. Stdlib-only and dependency-free, so a consumer can depend on the
+  format without inheriting the ~46-command CLI, the MCP servers, or a PyTorch
+  language model. `cli.crumb` re-exports every name, so existing
+  `from cli.crumb import parse_crumb` callers are unaffected — 757 tests passed
+  unchanged across the extraction.
+- **`WIRE_VERSION`** is exported so emitters stop hardcoding a version string.
+  Hardcoding is exactly how CrumbContext came to emit v1.3 against a v1.4 spec.
+- **`conformance/`** — 31 executable cases (12 accept, 19 reject) with a
+  machine-readable `manifest.json`, each citing the SPEC section it derives
+  from. Only the accept/reject decision is normative; rejection messages stay
+  free. Covers structure, the version and kind whitelists, additive
+  forward-compatibility, required and empty sections, fold pairs, refs and
+  content-ref digests, and deltas — plus a `render(parse(x))` round-trip check.
+
+**The suite found a real interop bug the first time both implementations ran
+the same cases.** `validators/validate.js` accepted a malformed `sha256:`
+content ref, and accepted a `kind=delta` crumb with no `base` header — a delta
+that cannot be applied to anything. The reference parser rejects both. The JS
+validator now enforces both rules, and both are permanent cases.
+
 **First PyPI release since 0.2.0 (April 2026).** Everything between 0.3.0 and
 1.1.0 shipped to the repository but never to the index, so this release carries
 four months of accumulated work to anyone installing from PyPI.

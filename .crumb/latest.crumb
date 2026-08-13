@@ -1,7 +1,7 @@
---- task: Real conversation ingest (`from-messages`) + honest compression measurement (`measure`)
+--- task: Extract crumb_core as the single normative parser, add a conformance suite
 source: github.pr
-pr: #40
-generated: 2026-08-12T17:14:03Z
+pr: #41
+generated: 2026-08-13T13:35:26Z
 ---
 
 [goal]
@@ -10,16 +10,44 @@ generated: 2026-08-12T17:14:03Z
 [context]
 Changed files in this PR:
 - CHANGELOG.md
-- README.md
 - cli/crumb.py
-- cli/measure.py
-- cli/transcripts.py
-- examples/README.md
-- examples/transcript-checkout-openai.json
-- examples/transcript-checkout.crumb
+- conformance/README.md
+- conformance/cases/accept-delta.crumb
+- conformance/cases/accept-fold-pair-satisfies-required.crumb
+- conformance/cases/accept-leading-trailing-blank-lines.crumb
+- conformance/cases/accept-minimal-mem.crumb
+- conformance/cases/accept-minimal-task.crumb
+- conformance/cases/accept-refs-header.crumb
+- conformance/cases/accept-unknown-header-ignored.crumb
+- conformance/cases/accept-unknown-section-ignored.crumb
+- conformance/cases/accept-version-11.crumb
+- conformance/cases/accept-version-12.crumb
+- conformance/cases/accept-version-13.crumb
+- conformance/cases/accept-version-14.crumb
+- conformance/cases/reject-body-before-section.crumb
+- conformance/cases/reject-delta-without-base.crumb
+- conformance/cases/reject-empty-required-section.crumb
+- conformance/cases/reject-fold-full-without-summary.crumb
+- conformance/cases/reject-header-without-equals.crumb
+- conformance/cases/reject-missing-begin.crumb
+- conformance/cases/reject-missing-end.crumb
+- conformance/cases/reject-missing-header-kind.crumb
+- conformance/cases/reject-missing-header-source.crumb
+- conformance/cases/reject-missing-header-v.crumb
+- conformance/cases/reject-missing-required-section.crumb
+- conformance/cases/reject-missing-separator.crumb
+- conformance/cases/reject-refs-empty.crumb
+- conformance/cases/reject-refs-malformed-sha.crumb
+- conformance/cases/reject-unknown-kind.crumb
+- conformance/cases/reject-version-10.crumb
+- conformance/cases/reject-version-15.crumb
+- conformance/cases/reject-version-20.crumb
+- conformance/cases/reject-version-abc.crumb
+- conformance/manifest.json
+- crumb_core/__init__.py
 - pyproject.toml
-- tests/test_measure.py
-- tests/test_transcripts.py
+- tests/test_conformance.py
+- validators/validate.js
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions

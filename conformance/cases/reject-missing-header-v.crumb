@@ -1,0 +1,7 @@
+BEGIN CRUMB
+kind=mem
+source=test
+---
+[consolidated]
+- x
+END CRUMB

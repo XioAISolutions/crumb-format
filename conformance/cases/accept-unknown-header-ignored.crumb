@@ -1,0 +1,10 @@
+BEGIN CRUMB
+v=1.4
+kind=mem
+source=test
+x-vendor.thing=whatever
+future_field=42
+---
+[consolidated]
+- x
+END CRUMB

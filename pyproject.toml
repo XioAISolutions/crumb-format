@@ -31,6 +31,7 @@ agentauth-mcp = "mcp.agentauth_server:main"
 [tool.setuptools]
 py-modules = ["crumb_cli"]
 packages = [
+    "crumb_core",
     "cli",
     "agentauth",
     "mcp",

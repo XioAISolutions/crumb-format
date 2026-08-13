@@ -1,0 +1,11 @@
+BEGIN CRUMB
+v=1.4
+kind=task
+source=test
+---
+[goal]
+Do it.
+
+[context]
+- c
+END CRUMB
