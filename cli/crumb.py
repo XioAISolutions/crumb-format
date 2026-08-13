@@ -5682,15 +5682,16 @@ def build_parser() -> argparse.ArgumentParser:
     full_help = dedent("""\
         Commands (use `crumb <cmd> --help` for details):
 
-          Create:    new   from-chat   from-messages   from-git   from-otel   import   template
+          Create:    new   capture   from-chat   from-messages   from-git   from-otel   import   template
           Inspect:   validate   inspect   diff   search   bench   measure
-          Edit:      append   dream   merge   watch
+          Edit:      append   log   dream   merge   watch
           Optimize:  optimize   lint   metalk
           Handoff:   handoff   receive   export
           Memory:    palace   wake   reflect   classify
           Format:    bridge   resolve   hash   delta   apply   seen
           Governance:passport   policy   audit   scan   comply   webhook   guardrails
           Todo:      todo (add | done | list | dream)
+          Research:  llm  — experimental crumb_wavelm model; not part of the format
           Setup:     hello   doctor   init   hooks   context   pack
     """).strip()
 
