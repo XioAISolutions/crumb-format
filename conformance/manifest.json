@@ -1,0 +1,224 @@
+{
+  "suite": "crumb-conformance",
+  "wire_version": "1.4",
+  "description": "Executable conformance cases for the CRUMB wire format. An implementation is conformant if it accepts every 'accept' case and rejects every 'reject' case. Rejection messages are deliberately unconstrained \u2014 only the accept/reject decision is normative.",
+  "cases": [
+    {
+      "id": "accept-minimal-task",
+      "file": "cases/accept-minimal-task.crumb",
+      "expect": "accept",
+      "spec": "2",
+      "reason": "A task crumb with the three required sections."
+    },
+    {
+      "id": "accept-minimal-mem",
+      "file": "cases/accept-minimal-mem.crumb",
+      "expect": "accept",
+      "spec": "2",
+      "reason": "kind=mem requires only [consolidated]."
+    },
+    {
+      "id": "reject-missing-begin",
+      "file": "cases/reject-missing-begin.crumb",
+      "expect": "reject",
+      "spec": "2",
+      "reason": "Every crumb opens with BEGIN CRUMB."
+    },
+    {
+      "id": "reject-missing-end",
+      "file": "cases/reject-missing-end.crumb",
+      "expect": "reject",
+      "spec": "2",
+      "reason": "Every crumb closes with END CRUMB."
+    },
+    {
+      "id": "reject-missing-separator",
+      "file": "cases/reject-missing-separator.crumb",
+      "expect": "reject",
+      "spec": "2",
+      "reason": "The --- separator divides headers from body."
+    },
+    {
+      "id": "reject-header-without-equals",
+      "file": "cases/reject-header-without-equals.crumb",
+      "expect": "reject",
+      "spec": "3",
+      "reason": "Header lines are key=value."
+    },
+    {
+      "id": "reject-body-before-section",
+      "file": "cases/reject-body-before-section.crumb",
+      "expect": "reject",
+      "spec": "4",
+      "reason": "Body content must fall inside a section."
+    },
+    {
+      "id": "accept-leading-trailing-blank-lines",
+      "file": "cases/accept-leading-trailing-blank-lines.crumb",
+      "expect": "accept",
+      "spec": "2",
+      "reason": "Surrounding blank lines are trimmed."
+    },
+    {
+      "id": "reject-missing-header-v",
+      "file": "cases/reject-missing-header-v.crumb",
+      "expect": "reject",
+      "spec": "3.1",
+      "reason": "'v' is a required header."
+    },
+    {
+      "id": "reject-missing-header-kind",
+      "file": "cases/reject-missing-header-kind.crumb",
+      "expect": "reject",
+      "spec": "3.1",
+      "reason": "'kind' is a required header."
+    },
+    {
+      "id": "reject-missing-header-source",
+      "file": "cases/reject-missing-header-source.crumb",
+      "expect": "reject",
+      "spec": "3.1",
+      "reason": "'source' is a required header."
+    },
+    {
+      "id": "accept-version-11",
+      "file": "cases/accept-version-11.crumb",
+      "expect": "accept",
+      "spec": "3.1",
+      "reason": "v=1.1 is in the supported set."
+    },
+    {
+      "id": "accept-version-12",
+      "file": "cases/accept-version-12.crumb",
+      "expect": "accept",
+      "spec": "3.1",
+      "reason": "v=1.2 is in the supported set."
+    },
+    {
+      "id": "accept-version-13",
+      "file": "cases/accept-version-13.crumb",
+      "expect": "accept",
+      "spec": "3.1",
+      "reason": "v=1.3 is in the supported set."
+    },
+    {
+      "id": "accept-version-14",
+      "file": "cases/accept-version-14.crumb",
+      "expect": "accept",
+      "spec": "3.1",
+      "reason": "v=1.4 is in the supported set."
+    },
+    {
+      "id": "reject-version-10",
+      "file": "cases/reject-version-10.crumb",
+      "expect": "reject",
+      "spec": "3.1",
+      "reason": "v=1.0 is outside the supported set; parsers must reject, not guess."
+    },
+    {
+      "id": "reject-version-15",
+      "file": "cases/reject-version-15.crumb",
+      "expect": "reject",
+      "spec": "3.1",
+      "reason": "v=1.5 is outside the supported set; parsers must reject, not guess."
+    },
+    {
+      "id": "reject-version-20",
+      "file": "cases/reject-version-20.crumb",
+      "expect": "reject",
+      "spec": "3.1",
+      "reason": "v=2.0 is outside the supported set; parsers must reject, not guess."
+    },
+    {
+      "id": "reject-version-abc",
+      "file": "cases/reject-version-abc.crumb",
+      "expect": "reject",
+      "spec": "3.1",
+      "reason": "v=abc is outside the supported set; parsers must reject, not guess."
+    },
+    {
+      "id": "reject-unknown-kind",
+      "file": "cases/reject-unknown-kind.crumb",
+      "expect": "reject",
+      "spec": "3.1",
+      "reason": "kind must be one of the defined values."
+    },
+    {
+      "id": "accept-unknown-header-ignored",
+      "file": "cases/accept-unknown-header-ignored.crumb",
+      "expect": "accept",
+      "spec": "8",
+      "reason": "Unknown headers are ignored, not rejected \u2014 this is what makes the format additive."
+    },
+    {
+      "id": "accept-unknown-section-ignored",
+      "file": "cases/accept-unknown-section-ignored.crumb",
+      "expect": "accept",
+      "spec": "8",
+      "reason": "Unknown sections are ignored, so a v1.3 parser accepts a v1.4 file."
+    },
+    {
+      "id": "reject-missing-required-section",
+      "file": "cases/reject-missing-required-section.crumb",
+      "expect": "reject",
+      "spec": "4.1",
+      "reason": "kind=task requires [goal], [context] and [constraints]."
+    },
+    {
+      "id": "reject-empty-required-section",
+      "file": "cases/reject-empty-required-section.crumb",
+      "expect": "reject",
+      "spec": "4.1",
+      "reason": "A required section present but empty is a rejection, not an acceptance."
+    },
+    {
+      "id": "accept-fold-pair-satisfies-required",
+      "file": "cases/accept-fold-pair-satisfies-required.crumb",
+      "expect": "accept",
+      "spec": "10.3",
+      "reason": "A fold pair substitutes for the required bare section."
+    },
+    {
+      "id": "reject-fold-full-without-summary",
+      "file": "cases/reject-fold-full-without-summary.crumb",
+      "expect": "reject",
+      "spec": "10",
+      "reason": "/full without /summary leaves a budget-constrained consumer nothing to load."
+    },
+    {
+      "id": "accept-refs-header",
+      "file": "cases/accept-refs-header.crumb",
+      "expect": "accept",
+      "spec": "9",
+      "reason": "refs may name other crumbs by id."
+    },
+    {
+      "id": "reject-refs-empty",
+      "file": "cases/reject-refs-empty.crumb",
+      "expect": "reject",
+      "spec": "9",
+      "reason": "An empty refs header is a mistake, not an absence."
+    },
+    {
+      "id": "reject-refs-malformed-sha",
+      "file": "cases/reject-refs-malformed-sha.crumb",
+      "expect": "reject",
+      "spec": "13",
+      "reason": "A sha256: ref must carry a well-formed digest."
+    },
+    {
+      "id": "accept-delta",
+      "file": "cases/accept-delta.crumb",
+      "expect": "accept",
+      "spec": "15",
+      "reason": "A delta names its base and lists changes."
+    },
+    {
+      "id": "reject-delta-without-base",
+      "file": "cases/reject-delta-without-base.crumb",
+      "expect": "reject",
+      "spec": "15",
+      "reason": "A delta with no base cannot be applied."
+    }
+  ]
+}
