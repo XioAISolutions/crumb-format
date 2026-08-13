@@ -34,6 +34,18 @@ parses — with the deliberately-invalid fixtures enumerated explicitly, and
 separately asserted to still be invalid so the exclusion list cannot hide a
 regression.
 
+**Two copy-paste templates were running as live workflows.**
+`.github/workflows/bench-template.yml` and `auto-crumb-template.yml` are
+documents meant to be copied into *other* repositories, but sitting in
+`.github/workflows/` meant GitHub executed them here too. The effects were
+visible on every pull request: two identical bench comments (the template's
+copy called `bench-pr.yml@main`, so it always ran main's logic rather than the
+version under review), and two workflows writing the same
+`.crumb/latest.crumb` — both emitting the invalid YAML front matter. Both are
+now in `docs/integrations/`, and the auto-crumb template's generator is fixed
+and gains the same pre-commit validation, so nobody copies a workflow that
+produces files the validator rejects.
+
 ## v1.2.0
 
 1.2.0 was never published — PyPI still serves 0.2.0 — so the parser extraction

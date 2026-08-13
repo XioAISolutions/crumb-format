@@ -1,4 +1,10 @@
 # =============================================================================
+# NOTE: this file lives in docs/ on purpose. It used to sit in
+# .github/workflows/, where GitHub ran it *in this repository* alongside
+# auto-crumb-pr.yml -- two workflows writing the same .crumb/latest.crumb,
+# both emitting YAML front matter that is not valid CRUMB. A template meant
+# to be copied should not also execute.
+#
 # CRUMB AUTO-GENERATE TEMPLATE
 # =============================================================================
 #
@@ -107,12 +113,14 @@ jobs:
           mkdir -p "$(dirname "$CRUMB_PATH")"
 
           cat > "$CRUMB_PATH" << CRUMB_EOF
-          --- task: ${PR_TITLE}
-          source: github.pr
-          pr: #${{ github.event.pull_request.number }}
-          generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          BEGIN CRUMB
+          v=1.4
+          kind=task
+          title=${PR_TITLE}
+          source=github.pr
+          x-github.pr=${{ github.event.pull_request.number }}
+          x-github.generated=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           ---
-
           [goal]
           ${PR_GOAL}
 
@@ -122,10 +130,18 @@ jobs:
 
           [constraints]
           Review checklist: tests pass, no breaking changes, follows project conventions
+          END CRUMB
           CRUMB_EOF
 
           # Strip leading whitespace from heredoc indentation
           sed -i 's/^          //' "$CRUMB_PATH"
+
+      # Never commit a crumb the validator rejects. Without this, an invalid
+      # file is regenerated on every pull request and nothing notices.
+      - name: Validate the generated crumb
+        run: |
+          python -m pip install --quiet crumb-format
+          crumb validate .crumb/latest.crumb
 
       - name: Check for changes
         id: diff
