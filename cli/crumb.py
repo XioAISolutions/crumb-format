@@ -1469,7 +1469,18 @@ def cmd_compress(args: argparse.Namespace) -> None:
 # ── bench ───────────────────────────────────────────────────────────
 
 def cmd_bench(args: argparse.Namespace) -> None:
-    """Benchmark a crumb's compression efficiency and information density."""
+    """Report a crumb's structure and its self-comparison redundancy headroom.
+
+    Deprecated in favour of ``crumb measure``, which compares a crumb against
+    the source it was compressed from. See the note above the print block below
+    for why the old score was withdrawn.
+    """
+    print(
+        "note: `crumb bench` is deprecated. It compares a crumb against itself, "
+        "so it cannot tell you what compression cost. Use `crumb measure "
+        "<crumb> --source <transcript>` for token savings and fact retention.",
+        file=sys.stderr,
+    )
     text = read_text(args.file)
     parsed = parse_crumb(text)
     headers = parsed['headers']
@@ -1514,44 +1525,36 @@ def cmd_bench(args: argparse.Namespace) -> None:
     metalk_saved_pct = ((compressed_tokens - metalked_tokens) / max(compressed_tokens, 1)) * 100
     full_ratio = tokens / max(metalked_tokens, 1)
 
-    # Score components
-    density_score = min(keyword_density * 5, 25)  # max 25
-    compression_score = min(max_ratio * 5, 25)  # max 25
-    structure_score = 25 if not (set(REQUIRED_SECTIONS.get(kind, [])) - set(sections.keys())) else 10
-    conciseness_score = min(25, max(0, 25 - (tokens - 100) / 40))  # smaller = better, max 25
+    # No score, no grade. `crumb bench` used to reduce a crumb to a number out
+    # of 100 built from axes it invented for itself — keyword density and
+    # "conciseness" — and a compression ratio measured against a squeezed copy
+    # of the same file. That number was not just uninformative, it was
+    # misleading in the expensive direction: it graded a transcript handoff at
+    # "74/100, 1.3x" when the same crumb measured 9.0x against the conversation
+    # it was actually compressed from. A self-comparison cannot tell you what
+    # compression cost, because it never sees the source.
+    from cli.measure import count_tokens
 
-    total = density_score + compression_score + structure_score + conciseness_score
-
-    # Grade
-    if total >= 85:
-        grade = 'A'
-    elif total >= 70:
-        grade = 'B'
-    elif total >= 55:
-        grade = 'C'
-    elif total >= 40:
-        grade = 'D'
-    else:
-        grade = 'F'
+    real_tokens, tokenizer = count_tokens(text)
+    missing_required = set(REQUIRED_SECTIONS.get(kind, [])) - set(sections.keys())
 
     print(f"CRUMB Bench — {args.file}")
-    print(f"{'=' * 50}")
+    print(f"{'=' * 62}")
     print(f"  Kind:              {kind}")
-    print(f"  Token cost:        ~{tokens} tokens ({chars} chars)")
+    print(f"  Wire version:      {headers.get('v', '?')}")
+    print(f"  Token cost:        {real_tokens} tokens ({chars} chars) via {tokenizer}")
     print(f"  Content:           {total_lines} lines, {len(sections)} sections")
     print(f"  Unique keywords:   {len(keywords)}")
-    print(f"  Keyword density:   {keyword_density:.1f} per 100 tokens")
-    print(f"  Max compression:   {max_ratio:.1f}x ({tokens} → {compressed_tokens} tokens)")
-    print(f"  Dedup potential:   {original_entries} → {after_stage1} entries (stage 1)")
-    print(f"  Prune potential:   {after_stage1} → {after_stage2} entries (stage 2)")
-    print(f"  MeTalk potential:  {full_ratio:.1f}x ({tokens} → {metalked_tokens} tokens, +{metalk_saved_pct:.0f}% over stage 2)")
-    print(f"{'=' * 50}")
-    print(f"  Density:           {density_score:.0f}/25")
-    print(f"  Compressibility:   {compression_score:.0f}/25")
-    print(f"  Structure:         {structure_score:.0f}/25")
-    print(f"  Conciseness:       {conciseness_score:.0f}/25")
-    print(f"{'=' * 50}")
-    print(f"  SCORE: {total:.0f}/100  Grade: {grade}")
+    print(f"  Required sections: {'complete' if not missing_required else 'MISSING ' + ', '.join(sorted(missing_required))}")
+    print(f"{'-' * 62}")
+    print("  Redundancy headroom — this crumb compared against a squeezed copy")
+    print("  of ITSELF. Not a measurement of what compression cost you.")
+    print(f"    Dedup + prune:   {max_ratio:.1f}x ({tokens} → {compressed_tokens} est. tokens)")
+    print(f"    Entries:         {original_entries} → {after_stage2}")
+    print(f"    With MeTalk:     {full_ratio:.1f}x ({tokens} → {metalked_tokens} est. tokens)")
+    print(f"{'=' * 62}")
+    print("  For what compression actually cost, measure against the source:")
+    print(f"    crumb measure {args.file} --source <transcript>")
 
 
 # ── diff ─────────────────────────────────────────────────────────────

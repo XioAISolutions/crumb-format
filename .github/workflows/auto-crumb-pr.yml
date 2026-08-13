@@ -85,14 +85,25 @@ jobs:
         run: |
           mkdir -p "$(dirname "$CRUMB_PATH")"
 
-          # Build the crumb content
+          # Build the crumb content.
+          #
+          # This previously emitted YAML front matter -- "--- task: ...", a
+          # "source:" line, and a closing "---" -- with no BEGIN CRUMB marker,
+          # no v=, no kind=, and no END CRUMB. It was not a CRUMB at all, and
+          # this workflow committed one to the repository on every pull request.
+          # The reference implementation's own automation was producing files
+          # its own validator rejects. `pr` and `generated` are not spec
+          # headers, so they are carried as namespaced extension headers, which
+          # SPEC §3.3 allows.
           cat > "$CRUMB_PATH" << CRUMB_EOF
-          --- task: ${PR_TITLE}
-          source: github.pr
-          pr: #${{ github.event.pull_request.number }}
-          generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+          BEGIN CRUMB
+          v=1.4
+          kind=task
+          title=${PR_TITLE}
+          source=github.pr
+          x-github.pr=${{ github.event.pull_request.number }}
+          x-github.generated=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           ---
-
           [goal]
           ${PR_GOAL}
 
@@ -102,10 +113,19 @@ jobs:
 
           [constraints]
           Review checklist: tests pass, no breaking changes, follows project conventions
+          END CRUMB
           CRUMB_EOF
 
           # Strip leading whitespace from heredoc indentation
           sed -i 's/^          //' "$CRUMB_PATH"
+
+      # A generated crumb that the validator rejects must never be committed.
+      # This is the check whose absence let an invalid file sit in .crumb/ and
+      # get regenerated on every PR.
+      - name: Validate the generated crumb
+        run: |
+          python -m pip install --quiet .
+          crumb validate "${{ inputs.crumb-path }}"
 
       - name: Check for changes
         id: diff

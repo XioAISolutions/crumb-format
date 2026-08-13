@@ -1,5 +1,39 @@
 # Changelog
 
+## Unreleased
+
+### Phase 6 — stop publishing invented numbers
+
+- **`crumb bench` no longer emits a score or a grade.** It reduced a crumb to a
+  number out of 100 built from axes it invented for itself — keyword density
+  and "conciseness" — plus a compression ratio measured against a squeezed copy
+  of the same file. That ratio was misleading in the expensive direction: it
+  graded the transcript handoff at **"74/100, 1.3x"** when the same crumb
+  measures **9.0x** against the conversation it was actually compressed from. A
+  self-comparison cannot report what compression cost, because it never sees
+  the source. The command now prints structure, a token count from a named
+  tokenizer, required-section completeness, and clearly-labelled redundancy
+  headroom, and points at `crumb measure`. It emits a deprecation notice on
+  stderr.
+- **The PR comment reports facts instead of judgements.** `bench-pr.yml`
+  published that Score/Grade/Compression table on every pull request. It now
+  lists file, kind, wire version, token count, and validity — and names the
+  tokenizer. Rejected files say *why* they were rejected rather than showing
+  `N/A`. Deliberately-invalid fixtures are excluded so they don't read as
+  failures.
+
+**The reference implementation was committing files its own validator rejects.**
+`auto-crumb-pr.yml` generated `.crumb/latest.crumb` on every pull request using
+YAML front matter — `--- task: ...`, a `source:` line, a closing `---` — with no
+`BEGIN CRUMB`, no `v=`, no `kind=`, and no `END CRUMB`. Nothing validated it, so
+an invalid file sat in the repository and was regenerated on every PR. The
+generator now emits v1.4 (carrying PR metadata as namespaced `x-github.*`
+headers per SPEC §3.3), the workflow validates before committing, and
+`tests/test_repo_crumbs_valid.py` asserts every `.crumb` in the repository
+parses — with the deliberately-invalid fixtures enumerated explicitly, and
+separately asserted to still be invalid so the exclusion list cannot hide a
+regression.
+
 ## v1.2.0
 
 1.2.0 was never published — PyPI still serves 0.2.0 — so the parser extraction
