@@ -1,0 +1,74 @@
+{
+  "tolerance": {
+    "saved_pct": 3.0,
+    "retention": 0.05
+  },
+  "results": [
+    {
+      "file": "short-anthropic.json",
+      "format": "anthropic-messages",
+      "messages": 39,
+      "source_tokens": 2804,
+      "crumb_tokens": 395,
+      "saved_pct": 85.9,
+      "ratio": 7.1,
+      "retention": 1.0,
+      "tokenizer": "heuristic:chars/4"
+    },
+    {
+      "file": "short-chatgpt-export.json",
+      "format": "chatgpt-export",
+      "messages": 39,
+      "source_tokens": 2804,
+      "crumb_tokens": 393,
+      "saved_pct": 86.0,
+      "ratio": 7.1,
+      "retention": 1.0,
+      "tokenizer": "heuristic:chars/4"
+    },
+    {
+      "file": "short-claude-export.json",
+      "format": "claude-export",
+      "messages": 39,
+      "source_tokens": 2804,
+      "crumb_tokens": 393,
+      "saved_pct": 86.0,
+      "ratio": 7.1,
+      "retention": 1.0,
+      "tokenizer": "heuristic:chars/4"
+    },
+    {
+      "file": "short-openai.json",
+      "format": "openai-messages",
+      "messages": 39,
+      "source_tokens": 2804,
+      "crumb_tokens": 394,
+      "saved_pct": 85.9,
+      "ratio": 7.1,
+      "retention": 1.0,
+      "tokenizer": "heuristic:chars/4"
+    },
+    {
+      "file": "long-claude-code.jsonl",
+      "format": "claude-code-transcript",
+      "messages": 159,
+      "source_tokens": 3705,
+      "crumb_tokens": 547,
+      "saved_pct": 85.2,
+      "ratio": 6.8,
+      "retention": 0.305,
+      "tokenizer": "heuristic:chars/4"
+    },
+    {
+      "file": "short-claude-code.jsonl",
+      "format": "claude-code-transcript",
+      "messages": 39,
+      "source_tokens": 2804,
+      "crumb_tokens": 397,
+      "saved_pct": 85.8,
+      "ratio": 7.1,
+      "retention": 1.0,
+      "tokenizer": "heuristic:chars/4"
+    }
+  ]
+}

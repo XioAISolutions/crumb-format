@@ -38,3 +38,9 @@ jobs:
 
       - name: Run tests
         run: python -m pytest tests/ -v --tb=short
+
+      # Prints the corpus table into the build log so the compression and
+      # retention numbers are visible per run, not only when something breaks.
+      # The pass/fail gate lives in tests/test_benchmarks.py.
+      - name: Benchmark corpus
+        run: python benchmarks/run_corpus.py
