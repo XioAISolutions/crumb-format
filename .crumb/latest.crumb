@@ -1,19 +1,20 @@
-BEGIN CRUMB
-v=1.4
-kind=task
-title=Extract crumb_core as the single normative parser
-source=github.pr
-x-github.pr=41
-x-github.generated=2026-08-13T14:02:56Z
+--- task: Stop publishing invented numbers, and stop committing invalid CRUMB
+source: github.pr
+pr: #42
+generated: 2026-08-13T14:05:58Z
 ---
+
 [goal]
-Consolidate three parsers into one.
+## What changed
 
 [context]
 Changed files in this PR:
+- .crumb/latest.crumb
+- .github/workflows/auto-crumb-pr.yml
+- .github/workflows/bench-pr.yml
+- CHANGELOG.md
 - cli/crumb.py
-- crumb_core/__init__.py
+- tests/test_repo_crumbs_valid.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
-END CRUMB
