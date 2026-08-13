@@ -1,9 +1,11 @@
---- task: Stop publishing invented numbers, and stop committing invalid CRUMB
-source: github.pr
-pr: #42
-generated: 2026-08-13T14:05:58Z
+BEGIN CRUMB
+v=1.4
+kind=task
+title=Stop publishing invented numbers, and stop committing invalid CRUMB
+source=github.pr
+x-github.pr=42
+x-github.generated=2026-08-13T14:05:58Z
 ---
-
 [goal]
 ## What changed
 
@@ -18,3 +20,5 @@ Changed files in this PR:
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
+
+END CRUMB
