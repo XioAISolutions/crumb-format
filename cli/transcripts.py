@@ -366,7 +366,9 @@ def load_messages(raw: str, fmt: str | None = None) -> Tuple[str, List[Message]]
         raise TranscriptError(f"unknown format {resolved!r}; expected one of {', '.join(FORMATS)}")
     messages = _READERS[resolved](obj)
     for msg in messages:
+        msg.text = strip_harness_envelopes(msg.text).strip()
         msg.code_blocks = _extract_code_blocks(msg.text)
+    # A turn that was nothing but harness machinery is not a turn.
     messages = [m for m in messages if m.is_substantive() or m.tool_results]
     if not messages:
         raise TranscriptError("transcript parsed but contained no usable messages")
@@ -398,6 +400,35 @@ def _parse_json_or_jsonl(raw: str) -> Any:
     if all(isinstance(r, dict) and "role" in r for r in records):
         return records
     return records if len(records) > 1 else records[0]
+
+
+# Agent harnesses inject machinery into the conversation as ordinary turns:
+# wake events, system reminders, webhook relays, task notifications, tool
+# permission prompts. They arrive with role=user and are not things a person
+# said, so extracting them produces handoffs whose stated goal is a timestamp.
+# Running `crumb capture --last` against a real session surfaced exactly that.
+HARNESS_ENVELOPE_TAGS = (
+    "system-reminder", "wake", "event", "task-notification",
+    "github-webhook-activity", "untrusted_external_data", "command-name",
+    "command-message", "command-args", "local-command-stdout", "function_results",
+)
+HARNESS_ENVELOPE_RE = re.compile(
+    r"<(" + "|".join(HARNESS_ENVELOPE_TAGS) + r")\b[^>]*>.*?</\1>"
+    r"|<(?:" + "|".join(HARNESS_ENVELOPE_TAGS) + r")\b[^>]*/?>",
+    re.DOTALL | re.IGNORECASE,
+)
+
+
+def strip_harness_envelopes(text: str) -> str:
+    """Remove agent-harness machinery that arrives disguised as a turn.
+
+    Kept conservative: only a closed list of known envelope tags is removed, so
+    a message that merely *discusses* one (or contains unrelated markup) is
+    untouched.
+    """
+    if not text or "<" not in text:
+        return text
+    return HARNESS_ENVELOPE_RE.sub(" ", text)
 
 
 # ── extraction ───────────────────────────────────────────────────────

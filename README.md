@@ -9,11 +9,12 @@
 A raw transcript is the worst possible way to move context between tools: it is optimised for a human replaying a conversation, not for an agent picking up work. CRUMB is a small structured block that carries what the next tool actually needs — the goal, what was diagnosed, the decisions, the files touched, the constraints, and what is still open.
 
 ```bash
-# Capture the session you just finished
-crumb from-messages -i ~/.claude/projects/*/session.jsonl -o handoff.crumb --stats
-#   49,489 → 2,403 tokens (95% smaller, 20.6x)
+# Crumb the session you just finished — finds it for you
+crumb capture --last
+#   crumb capture: .crumb/session-fb203b95.crumb
+#   49,489 → 2,403 tokens (95% smaller), 18% fact retention
 
-# Then paste handoff.crumb into whatever you open next.
+# Then paste it into whatever you open next.
 ```
 
 Or let it happen on its own — `install.sh` registers a `SessionEnd` hook, so every session leaves a handoff in `.crumb/` without anyone remembering to ask.

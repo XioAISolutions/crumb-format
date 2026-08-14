@@ -481,6 +481,45 @@ def cmd_from_messages(args: argparse.Namespace) -> None:
               f"({result.facts_retained}/{result.facts_total} load-bearing tokens kept)")
 
 
+# ── locating a recent agent session ──────────────────────────────────
+
+# Where agents keep session transcripts. Ordered by how likely a user is to
+# have one; the first existing directory with a transcript in it wins.
+TRANSCRIPT_SEARCH_DIRS = (
+    Path.home() / ".claude" / "projects",
+    Path.home() / ".codex" / "sessions",
+    Path.home() / ".cursor" / "sessions",
+)
+
+
+def find_recent_transcripts(limit: int = 5) -> List[Path]:
+    """Return the most recently modified agent transcripts on this machine.
+
+    Zero-argument discovery matters more than it looks. The difference between
+    "read the docs, find your transcript path, pass it in" and "run one command
+    against your own last session" is the difference between a tool someone
+    reads about and one they try.
+
+    Sidechain and subagent files are skipped: a handoff describes the main
+    thread, and those directories can hold far more subagent files than
+    sessions.
+    """
+    found: List[Path] = []
+    for root in TRANSCRIPT_SEARCH_DIRS:
+        if not root.is_dir():
+            continue
+        for path in root.rglob("*.jsonl"):
+            if "subagents" in path.parts or path.name.startswith("agent-"):
+                continue
+            try:
+                if path.stat().st_size > 0:
+                    found.append(path)
+            except OSError:
+                continue
+    found.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return found[:limit]
+
+
 # ── capture ──────────────────────────────────────────────────────────
 # Zero-friction auto-capture. `crumb it` requires the user to remember; a
 # session-end hook does not. Reads an agent hook payload on stdin, finds the
@@ -499,12 +538,27 @@ def cmd_capture(args: argparse.Namespace) -> None:
 
     transcript_path = args.transcript
     session_id = ""
+
+    if not transcript_path and getattr(args, "last", False):
+        recent = find_recent_transcripts(limit=1)
+        if not recent:
+            searched = "\n".join(f"         {d}" for d in TRANSCRIPT_SEARCH_DIRS)
+            print(
+                "error: no agent session transcripts found. Looked in:\n" + searched
+                + "\n       Pass --transcript <file> if yours lives elsewhere.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        transcript_path = str(recent[0])
+        print(f"crumb capture: using {transcript_path}", file=sys.stderr)
+
     if not transcript_path:
         raw = sys.stdin.read().strip()
         if not raw:
             print(
-                "error: no hook payload on stdin and no --transcript given.\n"
-                "       Pipe a SessionEnd hook payload, or pass --transcript <file>.",
+                "error: no hook payload on stdin and no transcript given.\n"
+                "       Try `crumb capture --last` to use your most recent session,\n"
+                "       pass --transcript <file>, or pipe a SessionEnd hook payload.",
                 file=sys.stderr,
             )
             sys.exit(2)
@@ -5800,6 +5854,8 @@ def build_parser() -> argparse.ArgumentParser:
         'capture',
         help='Capture an agent session as a crumb (drive from a SessionEnd hook).')
     capture_cmd.add_argument('--transcript', help='Transcript file. Default: read a hook payload on stdin.')
+    capture_cmd.add_argument('--last', action='store_true',
+                             help='Use your most recent agent session, found automatically.')
     capture_cmd.add_argument('--output', '-o', help='Output file, or - for stdout. Default: <dir>/session-<id>.crumb')
     capture_cmd.add_argument('--dir', default='.crumb', help='Directory for the default output path (default: .crumb).')
     capture_cmd.add_argument('--title', help='Title for the crumb.')
