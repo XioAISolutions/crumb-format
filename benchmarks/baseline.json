@@ -69,6 +69,17 @@
       "ratio": 7.1,
       "retention": 1.0,
       "tokenizer": "heuristic:chars/4"
+    },
+    {
+      "file": "tools-claude-code.jsonl",
+      "format": "claude-code-transcript",
+      "messages": 63,
+      "source_tokens": 1499,
+      "crumb_tokens": 497,
+      "saved_pct": 66.8,
+      "ratio": 3.0,
+      "retention": 0.271,
+      "tokenizer": "heuristic:chars/4"
     }
   ]
 }

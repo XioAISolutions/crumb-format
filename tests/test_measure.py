@@ -21,6 +21,20 @@ from cli import measure  # noqa: E402
 from cli import transcripts  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _clear_encoder_cache():
+    """The tiktoken encoder is cached, so stubs must not leak between tests.
+
+    `measure._encoder` is lru_cached because resolving an encoding re-reads
+    (and without a local cache, re-downloads) the BPE table on every call.
+    That cache would otherwise hold a result from a previous test and make
+    these outcomes depend on execution order.
+    """
+    measure._encoder.cache_clear()
+    yield
+    measure._encoder.cache_clear()
+
+
 SOURCE = """\
 user: The cart drops on refresh at /checkout/payment, returning a 503 from the
 edge. Latency is 450ms on the hydrate call. Do not change the CartService API.

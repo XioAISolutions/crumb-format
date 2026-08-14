@@ -581,10 +581,13 @@ def cmd_measure(args: argparse.Namespace) -> None:
 
     result = measure_mod.measure(source_text, crumb_text, encoding=args.encoding)
 
+    subject = getattr(args, "label", None) or "CRUMB"
     if args.json:
-        print(measure_mod.format_json(result, source_label=source_label, crumb_label=args.crumb))
+        print(measure_mod.format_json(
+            result, source_label=source_label, crumb_label=args.crumb, subject=subject))
     else:
-        print(measure_mod.format_report(result, source_label=source_label, crumb_label=args.crumb))
+        print(measure_mod.format_report(
+            result, source_label=source_label, crumb_label=args.crumb, subject=subject))
 
     failures = measure_mod.check_thresholds(
         result, min_saved_pct=args.min_saved, min_retention=args.min_retention
@@ -5692,7 +5695,7 @@ def build_parser() -> argparse.ArgumentParser:
         Commands (use `crumb <cmd> --help` for details):
 
           Create:    new   capture   from-chat   from-messages   from-git   from-otel   import   template
-          Inspect:   validate   inspect   diff   search   bench   measure
+          Inspect:   validate   inspect   diff   search   bench   measure   verify
           Edit:      append   log   dream   merge   watch
           Optimize:  optimize   lint   metalk
           Handoff:   handoff   receive   export
@@ -5821,7 +5824,30 @@ def build_parser() -> argparse.ArgumentParser:
                              help='Exit non-zero if token savings fall below this percentage.')
     measure_cmd.add_argument('--min-retention', type=float, dest='min_retention',
                              help='Exit non-zero if fact retention falls below this percentage.')
+    measure_cmd.add_argument('--label', help='Name what is being audited (default: CRUMB).')
     measure_cmd.set_defaults(func=cmd_measure)
+
+    # verify — the same measurement, named for what it actually does. The
+    # compressed side is never parsed, so this audits any compaction output:
+    # a provider's compaction, an LLM summary, a truncated transcript. Useful
+    # to someone who never adopts the CRUMB format at all.
+    verify_cmd = sub.add_parser(
+        'verify',
+        help='Audit any compressed context against its source: what survived, what was dropped.')
+    verify_cmd.add_argument('crumb', metavar='FILE',
+                            help='The compressed artifact to audit (any text file).')
+    verify_cmd.add_argument('--source', '-s', required=True,
+                            help='The original it was compressed from (- for stdin).')
+    verify_cmd.add_argument('--label', default='compressed',
+                            help='Name what is being audited (default: compressed).')
+    verify_cmd.add_argument('--json', action='store_true', help='Emit machine-readable JSON.')
+    verify_cmd.add_argument('--encoding', default='o200k_base',
+                            help='tiktoken encoding name (default: o200k_base).')
+    verify_cmd.add_argument('--min-saved', type=float, dest='min_saved',
+                            help='Exit non-zero if token savings fall below this percentage.')
+    verify_cmd.add_argument('--min-retention', type=float, dest='min_retention',
+                            help='Exit non-zero if fact retention falls below this percentage.')
+    verify_cmd.set_defaults(func=cmd_measure)
 
     # from-otel
     from_otel = sub.add_parser('from-otel', help='Convert an OpenTelemetry trace JSONL into a kind=log crumb.')
