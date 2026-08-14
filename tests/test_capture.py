@@ -216,3 +216,90 @@ def test_no_stdin_and_no_transcript_explains_both_options(tmp_path: Path):
     )
     assert result.returncode == 2
     assert "--transcript" in result.stderr
+
+
+# ── harness envelopes ────────────────────────────────────────────────
+# Agent harnesses inject machinery into the conversation as ordinary turns.
+# Running `crumb capture --last` against a real session produced a handoff
+# whose stated goal was `<wake reason="external-event" current-time="...">`.
+
+def test_harness_envelopes_are_stripped():
+    text = (
+        'Fix the login bug.\n'
+        '<system-reminder>This is injected machinery.</system-reminder>\n'
+        '<wake reason="external-event" current-time="2026-01-01T00:00:00Z">\n'
+        '  <event source="github">a webhook body</event>\n'
+        '</wake>'
+    )
+    cleaned = transcripts.strip_harness_envelopes(text)
+    assert "Fix the login bug." in cleaned
+    assert "injected machinery" not in cleaned
+    assert "external-event" not in cleaned
+    assert "webhook body" not in cleaned
+
+
+def test_a_turn_that_is_only_machinery_is_dropped(tmp_path):
+    records = [
+        _record("user", "Real instruction: migrate the billing service."),
+        _record("user", '<wake reason="external-event"><event>noise</event></wake>'),
+        _record("assistant", "Decision: use cursor paging."),
+    ]
+    path = tmp_path / "t.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in records), encoding="utf-8")
+    _, messages = transcripts.load_messages(path.read_text(encoding="utf-8"))
+    assert len(messages) == 2
+    assert all("noise" not in m.text for m in messages)
+
+
+def test_the_derived_goal_is_a_real_instruction_not_an_envelope(tmp_path):
+    records = [
+        _record("user", "Migrate the billing service off the legacy ledger."),
+        _record("assistant", "Working on it."),
+        _record("user", '<wake reason="external-event" current-time="2026-01-01T00:00:00Z"/>'),
+    ]
+    path = tmp_path / "t.jsonl"
+    path.write_text("\n".join(json.dumps(r) for r in records), encoding="utf-8")
+    fmt, messages = transcripts.load_messages(path.read_text(encoding="utf-8"))
+    goal = transcripts.derive_goal(messages)
+    assert "billing service" in goal
+    assert "wake" not in goal and "external-event" not in goal
+
+
+def test_prose_mentioning_an_envelope_tag_survives():
+    """Only a closed list of tags is stripped, and only as a whole element."""
+    text = "The <system-reminder> tag is what the harness injects; document it."
+    assert "document it" in transcripts.strip_harness_envelopes(text)
+
+
+# ── locating a recent session ────────────────────────────────────────
+
+def test_recent_transcript_search_skips_subagents(tmp_path, monkeypatch):
+    """A handoff describes the main thread, and subagent files can outnumber
+    real sessions in the same directory."""
+    root = tmp_path / "projects" / "proj"
+    root.mkdir(parents=True)
+    (root / "session.jsonl").write_text('{"role":"user","content":"hello there"}', encoding="utf-8")
+    sub = root / "subagents"
+    sub.mkdir()
+    (sub / "agent-abc.jsonl").write_text('{"role":"user","content":"sub"}', encoding="utf-8")
+
+    from cli import crumb as crumb_cli
+    monkeypatch.setattr(crumb_cli, "TRANSCRIPT_SEARCH_DIRS", (tmp_path / "projects",))
+    found = crumb_cli.find_recent_transcripts()
+    assert [p.name for p in found] == ["session.jsonl"]
+
+
+def test_capture_last_reports_where_it_looked_when_nothing_is_found(tmp_path, monkeypatch):
+    from cli import crumb as crumb_cli
+    monkeypatch.setattr(crumb_cli, "TRANSCRIPT_SEARCH_DIRS", (tmp_path / "nowhere",))
+    assert crumb_cli.find_recent_transcripts() == []
+
+
+def test_capture_last_cli_errors_usefully_when_no_sessions_exist(tmp_path):
+    """The message must name the directories searched and the way out."""
+    result = subprocess.run(
+        CLI + ["capture", "--last"], input="", capture_output=True, text=True, cwd=tmp_path,
+        env={**__import__("os").environ, "HOME": str(tmp_path)},
+    )
+    assert result.returncode == 2
+    assert "--transcript" in result.stderr
