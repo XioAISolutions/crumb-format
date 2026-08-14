@@ -40,6 +40,33 @@ crumb measure handoff.crumb --source session.jsonl
 
 Retention is a **lexical** proxy — it reports which load-bearing tokens survived, not whether the next model succeeds. It also falls on very long sessions: a 40-message conversation retains ~92%, while a 1,000-message one retains ~18%, because a 50k-token session genuinely cannot be carried losslessly in a 2.4k handoff. The number is reported as measured rather than tuned, so you can see the trade instead of taking it on trust.
 
+## What compression actually costs
+
+Six strategies, seven transcripts, reproducible in two seconds with no API key
+([full writeup](docs/BENCHMARK.md)):
+
+```text
+long-claude-code.jsonl  (159 messages)
+  strategy                         tokens    saved  retained   example losses
+  recency-window-4                    169    95.4%      6.1%   module_00, module_01, module_02
+  head-truncate-10                    251    93.2%      6.1%   1200ms, 502, https://…/ledger
+  crumb                               547    85.2%     30.5%   module_00, module_01, module_02
+  full-transcript                   3,705     0.0%    100.0%   —
+```
+
+A structured handoff retains 3–5× more than truncation at comparable
+compression — and head-truncation drops the whole diagnosis, because in a real
+session the conclusion is at the end.
+
+It does not win everywhere. On tool-heavy sessions, clearing old tool results
+retains 62% where CRUMB retains 27%, at a quarter of the compression. That row
+is in the benchmark on purpose; a test fails the build if no strategy beats
+CRUMB on any axis anywhere.
+
+```bash
+python benchmarks/compare.py
+```
+
 ## Step 1 — Add "crumb it" to your AI (30 seconds, no install)
 
 Paste this into ChatGPT custom instructions, Claude Projects, Cursor rules, or any AI's system prompt:
