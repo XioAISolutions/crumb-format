@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import re
+from functools import lru_cache
 from dataclasses import asdict, dataclass, field
 from typing import Dict, List, Sequence, Tuple
 
@@ -34,19 +35,36 @@ DEFAULT_ENCODING = "o200k_base"
 
 # ── tokenisation ─────────────────────────────────────────────────────
 
+@lru_cache(maxsize=4)
+def _encoder(encoding: str):
+    """Resolve and cache a tiktoken encoder, or ``None`` if unavailable.
+
+    Cached because ``tiktoken.get_encoding`` loads (and, with no local cache,
+    re-downloads) the BPE table on every call. Measuring a corpus of seven
+    transcripts against six strategies calls this hundreds of times; without
+    the cache that was ~0.6s and a network round-trip *per call*, which made
+    `crumb measure` in any loop pathologically slow and coupled it to network
+    availability. The cache is keyed on the encoding name and holds the
+    encoder object, not any text.
+    """
+    try:
+        import tiktoken  # type: ignore
+    except ImportError:
+        return None
+    try:
+        return tiktoken.get_encoding(encoding)
+    except Exception:  # unknown encoding name, or no network for the BPE file
+        return None
+
+
 def count_tokens(text: str, encoding: str = DEFAULT_ENCODING) -> Tuple[int, str]:
     """Return ``(token_count, method)``.
 
     ``method`` is part of the result on purpose — every number this module
     prints carries the provenance of how it was counted.
     """
-    try:
-        import tiktoken  # type: ignore
-    except ImportError:
-        return len(text) // 4, "heuristic:chars/4"
-    try:
-        enc = tiktoken.get_encoding(encoding)
-    except Exception:  # unknown encoding name, or no network for the BPE file
+    enc = _encoder(encoding)
+    if enc is None:
         return len(text) // 4, "heuristic:chars/4"
     return len(enc.encode(text)), f"tiktoken:{encoding}"
 
@@ -214,15 +232,28 @@ def measure(source_text: str, crumb_text: str, encoding: str = DEFAULT_ENCODING)
     )
 
 
-def format_report(result: MeasureResult, *, source_label: str, crumb_label: str) -> str:
-    """Human-readable report. Every number states how it was produced."""
+def format_report(
+    result: MeasureResult,
+    *,
+    source_label: str,
+    crumb_label: str,
+    subject: str = "CRUMB",
+) -> str:
+    """Human-readable report. Every number states how it was produced.
+
+    ``subject`` names what is being audited. It defaults to CRUMB but the
+    measurement is method-neutral — the compressed side is read as plain text
+    and never parsed — so this same report describes a provider's compaction
+    output, an LLM summary, or a truncated transcript. Labelling all of those
+    "CRUMB" was the only thing making the tool look CRUMB-specific.
+    """
     lines = [
-        f"CRUMB measure — {crumb_label} vs {source_label}",
+        f"{subject} audit — {crumb_label} vs {source_label}",
         "=" * 58,
         f"  Tokenizer:         {result.tokenizer}"
         + ("" if result.exact else "  (approximate — pip install tiktoken for exact counts)"),
         f"  Source:            {result.source_tokens:,} tokens",
-        f"  CRUMB:             {result.crumb_tokens:,} tokens",
+        f"  {subject + ':':<18} {result.crumb_tokens:,} tokens",
         f"  Saved:             {result.saved_pct:.1f}%  ({result.ratio:.1f}x smaller)",
         "-" * 58,
         f"  Fact retention:    {result.retention * 100:.1f}%  "
@@ -242,8 +273,10 @@ def format_report(result: MeasureResult, *, source_label: str, crumb_label: str)
     return "\n".join(lines)
 
 
-def format_json(result: MeasureResult, *, source_label: str, crumb_label: str) -> str:
-    payload = {"source": source_label, "crumb": crumb_label}
+def format_json(
+    result: MeasureResult, *, source_label: str, crumb_label: str, subject: str = "CRUMB"
+) -> str:
+    payload = {"source": source_label, "subject": subject, "compressed": crumb_label}
     payload.update(result.to_dict())
     return json.dumps(payload, indent=2, sort_keys=False)
 

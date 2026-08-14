@@ -147,6 +147,49 @@ def long_session() -> str:
     return "\n".join(lines) + "\n"
 
 
+def tool_heavy_session() -> str:
+    """An agent session dominated by tool traffic, which is the real shape.
+
+    A sample of a genuine Claude Code transcript ran 427 tool_use and 426
+    tool_result blocks against 162 text blocks — tool traffic is the majority of
+    a real session, and none of the other fixtures contain any. Without this,
+    tool-result-clearing strategies measure nothing and look free.
+    """
+    lines = []
+    idx = 0
+
+    def emit(role: str, blocks: list) -> None:
+        nonlocal idx
+        lines.append(json.dumps({
+            "type": role, "sessionId": "bench-tools", "uuid": f"u{idx}",
+            "timestamp": f"2026-01-03T00:00:{idx % 60:02d}Z", "cwd": "/work",
+            "message": {"role": role, "content": blocks},
+        }))
+        idx += 1
+
+    emit("user", [{"type": "text", "text":
+                   "The nightly export job silently drops rows. Find out why. Do not change the "
+                   "public exporter interface, and never delete from warehouse.exports."}])
+    for i in range(30):
+        emit("assistant", [
+            {"type": "text", "text": f"Checking partition {i}."},
+            {"type": "tool_use", "name": "read_file",
+             "input": {"path": f"jobs/export/partition_{i:02d}.py"}},
+        ])
+        emit("user", [{"type": "tool_result", "content":
+                       f"def run(): return fetch(limit=1000, offset={i * 1000})  # rows: {950 + i}"}])
+    emit("assistant", [{"type": "text", "text":
+                        "Root cause: fetch() pages with a hard limit of 1000 but the offset stride "
+                        "assumes 1000 rows returned, so any short page skips the remainder. The "
+                        "export loses roughly 4200 rows per night and the job reports a 200. "
+                        "Decision: page by cursor on export_id instead of offset. Spec: "
+                        "https://example.com/docs/cursor-paging. Next step is a regression test in "
+                        "tests/export/test_paging.py."}])
+    emit("user", [{"type": "text", "text":
+                   "Good. Keep the exports_v2 table name and never backfill without a dry run."}])
+    return "\n".join(lines) + "\n"
+
+
 def main() -> None:
     CORPUS.mkdir(parents=True, exist_ok=True)
     written = []
@@ -161,6 +204,7 @@ def main() -> None:
     for name, text in [
         ("short-claude-code.jsonl", claude_code_transcript()),
         ("long-claude-code.jsonl", long_session()),
+        ("tools-claude-code.jsonl", tool_heavy_session()),
     ]:
         (CORPUS / name).write_text(text, encoding="utf-8")
         written.append(name)

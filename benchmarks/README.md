@@ -51,6 +51,49 @@ metric and a bloated crumb. The long fixture sits at 30.5% and is expected to.
 Whether the *right* 30.5% survived is a question only a task-success benchmark
 answers, and that is the natural next thing to build here.
 
+## Comparing strategies
+
+`compare.py` runs several context-compression strategies over the same corpus
+and reports, for each, what it dropped:
+
+```bash
+python benchmarks/compare.py
+```
+
+```text
+long-claude-code.jsonl  (159 messages)
+  strategy                         tokens    saved  retained   example losses
+  recency-window-4                    169    95.4%      6.1%   module_00, module_01, module_02
+  head-truncate-10                    251    93.2%      6.1%   1200ms, 502, https://example.com/docs/ledger
+  recency-window-10                   306    91.7%      9.8%   module_00, module_01, module_02
+  crumb                               547    85.2%     30.5%   module_00, module_01, module_02
+  full-transcript                   3,705     0.0%    100.0%   —
+```
+
+Every strategy is **deterministic and offline**, so the numbers reproduce
+exactly and cost nothing. A comparison that needs API keys is one nobody
+re-runs, and one that cannot be re-run is indistinguishable from a claim.
+
+**`*-style` rows replicate a documented mechanism, not a vendor's
+implementation.** The hosted versions also summarise; these do not. No row here
+is a vendor's score, and the table says so.
+
+### What it shows, including where CRUMB loses
+
+On **long sessions**, CRUMB retains 30.5% where truncation retains 6–10% at
+comparable compression — and head-truncation loses the root cause outright
+(`1200ms`, `502`, the spec URL), because in a real session the conclusion is at
+the end.
+
+On **tool-heavy sessions**, Anthropic-style tool-result clearing retains **62%
+where CRUMB retains 27%**, at far lower compression (17.8% vs 66.8% saved).
+CRUMB does not win that one, and the harness is tested for its ability to say
+so — `tests/test_compare.py` fails if no strategy beats CRUMB on any axis
+anywhere, because a comparison built so its author always wins is marketing.
+
+The column that actually differentiates is the last one. Every strategy here
+can state what it dropped; hosted compaction does not expose that at all.
+
 ## Regenerating
 
 The corpus is committed rather than generated at test time, so `baseline.json`
