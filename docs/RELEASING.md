@@ -1,15 +1,32 @@
 # Releasing crumb-format
 
-**Pushing a tag is the release.** Everything else is automation.
+**Merging a version bump to `main` is the release.** Everything else is
+automation. Land a PR that sets the new version in `pyproject.toml`,
+`cli/crumb.py`, and `CHANGELOG.md`, and the merge publishes it.
+
+There is no separate ceremony, and nothing to remember to do afterwards. The
+publish workflow reads the version from `pyproject.toml`, checks whether
+`v<version>` has ever been tagged, and releases it if not — creating the tag,
+the GitHub Release, and the PyPI upload in one run. Merges that do not change
+the version see an existing tag and stop at the gate.
+
+## The other two entry points
+
+Both still work and both are honoured even when the tag already exists, since
+each is a deliberate act:
 
 ```bash
+# A tag push, if your credentials can create tags on this repo:
 git checkout main && git pull origin main
 python scripts/release_check.py          # versions, docs, publish path
 git tag -a v1.2.0 -m "v1.2.0"
-git push origin v1.2.0                   # this publishes
+git push origin v1.2.0
+
+# Or dispatch it by hand from the Actions tab ("Publish to PyPI" → Run
+# workflow → tag: v1.2.0), which needs `actions: write`.
 ```
 
-That tag push triggers `.github/workflows/publish-pypi.yml`, which verifies the
+Any of the three triggers `.github/workflows/publish-pypi.yml`, which verifies the
 release metadata, runs the tests, builds the wheel, **installs it into a clean
 venv outside the source tree and runs the README's own quickstart against it**,
 creates the GitHub Release, and publishes to PyPI via Trusted Publishing (no
@@ -30,9 +47,19 @@ Three compounding causes, all now fixed:
    August, nobody created one, so it never ran. It is now tag-triggered.
 2. This very checklist listed the tag push as **"(Optional)"**, noting that
    tag pushes "have historically 403'd" and declaring the merge commit the
-   "canonical release marker." Nothing downstream reads merge commits. The tag
-   is now the mechanism, not a marker. If the push 403s, fix the permission —
-   do not skip it.
+   "canonical release marker." Nothing downstream read merge commits, so that
+   marker meant nothing.
+
+   The 403 was real, and it is still real: pushing `v1.2.0` from this org's
+   automation is rejected at `git-receive-pack` for any ref outside the
+   session's allowed branch, and `POST /actions/workflows/.../dispatches`
+   answers `403 Resource not accessible by integration` for the same identity.
+   Rather than leaving the release gated on a human at an unrestricted
+   terminal — the exact dependency that let 0.2.0 sit on PyPI for four months
+   — the merge commit is now genuinely load-bearing: a push to `main` carrying
+   an untagged version releases, and the workflow creates the tag itself.
+   `tests/test_release_metadata.py` fails if that branch trigger is ever
+   removed, or if the gate that prevents republishing is bypassed.
 3. Nothing compared the published version to the working tree. A weekly
    `detect-drift` job now does, and `scripts/release_check.py --check-pypi`
    does it on demand.

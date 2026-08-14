@@ -74,6 +74,76 @@ def test_publish_workflow_stays_tag_triggered():
     release_check.check_publish_is_tag_triggered()
 
 
+def _publish_workflow() -> dict:
+    import yaml
+
+    text = (REPO_ROOT / ".github" / "workflows" / "publish-pypi.yml").read_text()
+    loaded = yaml.safe_load(text)
+    # PyYAML reads the bare key `on` as the boolean True (YAML 1.1).
+    loaded["on"] = loaded.get("on", loaded.get(True))
+    return loaded
+
+
+def test_publish_workflow_is_valid_yaml_with_three_entry_points():
+    """Tag push, branch push, and dispatch must all reach the publish jobs.
+
+    The tag path alone is not enough: `git push origin v1.2.0` is rejected at
+    `git-receive-pack` from this org's automation, and the Actions dispatch API
+    answers 403 for the same identity. If a future edit drops the branch
+    trigger, releasing goes back to requiring a human at an unrestricted
+    terminal — which is exactly how 0.2.0 stayed on PyPI for four months.
+    """
+    workflow = _publish_workflow()
+    triggers = workflow["on"]
+    assert "v*.*.*" in triggers["push"]["tags"]
+    assert "main" in triggers["push"]["branches"]
+    assert "tag" in triggers["workflow_dispatch"]["inputs"]
+
+
+def test_workflows_running_the_suite_install_its_test_dependencies():
+    """Three separate workflows run `pytest tests/`; all three need the deps.
+
+    Adding the yaml-based workflow guards above broke two of them until this
+    test pointed at it: they installed `pytest` and nothing else, so a
+    test-only import would have failed in CI rather than locally.
+    """
+    workflows = (REPO_ROOT / ".github" / "workflows").glob("*.yml")
+    TEST_ONLY_IMPORTS = {"yaml": "pyyaml"}
+
+    offenders = []
+    for path in workflows:
+        text = path.read_text()
+        if "pytest tests/" not in text:
+            continue
+        for module, distribution in TEST_ONLY_IMPORTS.items():
+            if distribution not in text:
+                offenders.append(f"{path.name} runs the suite without installing {distribution}")
+    assert not offenders, "\n".join(offenders)
+
+
+def test_branch_push_cannot_republish_an_existing_version():
+    """Every merge to main runs this workflow; only new versions may release.
+
+    Without the tag-existence check, each merge after a release would rebuild
+    and re-upload the same version. The gate job answers that question once and
+    every downstream job keys off its output.
+    """
+    workflow = _publish_workflow()
+    jobs = workflow["jobs"]
+
+    decide = next(
+        step for step in jobs["gate"]["steps"] if step.get("id") == "decide"
+    )
+    assert "refs/tags/$TAG" in decide["run"], "gate no longer checks for the tag"
+
+    for name in ("build", "release", "publish"):
+        assert jobs[name]["if"] == "needs.gate.outputs.release == 'true'", (
+            f"job {name!r} does not honour the gate; a merge to main after a "
+            "release would rebuild and re-upload the published version"
+        )
+        assert "gate" in jobs[name]["needs"]
+
+
 def test_release_check_script_runs_clean():
     """End-to-end: the script itself exits 0 on a healthy tree."""
     result = subprocess.run(
