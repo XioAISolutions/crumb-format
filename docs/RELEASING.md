@@ -71,28 +71,50 @@ needs PyPI credentials in `~/.pypirc`. Prefer the tag path — the manual script
 skips the out-of-tree install proof, which is the check that catches a wheel
 that cannot run its own documentation.
 
-## One-time setup
+## One-time setup: register the trusted publisher on PyPI
+
+**Do this before the first automated release, or the publish job fails at the
+last step.** The workflow authenticates to PyPI with
+[Trusted Publishing](https://docs.pypi.org/trusted-publishers/) — GitHub mints
+a short-lived OIDC token and PyPI verifies it — so there is no API token to
+store, rotate, or leak. PyPI will only accept that token if a publisher with
+matching claims has been registered by hand, once:
+
+**pypi.org → `crumb-format` → Manage → Publishing → Add a new publisher →
+GitHub**
+
+| Field | Value |
+| --- | --- |
+| Owner | `XioAISolutions` |
+| Repository | `crumb-format` |
+| Workflow name | `publish-pypi.yml` |
+| Environment name | `pypi` |
+
+All four must match exactly. The environment name is the one that is easiest
+to miss and it is not optional: the publish job declares
+`environment: name: pypi`, so the OIDC subject is
+`repo:XioAISolutions/crumb-format:environment:pypi`, and a publisher
+registered without it will not match.
+
+If this is missing, the run reaches PyPI and is refused:
+
+```
+Trusted publishing exchange failure:
+* `invalid-publisher`: valid token, but no corresponding publisher
+```
+
+That is not a build failure — the wheel is already built, verified, and
+attached to the GitHub Release by that point. Register the publisher, then
+re-run the failed `publish` job, or dispatch the workflow with the tag you
+are releasing. Both paths are deliberate, so both proceed even though the tag
+already exists.
+
+The old instructions here described generating an API token and writing
+`~/.pypirc`. Those are only needed for the manual `scripts/publish.sh`
+fallback below, not for the automated path.
 
 ```bash
-# 1. Make a PyPI account if you don't have one
-#    https://pypi.org/account/register/
-
-# 2. Generate an API token (scope: "Entire account" for the first publish)
-#    https://pypi.org/manage/account/token/
-
-# 3. Save the token in ~/.pypirc
-cat > ~/.pypirc <<'EOF'
-[pypi]
-username = __token__
-password = pypi-<your-token-here>
-
-[testpypi]
-username = __token__
-password = pypi-<your-testpypi-token-here>  # optional, separate token
-EOF
-chmod 600 ~/.pypirc
-
-# 4. Modern toolchain (PEP 639 license metadata needs packaging>=24.2)
+# Modern toolchain for local builds (PEP 639 license metadata needs packaging>=24.2)
 pip install --upgrade build twine 'packaging>=24.2'
 ```
 
