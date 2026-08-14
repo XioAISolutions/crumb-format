@@ -28,7 +28,9 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
+          # pyyaml is test-only: tests/test_release_metadata.py parses the
+          # publish workflow to assert the release path is still reachable.
+          pip install pytest pyyaml
           pip install -e .
 
       # Runs on every PR, not only at release time. This is the check that was
