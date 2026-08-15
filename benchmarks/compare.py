@@ -36,6 +36,7 @@ from cli import measure as measure_mod  # noqa: E402
 from cli import transcripts  # noqa: E402
 
 CORPUS = Path(__file__).resolve().parent / "corpus"
+EXTERNAL = Path(__file__).resolve().parent / "external"
 
 
 # ── strategies ───────────────────────────────────────────────────────
@@ -102,14 +103,53 @@ STRATEGIES = {
 }
 
 
+def external_tools() -> list[str]:
+    """Tools that have supplied real artifacts under benchmarks/external/."""
+    if not EXTERNAL.is_dir():
+        return []
+    return sorted(
+        d.name for d in EXTERNAL.iterdir()
+        if d.is_dir() and not d.name.startswith(".")
+    )
+
+
+def _external_artifact(tool: str, corpus_path: Path) -> str | None:
+    """The text `tool` would hand the next agent for this transcript, if given.
+
+    Returns None when the case has not been supplied. Callers must report that
+    as `missing` rather than skipping the row: an unmeasured case is a fact
+    about the state of the comparison, and dropping it silently would make the
+    table read as though the tool had been measured everywhere.
+    """
+    for suffix in (".txt", ".md", ".crumb"):
+        candidate = EXTERNAL / tool / (corpus_path.stem + suffix)
+        if candidate.is_file():
+            return candidate.read_text(encoding="utf-8")
+    return None
+
+
 def run() -> list[dict]:
     files = sorted(CORPUS.glob("*.json")) + sorted(CORPUS.glob("*.jsonl"))
+    tools = external_tools()
     rows: list[dict] = []
     for path in files:
         fmt, messages = transcripts.load_messages(path.read_text(encoding="utf-8"))
         source = transcripts.transcript_text(messages)
-        for name, fn in STRATEGIES.items():
-            compressed = fn(messages, fmt)
+
+        def record(name: str, compressed: str | None) -> None:
+            if compressed is None:
+                rows.append({
+                    "file": path.name,
+                    "messages": len(messages),
+                    "strategy": name,
+                    "tokens": None,
+                    "saved_pct": None,
+                    "retention": None,
+                    "lost_examples": [],
+                    "tokenizer": None,
+                    "status": "missing",
+                })
+                return
             result = measure_mod.measure(source, compressed)
             lost = sorted({f for c in result.categories.values() for f in c.lost})
             rows.append({
@@ -121,7 +161,16 @@ def run() -> list[dict]:
                 "retention": round(result.retention, 3),
                 "lost_examples": lost[:5],
                 "tokenizer": result.tokenizer,
+                "status": "measured",
             })
+
+        for name, fn in STRATEGIES.items():
+            record(name, fn(messages, fmt))
+
+        # Real output from other tools, measured by the same code path. These
+        # carry no `-style` suffix because they are not replicated mechanisms.
+        for tool in tools:
+            record(tool, _external_artifact(tool, path))
     return rows
 
 
@@ -132,14 +181,23 @@ def format_table(rows: list[dict]) -> str:
         out.append(f"\n{path}  ({subset[0]['messages']} messages)")
         out.append(f"  {'strategy':<30} {'tokens':>8} {'saved':>8} {'retained':>9}   {'example losses'}")
         out.append("  " + "-" * 92)
-        for r in sorted(subset, key=lambda r: -r["saved_pct"]):
+        measured = [r for r in subset if r.get("status") != "missing"]
+        for r in sorted(measured, key=lambda r: -r["saved_pct"]):
             losses = ", ".join(r["lost_examples"][:3]) or "—"
             out.append(
                 f"  {r['strategy']:<30} {r['tokens']:>8,} {r['saved_pct']:>7.1f}% "
                 f"{r['retention'] * 100:>8.1f}%   {losses[:44]}"
             )
+        # Printed, not omitted. See benchmarks/external/README.md.
+        for r in sorted(subset, key=lambda r: r["strategy"]):
+            if r.get("status") == "missing":
+                out.append(
+                    f"  {r['strategy']:<30} {'—':>8} {'—':>8} {'—':>9}   "
+                    "no artifact supplied for this case"
+                )
     out.append("")
-    out.append(f"Token counts via {rows[0]['tokenizer']}.")
+    tokenizers = {r["tokenizer"] for r in rows if r.get("tokenizer")}
+    out.append(f"Token counts via {sorted(tokenizers)[0]}.")
     out.append(
         "`*-style` rows replicate a documented mechanism, not a vendor's implementation:\n"
         "the hosted versions also summarise, which these do not. No row is a vendor's score."
@@ -149,6 +207,17 @@ def format_table(rows: list[dict]) -> str:
         "model succeeds. The column that matters is the last one: every strategy here can\n"
         "say what it dropped, which hosted compaction does not expose."
     )
+    tools = external_tools()
+    if tools:
+        out.append(
+            f"Rows without a `-style` suffix ({', '.join(tools)}) are real artifacts supplied\n"
+            "under benchmarks/external/, measured by the same code as every other row."
+        )
+    else:
+        out.append(
+            "No external tool has supplied artifacts yet. The corpus is committed, so any\n"
+            "handoff tool can be run over the same bytes — see benchmarks/external/README.md."
+        )
     return "\n".join(out)
 
 
