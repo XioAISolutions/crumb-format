@@ -111,3 +111,84 @@ def test_runner_emits_json_and_exits_zero():
 def test_table_discloses_that_vendor_rows_are_mechanisms_not_implementations():
     table = compare.format_table(ROWS)
     assert "not a vendor's implementation" in table or "No row is a vendor's score" in table
+
+
+# ── external artifacts ───────────────────────────────────────────────
+# Every strategy above is one this repository implements, which is a real
+# limit: replicating a competitor's mechanism and scoring it is not measuring
+# the competitor. benchmarks/external/ is how a real tool gets measured, and
+# these tests hold the properties that make such a comparison trustworthy.
+
+def _run_with_external(tmp_path, artifacts: dict[str, str]) -> list[dict]:
+    """Run the comparison with a temporary external tool directory."""
+    original = compare.EXTERNAL
+    compare.EXTERNAL = tmp_path
+    try:
+        for relative, text in artifacts.items():
+            target = tmp_path / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text, encoding="utf-8")
+        return compare.run()
+    finally:
+        compare.EXTERNAL = original
+
+
+def test_external_artifacts_are_measured_by_the_same_code(tmp_path):
+    """A supplied artifact is scored on the same axes as every built-in row."""
+    corpus = sorted(compare.CORPUS.glob("*.jsonl"))[0]
+    rows = _run_with_external(
+        tmp_path, {f"rival/{corpus.stem}.txt": "the 502 came from /api/ledger after 1200ms"}
+    )
+    row = next(r for r in rows if r["strategy"] == "rival" and r["file"] == corpus.name)
+    assert row["status"] == "measured"
+    assert row["tokens"] > 0
+    assert 0.0 <= row["retention"] <= 1.0
+
+
+def test_unsupplied_cases_are_reported_missing_not_skipped(tmp_path):
+    """An unmeasured case must stay visible.
+
+    Dropping it would make the table read as though the tool had been measured
+    on every transcript, which is the precise dishonesty this harness exists to
+    prevent. The row is emitted with null metrics and rendered as `—`.
+    """
+    corpus = sorted(compare.CORPUS.glob("*.jsonl"))[0]
+    rows = _run_with_external(tmp_path, {f"rival/{corpus.stem}.txt": "only one case supplied"})
+
+    rival = [r for r in rows if r["strategy"] == "rival"]
+    corpus_files = {r["file"] for r in rows if r["strategy"] == "crumb"}
+    assert {r["file"] for r in rival} == corpus_files, "rival was skipped on some transcripts"
+
+    missing = [r for r in rival if r["status"] == "missing"]
+    assert missing, "expected unsupplied cases to be reported"
+    for row in missing:
+        assert row["tokens"] is None and row["retention"] is None
+
+    table = compare.format_table(rows)
+    assert "no artifact supplied for this case" in table
+
+
+def test_external_rows_carry_no_style_suffix(tmp_path):
+    """`-style` means "we replicated a mechanism". Real output must not claim it."""
+    corpus = sorted(compare.CORPUS.glob("*.jsonl"))[0]
+    rows = _run_with_external(tmp_path, {f"ai-memory/{corpus.stem}.txt": "real output"})
+    external = [r for r in rows if r["strategy"] == "ai-memory"]
+    assert external and not any(r["strategy"].endswith("-style") for r in external)
+
+
+def test_footer_states_whether_anything_external_has_been_measured():
+    """The reader must be able to tell an empty comparison from a completed one."""
+    table = compare.format_table(ROWS)
+    if compare.external_tools():
+        assert "real artifacts supplied" in table
+    else:
+        assert "No external tool has supplied artifacts yet" in table
+
+
+def test_the_protocol_is_documented():
+    """A corpus nobody knows how to run against is not an invitation."""
+    readme = REPO_ROOT / "benchmarks" / "external" / "README.md"
+    assert readme.is_file(), "benchmarks/external/README.md is the protocol; it must exist"
+    text = readme.read_text(encoding="utf-8")
+    assert "SOURCE.md" in text, "provenance requirement is missing"
+    assert "missing" in text, "the unsupplied-case behaviour must be documented"

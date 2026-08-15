@@ -152,6 +152,45 @@ ran 427 `tool_use` and 426 `tool_result` blocks against 162 text blocks. Tool
 traffic is the majority of a real agent session; a corpus without it makes
 tool-clearing strategies look free.
 
+## Measuring other tools, not just other strategies
+
+Everything above is a strategy *this repository implements*, and that is a real
+limit. Replicating a competitor's documented mechanism and then scoring it is
+not the same as measuring the competitor — which is why those rows are labelled
+`*-style` and why none of them carries a vendor's name as though it were a
+vendor's result.
+
+The corpus is what makes the honest version possible. It holds **committed
+transcripts**, so any tool that turns a conversation into a handoff can be run
+over the same bytes, and two people can compare results without either trusting
+the other's harness. Publishing the inputs matters more than publishing a score.
+
+`benchmarks/external/<tool>/<corpus-stem>.txt` is where real output goes. Drop
+in what the tool would actually hand the next agent, add a `SOURCE.md` naming
+the version and command, and re-run `compare.py`. Those rows are measured by
+the same `cli/measure.py` as everything else and carry no `-style` suffix,
+because they are not approximations. The full protocol is in
+[`benchmarks/external/README.md`](../benchmarks/external/README.md).
+
+**Cases nobody has supplied are printed as `—`, never skipped.** An unmeasured
+transcript is a fact about how far the comparison has actually got, and hiding
+it would let the table imply coverage it does not have.
+`tests/test_compare.py` fails if a missing case is silently dropped.
+
+### What is not measured yet
+
+| Tool | Status |
+| --- | --- |
+| `ai-memory` | not measured — session pages are plain files (`sessions/<id>.md`), so this is capturable; the handoff records themselves live in SQLite behind MCP |
+| OpenAI compaction, Anthropic context editing | **not capturable** — the provider compacts server-side and never returns the compacted context, which is why only the documented mechanisms are replicated above |
+
+That first row is an open invitation, not an oversight. If you maintain a
+handoff tool and think this measures you unfairly, the corpus and the
+measurement code are both here — open a PR with your artifacts. Results that
+show CRUMB losing get merged; `tests/test_compare.py` already fails if no
+strategy beats CRUMB on any axis anywhere, because a comparison its author
+always wins is marketing rather than measurement.
+
 ## Reproducing and extending
 
 ```bash
