@@ -14,6 +14,7 @@ import base64
 import shutil
 import subprocess
 import sys
+import time
 from collections import Counter
 from pathlib import Path
 from textwrap import dedent
@@ -611,6 +612,127 @@ def cmd_capture(args: argparse.Namespace) -> None:
             f"{result.retention * 100:.0f}% fact retention",
             file=sys.stderr,
         )
+
+
+# ── resume ───────────────────────────────────────────────────────────
+
+# Which SessionStart sources should receive a handoff.
+#
+# `startup` is the case this exists for: a fresh session with no history, which
+# is exactly when the previous session's handoff is worth having.
+#
+# `resume` and `clear` are deliberately excluded by default. On `resume` the
+# conversation history is restored, so injecting a summary of it duplicates
+# what is already there. On `clear` the user explicitly asked for a clean
+# slate, and quietly putting the old context back is not a feature — it is the
+# tool overriding an instruction it was given.
+#
+# `compact` is included: compaction has already discarded detail, and a crumb
+# carries the load-bearing facts (paths, identifiers, error codes) that a prose
+# summary tends to lose.
+DEFAULT_RESUME_SOURCES = ('startup', 'compact')
+
+RESUME_PREAMBLE = (
+    "Handoff from a previous session in this project, captured {age} ago by "
+    "crumb-format ({path}). It records the goal, what was decided, the files "
+    "touched, the constraints, and what was still open.\n\n"
+    "Treat it as background, not as current truth: verify anything "
+    "load-bearing against the repository as it stands now, because the working "
+    "tree may have moved since it was written."
+)
+
+
+def _humanize_age(seconds: float) -> str:
+    if seconds < 90:
+        return "less than a minute"
+    minutes = seconds / 60
+    if minutes < 90:
+        return f"{round(minutes)} minutes"
+    hours = minutes / 60
+    if hours < 36:
+        return f"{round(hours)} hours"
+    return f"{round(hours / 24)} days"
+
+
+def cmd_resume(args: argparse.Namespace) -> None:
+    """Inject the last session's crumb into a new one, from a SessionStart hook.
+
+    This is the other half of ``crumb capture``. Capture writes the handoff when
+    a session ends; without this, picking it up is a manual copy-paste, which is
+    the step people forget.
+
+    Claude Code delivers a JSON payload on stdin containing ``source``
+    (``startup`` / ``resume`` / ``clear`` / ``compact`` / ``fork``), and adds a
+    SessionStart hook's stdout to the model's context. **Everything diagnostic
+    therefore goes to stderr** — a stray print here would be silently injected
+    into the conversation as though the user had written it.
+    """
+    def note(message: str) -> None:
+        print(f"crumb resume: {message}", file=sys.stderr)
+
+    payload: dict = {}
+    if not sys.stdin.isatty():
+        raw = sys.stdin.read().strip()
+        if raw:
+            try:
+                payload = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                note(f"skipped (hook payload is not JSON: {exc})")
+                sys.exit(1 if args.strict else 0)
+    if not isinstance(payload, dict):
+        note("skipped (hook payload is not a JSON object)")
+        sys.exit(1 if args.strict else 0)
+
+    source = str(payload.get('source') or 'startup')
+    wanted = {s.strip() for s in args.on.split(',') if s.strip()}
+    if source not in wanted:
+        note(f"nothing injected (source={source}; injecting on {sorted(wanted)})")
+        sys.exit(0)
+
+    if args.file:
+        candidate = Path(args.file)
+        if not candidate.is_file():
+            note(f"skipped (no such crumb: {candidate})")
+            sys.exit(1 if args.strict else 0)
+    else:
+        crumb_dir = Path(args.dir)
+        found = sorted(
+            (p for p in crumb_dir.glob('*.crumb') if p.is_file()),
+            key=lambda p: p.stat().st_mtime,
+        )
+        if not found:
+            note(f"nothing to inject (no .crumb files in {crumb_dir}/)")
+            sys.exit(0)
+        candidate = found[-1]
+
+    age_seconds = max(0.0, time.time() - candidate.stat().st_mtime)
+    if args.max_age_hours and age_seconds > args.max_age_hours * 3600:
+        note(
+            f"nothing injected ({candidate} is {_humanize_age(age_seconds)} old, "
+            f"past --max-age-hours {args.max_age_hours:g})"
+        )
+        sys.exit(0)
+
+    crumb_text = candidate.read_text(encoding='utf-8').strip()
+    if not crumb_text:
+        note(f"nothing injected ({candidate} is empty)")
+        sys.exit(0)
+
+    context = (
+        RESUME_PREAMBLE.format(age=_humanize_age(age_seconds), path=candidate)
+        + "\n\n" + crumb_text
+    )
+
+    if args.plain:
+        print(context)
+    else:
+        print(json.dumps({
+            'hookSpecificOutput': {
+                'hookEventName': 'SessionStart',
+                'additionalContext': context,
+            }
+        }))
+    note(f"injected {candidate} ({_humanize_age(age_seconds)} old, source={source})")
 
 
 # ── measure ──────────────────────────────────────────────────────────
@@ -5752,7 +5874,7 @@ def build_parser() -> argparse.ArgumentParser:
           Inspect:   validate   inspect   diff   search   bench   measure   verify
           Edit:      append   log   dream   merge   watch
           Optimize:  optimize   lint   metalk
-          Handoff:   handoff   receive   export
+          Handoff:   handoff   receive   resume   export
           Memory:    palace   wake   reflect   classify
           Format:    bridge   resolve   hash   delta   apply   seen
           Governance:passport   policy   audit   scan   comply   webhook   guardrails
@@ -5865,6 +5987,26 @@ def build_parser() -> argparse.ArgumentParser:
     capture_cmd.add_argument('--strict', action='store_true',
                              help='Exit non-zero if the transcript cannot be read (default: exit 0 so a hook never breaks the session).')
     capture_cmd.set_defaults(func=cmd_capture)
+
+    # resume
+    resume_cmd = sub.add_parser(
+        'resume',
+        help='Inject the last session\'s crumb into a new one (drive from a SessionStart hook).')
+    resume_cmd.add_argument('--dir', default='.crumb',
+                            help='Directory to read crumbs from (default: .crumb).')
+    resume_cmd.add_argument('--file', help='Inject this crumb instead of the most recent one.')
+    resume_cmd.add_argument('--on', default=','.join(DEFAULT_RESUME_SOURCES),
+                            help='Comma-separated SessionStart sources to inject on '
+                                 f'(default: {",".join(DEFAULT_RESUME_SOURCES)}). '
+                                 'Excluding "clear" is deliberate: it means the user asked '
+                                 'for a clean slate.')
+    resume_cmd.add_argument('--max-age-hours', type=float, default=168.0,
+                            help='Skip crumbs older than this (default: 168, one week; 0 disables).')
+    resume_cmd.add_argument('--plain', action='store_true',
+                            help='Print the context as plain text instead of hook JSON.')
+    resume_cmd.add_argument('--strict', action='store_true',
+                            help='Exit non-zero on a malformed payload (default: exit 0 so a hook never breaks the session).')
+    resume_cmd.set_defaults(func=cmd_resume)
 
     # measure
     measure_cmd = sub.add_parser(

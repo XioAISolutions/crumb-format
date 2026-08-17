@@ -17,13 +17,27 @@ crumb capture --last
 # Then paste it into whatever you open next.
 ```
 
-Or let it happen on its own — `install.sh` registers a `SessionEnd` hook, so every session leaves a handoff in `.crumb/` without anyone remembering to ask.
+Or let it happen on its own. `install.sh` registers **both** lifecycle hooks, so
+the loop closes without anyone remembering any of it:
+
+| Hook | Command | Effect |
+| --- | --- | --- |
+| `SessionEnd` | `crumb capture` | every session leaves a handoff in `.crumb/` |
+| `SessionStart` | `crumb resume` | the next session starts with it already in context |
+
+`crumb resume` injects on a fresh `startup` and after a `compact` — but **not on
+`clear`**, because that is the user asking for a clean slate, and restoring the
+old context would override an explicit instruction. It skips handoffs older than
+a week, states the age of the one it injects, and tells the model to verify
+anything load-bearing against the current tree rather than trusting a snapshot.
+It cannot fail the session it is attached to: every problem exits 0 with the
+reason on stderr.
 
 ## Where it reads from
 
 | Source | How |
 | --- | --- |
-| **Claude Code** | `SessionEnd` hook (automatic) or `crumb capture --transcript <session>.jsonl` |
+| **Claude Code** | `SessionEnd` + `SessionStart` hooks (automatic, both directions) or `crumb capture --transcript <session>.jsonl` |
 | **OpenAI Chat Completions** | `crumb from-messages` — `messages[]`, a bare array, or a response with `choices` |
 | **Anthropic Messages API** | content blocks: `text`, `tool_use`, `tool_result`, `thinking` |
 | **ChatGPT data export** | `conversations.json` |
