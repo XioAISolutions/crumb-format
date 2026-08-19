@@ -115,9 +115,16 @@ def test_resume_does_not_duplicate_restored_history(tmp_path):
     assert run_resume(tmp_path, {"source": "resume"}).stdout == ""
 
 
-def test_compact_injects_because_detail_was_just_discarded(tmp_path):
+def test_compact_does_not_inject_by_default(tmp_path):
+    """Compaction fires mid-session, but the newest crumb is from the last
+    session that *ended* — the current one has no crumb yet. Injecting it
+    would restore a different session's detail at the exact moment the model
+    is most disoriented. `--on startup,compact` remains available."""
     make_project(tmp_path)
-    assert "BEGIN CRUMB" in injected_context(run_resume(tmp_path, {"source": "compact"}))
+    assert run_resume(tmp_path, {"source": "compact"}).stdout == ""
+    assert "BEGIN CRUMB" in injected_context(
+        run_resume(tmp_path, {"source": "compact"}, "--on", "startup,compact")
+    )
 
 
 def test_sources_are_configurable(tmp_path):
@@ -198,6 +205,35 @@ def test_an_empty_crumb_file_is_skipped(tmp_path):
     crumb_dir.mkdir()
     (crumb_dir / "empty.crumb").write_text("   \n", encoding="utf-8")
     assert run_resume(tmp_path, {"source": "startup"}).stdout == ""
+
+
+# ── a session receives the handoff at most once ──────────────────────
+# Not hypothetical: install.sh and the Claude Code plugin each register this
+# hook, and a user with both gets two firings on the same SessionStart.
+
+def test_the_same_session_is_never_injected_twice(tmp_path):
+    make_project(tmp_path)
+    payload = {"source": "startup", "session_id": "sess-aaaa"}
+    first = run_resume(tmp_path, payload)
+    assert "BEGIN CRUMB" in injected_context(first)
+
+    second = run_resume(tmp_path, payload)
+    assert second.stdout == "", "second firing for the same session injected again"
+    assert "not injecting twice" in second.stderr
+    assert second.returncode == 0
+
+
+def test_a_new_session_injects_even_after_a_previous_one_did(tmp_path):
+    make_project(tmp_path)
+    run_resume(tmp_path, {"source": "startup", "session_id": "sess-aaaa"})
+    result = run_resume(tmp_path, {"source": "startup", "session_id": "sess-bbbb"})
+    assert "BEGIN CRUMB" in injected_context(result)
+
+
+def test_a_payload_without_a_session_id_still_injects(tmp_path):
+    """The dedupe guard keys on session_id; its absence must not disable resume."""
+    make_project(tmp_path)
+    assert "BEGIN CRUMB" in injected_context(run_resume(tmp_path, {"source": "startup"}))
 
 
 # ── round trip with capture ──────────────────────────────────────────

@@ -621,16 +621,23 @@ def cmd_capture(args: argparse.Namespace) -> None:
 # `startup` is the case this exists for: a fresh session with no history, which
 # is exactly when the previous session's handoff is worth having.
 #
-# `resume` and `clear` are deliberately excluded by default. On `resume` the
-# conversation history is restored, so injecting a summary of it duplicates
-# what is already there. On `clear` the user explicitly asked for a clean
-# slate, and quietly putting the old context back is not a feature — it is the
-# tool overriding an instruction it was given.
+# Everything else is deliberately excluded by default, each for its own reason:
 #
-# `compact` is included: compaction has already discarded detail, and a crumb
-# carries the load-bearing facts (paths, identifiers, error codes) that a prose
-# summary tends to lose.
-DEFAULT_RESUME_SOURCES = ('startup', 'compact')
+# - `resume`: the conversation history is restored, so injecting a summary of
+#   it duplicates what is already there.
+# - `clear`: the user explicitly asked for a clean slate. Quietly putting the
+#   old context back is not a feature — it is the tool overriding an
+#   instruction it was given.
+# - `compact`: this one looks attractive and is a trap. Compaction fires
+#   *mid-session*, but the newest file in `.crumb/` at that moment is from the
+#   last session that **ended** — the current session has not ended and has no
+#   crumb. "Compaction discarded detail, the crumb restores it" is wrong on
+#   the timeline: it would restore a *different session's* detail, injected at
+#   the exact moment the model is most disoriented. `--on startup,compact`
+#   remains available for workflows where the latest crumb genuinely is the
+#   current task (e.g. a single long-running project handoff), but it is not a
+#   safe default.
+DEFAULT_RESUME_SOURCES = ('startup',)
 
 RESUME_PREAMBLE = (
     "Handoff from a previous session in this project, captured {age} ago by "
@@ -689,6 +696,24 @@ def cmd_resume(args: argparse.Namespace) -> None:
         note(f"nothing injected (source={source}; injecting on {sorted(wanted)})")
         sys.exit(0)
 
+    # A session must receive the handoff at most once. This is not
+    # hypothetical: a user who ran install.sh *and* installed the Claude Code
+    # plugin has this hook registered twice — settings.json and the plugin
+    # manifest — and both fire on the same SessionStart. Double capture is
+    # harmless (same file, overwritten); double injection is the same context
+    # pasted into the conversation twice. The marker keys on session_id, so a
+    # genuinely new session always injects.
+    session_id = str(payload.get('session_id') or '')
+    state_path = Path(args.dir) / '.resume-state'
+    if session_id:
+        try:
+            already = state_path.read_text(encoding='utf-8').strip()
+        except OSError:
+            already = ''
+        if already == session_id:
+            note(f"already injected for session {session_id[:12]}; not injecting twice")
+            sys.exit(0)
+
     if args.file:
         candidate = Path(args.file)
         if not candidate.is_file():
@@ -732,6 +757,12 @@ def cmd_resume(args: argparse.Namespace) -> None:
                 'additionalContext': context,
             }
         }))
+    if session_id:
+        try:
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(session_id + '\n', encoding='utf-8')
+        except OSError:
+            pass  # the marker is best-effort; failing to write it must not fail the hook
     note(f"injected {candidate} ({_humanize_age(age_seconds)} old, source={source})")
 
 
