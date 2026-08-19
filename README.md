@@ -49,6 +49,24 @@ session it is attached to: every problem exits 0 with the reason on stderr.
 | **Cursor** | rules + MCP server (`integrations/cursor/install.sh`) |
 | **Anything else** | it is just text — paste it, or hand-write it |
 
+Every captured crumb **carries its own receipt**, so the cost travels with the
+artifact instead of scrolling past in a terminal:
+
+```text
+BEGIN CRUMB
+v=1.4
+kind=task
+source=transcript.claude-code
+measured=3705->565 tokens, 84.8% saved, 30.5% retention, tiktoken:o200k_base
+---
+```
+
+`crumb measure` on that file reproduces the header exactly — the receipt is
+written to a fixed point, since it is part of the file it measures. It is
+excluded from fact matching, so a crumb can never inflate its own retention
+with the digits in its own receipt. `--no-receipt` omits it; `measured=` is an
+optional header that existing parsers already ignore, so the spec stays at 1.4.
+
 And unlike every other tool in this space, **you can check what it cost you**:
 
 ```bash

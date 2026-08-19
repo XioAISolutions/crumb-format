@@ -132,6 +132,101 @@ def _normalise_haystack(text: str) -> str:
     return re.sub(r"\s+", " ", text.lower())
 
 
+# ── the compression receipt ──────────────────────────────────────────
+# A crumb can carry what its compression cost, in its own header. Without it
+# the numbers live only in the stderr of the command that happened to create
+# the file, which is to say they die: a crumb pasted into another tool arrives
+# with no record of what was dropped to make it.
+#
+# `measured=` is an optional header. The spec stays frozen at 1.4 because
+# parsers already ignore unknown headers — conformance/cases/
+# accept-unknown-header-ignored.crumb pins exactly that behaviour.
+
+RECEIPT_KEY = "measured"
+RECEIPT_LINE_RE = re.compile(rf"^{RECEIPT_KEY}=.*$\n?", re.MULTILINE)
+RECEIPT_VALUE_RE = re.compile(
+    r"(?P<source>\d+)->(?P<crumb>\d+) tokens, "
+    r"(?P<saved>[\d.]+)% saved, "
+    r"(?P<retention>[\d.]+)% retention, "
+    r"(?P<tokenizer>\S+)"
+)
+
+
+def strip_receipt(crumb_text: str) -> str:
+    """The crumb without its own receipt header."""
+    return RECEIPT_LINE_RE.sub("", crumb_text)
+
+
+def parse_receipt(crumb_text: str) -> Dict[str, object] | None:
+    """Read a crumb's receipt back, or ``None`` if it carries none."""
+    line = RECEIPT_LINE_RE.search(crumb_text)
+    if not line:
+        return None
+    match = RECEIPT_VALUE_RE.search(line.group(0))
+    if not match:
+        return None
+    return {
+        "source_tokens": int(match.group("source")),
+        "crumb_tokens": int(match.group("crumb")),
+        "saved_pct": float(match.group("saved")),
+        "retention_pct": float(match.group("retention")),
+        "tokenizer": match.group("tokenizer"),
+    }
+
+
+def _receipt_value(result: "MeasureResult") -> str:
+    return (
+        f"{result.source_tokens}->{result.crumb_tokens} tokens, "
+        f"{result.saved_pct:.1f}% saved, "
+        f"{result.retention * 100:.1f}% retention, "
+        f"{result.tokenizer}"
+    )
+
+
+def embed_receipt(
+    source_text: str,
+    crumb_text: str,
+    encoding: str = DEFAULT_ENCODING,
+    max_passes: int = 5,
+) -> str:
+    """Return ``crumb_text`` carrying a receipt that describes itself.
+
+    The receipt is part of the file it measures, so writing it changes the
+    token count it reports. Rather than quietly measuring the body and
+    labelling it as the whole, this iterates to a fixed point: measure, write,
+    re-measure, until the value stops moving. It converges in one or two passes
+    because only the digits can change, and if it somehow does not, the last
+    computed value is used rather than looping.
+
+    The result is a file whose header `crumb measure` reproduces exactly —
+    which is the property that makes the receipt worth trusting, and the one
+    `tests/test_receipt.py` asserts.
+    """
+    body = strip_receipt(crumb_text)
+    previous = ""
+    candidate = body
+    for _ in range(max_passes):
+        result = measure(source_text, candidate, encoding=encoding)
+        value = _receipt_value(result)
+        if value == previous:
+            break
+        previous = value
+        candidate = _write_receipt(body, value)
+    return candidate
+
+
+def _write_receipt(body: str, value: str) -> str:
+    """Insert the receipt as the last header, just above the `---` divider."""
+    lines = body.splitlines()
+    for index, line in enumerate(lines):
+        if line.strip() == "---":
+            lines.insert(index, f"{RECEIPT_KEY}={value}")
+            break
+    else:
+        return body  # no divider: not a crumb we should be editing
+    return "\n".join(lines) + ("\n" if body.endswith("\n") else "")
+
+
 # ── report ───────────────────────────────────────────────────────────
 
 @dataclass
@@ -208,11 +303,21 @@ class MeasureResult:
 
 
 def measure(source_text: str, crumb_text: str, encoding: str = DEFAULT_ENCODING) -> MeasureResult:
-    """Compare a source transcript against its compressed CRUMB."""
+    """Compare a source transcript against its compressed CRUMB.
+
+    The crumb's own ``measured=`` receipt is counted in the token total — those
+    bytes are real and whoever pastes the crumb pays for them — but removed
+    before facts are matched. Retention is a substring test against digit-rich
+    patterns (``\\b[45]\\d{2}\\b`` for error codes, ``\\b\\d{3,}\\b`` for
+    numbers), so a receipt reading ``90808->3502`` would make a source ``502``
+    count as retained. That is not a quirk of the receipt: any numeric metadata
+    in a crumb could inflate its own score the same way, which is why the
+    exclusion lives here rather than in the writer.
+    """
     source_tokens, method = count_tokens(source_text, encoding)
     crumb_tokens, _ = count_tokens(crumb_text, encoding)
 
-    haystack = _normalise_haystack(crumb_text)
+    haystack = _normalise_haystack(strip_receipt(crumb_text))
     categories: Dict[str, CategoryResult] = {}
     for name, facts in extract_facts(source_text).items():
         result = CategoryResult(total=len(facts))
