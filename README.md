@@ -25,13 +25,17 @@ the loop closes without anyone remembering any of it:
 | `SessionEnd` | `crumb capture` | every session leaves a handoff in `.crumb/` |
 | `SessionStart` | `crumb resume` | the next session starts with it already in context |
 
-`crumb resume` injects on a fresh `startup` and after a `compact` — but **not on
-`clear`**, because that is the user asking for a clean slate, and restoring the
-old context would override an explicit instruction. It skips handoffs older than
-a week, states the age of the one it injects, and tells the model to verify
-anything load-bearing against the current tree rather than trusting a snapshot.
-It cannot fail the session it is attached to: every problem exits 0 with the
-reason on stderr.
+`crumb resume` injects on a fresh `startup` only. **Not on `clear`** — that is
+the user asking for a clean slate, and restoring the old context would override
+an explicit instruction. **Not on `compact`** — compaction fires mid-session,
+and the newest crumb is from the last session that *ended*, so injecting it
+would restore a different session's detail at the worst possible moment
+(`--on startup,compact` exists for workflows where that is genuinely wanted).
+It skips handoffs older than a week, states the age of the one it injects,
+injects at most once per session even if the hook is registered twice (plugin
+*and* `install.sh`), and tells the model to verify anything load-bearing
+against the current tree rather than trusting a snapshot. It cannot fail the
+session it is attached to: every problem exits 0 with the reason on stderr.
 
 ## Where it reads from
 
