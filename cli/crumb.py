@@ -596,6 +596,14 @@ def cmd_capture(args: argparse.Namespace) -> None:
         project=args.project, source=args.source,
     )
 
+    # Carry the compression cost in the artifact. Printed to stderr it dies
+    # with the shell that ran the command; in the header it travels with the
+    # crumb, so whoever receives it can see what was dropped without holding
+    # the original transcript.
+    source_text = transcripts.transcript_text(messages)
+    if not getattr(args, "no_receipt", False):
+        crumb_text = measure_mod.embed_receipt(source_text, crumb_text)
+
     output = args.output
     if not output:
         stem = session_id[:12] or source_file.stem[:12] or "session"
@@ -605,7 +613,7 @@ def cmd_capture(args: argparse.Namespace) -> None:
 
     write_text(output, crumb_text)
     if output != '-':
-        result = measure_mod.measure(transcripts.transcript_text(messages), crumb_text)
+        result = measure_mod.measure(source_text, crumb_text)
         print(
             f"crumb capture: {output} — {result.source_tokens:,} → "
             f"{result.crumb_tokens:,} tokens ({result.saved_pct:.0f}% smaller), "
@@ -6017,6 +6025,8 @@ def build_parser() -> argparse.ArgumentParser:
     capture_cmd.add_argument('--source', help='Source label (default: transcript.<format>).')
     capture_cmd.add_argument('--strict', action='store_true',
                              help='Exit non-zero if the transcript cannot be read (default: exit 0 so a hook never breaks the session).')
+    capture_cmd.add_argument('--no-receipt', action='store_true',
+                             help='Omit the measured= header recording what the compression cost.')
     capture_cmd.set_defaults(func=cmd_capture)
 
     # resume
