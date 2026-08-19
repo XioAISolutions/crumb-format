@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "plugins": {
+    "crumb-format": {
+      "displayName": "CRUMB",
+      "description": "Structured AI handoffs between tools. Captures the goal, decisions, files, constraints and open threads when a session ends, and injects them when the next one starts.",
+      "source": "github",
+      "owner": "XioAISolutions",
+      "repo": "crumb-format",
+      "path": ".",
+      "version": "1.2.0"
+    }
+  }
+}
