@@ -152,9 +152,21 @@ Paste it at the start of any session. No more "I like concise answers, don't use
 
 Six kinds: `task` (what to do next), `mem` (long-term memory), `map` (repo overview), `log` (session transcript), `todo` (work items), `agent` (reusable persona).
 
-## Optional — install the CLI for power tooling
+## Install
 
-Everything above works with no install. The CLI is for power users who want to validate, search, lint, pack, or pipeline CRUMBs at scale.
+### Claude Code plugin — both hooks, no `pip`
+
+```
+/plugin marketplace add XioAISolutions/crumb-format
+/plugin install crumb-format
+```
+
+That installs from GitHub and wires up everything: the `SessionEnd` and
+`SessionStart` hooks, the MCP tools, and the `/crumb-export` and `/crumb-import`
+commands. The CLI is stdlib-only and runs straight from the plugin checkout, so
+there is no build step and no package index in the path.
+
+### CLI, for pipelines and CI
 
 ```bash
 pip install crumb-format
@@ -163,6 +175,14 @@ crumb doctor        # check your install
 crumb --help        # core commands
 crumb --help-all    # full surface (~46 commands grouped by concern)
 ```
+
+> **Note:** the published wheel is behind the repository while a PyPI trusted
+> publisher is registered — see [docs/RELEASING.md](docs/RELEASING.md). Until
+> then the plugin above, or a source install, gets you the current version:
+> `pip install "crumb-format @ git+https://github.com/XioAISolutions/crumb-format@main"`
+
+Everything in the sections above works with no install at all — CRUMB is text.
+The CLI is for validating, searching, linting, packing, or pipelining at scale.
 
 The five core commands cover most workflows:
 

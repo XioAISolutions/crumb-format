@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "crumb-format",
+  "displayName": "CRUMB",
+  "version": "1.2.0",
+  "description": "Quit Claude Code mid-task, open Cursor or ChatGPT, and keep going. Captures a structured handoff when a session ends and injects it when the next one starts.",
+  "author": {
+    "name": "XioAI Solutions",
+    "url": "https://github.com/XioAISolutions"
+  },
+  "homepage": "https://github.com/XioAISolutions/crumb-format",
+  "repository": "https://github.com/XioAISolutions/crumb-format",
+  "license": "MIT",
+  "keywords": [
+    "handoff",
+    "context",
+    "memory",
+    "compaction",
+    "session",
+    "interop",
+    "portability"
+  ],
+  "commands": "./integrations/claude-code/commands",
+  "mcpServers": "./.claude-plugin/mcp.json",
+  "hooks": "./.claude-plugin/hooks.json"
+}

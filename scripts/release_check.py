@@ -122,6 +122,18 @@ def check_versions(tag: str | None) -> str:
     cli_version = capture(r'^CLI_VERSION\s*=\s*"([^"]+)"', cli_source, "CLI_VERSION")
 
     versions = {"pyproject.toml": project_version, "cli/crumb.py": cli_version}
+
+    # The plugin manifests are a second distribution channel — installed from
+    # GitHub rather than PyPI — and they carry their own version string. That
+    # is exactly the shape of the drift that let PyPI serve 0.2.0 for four
+    # months, so they are checked here rather than left to rot independently.
+    plugin = json.loads(read(".claude-plugin/plugin.json"))
+    versions[".claude-plugin/plugin.json"] = plugin.get("version", "")
+
+    marketplace = json.loads(read(".claude-plugin/marketplace.json"))
+    entry = marketplace.get("plugins", {}).get("crumb-format", {})
+    versions[".claude-plugin/marketplace.json"] = entry.get("version", "")
+
     if len(set(versions.values())) != 1:
         raise CheckFailed(f"versions disagree: {versions}")
 
