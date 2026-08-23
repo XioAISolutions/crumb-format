@@ -207,6 +207,83 @@ def test_an_empty_crumb_file_is_skipped(tmp_path):
     assert run_resume(tmp_path, {"source": "startup"}).stdout == ""
 
 
+# ── age comes from the content, not the filesystem ───────────────────
+# `git checkout` stamps every file with the checkout time. A handoff committed
+# to a repository months ago therefore arrives on a fresh clone looking newly
+# written — so an mtime-based staleness gate is blind to exactly the crumbs
+# most likely to be stale.
+
+def write_crumb(tmp_path: Path, *, captured: str | None, mtime_hours: float = 0.0) -> Path:
+    crumb_dir = tmp_path / ".crumb"
+    crumb_dir.mkdir(parents=True, exist_ok=True)
+    text = CRUMB
+    if captured is not None:
+        text = text.replace("---", f"captured={captured}\n---", 1)
+    target = crumb_dir / "session-a.crumb"
+    target.write_text(text, encoding="utf-8")
+    if mtime_hours:
+        old = time.time() - mtime_hours * 3600
+        os.utime(target, (old, old))
+    return target
+
+
+def _iso_hours_ago(hours: float) -> str:
+    import datetime
+
+    stamp = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=hours)
+    return stamp.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def test_a_freshly_checked_out_but_old_handoff_is_still_stale(tmp_path):
+    """The bug this fixes: mtime says 'now', the content says three weeks."""
+    write_crumb(tmp_path, captured=_iso_hours_ago(24 * 21), mtime_hours=0.0)
+    result = run_resume(tmp_path, {"source": "startup"})
+    assert result.stdout == "", "injected a three-week-old handoff that had just been checked out"
+    assert "max-age" in result.stderr
+
+
+def test_a_recent_handoff_with_an_old_mtime_is_still_injected(tmp_path):
+    """The converse: a rebase or archive extract can backdate a current file."""
+    write_crumb(tmp_path, captured=_iso_hours_ago(2), mtime_hours=24 * 21)
+    assert "BEGIN CRUMB" in injected_context(run_resume(tmp_path, {"source": "startup"}))
+
+
+def test_the_age_basis_is_reported(tmp_path):
+    """Which clock was trusted is part of the answer, not an implementation detail."""
+    write_crumb(tmp_path, captured=_iso_hours_ago(1))
+    assert "by captured header" in run_resume(tmp_path, {"source": "startup"}).stderr
+
+    write_crumb(tmp_path, captured=None)
+    assert "by file mtime" in run_resume(tmp_path, {"source": "startup"}).stderr
+
+
+def test_an_unparseable_captured_header_falls_back_to_mtime(tmp_path):
+    """A malformed stamp must not make resume refuse to work."""
+    write_crumb(tmp_path, captured="not-a-date")
+    result = run_resume(tmp_path, {"source": "startup"})
+    assert "BEGIN CRUMB" in injected_context(result)
+    assert "by file mtime" in result.stderr
+
+
+def test_capture_records_when_the_handoff_was_made(tmp_path):
+    """Without this the fix has nothing to read."""
+    transcript = tmp_path / "session.jsonl"
+    transcript.write_text("\n".join(json.dumps(m) for m in [
+        {"type": "user", "message": {"role": "user", "content": "the /api/ledger route 502s"}},
+        {"type": "assistant", "message": {"role": "assistant", "content": [
+            {"type": "text", "text": "Traced it to pool exhaustion in src/db/pool.ts at 1200ms."}]}},
+    ]), encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(CLI), "capture", "--transcript", str(transcript), "--dir", ".crumb"],
+        capture_output=True, text=True, cwd=tmp_path,
+    )
+    assert result.returncode == 0, result.stderr
+    written = next((tmp_path / ".crumb").glob("*.crumb")).read_text(encoding="utf-8")
+    import re
+
+    assert re.search(r"^captured=\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", written, re.MULTILINE)
+
+
 # ── a session receives the handoff at most once ──────────────────────
 # Not hypothetical: install.sh and the Claude Code plugin each register this
 # hook, and a user with both gets two firings on the same SessionStart.

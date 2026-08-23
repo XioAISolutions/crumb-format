@@ -18,7 +18,7 @@ import time
 from collections import Counter
 from pathlib import Path
 from textwrap import dedent
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 # When run as a script (python3 cli/crumb.py ...), sibling submodules like
 # `cli.linting` can't be imported unless the repo root is on sys.path. Adding
@@ -526,6 +526,54 @@ def find_recent_transcripts(limit: int = 5) -> List[Path]:
 # session-end hook does not. Reads an agent hook payload on stdin, finds the
 # session transcript, and writes a handoff crumb.
 
+# The header recording when a handoff was captured. Optional, like
+# `measured=`, so the spec stays frozen at 1.4 — unknown headers are ignored.
+CAPTURED_KEY = "captured"
+CAPTURED_RE = re.compile(rf"^{CAPTURED_KEY}=(\S+)\s*$", re.MULTILINE)
+
+
+def _utc_now_iso() -> str:
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _insert_header(crumb_text: str, key: str, value: str) -> str:
+    """Add a header just above the `---` divider, replacing any existing one."""
+    existing = re.compile(rf"^{re.escape(key)}=.*$\n?", re.MULTILINE)
+    body = existing.sub("", crumb_text)
+    lines = body.splitlines()
+    for index, line in enumerate(lines):
+        if line.strip() == "---":
+            lines.insert(index, f"{key}={value}")
+            break
+    else:
+        return crumb_text  # no divider: not a crumb we should be editing
+    return "\n".join(lines) + ("\n" if body.endswith("\n") else "")
+
+
+def _crumb_age_seconds(path: Path) -> Tuple[float, str]:
+    """How old a handoff is, and how that was determined.
+
+    Prefers the `captured=` header over the filesystem. mtime is not age: a
+    crumb committed to a repository months ago gets the checkout time, which
+    made the staleness gate blind to exactly the handoffs most likely to be
+    stale.
+    """
+    try:
+        match = CAPTURED_RE.search(path.read_text(encoding="utf-8"))
+    except OSError:
+        match = None
+    if match:
+        try:
+            stamp = datetime.datetime.strptime(
+                match.group(1), "%Y-%m-%dT%H:%M:%SZ"
+            ).replace(tzinfo=datetime.timezone.utc)
+            age = (datetime.datetime.now(datetime.timezone.utc) - stamp).total_seconds()
+            return max(0.0, age), "captured header"
+        except ValueError:
+            pass  # unparseable stamp: fall back rather than refuse to resume
+    return max(0.0, time.time() - path.stat().st_mtime), "file mtime"
+
+
 def cmd_capture(args: argparse.Namespace) -> None:
     """Capture an agent session as a crumb, driven by a lifecycle hook.
 
@@ -596,10 +644,19 @@ def cmd_capture(args: argparse.Namespace) -> None:
         project=args.project, source=args.source,
     )
 
+    # When this handoff was made, carried in the file rather than inferred
+    # from it. A crumb's mtime is not its age: `git checkout` stamps every
+    # file with the checkout time, so a handoff committed months ago looks
+    # newly written, and a rebase can refresh one that never changed. Anything
+    # deciding whether a handoff is still relevant needs the date the content
+    # was captured, which only the content can carry.
+    crumb_text = _insert_header(crumb_text, CAPTURED_KEY, _utc_now_iso())
+
     # Carry the compression cost in the artifact. Printed to stderr it dies
     # with the shell that ran the command; in the header it travels with the
     # crumb, so whoever receives it can see what was dropped without holding
-    # the original transcript.
+    # the original transcript. Embedded last, so the receipt counts every
+    # header above it.
     source_text = transcripts.transcript_text(messages)
     if not getattr(args, "no_receipt", False):
         crumb_text = measure_mod.embed_receipt(source_text, crumb_text)
@@ -731,14 +788,14 @@ def cmd_resume(args: argparse.Namespace) -> None:
         crumb_dir = Path(args.dir)
         found = sorted(
             (p for p in crumb_dir.glob('*.crumb') if p.is_file()),
-            key=lambda p: p.stat().st_mtime,
+            key=lambda p: -_crumb_age_seconds(p)[0],
         )
         if not found:
             note(f"nothing to inject (no .crumb files in {crumb_dir}/)")
             sys.exit(0)
         candidate = found[-1]
 
-    age_seconds = max(0.0, time.time() - candidate.stat().st_mtime)
+    age_seconds, age_basis = _crumb_age_seconds(candidate)
     if args.max_age_hours and age_seconds > args.max_age_hours * 3600:
         note(
             f"nothing injected ({candidate} is {_humanize_age(age_seconds)} old, "
@@ -771,7 +828,10 @@ def cmd_resume(args: argparse.Namespace) -> None:
             state_path.write_text(session_id + '\n', encoding='utf-8')
         except OSError:
             pass  # the marker is best-effort; failing to write it must not fail the hook
-    note(f"injected {candidate} ({_humanize_age(age_seconds)} old, source={source})")
+    note(
+        f"injected {candidate} ({_humanize_age(age_seconds)} old "
+        f"by {age_basis}, source={source})"
+    )
 
 
 # ── measure ──────────────────────────────────────────────────────────
