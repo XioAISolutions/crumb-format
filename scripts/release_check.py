@@ -171,6 +171,61 @@ def check_docs_match_cli() -> None:
         )
 
 
+def check_version_is_not_already_released(version: str) -> None:
+    """Fail when this version is already tagged at a *different* commit.
+
+    Every other check here verifies internal consistency: pyproject, the CLI,
+    the CHANGELOG and the tag all saying the same number. They cannot catch the
+    case where all four agree and the number is simply wrong — where a version
+    has already been tagged and released, and then eight more feature commits
+    landed on main still claiming to be it.
+
+    That is not hypothetical: v1.2.0 was tagged and released, and `crumb
+    resume`, the Claude Code plugin, the compression receipt and the `captured=`
+    header all merged afterwards under the same version string. Two different
+    trees answering to one version is exactly the drift this file exists to
+    prevent, arriving somewhere the file did not look.
+
+    Skipped, with a note, when tags are unavailable — a shallow CI checkout has
+    none, and refusing to run would make the check useless where it is cheapest
+    to run. The publish workflow fetches with ``fetch-depth: 0``, so it is
+    enforced at the moment that matters.
+    """
+    import subprocess
+
+    tag = f"v{version}"
+    try:
+        tagged = subprocess.run(
+            ["git", "rev-parse", f"refs/tags/{tag}^{{commit}}"],
+            capture_output=True, text=True, cwd=ROOT,
+        )
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True, text=True, cwd=ROOT,
+        )
+    except (OSError, subprocess.SubprocessError):
+        print("  !  git unavailable; skipping the released-version check")
+        return
+
+    if head.returncode != 0:
+        print("  !  no git history here; skipping the released-version check")
+        return
+    if tagged.returncode != 0:
+        return  # not tagged yet, which is what an unreleased version looks like
+
+    tagged_commit, head_commit = tagged.stdout.strip(), head.stdout.strip()
+    if tagged_commit == head_commit:
+        return  # this commit *is* the release
+
+    raise CheckFailed(
+        f"{tag} is already tagged at {tagged_commit[:12]}, but HEAD is "
+        f"{head_commit[:12]}.\n"
+        f"      Version {version} has been released with different content. Bump "
+        "the version and add a CHANGELOG heading before merging more work, or "
+        "two trees will answer to one version."
+    )
+
+
 def check_publish_is_tag_triggered() -> None:
     workflow = read(".github/workflows/publish-pypi.yml")
     if "tags:" not in workflow:
@@ -232,6 +287,15 @@ def main(argv: list[str] | None = None) -> int:
         except CheckFailed as exc:
             failures += 1
             print(f"  FAIL {label}:\n       {exc}", file=sys.stderr)
+
+    # Runs after the loop because it needs the version the first check resolved.
+    if version:
+        try:
+            check_version_is_not_already_released(version)
+            print("  ok  version is not already released")
+        except CheckFailed as exc:
+            failures += 1
+            print(f"  FAIL version is not already released:\n       {exc}", file=sys.stderr)
 
     if args.check_pypi and version:
         try:

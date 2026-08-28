@@ -1,6 +1,70 @@
 # Changelog
 
-## Unreleased
+## v1.3.0
+
+Everything below shipped after `v1.2.0` was tagged. It is a separate version
+because the tag already exists and carries different content — continuing to
+call this 1.2.0 would mean two different trees answering to one version, which
+is the drift the release checks exist to prevent. `scripts/release_check.py`
+now fails when the working tree's version is already tagged at another commit.
+
+### The handoff loop closes itself
+
+- **`crumb resume`** injects the last session's handoff at `SessionStart`, the
+  other half of `crumb capture`. Previously the README's next step was "paste
+  it into whatever you open next", and the step people forget is the one that
+  decides whether a tool gets used twice. It injects on a fresh `startup` only
+  — never on `clear`, which is the user asking for a clean slate, and never on
+  `compact`, which fires mid-session when the newest crumb belongs to a
+  *different* session. Injects at most once per session even when the hook is
+  registered twice (plugin *and* `install.sh`).
+- **A SessionStart hook's stdout is model context**, so every diagnostic goes
+  to stderr; the tests assert each skip path leaves stdout byte-for-byte empty.
+
+### Crumbs carry their own numbers
+
+- **`measured=`** records what the compression cost, in the artifact:
+  `measured=3705->565 tokens, 84.8% saved, 30.5% retention, tiktoken:o200k_base`.
+  Written to a fixed point, so `crumb measure` on the finished file reproduces
+  the header exactly. Excluded from fact matching, because retention is a
+  substring test over digit-heavy patterns and a receipt reading `->3502` would
+  otherwise make a source `502` count as retained.
+- **`captured=`** records when the handoff was made. A crumb's mtime is not its
+  age: `git checkout` stamps every file with the checkout time, so a handoff
+  committed months ago arrived on a fresh clone looking newly written, and the
+  staleness gate was blind to exactly the crumbs most likely to be stale.
+- Both headers are optional and ignorable, so the wire format stays at **v1.4**.
+
+### Distribution that does not depend on PyPI
+
+- **A Claude Code plugin** (`.claude-plugin/`). Plugins install from GitHub, so
+  this channel would have delivered a working CRUMB throughout the four months
+  PyPI served a stale wheel. `/plugin marketplace add XioAISolutions/crumb-format`
+  then `/plugin install crumb-format` wires up both hooks, the MCP tools and the
+  slash commands. The CLI is stdlib-only and runs from the plugin checkout, and
+  a test fails if that ever stops being true.
+- **The release became reachable.** Tag pushes are rejected from this org's
+  automation and the Actions dispatch API answers 403 for the same identity, so
+  a merge to `main` carrying an untagged version now releases itself; a `gate`
+  job stops the run when the tag already exists. The PyPI trusted-publisher
+  prerequisite — undocumented, and the reason the first attempt failed — is now
+  in `docs/RELEASING.md`.
+
+### Measuring other tools, not just other strategies
+
+- **`benchmarks/external/`** takes real output from competing tools, measured
+  through the same code as every built-in row and carrying no `-style` suffix.
+  Cases nobody has supplied print as `—` rather than being skipped, so the
+  table cannot imply coverage it does not have.
+
+### Known limitation
+
+- The plugin's hooks invoke `python3`, which on native Windows is usually
+  `python` or `py -3`. No Windows machine was available to verify a fallback,
+  so the gap is documented in `.claude-plugin/README.md` rather than papered
+  over with an untested launcher.
+
+## v1.2.0
 
 ### Phase 6 — stop publishing invented numbers
 
@@ -45,8 +109,6 @@ version under review), and two workflows writing the same
 now in `docs/integrations/`, and the auto-crumb template's generator is fixed
 and gains the same pre-commit validation, so nobody copies a workflow that
 produces files the validator rejects.
-
-## v1.2.0
 
 1.2.0 was never published — PyPI still serves 0.2.0 — so the parser extraction
 lands in the same release rather than a later one. This matters for the
