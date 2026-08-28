@@ -69,6 +69,28 @@ def test_docs_check_ignores_prose_and_reads_only_code():
     assert names == {"validate"}
 
 
+def test_the_working_version_is_not_already_released():
+    """The check that the other version checks structurally could not make.
+
+    Every other assertion here verifies internal agreement — pyproject, the
+    CLI, the CHANGELOG and the tag all saying one number. They pass happily
+    when all four agree and the number is simply wrong. v1.2.0 was tagged and
+    released, then eight feature commits landed on main still calling
+    themselves 1.2.0, and nothing noticed.
+    """
+    version = release_check.check_versions(None)
+    release_check.check_version_is_not_already_released(version)
+
+
+def test_the_changelog_documents_the_current_version():
+    """A version with no entry ships as an unexplained number."""
+    version = release_check.check_versions(None)
+    changelog = (REPO_ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    heading = f"## v{version}"
+    assert heading in changelog, f"CHANGELOG.md has no {heading!r} section"
+    assert changelog.count(heading) == 1, f"{heading!r} appears more than once"
+
+
 def test_publish_workflow_stays_tag_triggered():
     """Reverting to `release: published` reintroduces the original failure."""
     release_check.check_publish_is_tag_triggered()

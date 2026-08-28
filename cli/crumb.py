@@ -50,7 +50,7 @@ from crumb_core import (  # noqa: F401  (re-exported for backwards compatibility
     render_crumb,
 )
 
-CLI_VERSION = "1.2.0"
+CLI_VERSION = "1.3.0"
 # Mirrors cli.transcripts.FORMATS. Duplicated as a literal so building the
 # argument parser doesn't pull in the transcript readers on every CLI start;
 # tests assert the two stay in sync.
