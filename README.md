@@ -95,6 +95,13 @@ A structured handoff retains 3–5× more than truncation at comparable
 compression — and head-truncation drops the whole diagnosis, because in a real
 session the conclusion is at the end.
 
+**And retention is not task success.** A separate harness probes whether the
+next model can still *use* what survived, and there CRUMB does not win: at the
+recoverability ceiling a recency window matches it at 56% of the tokens on the
+long session, and beats it on the tool-heavy one. Both numbers are real and they
+measure different things — which is exactly why the proxy is labelled a proxy.
+See [`docs/TASK_SUCCESS.md`](docs/TASK_SUCCESS.md).
+
 It does not win everywhere. On tool-heavy sessions, clearing old tool results
 retains 62% where CRUMB retains 27%, at a quarter of the compression. That row
 is in the benchmark on purpose; a test fails the build if no strategy beats

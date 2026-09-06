@@ -152,6 +152,24 @@ ran 427 `tool_use` and 426 `tool_result` blocks against 162 text blocks. Tool
 traffic is the majority of a real agent session; a corpus without it makes
 tool-clearing strategies look free.
 
+## Retention is not task success, and the gap is now measured
+
+Everything above is **lexical retention** — whether a load-bearing token
+survives. That is a recoverability metric, and compaction can also fail through
+attention rather than deletion: information present but unused, what the
+literature calls "lost in compaction".
+
+[`benchmarks/task_success.py`](../benchmarks/task_success.py) asks the harder
+question with deterministic cloze probes, and the answer is **not flattering to
+CRUMB**. At the recoverability ceiling, a recency window matches CRUMB on the
+long session at 56% of the tokens and beats it outright on the tool-heavy one —
+the opposite of what the retention table above suggests.
+
+Both numbers are real; they measure different things over different
+denominators. That disagreement is the reason a retention number should never
+have been read as a stand-in for task success. Full methodology, prior art and
+limitations: [`docs/TASK_SUCCESS.md`](TASK_SUCCESS.md).
+
 ## Measuring other tools, not just other strategies
 
 Everything above is a strategy *this repository implements*, and that is a real
