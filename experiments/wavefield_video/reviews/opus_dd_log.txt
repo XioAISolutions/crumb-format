@@ -1,0 +1,18 @@
+`DEEP_DIVE_opus.md` is written. Summary of what it says, numbers-first:
+
+**(a) Architecture race (g16 confirmed, g32 partial):**
+- Harness fix worked — all four arms now beat copy-last/const-vel one-step (r = 0.22–0.46 < 1). The v1 "loses to trivial baseline" failure is gone.
+- **Dispersion > separable > SSM** on quality: w1 0.239 /copy beats w0 0.276 and nearly halves ssm's 0.459. The wave inductive bias earns its keep vs a generic SSM — the one pro-thesis result.
+- **But w1 costs 2.06 GB vs attention's 0.59 GB (3.5× *worse*)** — the opposite of the thesis at this N. And **every arm fails rollout**: `div_horizon ≈ 0`, models 24–55× worse than freezing frame 0 over 256 frames, ~10% identity survival. One-step skill doesn't transfer to coherence.
+- g32: **SSM already collapsed** (0.99× copy-last); attn+w1 still running — the decisive number.
+
+**(b)** Ranked table, H/Q tagged: auto-batch OOM retry → resume checkpoints → streaming `step()` → rollout-loss curriculum (K=3→8, the real fix for horizon=0) → transfer-FFT caching → latent tokens → causal gate.
+
+**(c)** Exact state math matching `_transfer`/`_wave_dispersion` (`z_t=λz_{t-1}+Bx_t` per mode on the padded freq grid, flat-in-T state ~1.1 GB vs 34 GB/layer dense at 1024 frames), three verification tests (equivalence <1e-3 is the load-bearing gate), and the causal-gate caveat that blocks naive `step()==forward()`.
+
+**(d)** Hour-blocked 48h plan with GPU/coding overlap and four kill/prove checkpoints wired in.
+
+Two calls I made that you should sanity-check:
+- I cited the **eeval_*.json** rollout-fps (64/123/238/354), not the higher `result_*.json` fps (316–1312) — the eeval re-run is warmup-clean and matches your brief. If the `result_*.json` fps were the intended headline, flag it.
+- I read `divergence_horizon ≈ 0–1` and centroid ~6px as **genuine rollout collapse across all arms**. If instead the centroid metric itself is suspect at grid 16 (6px on a 16px grid is near-random), that's a measurement bug worth ruling out before H12 — I noted it as a possibility but treated the collapse as real. Worth a quick eyeball of a rendered rollout before trusting the horizon=0 verdict.
+EXIT-0

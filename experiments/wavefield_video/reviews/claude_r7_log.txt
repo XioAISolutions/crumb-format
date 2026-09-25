@@ -1,0 +1,27 @@
+The sandbox blocks even `chmod`/`python` (Python is session-gated in this repo, as expected — the operator runs the smoke). `bash run_smoke_r7.sh` doesn't need the executable bit, and that's the documented invocation. All three deliverables are complete.
+
+`★ Insight ─────────────────────────────────────`
+- **The reuse boundary I drew matters.** `VideoPredictor.forward` hardcodes `reshape(..., 3)`, and I could only edit `train_compare.py`. So instead of forcing a 3-channel latent (which would violate the 3→32→**64** spec), I reused the *learned mixing stack* (`posemb`/`blocks`/`norm`) and re-implemented the ~6 lines of channel I/O in `LatentCore`. `wfvideo.py` stays untouched.
+- **`LatentWrapper` is the leverage.** By making it pixel-in/pixel-out, *zero* eval code changed — `rollout_eval`, `centroids_by_color`, baselines all run verbatim, which is exactly why "same JSON fields" falls out for free. The cost: each rollout step pays a full AE round-trip, so the metrics honestly bake in reconstruction error.
+- **Training in latents, scoring in pixels** is the whole efficiency argument: loss/backprop happen on 8×8×64 tokens (16× fewer positions than 32×32), while the decoded eval keeps the numbers comparable to the pixel arm.
+`─────────────────────────────────────────────────`
+
+## Summary
+
+**Delivered (no commits made):**
+
+1. **`latent_ae.py`** (new) — `ConvAE`: encoder `3→32→64` (two stride-2 convs, spatial `/4`), mirrored `ConvTranspose2d` decoder ending in `sigmoid`. `encode`/`decode` APIs; `--train` mode reports held-out recon MSE and saves `{state, config}`; `load_ae()` returns it frozen with `weights_only=True`. CPU-quick.
+
+2. **`train_compare.py --latent`** (only-allowed edit) — adds `--latent`/`--ae-ckpt`, loads and freezes the AE, and via two adapters (`LatentCore`, `LatentWrapper`) trains the wave/attn/ssm predictor on encoded tokens, predicts the next latent, and decodes for pixel-space eval. New JSON fields (`latent`, `latent_ch`, `latent_grid`, `ae_ckpt`, `ae_params`); all prior pixel-space fields unchanged. Everything is gated behind `a.latent` so the pixel path is byte-for-byte identical. `--motion-loss` and `--stream-test` are guarded with clear errors in latent mode.
+
+3. **`run_smoke_r7.sh`** (new) + **`IMPL_NOTES_R7.md`** — smoke proves (1) AE roundtrip beats a gray baseline with correct `[B,64,8,8]↔[B,3,32,32]` shapes, (2) a tiny latent train runs with all pixel-space JSON fields present and non-NaN, (3) balls regression: `latent=False`, original fields present, and `eval_mse` identical across two fixed-seed runs (proves the pixel RNG path is untouched).
+
+**To run** (Python is session-gated — you run it):
+```bash
+cd experiments/wavefield_video && bash run_smoke_r7.sh
+```
+
+One thing I could **not** do in this sandbox: execute Python to self-verify (compile check and smoke were permission-denied). I've reviewed the wiring carefully — including the one CUDA dtype hazard I fixed (`encode_clip().float()` so bf16 latents don't clash with float32 in `mse_loss`/`cat`) — but the smoke run itself is the real confirmation and needs your approval.
+
+Want me to also add a `--latent-pixel-loss λ` term (the "next knob" in the notes) that supervises decoded pixels directly, or leave latent-only as the default?
+EXIT-0

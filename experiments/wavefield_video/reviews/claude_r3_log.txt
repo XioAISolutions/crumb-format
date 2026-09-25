@@ -1,0 +1,29 @@
+All five items are implemented and internally consistent. Here's a final insight on a subtle correctness point I verified by hand, then the summary.
+
+`★ Insight ─────────────────────────────────────`
+The **whole-model** streaming equivalence (sanity check 8b) works because per-frame `step==forward` *composes through depth*. Block `i`'s streamed output sequence equals its windowed output sequence frame-by-frame, so block `i+1` receives an identical input stream in both paths — the recurrence's integrated history at layer `i+1` is built from exactly the frames it would have seen in `forward()`. This is why a T-frame stream reproduces the windowed prediction to `1e-3`, not just the single-mixer test.
+`─────────────────────────────────────────────────`
+
+## Summary
+
+All work is in `experiments/wavefield_video/`, nothing committed, no Python run (session-gated).
+
+**(1) Recurrent `step()` — `wfvideo.py`**
+- Added `WaveMix3D.init_state(B, device)` + `step(x_t, state)` implementing the frequency-domain recurrence `z_t(k)=λ(k)·z_{t-1}(k)+B·x_t(k)`, `out=Re(C·z_t)→iFFT2→po`. `λ/B/C` come from a factored `_dispersion_lam()` using the *identical* formula as `_transfer()`; `forward()` numerics are left untouched.
+- Added `VideoPredictor.stream_init/stream_step` (wave-only) threading per-layer state through the full model.
+- `sanity_check.py`: **7b** `dispersion forward == step()` (own `T=16` so aliasing ≪ 1e-3) and **8b** `wave stream_step == forward` over T frames.
+
+**(2) `--stream-test` — `train_compare.py`** — builds model, runs a 1024-frame rollout (wave via `step()`, attn/ssm via windowed re-forward), logs `{frame, peak_gb, seg_fps, cum_fps}` every 128 frames to `stream_{kind}{tag}.json`, then exits without training.
+
+**(3) `--auto-batch`** — train step, single-step eval, and rollout eval each wrapped in `1 try + 3 OOM retries`: zero grads → `empty_cache()` → halve batch → retry; `empty_cache()` between eval passes. Inert on CPU / when off.
+
+**(4) `--save-every N` + `--resume PATH`** — checkpoints `{state, opt, step}`; resume restores model+opt, fast-forwards OneCycleLR, continues from `step+1`.
+
+**(5)** `run_smoke_v3.sh` (gated, operator runs) exercises sanity → stream-test ×3 → save/resume roundtrip with `--auto-batch`; `IMPL_NOTES_V3.md` documents each change, the aliasing math, verification, and caveats.
+
+**Defaults intact:** every v3 flag defaults to a no-op, so `run_smoke.sh`/`run_v2.sh` behave exactly as before.
+
+Two honesty notes carried into `IMPL_NOTES_V3.md`: streaming past `T` uses a documented steady-state posemb (`pt[T-1]`) so the >T rollout is a *cost* benchmark, not a numerical-equivalence claim; and `--resume` uses `torch.load` default (`weights_only=False`) on self-produced trusted checkpoints.
+
+To run when you approve Python: `cd experiments/wavefield_video && bash run_smoke_v3.sh` — I'll paste the real numbers into the notes afterward.
+EXIT-0

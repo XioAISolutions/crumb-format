@@ -174,15 +174,31 @@ class WaveFieldLM(nn.Module):
         top_k: Optional[int] = None,
         eos_token_id: Optional[int] = None,
         scatter_weights: Optional[Tensor] = None,
+        use_cache: bool = True,
     ) -> Tensor:
         """Autoregressive sampling.
 
-        Re-runs the full forward each step (no KV-cache equivalent yet —
-        see TODO in docs/wave-field-llm.md). For sequences up to the
-        configured field_size, this is fine; beyond that, accuracy
-        degrades because the scatter target moves off the field's right
-        edge. A streaming variant is future work.
+        With ``use_cache=True`` (default), delegates to
+        :func:`crumb_llm.cache.generate_cached`, which uses an O(1)-per-token
+        field-state cache and a sliding-window field manager. This path
+        handles generation past ``field_size`` correctly: old tokens leave
+        residual wave energy behind as their positions scroll off the
+        viewport, instead of being hard-truncated.
+
+        With ``use_cache=False`` (or when ``scatter_weights`` is supplied —
+        the cache doesn't propagate per-token weights yet), falls back to
+        the original full-forward-per-step path with right-truncation to
+        ``field_size``.
         """
+        if use_cache and scatter_weights is None:
+            from .cache import generate_cached
+            return generate_cached(
+                self, input_ids,
+                max_new_tokens=max_new_tokens,
+                temperature=temperature,
+                top_k=top_k,
+                eos_token_id=eos_token_id,
+            )
         ids = input_ids
         for _ in range(max_new_tokens):
             # Truncate context to the field size on the right.

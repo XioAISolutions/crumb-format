@@ -41,6 +41,7 @@ packages = [
 ]
 
 [tool.setuptools.package-data]
+"crumb_llm" = ["models.json"]
 "crumb_llm.configs" = ["*.json"]
 
 [project.optional-dependencies]

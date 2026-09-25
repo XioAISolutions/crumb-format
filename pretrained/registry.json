@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "crumb-llm-tiny-local",
+      "aliases": ["local-tiny", "tiny-local"],
+      "name": "Crumb LLM Tiny Local",
+      "description": "Tiny char-level Wave-Field LM checkpoint trained for local registry/download smoke tests. Not a production-quality language model.",
+      "status": "local",
+      "format": "checkpoint",
+      "source_dir": "crumb-llm-tiny",
+      "license": "MIT",
+      "tags": ["wave-field", "tiny", "local", "experimental"]
+    }
+  ]
+}

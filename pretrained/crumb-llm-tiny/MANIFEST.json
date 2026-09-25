@@ -1,0 +1,27 @@
+{
+  "schema": "crumb-llm-checkpoint-manifest/v1",
+  "model_id": "crumb-llm-tiny-local",
+  "description": "Tiny local CrumbLLM checkpoint for registry and loader smoke tests.",
+  "files": [
+    {
+      "path": "ckpt.pt",
+      "bytes": 941936,
+      "sha256": "ff913044b1c590c1b382e9a6e77e83805902c97dad382b4995eaabc1c0e7de5d"
+    },
+    {
+      "path": "metrics.json",
+      "bytes": 204,
+      "sha256": "c18d3e66e186c9a16856490d41bb1de1c941fc8cb995b7daa992516bf533aedf"
+    },
+    {
+      "path": "tokenizer.json",
+      "bytes": 513,
+      "sha256": "65cb49c1e5f7ab2daf190ab99ff04e7232c1bb2957017305846bdb8e1ad194f3"
+    },
+    {
+      "path": "README.md",
+      "bytes": 1027,
+      "sha256": "a3f2b5cd4eaed516a88d0c9d86920bfaeead35ead01c4854f8fd2ed9aa89dd5a"
+    }
+  ]
+}

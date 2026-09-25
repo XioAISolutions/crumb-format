@@ -27,7 +27,7 @@ from torch.optim.lr_scheduler import LambdaLR
 from .baseline import TinyTransformerLM, TransformerConfig
 from .data import load_text_corpus, make_token_stream, train_eval_split
 from .model import WaveFieldLM, WaveFieldConfig
-from .tokenizer import ByteTokenizer, CharTokenizer
+from .tokenizer import build_tokenizer as _build_tokenizer
 
 
 CONFIG_DIR = Path(__file__).resolve().parent / "configs"
@@ -101,12 +101,16 @@ def build_model(cfg: dict, vocab_size: int):
 
 
 def build_tokenizer(cfg: dict, corpus: str):
+    """Build the tokenizer named in ``cfg['tokenizer']``.
+
+    Recognized names: byte, char, bpe, tiktoken, sentencepiece. The
+    trainable types (bpe, sentencepiece) fit on the given corpus.
+    BPE/SP also accept ``tokenizer_kwargs`` in the config (e.g.
+    ``{"vocab_size": 8192}``).
+    """
     tname = cfg.get("tokenizer", "byte")
-    if tname == "byte":
-        return ByteTokenizer()
-    if tname == "char":
-        return CharTokenizer.fit(corpus)
-    raise ValueError(f"unknown tokenizer: {tname!r}")
+    kwargs = cfg.get("tokenizer_kwargs", {}) or {}
+    return _build_tokenizer(tname, corpus=corpus, **kwargs)
 
 
 # ── Eval ─────────────────────────────────────────────────────────────

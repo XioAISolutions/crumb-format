@@ -1,0 +1,8 @@
+{
+  "final_loss": 1.6301699876785278,
+  "final_bpc": 2.351838157029835,
+  "params": 230916,
+  "steps": 200,
+  "wallclock_seconds": 2.7839291095733643,
+  "checkpoint": "pretrained/crumb-llm-tiny/ckpt.pt"
+}

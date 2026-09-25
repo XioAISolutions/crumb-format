@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "crumb-llm-tiny",
+      "aliases": ["tiny"],
+      "name": "Crumb LLM Tiny",
+      "description": "Official tiny Wave-Field LM checkpoint slot. Until a public artifact is uploaded, register a local checkpoint with `crumb-llm register crumb-llm-tiny-local --path <dir>`.",
+      "status": "planned",
+      "format": "hub",
+      "license": "MIT",
+      "tags": ["wave-field", "tiny", "experimental"],
+      "hf_repo": "XioAISolutions/crumb-llm-tiny",
+      "revision": "main"
+    }
+  ]
+}

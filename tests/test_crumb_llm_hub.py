@@ -20,7 +20,10 @@ def test_save_and_load_roundtrip(tmp_path):
 
     # Check files exist.
     assert (tmp_path / "hub_test" / "config.json").exists()
-    assert (tmp_path / "hub_test" / "model.pt").exists()
+    weights = tmp_path / "hub_test" / "model.safetensors"
+    if not weights.exists():
+        weights = tmp_path / "hub_test" / "model.pt"
+    assert weights.exists(), "expected model.safetensors or model.pt"
     assert (tmp_path / "hub_test" / "tokenizer.json").exists()
     assert (tmp_path / "hub_test" / "README.md").exists()
 

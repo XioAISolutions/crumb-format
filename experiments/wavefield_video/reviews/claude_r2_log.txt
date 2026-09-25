@@ -1,0 +1,38 @@
+Python execution is hard-gated in this session (three attempts, all auto-denied) — same wall the round-1 session hit. Everything is implemented, statically reviewed, and wired; I won't fabricate smoke numbers. Here's where things stand.
+
+## What I built (all 12 changes)
+
+| # | Change | Where | Flag / default |
+|---|--------|-------|----------------|
+| 1 | Residual prediction, zero-init head | `wfvideo.VideoPredictor` | `--residual` (ON) |
+| 2 | zero / copy-last / const-vel baselines in JSON + table | `train_compare.baseline_mses` | always |
+| 3 | Param matching via `ffn_mult` bisection | `train_compare.match_ffn_mult` | `--target-params N` |
+| 4 | One shared factorized (t,y,x) posenc; flat attn table **deleted** | `FactorizedPosEmb` | always on |
+| 5 | Dispersion kernel `λ(kx,ky)=e^{-α}e^{iΩ}`, 2–4 modes/head | `WaveMix3D._transfer` | `--kernel-version dispersion` |
+| 6 | Hyena-style content gate | `WaveMix3D._apply_gate` | `--gate` |
+| 7 | 3×3 depthwise local path, fused before `po` | `WaveMix3D._apply_local` | `--local-fuse` |
+| 8 | Linear zero-padded conv over time **and** space | `_lin_conv_axis`, `_wave_dispersion` | `--linear-pad` (ON) |
+| 9 | Multi-step rollout loss, detached between steps | `train_compare` train loop | `--rollout-loss K` |
+| 10 | Divergence-horizon eval, color-matched centroids, fixed thresholds | `rollout_eval` | `--eval-rollout 256 --eval-seeds 32` |
+| 11 | Ball-ball elastic collisions; `RADIUS` constant exported | `data.py` | `--collisions` |
+| 12 | `IMPL_NOTES_V2.md`; nothing committed | — | — |
+
+`★ Insight ─────────────────────────────────────`
+The dispersion kernel and the SSM baseline are the *same math* seen two ways: both are sums of damped complex exponentials. The wave arm **hand-structures** its poles with a physical dispersion relation `Ω=vx·kx+vy·ky+β|k|` (propagation direction/speed are learnable but constrained); the SSM **freely learns** its poles. The falsifiable experiment the reviews want is precisely: does the physical structure *beat* the free-form SSM on rollout horizon? If not, the "wave-field" framing adds nothing and you fold back to an SSM — a clean kill criterion.
+`─────────────────────────────────────────────────`
+
+## One real bug I caught and fixed (by inspection)
+The spatial `--linear-pad` conv initially used `ifftshift` placement + `[0,n)` crop. Under zero-padding that silently turns a **symmetric** spatial blur into a **one-sided** filter (the "below/right" taps read zero-padded off-signal). Fixed to natural placement + center crop — a correct "same" linear convolution. Time causality is unaffected because a causal kernel's future taps are already zero.
+
+## What I need from you
+Python is gated. To run the smokes (one approval covers the whole suite):
+
+```bash
+cd experiments/wavefield_video
+bash run_smoke.sh          # sanity_check.py, then wave/attn/ssm/separable at grid 8 & 16
+```
+
+`sanity_check.py` runs first as the correctness gate (dispersion `|λ|<1` stability, residual-zero-init == copy-last, `SSMLite.forward()==step()`, attention no-future-leak, color-centroid, etc.) and prints `SANITY ALL-OK` or `FAILURES-PRESENT`. Results land in `smoke_v2/result_*.json`.
+
+**If you approve Python (or paste the run output), I'll record the real smoke numbers into `IMPL_NOTES_V2.md` immediately** — and fix anything the sanity gate flags. Want me to try running it again now that you can approve, or will you run it yourself?
+EXIT-0

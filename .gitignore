@@ -13,3 +13,19 @@ node_modules/
 .venv/
 .env
 .crumb-auth/
+
+# crumb-llm standalone work
+data/
+.venv-llm/
+*.safetensors
+checkpoints/
+
+# wavefield experiment artifacts (keep source/docs/results-json; exclude binaries)
+*.pt
+*.mp4
+experiments/**/ckpts/
+experiments/**/demo_out/
+experiments/**/demo_ckpts/
+experiments/**/smoke_*/
+experiments/**/runs_*/
+experiments/**/frames_*/

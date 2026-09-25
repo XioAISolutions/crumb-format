@@ -1,0 +1,8 @@
+{
+ "device": "cpu",
+ "params": 89547,
+ "fwd_eager_ms": 62.31,
+ "fwd_compiled_ms": 60.99,
+ "stream_eager_ms_per_step": 2.924,
+ "stream_compiled_ms_per_step": 2.927
+}

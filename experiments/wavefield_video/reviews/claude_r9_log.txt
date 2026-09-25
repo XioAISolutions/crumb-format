@@ -1,0 +1,36 @@
+Written `DEEP_DIVE_2_opus.md`. Here's the summary.
+
+## (1) The scale-dependent flaw
+
+The collapse is **real** (not a metric artifact — the zero-init residual model literally starts at copy-last and `copy_ratio 0.115` means it stayed there), and the decisive fact is that **the benchmark scales field-of-view, not resolution.** `RADIUS=1.6` and `SPEED=1.15` are constants in grid-*cell* units, so g32 is the *same tiny balls* in a 4× larger, ~4× emptier canvas — `moving_frac` ~0.75 → ~0.19.
+
+The 0.5/0.5 split makes the loss `moving_frac`-invariant **for its first two terms** — so collapse is *not* a loss optimum (perfect prediction still scores 0 at every grid); it's an **optimization** failure. Three leaks push toward freeze as the canvas empties:
+
+1. **`0.25·resid` is full-frame/un-balanced** — its motion content dilutes ∝ `moving_frac`, re-importing the copy-last shortcut the split removed (its share of `L_init` falls 0.27→0.09).
+2. **K-ramp × `--collisions`** — far-horizon ball positions are unpredictable (bounces), so those `e_move` gradients are zero-mean noise; freezing protects the now-larger static+resid mass across all 8 horizons, and it bites in the second half exactly as OneCycleLR decays. Benign at g16 (freezing is catastrophic at 75% moving), harmful at g32.
+3. **Fixed compute for 4× more per-pixel tokens** — the honest confound.
+
+I **ruled out** two of your three hypotheses: threshold scale-dependence (per-pixel |Δ| classification is grid-invariant in cell units) and kernel capacity (advection `vx` and damping are parameterized in cell units → grid-invariant).
+
+## (2) Experiments, ranked
+
+- **A (free, do first):** CPU probe of `moving_frac` + loss decomposition across grids — gates the whole diagnosis. I included the snippet; I *couldn't run it here* (Python is operator-gated).
+- **B (highest-value run):** balance/drop the `resid` term (new `--resid-balanced`), g32, `--rollout-loss 1`.
+- **D (null control, run with B):** matched-signal g32 at `--steps 8000` — tells you if it's just undertraining before you credit any fix.
+- **C (richest, 4 runs):** {ramp on, K=1} × {collisions on/off} to isolate the schedule×scene interaction.
+
+Exact CLI for each is in the doc.
+
+## (3) Protocol reconciliation
+
+**Sound:** the two-harness model-MSE agreement (0.0777 vs 0.0819) is a valid checksum — both are 256-frame open-loop autoregressive.
+
+**Flaws to fix:**
+- **Buried headline:** the frozen-frame baseline (0.043) *beats both arms* — "wave wins 5/5" is wave-vs-attn only; neither beats a frozen frame over 256 frames.
+- **256-frame mean MSE is saturated/low-discrimination** — two saturated numbers agreeing is weak evidence; re-anchor on short-horizon MSE + `divergence_horizon` + `identity_survival` (your `div_h` 1/0 already says balls are lost immediately).
+- **Three different "persistence" baselines** (render frozen-t0-256 vs train one-step GT persistence vs single-step copy-last) are listed as comparable; report each with its horizon.
+- **Cross-grid absolute MSE** (tail 0.11 vs 0.94) is confounded by scene variance — normalize; lean on the ratio-metric `copy_ratio` for cross-grid claims.
+- **Minor correction:** the "same seed family" label contradicts the code (train seed 90000 vs render default 170001) — confirm which.
+
+No commits made.
+EXIT-0

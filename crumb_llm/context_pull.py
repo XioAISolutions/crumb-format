@@ -55,7 +55,7 @@ from typing import Optional
 import torch
 from torch import Tensor
 
-from .crumb_adapter import CrumbPriorBuilder, iter_crumb_files, SECTION_SEP
+from .crumb_adapter import CrumbPriorBuilder, iter_crumb_files, SECTION_SEP, _get_parse_crumb
 from .tokenizer import ByteTokenizer
 
 
@@ -144,15 +144,13 @@ def build_index(
     """
     tok = ByteTokenizer()
     sections: list[IndexedSection] = []
+    parse_crumb = _get_parse_crumb()
 
     for crumb_path in iter_crumb_files(Path(crumb_dir)):
         try:
             text = crumb_path.read_text(encoding="utf-8", errors="replace")
-            from cli.crumb import parse_crumb
-        except Exception:
-            import sys
-            sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "cli"))
-            from crumb import parse_crumb
+        except OSError:
+            continue
         try:
             parsed = parse_crumb(text)
         except ValueError:

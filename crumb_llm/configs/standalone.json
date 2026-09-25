@@ -1,0 +1,20 @@
+{
+  "arch": "wave_field",
+  "tokenizer": "bpe",
+  "tokenizer_kwargs": { "vocab_size": 4096 },
+  "dim": 128,
+  "n_layers": 4,
+  "n_heads": 4,
+  "field_size": 256,
+  "block_size": 256,
+  "ffn_mult": 2.0,
+  "causal": true,
+  "kernel_mode": "freq",
+  "dropout": 0.1,
+  "tie_embeddings": true,
+  "batch_size": 16,
+  "lr": 0.0006,
+  "weight_decay": 0.1,
+  "warmup": 100,
+  "mixed_precision": false
+}

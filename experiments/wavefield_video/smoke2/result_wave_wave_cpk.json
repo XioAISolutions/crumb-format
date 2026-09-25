@@ -1,0 +1,38 @@
+{
+ "kind": "wave",
+ "params": 22803,
+ "steps": 20,
+ "dim": 32,
+ "layers": 2,
+ "heads": 4,
+ "grid": 8,
+ "frames": 5,
+ "batch": 8,
+ "causal": true,
+ "posemb": true,
+ "kicks": true,
+ "train_sec": 0.2,
+ "peak_gb": 0,
+ "eval_mse": 0.10498,
+ "drift": [
+  0.11363,
+  0.10124,
+  0.10742,
+  0.10557
+ ],
+ "centroid_acc": 0.7812,
+ "centroid_acc_step": [
+  0.875,
+  0.812,
+  0.75,
+  0.688
+ ],
+ "png": true,
+ "log_tail": [
+  {
+   "step": 1,
+   "loss": 0.29913,
+   "st_s": 46.43
+  }
+ ]
+}

@@ -1,111 +1,90 @@
 """Crumb LLM — O(N log N) language modeling via wave-equation dynamics.
 
-Crumb LLM is an experimental open-source architecture that replaces the
-traditional O(N²) transformer self-attention with physics-based wave
-equations at O(N log N) complexity. It is native to the crumb-format
-ecosystem and treats CRUMB document structure as physical priors on a
-continuous wave field.
-
-Architecture: each layer performs three steps instead of QKᵀV attention:
-
-    1. Scatter   — tokens deposit their state onto a continuous 1-D field
-    2. Convolve  — an FFT-based wave kernel propagates information across
-                   the field in O(F log F) time
-    3. Gather    — tokens read updated state back from the field at their
-                   positions
-
-Each head learns three physics scalars that parameterise the kernel:
-
-    k(t) = exp(-α |t|) · cos(ω t + φ)
-
-with α (damping), ω (frequency), φ (phase). Convolution is performed in
-the frequency domain via rfft / irfft.
-
-Advanced physics features:
-    - Multi-scale fields: heads can operate at different field resolutions
-    - Dispersion: frequency-dependent wave speed via learned dispersion
-    - Boundary conditions: periodic (default), absorbing, or reflecting
-    - Wave-packet heads: Gabor wavelet kernels for localised attention
-    - Interference mixing: multi-head wave superposition with learned coupling
-
-The package is gated behind the ``[llm]`` install extra. Importing
-``crumb_llm`` without torch installed raises a clear ImportError
-pointing at ``pip install crumb-format[llm]``.
-
-Crumb-aware extensions (optional, off by default) let crumb section
-boundaries, fold priorities, and @priority annotations bias the field
-dynamics. See ``crumb_adapter`` and ``docs/crumb-llm-architecture.md``.
-
-Based on Wave-Field LLM (Badaramoni 2026; cf. arXiv:2510.04304
-"Wave-PDE Nets") — extended with Crumb-native structural priors
-and advanced wave physics.
+The package metadata and light utilities are importable without PyTorch so
+standalone packaging and ``crumb-llm info`` work on clean machines. Model
+symbols are loaded lazily and raise a focused install hint when PyTorch is
+missing.
 """
 
 from __future__ import annotations
 
+from importlib import import_module
+from typing import Any
+
+__version__ = "0.3.1"
+
 _TORCH_HINT = (
-    "crumb_llm requires PyTorch. Install with:\n"
-    "    pip install 'crumb-format[llm]'\n"
-    "or directly:\n"
-    "    pip install torch numpy"
+    "crumb_llm requires PyTorch for model operations. Install with:\n"
+    "    pip install crumb-llm\n"
+    "or, from a crumb-format checkout:\n"
+    "    pip install -e '.[llm]'"
 )
 
-try:
-    import torch  # noqa: F401
-except ImportError as exc:  # pragma: no cover - exercised by gating
-    raise ImportError(_TORCH_HINT) from exc
-
-
-from .kernels import (  # noqa: E402
-    wave_kernel_time,
-    wave_kernel_freq,
-    fft_convolve,
-)
-from .scatter_gather import scatter_linear, gather_linear  # noqa: E402
-from .layers import (  # noqa: E402
-    RMSNorm,
-    SwiGLUFFN,
-    WaveFieldHead,
-    WaveFieldBlock,
-)
-from .model import WaveFieldLM, WaveFieldConfig  # noqa: E402
-from .cache import FieldStateCache, generate_cached  # noqa: E402
-from .hub import save_for_hub, load_hub_model  # noqa: E402
-from .v2 import (  # noqa: E402
-    SmoothCausalKernel,
-    LearnedScatterGather,
-    QueryFrequencyGate,
-    ShortConvGate,
-    RotaryFieldEncoding,
-    WaveFieldBlockV2,
-    WaveFieldBlockV2Config,
-    AdaptiveKernelHead,
-    FieldAttentionGate,
-    ResonanceMemory,
-    SpectralGate,
-)
-from .context_pull import CrumbIndex, ContextPullSession, pull_context  # noqa: E402
-
-__all__ = [
-    # Core
-    "wave_kernel_time", "wave_kernel_freq", "fft_convolve",
-    "scatter_linear", "gather_linear",
-    "RMSNorm", "SwiGLUFFN",
-    # V1 blocks
-    "WaveFieldHead", "WaveFieldBlock",
+_EXPORTS: dict[str, tuple[str, str]] = {
+    # Core kernels / scatter
+    "wave_kernel_time": ("crumb_llm.kernels", "wave_kernel_time"),
+    "wave_kernel_freq": ("crumb_llm.kernels", "wave_kernel_freq"),
+    "fft_convolve": ("crumb_llm.kernels", "fft_convolve"),
+    "scatter_linear": ("crumb_llm.scatter_gather", "scatter_linear"),
+    "gather_linear": ("crumb_llm.scatter_gather", "gather_linear"),
+    # Layers
+    "RMSNorm": ("crumb_llm.layers", "RMSNorm"),
+    "SwiGLUFFN": ("crumb_llm.layers", "SwiGLUFFN"),
+    "WaveFieldHead": ("crumb_llm.layers", "WaveFieldHead"),
+    "WaveFieldBlock": ("crumb_llm.layers", "WaveFieldBlock"),
     # V2 blocks
-    "SmoothCausalKernel", "LearnedScatterGather", "QueryFrequencyGate",
-    "ShortConvGate", "RotaryFieldEncoding",
-    "WaveFieldBlockV2", "WaveFieldBlockV2Config",
-    "AdaptiveKernelHead", "FieldAttentionGate", "ResonanceMemory", "SpectralGate",
-    # Model
-    "WaveFieldLM", "WaveFieldConfig",
-    # Cache
-    "FieldStateCache", "generate_cached",
+    "SmoothCausalKernel": ("crumb_llm.v2", "SmoothCausalKernel"),
+    "LearnedScatterGather": ("crumb_llm.v2", "LearnedScatterGather"),
+    "QueryFrequencyGate": ("crumb_llm.v2", "QueryFrequencyGate"),
+    "ShortConvGate": ("crumb_llm.v2", "ShortConvGate"),
+    "RotaryFieldEncoding": ("crumb_llm.v2", "RotaryFieldEncoding"),
+    "WaveFieldBlockV2": ("crumb_llm.v2", "WaveFieldBlockV2"),
+    "WaveFieldBlockV2Config": ("crumb_llm.v2", "WaveFieldBlockV2Config"),
+    "AdaptiveKernelHead": ("crumb_llm.v2", "AdaptiveKernelHead"),
+    "FieldAttentionGate": ("crumb_llm.v2", "FieldAttentionGate"),
+    "ResonanceMemory": ("crumb_llm.v2", "ResonanceMemory"),
+    "SpectralGate": ("crumb_llm.v2", "SpectralGate"),
+    # Model / generation
+    "WaveFieldLM": ("crumb_llm.model", "WaveFieldLM"),
+    "WaveFieldConfig": ("crumb_llm.model", "WaveFieldConfig"),
+    "FieldStateCache": ("crumb_llm.cache", "FieldStateCache"),
+    "generate_cached": ("crumb_llm.cache", "generate_cached"),
     # Hub
-    "save_for_hub", "load_hub_model",
+    "save_for_hub": ("crumb_llm.hub", "save_for_hub"),
+    "load_hub_model": ("crumb_llm.hub", "load_hub_model"),
+    # Registry
+    "download_model": ("crumb_llm.registry", "download_model"),
+    "find_model": ("crumb_llm.registry", "find_model"),
+    "list_models": ("crumb_llm.registry", "list_models"),
+    "register_local_model": ("crumb_llm.registry", "register_local_model"),
     # Context pulling
-    "CrumbIndex", "ContextPullSession", "pull_context",
-]
+    "CrumbIndex": ("crumb_llm.context_pull", "CrumbIndex"),
+    "ContextPullSession": ("crumb_llm.context_pull", "ContextPullSession"),
+    "pull_context": ("crumb_llm.context_pull", "pull_context"),
+    # Quantization
+    "quantize_dynamic_linear": ("crumb_llm.quantize", "quantize_dynamic_linear"),
+    "model_size_mb": ("crumb_llm.quantize", "model_size_mb"),
+    "linear_param_breakdown": ("crumb_llm.quantize", "linear_param_breakdown"),
+    # Chat templates
+    "apply_chat_template": ("crumb_llm.chat", "apply_chat_template"),
+    "stop_tokens_for": ("crumb_llm.chat", "stop_tokens_for"),
+}
 
-__version__ = "0.3.0"
+__all__ = list(_EXPORTS)
+
+
+def __getattr__(name: str) -> Any:
+    try:
+        module_name, attr_name = _EXPORTS[name]
+    except KeyError as exc:
+        raise AttributeError(f"module 'crumb_llm' has no attribute {name!r}") from exc
+
+    try:
+        value = getattr(import_module(module_name), attr_name)
+    except ImportError as exc:
+        if exc.name == "torch":
+            raise ImportError(_TORCH_HINT) from exc
+        raise
+
+    globals()[name] = value
+    return value

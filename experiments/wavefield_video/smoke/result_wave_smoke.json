@@ -1,0 +1,35 @@
+{
+ "kind": "wave",
+ "params": 85171,
+ "steps": 40,
+ "dim": 64,
+ "layers": 2,
+ "heads": 4,
+ "grid": 8,
+ "frames": 5,
+ "batch": 8,
+ "train_sec": 0.5,
+ "peak_gb": 0,
+ "eval_mse": 0.1531,
+ "drift": [
+  0.1597,
+  0.15286,
+  0.15197,
+  0.15974,
+  0.18014,
+  0.19171
+ ],
+ "png": true,
+ "log_tail": [
+  {
+   "step": 1,
+   "loss": 0.40221,
+   "st_s": 12.25
+  },
+  {
+   "step": 25,
+   "loss": 0.15391,
+   "st_s": 68.93
+  }
+ ]
+}

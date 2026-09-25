@@ -1,0 +1,35 @@
+{
+ "kind": "attn",
+ "params": 142723,
+ "steps": 40,
+ "dim": 64,
+ "layers": 2,
+ "heads": 4,
+ "grid": 8,
+ "frames": 5,
+ "batch": 8,
+ "train_sec": 0.5,
+ "peak_gb": 0,
+ "eval_mse": 0.09153,
+ "drift": [
+  0.09638,
+  0.09813,
+  0.09805,
+  0.09893,
+  0.10219,
+  0.10466
+ ],
+ "png": true,
+ "log_tail": [
+  {
+   "step": 1,
+   "loss": 0.47025,
+   "st_s": 39.68
+  },
+  {
+   "step": 25,
+   "loss": 0.09399,
+   "st_s": 85.26
+  }
+ ]
+}

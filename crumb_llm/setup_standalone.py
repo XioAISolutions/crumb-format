@@ -26,12 +26,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crumb-llm"
-version = "0.2.0"
-description = "Crumb LLM: O(N log N) language modeling via physics-based wave equations. Replaces transformer attention with scatter → FFT-convolve → gather."
+version = "0.3.1"
+description = "Crumb LLM: O(N log N) language modeling via physics-based wave equations. Replaces transformer attention with scatter -> FFT-convolve -> gather."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
-authors = [{{ name = "XIO AI Solutions" }}]
+authors = [{ name = "XIO AI Solutions" }]
 keywords = ["llm", "wave-field", "fft", "attention", "physics", "transformer", "O(N-log-N)"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -43,12 +43,17 @@ classifiers = [
 dependencies = [
     "torch>=2.2",
     "numpy>=1.26",
+    "safetensors>=0.4",
 ]
 
 [project.optional-dependencies]
+bpe = ["tokenizers>=0.15"]
+tiktoken = ["tiktoken>=0.5"]
+sentencepiece = ["sentencepiece>=0.2"]
+all-tokenizers = ["tokenizers>=0.15", "tiktoken>=0.5", "sentencepiece>=0.2"]
 crumb = ["crumb-format"]
 serve = ["crumb-format"]
-all = ["crumb-format"]
+all = ["crumb-format", "tokenizers>=0.15", "tiktoken>=0.5", "sentencepiece>=0.2"]
 
 [project.urls]
 Homepage = "https://github.com/XioAISolutions/crumb-format"
@@ -56,12 +61,13 @@ Repository = "https://github.com/XioAISolutions/crumb-format"
 Documentation = "https://github.com/XioAISolutions/crumb-format/blob/main/CRUMB_LLM.md"
 
 [project.scripts]
-crumb-llm = "crumb_llm.__main__:main"
+crumb-llm = "crumb_llm.cli:main"
 
 [tool.setuptools]
 packages = ["crumb_llm", "crumb_llm.configs"]
 
 [tool.setuptools.package-data]
+"crumb_llm" = ["models.json"]
 "crumb_llm.configs" = ["*.json"]
 
 [tool.pytest.ini_options]

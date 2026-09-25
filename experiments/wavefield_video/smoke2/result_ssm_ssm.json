@@ -1,0 +1,38 @@
+{
+ "kind": "ssm",
+ "params": 24579,
+ "steps": 20,
+ "dim": 32,
+ "layers": 2,
+ "heads": 4,
+ "grid": 8,
+ "frames": 5,
+ "batch": 8,
+ "causal": false,
+ "posemb": false,
+ "kicks": false,
+ "train_sec": 0.2,
+ "peak_gb": 0,
+ "eval_mse": 0.20361,
+ "drift": [
+  0.21828,
+  0.23626,
+  0.25045,
+  0.31557
+ ],
+ "centroid_acc": 0.7188,
+ "centroid_acc_step": [
+  0.812,
+  0.75,
+  0.688,
+  0.625
+ ],
+ "png": true,
+ "log_tail": [
+  {
+   "step": 1,
+   "loss": 0.71729,
+   "st_s": 47.12
+  }
+ ]
+}

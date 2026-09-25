@@ -164,29 +164,50 @@ Crumb LLM is *not* just a reproduction. These are original:
 
 ```bash
 # Install
-pip install 'crumb-format[llm]'
+pip install crumb-llm
+
+# See pretrained checkpoints in the registry
+crumb-llm models
+
+# Download a registered checkpoint
+crumb-llm download crumb-llm-tiny-local
+
+# Generate from the downloaded checkpoint
+crumb-llm generate --ckpt ~/.cache/crumb-llm/models/crumb-llm-tiny-local --prompt "BEGIN CRUMB"
 
 # Train a model (CPU, ~2 min)
-crumb llm train --config tiny --steps 500 --out /tmp/crumb_model
+crumb-llm train --config tiny --steps 500 --out /tmp/crumb_model
 
 # Generate text
-crumb llm generate --ckpt /tmp/crumb_model --prompt "BEGIN CRUMB"
+crumb-llm generate --ckpt /tmp/crumb_model --prompt "BEGIN CRUMB"
 
 # Index your crumb library for context pulling
-crumb llm index examples/ -o my_index.json
+crumb-llm index examples/ -o my_index.json
 
 # Pull relevant context for a query
-crumb llm pull "How do I fix auth?" --index-file my_index.json
+crumb-llm pull "How do I fix auth?" --index-file my_index.json
 
 # Serve over HTTP with context pulling
-crumb llm serve --ckpt /tmp/crumb_model --index examples/
+crumb-llm serve --ckpt /tmp/crumb_model --index examples/
 
 # Compare against a transformer baseline
-crumb llm compare --config tiny --steps 1000 --data examples/
+crumb-llm compare --config tiny --steps 1000 --data examples/
 
 # Export for HuggingFace Hub
-crumb llm export --ckpt /tmp/crumb_model --name my-crumb-llm
+crumb-llm export --ckpt /tmp/crumb_model --name my-crumb-llm
+
+# Register your own local checkpoint
+crumb-llm register my-crumb-model --path /tmp/crumb_model --alias mine
+
+# Prepare the bundled tiny checkpoint for HuggingFace publication
+python scripts/publish_crumb_llm_model.py
 ```
+
+`crumb-format` is optional. Install `pip install 'crumb-llm[crumb]'`
+only when you want CRUMB parser priors or direct `.crumb` adapters.
+The model, tokenizer, trainer, sampler, chat REPL, server, quantizer,
+model registry, downloader, and hub export live in the standalone
+`crumb_llm` package.
 
 ---
 
@@ -194,7 +215,7 @@ crumb llm export --ckpt /tmp/crumb_model --name my-crumb-llm
 
 | Method | Cost | Latency | Setup |
 |--------|------|---------|-------|
-| Local CLI | Free | ~15ms/tok | `pip install crumb-format[llm]` |
+| Local CLI | Free | ~15ms/tok | `pip install crumb-llm` |
 | Docker (CPU) | ~$5/mo | ~20ms/tok | `docker build -f Dockerfile.crumb-llm .` |
 | Fly.io | ~$7/mo | ~25ms/tok | `fly launch` |
 | HF Spaces | Free tier | ~30ms/tok | Push hub export |

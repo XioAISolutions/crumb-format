@@ -1,0 +1,28 @@
+The implementation is complete. Python/git execution is session-gated in this environment (the project convention — you approve `python`/script runs), so I've validated by close code review rather than execution. Here's what shipped.
+
+`★ Insight ─────────────────────────────────────`
+- **Two paths that refuse to cross.** The strongest correctness guarantee here isn't a positive test — it's the *negative* one. A latent checkpoint's state keys are all `vp.*` (because `LatentCore` nests the `VideoPredictor` under `self.vp`), while a pixel checkpoint has bare `blocks.0.*`/`posemb.pt`. Each loader keys off exactly the prefix the other lacks, so `--latent` on a pixel ckpt and the pixel path on a latent ckpt both fail loudly instead of silently loading garbage. Smoke step (2) asserts this.
+- **The AE reconstruction floor is a first-class metric, not a footnote.** Because every scored frame is a real `ae.decode(...)`, the reported MSE can never beat the AE's own `eval_recon_mse` — so I surface it directly in `metrics.json`. Without it, a reader could mistake the AE's lossy floor for predictor error.
+`─────────────────────────────────────────────────`
+
+## Summary
+
+**(1) `render_rollout.py` — `--latent --ae-ckpt PATH`** (edited)
+- `render()` gets a 2-line early branch to `render_latent()`; the entire pixel path below is byte-for-byte unchanged.
+- `load_latent_model()` rebuilds `LatentCore(VideoPredictor@grid/4)` from the `vp.*` state + `result_<tag>.json`, recovering the exact FFN width from the tensor so `strict=True` load matches the 1.6M-param arms; loads and channel-checks the frozen AE.
+- `render_latent()` encodes the seed once, then rolls **autoregressively at the latent grid** (feeds the predicted latent back), decodes **every** predicted latent to pixels, and scores in **pixel space** vs the same-seed `make_clip_batch` clip: `mse`, `copy_last_mse`, centroid error, `divergence_horizon` (+ full curves, `ae_eval_recon_mse`, provenance).
+
+**(2) Pixel path untouched / AE reused** — `render_latent` is a sibling; it imports `load_ae`/`ConvAE` from `latent_ae.py` and `centroids_by_color`/`divergence_horizon` from `train_compare.py` so metric definitions match training exactly.
+
+**(3) `run_smoke_r11.sh`** (new) — synthesizes tiny **random** AE + LatentCore + result JSON (no training, no trained ckpt), renders the decode path and asserts pixel metrics/PNGs/MP4; checks both paths reject each other's ckpts; re-renders a tiny **pixel** VideoPredictor for the default-path regression.
+
+**(4) `IMPL_NOTES_R11.md`** — with the exact box commands for `runs_latent/model_wave_w1lat.pt` and `runs_latent/model_attn_a1lat.pt` against `/workspace/slava/exp/wavefield_video/ckpts/ae_g32.pt`, writing pixel metrics + mp4 into `demo_out/`.
+
+No commits made, as instructed.
+
+**To validate**, please run (session-gated):
+```bash
+cd experiments/wavefield_video && bash run_smoke_r11.sh
+```
+If anything in the smoke fails, paste the output and I'll fix it — my main residual uncertainty is runtime-only behavior I couldn't exercise here (e.g. `torch.linalg.inv` inside `centroids_by_color` under `inference_mode`, and the recurrent pixel-smoke stream path).
+EXIT-0

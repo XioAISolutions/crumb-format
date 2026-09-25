@@ -2,7 +2,8 @@
 
 Saves Crumb LLM checkpoints in a format that can be uploaded to
 HuggingFace Hub and loaded back. Includes:
-  - Model weights (safetensors-compatible state dict)
+  - Model weights (``model.safetensors`` if ``safetensors`` is installed,
+    falling back to ``model.pt`` via secure ``torch.load(weights_only=True)``)
   - Config (JSON, maps to WaveFieldConfig)
   - Tokenizer metadata
   - Model card (auto-generated README.md)
@@ -17,6 +18,14 @@ from pathlib import Path
 import torch
 
 from .model import WaveFieldLM, WaveFieldConfig
+
+
+def _try_safetensors():
+    try:
+        from safetensors.torch import save_file, load_file  # noqa: F401
+        return save_file, load_file
+    except ImportError:
+        return None, None
 
 
 MODEL_CARD_TEMPLATE = """\
@@ -71,8 +80,8 @@ model, tok = load_hub_model("{model_name}")
 
 Or via CLI:
 ```bash
-pip install 'crumb-format[llm]'
-crumb llm generate --ckpt {model_name} --prompt "Hello"
+pip install crumb-llm
+crumb-llm generate --ckpt {model_name} --prompt "Hello"
 ```
 
 ## Training
@@ -106,8 +115,15 @@ def save_for_hub(
     cfg_dict = asdict(model.cfg)
     (out / "config.json").write_text(json.dumps(cfg_dict, indent=2, default=str))
 
-    # Weights.
-    torch.save(model.state_dict(), out / "model.pt")
+    # Weights — prefer safetensors (safe, fast, cross-framework). Fall back
+    # to a pickled .pt only when safetensors isn't installed.
+    save_file, _ = _try_safetensors()
+    if save_file is not None:
+        # safetensors needs contiguous tensors and no shared storage.
+        state = {k: v.detach().contiguous().cpu() for k, v in model.state_dict().items()}
+        save_file(state, str(out / "model.safetensors"))
+    else:
+        torch.save(model.state_dict(), out / "model.pt")
 
     # Tokenizer.
     tokenizer.save(out / "tokenizer.json")
@@ -129,8 +145,9 @@ def save_for_hub(
     )
     (out / "README.md").write_text(card)
 
+    weights_file = "model.safetensors" if (out / "model.safetensors").exists() else "model.pt"
     print(f"[hub] saved to {out}/")
-    print(f"  config.json, model.pt, tokenizer.json, README.md")
+    print(f"  config.json, {weights_file}, tokenizer.json, README.md")
     print(f"  Upload: huggingface-cli upload {model_name} {out}")
     return out
 
@@ -139,8 +156,13 @@ def load_hub_model(
     path: str | Path,
     device: str = "cpu",
 ) -> tuple[WaveFieldLM, object]:
-    """Load a Crumb LLM from a Hub-format directory."""
-    from .tokenizer import ByteTokenizer, CharTokenizer
+    """Load a Crumb LLM from a Hub-format directory.
+
+    Prefers ``model.safetensors`` over ``model.pt`` when both exist. The
+    .pt path uses ``weights_only=True`` to avoid arbitrary code execution
+    from pickled state dicts.
+    """
+    from .tokenizer import ByteTokenizer, load_tokenizer
 
     p = Path(path)
     cfg_dict = json.loads((p / "config.json").read_text())
@@ -149,17 +171,24 @@ def load_hub_model(
     filtered = {k: v for k, v in cfg_dict.items() if k in valid_keys}
     cfg = WaveFieldConfig(**filtered)
     model = WaveFieldLM(cfg)
-    state = torch.load(p / "model.pt", map_location=device, weights_only=True)
+
+    st_path = p / "model.safetensors"
+    pt_path = p / "model.pt"
+    if st_path.exists():
+        _, load_file = _try_safetensors()
+        if load_file is None:
+            raise ImportError(
+                "model.safetensors found but `safetensors` is not installed. "
+                "Install with `pip install safetensors`."
+            )
+        state = load_file(str(st_path), device=device)
+    elif pt_path.exists():
+        state = torch.load(pt_path, map_location=device, weights_only=True)
+    else:
+        raise FileNotFoundError(f"no model.safetensors or model.pt in {p}")
     model.load_state_dict(state)
     model.eval()
 
     tok_path = p / "tokenizer.json"
-    tok_meta = json.loads(tok_path.read_text())
-    if tok_meta.get("type") == "byte":
-        tok = ByteTokenizer()
-    elif tok_meta.get("type") == "char":
-        tok = CharTokenizer.load(tok_path)
-    else:
-        tok = ByteTokenizer()
-
+    tok = load_tokenizer(tok_path) if tok_path.exists() else ByteTokenizer()
     return model, tok

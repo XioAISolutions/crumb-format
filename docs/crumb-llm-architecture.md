@@ -7,7 +7,7 @@
 > wave field.
 
 This document is the architecture reference. For the quick-start
-walkthrough, see the [README section](../README.md#crumb-llm-experimental).
+walkthrough, see the [README section](../README.md#crumb-llm-standalone-experimental).
 
 ---
 
@@ -236,11 +236,11 @@ At GPU scale and 32K–128K context (per the upstream paper):
 
 The upstream paper claims **within 5% of transformer perplexity** on
 WikiText-2 at matched parameter counts. Our own head-to-head comparison
-(`crumb llm compare`) on the crumb-format examples corpus shows Crumb LLM
+(`crumb-llm compare`) on the crumb-format examples corpus shows Crumb LLM
 dramatically outperforming the matched transformer:
 
 ```
-crumb llm compare --config tiny --steps 1000 --data examples/
+crumb-llm compare --config tiny --steps 1000 --data examples/
 
 ┌─────────────┬────────┬───────┬──────────┬────────┐
 │ Architecture │  PPL   │  BPC  │  Params  │  Time  │
@@ -303,7 +303,14 @@ save_for_hub(model, tokenizer, "my-crumb-llm", model_name="crumb-llm-v1")
 # Upload: huggingface-cli upload crumb-llm-v1 my-crumb-llm/
 ```
 
-Or via CLI: `crumb llm export --ckpt <dir> --name crumb-llm-tiny`
+Or via CLI: `crumb-llm export --ckpt <dir> --name crumb-llm-tiny`
+
+For the bundled tiny checkpoint, the release-prep script writes a
+Hub-compatible folder, checksum manifest, and registry JSON:
+
+```bash
+python scripts/publish_crumb_llm_model.py
+```
 
 ## 10. Roadmap
 - **Multi-scale fields** (different F per head group — code in
@@ -311,8 +318,8 @@ Or via CLI: `crumb llm export --ckpt <dir> --name crumb-llm-tiny`
 - **BPE tokenizer** integration (use `tiktoken` or `tokenizers`)
 - **WikiText-2 reproduction** script (needs HuggingFace `datasets`)
 - **Quantisation / mobile deployment**
-- **Publish standalone `crumb-llm` PyPI package**
-- **Pre-trained checkpoint on HuggingFace Hub**
+- **Publish and maintain standalone `crumb-llm` PyPI package**
+- **Publish public HuggingFace artifact for `crumb-llm-tiny`**
 
 ## 11. References
 
@@ -339,6 +346,7 @@ crumb_llm/
 ├── sliding.py             # sliding-window field for N > F
 ├── compare.py             # head-to-head wave-field vs transformer
 ├── hub.py                 # HuggingFace Hub save/load + model cards
+├── registry.py            # model registry + checkpoint download
 ├── baseline.py            # TinyTransformerLM for comparison
 ├── tokenizer.py           # ByteTokenizer, CharTokenizer
 ├── crumb_adapter.py       # CRUMB → (input_ids, scatter_weights, ...)

@@ -1,0 +1,29 @@
+Everything is wired and backward-compatible. Here's the summary.
+
+## Summary
+
+All four items from the objective-fix round (Astra #2 + Opus #4) are implemented in `experiments/wavefield_video/`. No commit, per the standing rule for this scratch directory.
+
+**1) `data.py` — moving-mask batch**
+- New `moving_mask(frames, thresh)` → bool `[B, N-1, H, W]`, True where consecutive GT frames differ by `>thresh` in any channel (the pixels where copy-last is wrong).
+- `make_clip_batch(..., return_moving=True, move_thresh=)` appends the mask; return order is fixed and unambiguous — `out`, then `meta`, then `moving` (always last). New constant `MOVE_THRESH = 0.05`. Existing `return_meta` callers are untouched.
+
+**2) `train_compare.py` — motion-balanced loss + `copy_ratio`**
+- `--motion-loss` uses `motion_balanced_loss()` = `0.5·mean(E[moving]) + 0.5·mean(E[static]) + 0.25·MSE(pred−last, tgt−last)`, with empty-mask guards. `last` and the mask both key off the GT previous frame `clips[:, frames+k-1]` — consistent at every rollout step.
+- `copy_ratio = ‖pred−last‖/‖tgt−last‖` is **always** computed in eval and reported in the result JSON and the printed table (with the ≈0/≈1/≫1 legend).
+
+**3) `--rollout-ramp`** — holds `K=3` through the first half, ramps `3→8` linearly over the second half; `gen_frames` provisions for `Kmax=8` up front. The per-25-step log row now carries `"K"` so the ramp is observable.
+
+**4) `run_smoke_v4.sh` + `IMPL_NOTES_V4.md`** — five CPU blocks, each proving one flag end-to-end (mask shapes/ordering/threshold monotonicity; motion-loss + copy_ratio in JSON; K-ramp reaching 8 via the logged tail; both flags together; a no-flags regression that confirms the plain-MSE path is unchanged).
+
+`★ Insight ─────────────────────────────────────`
+- **Decoupling matters for fair comparison**: basing the mask on GT frame diffs (not the model's own rollout output) means the *same* moving/static partition is applied to wave/attn/ssm — the objective can't shift under whichever arm happens to be training.
+- **Instrument before you sweep**: `copy_ratio` is always-on (not gated behind `--motion-loss`) precisely so it also lands in *plain-MSE* runs — that's how you retroactively detect whether the old g32 SSM result was a collapse without re-deriving it.
+- **Curriculum via provisioning, not regeneration**: the ramp generates `Kmax` frames from step 1 and only varies how many rollout *terms* are summed — so changing K mid-training costs nothing and never re-shapes the data pipeline.
+`─────────────────────────────────────────────────`
+
+Since Python is session-gated here, you'll need to run the smoke yourself to confirm green:
+```
+cd experiments/wavefield_video && bash run_smoke_v4.sh
+```
+Want me to add `copy_ratio` to the **rollout** eval as well (not just single-step), or is the one-step collapse detector sufficient for now?

@@ -1,0 +1,444 @@
+"""Wave-field video predictor + transformer / SSM baselines (identical scaffolds).
+
+Mixing is 3D over (time, y, x), applied via FFT. Two wave kernels:
+
+  * ``separable``  (v1): damped-cosine kernels K_t(t)*K_y(y)*K_x(x). A *standing*
+                   field -- time and space factorize, so it cannot represent a
+                   translating pattern (whose spectrum obeys omega_t = v . k).
+  * ``dispersion`` (v2): each spatial-frequency cell (kx,ky) gets its own temporal
+                   pole  lambda(kx,ky) = exp(-alpha(kx,ky)) * exp(i*Omega(kx,ky)),
+                   Omega = vx*kx + vy*ky + beta*|k|, with 2-4 damped-oscillator
+                   modes per head. A *propagating* field: heads learn direction/
+                   speed. Implemented as a per-cell temporal transfer function
+                   (frequency-domain multiplier over the rfft/fft time axis) --
+                   the transfer of the causal recurrence
+                       z_t(k) = lambda(k) z_{t-1}(k) + B x_t(k),  y_t = Re(C z_t),
+                   so the SAME operator streams O(1)-in-T later (see ssm_lite.py).
+
+Fairness (v2): ALL arms share ONE compact factorized (t,y,x) positional encoding
+at the input; attention's giant per-layer [1,N,dim] table is gone. v1 numerics
+are still reproduced by the ``separable`` wave arm with every new flag off.
+"""
+import math
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class RMSNorm(nn.Module):
+    def __init__(self, dim, eps=1e-6):
+        super().__init__()
+        self.eps = eps
+        self.w = nn.Parameter(torch.ones(dim))
+
+    def forward(self, x):
+        return x * torch.rsqrt(x.pow(2).mean(-1, keepdim=True) + self.eps) * self.w
+
+
+class FFN(nn.Module):
+    def __init__(self, dim, mult=4.0):
+        super().__init__()
+        h = max(1, int(round(dim * mult)))
+        self.fc1 = nn.Linear(dim, h)
+        self.fc2 = nn.Linear(h, dim)
+
+    def forward(self, x):
+        return self.fc2(F.gelu(self.fc1(x)))
+
+
+class FactorizedPosEmb(nn.Module):
+    """Shared learned separable (t, y, x) positional embeddings, summed.
+
+    ONE compact table per axis, broadcast-added at the model input for every
+    arm. Parameter count is (T + H + W)*dim instead of the flat (T*H*W)*dim
+    table the v1 attention arm carried per layer -- so no arm can win just by
+    memorizing absolute position in a huge dedicated table."""
+
+    def __init__(self, dim, T, H, W):
+        super().__init__()
+        self.T, self.H, self.W = T, H, W
+        self.pt = nn.Parameter(torch.zeros(T, dim))
+        self.py = nn.Parameter(torch.zeros(H, dim))
+        self.px = nn.Parameter(torch.zeros(W, dim))
+        for p in (self.pt, self.py, self.px):
+            nn.init.normal_(p, std=0.02)
+
+    def forward(self, x):  # x: [B, N, dim], N = T*H*W in (t, y, x) order
+        B, N, D = x.shape
+        pos = (self.pt[:, None, None, :]
+               + self.py[None, :, None, :]
+               + self.px[None, None, :, :])          # [T, H, W, dim]
+        return x + pos.reshape(1, N, D)
+
+
+def _damped_cos(a, w, p, d):
+    """Per-head damped cosine e^{-|a||d|} cos(w d + p). a,w,p: [nh]; d: [L]."""
+    env = torch.exp(-a.abs()[:, None] * d.abs()[None, :])
+    return env * torch.cos(w[:, None] * d[None, :] + p[:, None])
+
+
+class WaveMix3D(nn.Module):
+    """Wave-field spatiotemporal mixer applied per head via FFT.
+
+    kernel_version: "separable" (v1 standing field) | "dispersion" (v2 propagating).
+    causal_time:    zero the future-reaching temporal taps (separable path).
+    linear_pad:     zero-padded (linear) convolution over time AND space so the
+                    FFT does not treat the clip as a torus (default ON for v2).
+    gate:           Hyena-style content gate  y = po(g * wave(pi(x))),
+                    g = sigmoid(MLP(pooled per-head features)), broadcast back.
+    local_fuse:     parallel 3x3 depthwise conv per head, added to the wave output
+                    before po (global field carries transport, local path edges).
+
+    All flags off with kernel_version="separable" => exact v1 rfftn code path.
+    """
+
+    def __init__(self, dim, n_heads, T, H, W, kernel_version="separable",
+                 causal_time=False, linear_pad=False, gate=False, local_fuse=False,
+                 n_modes=3):
+        super().__init__()
+        self.nh = n_heads
+        self.dh = dim // n_heads
+        self.T, self.H, self.W = T, H, W
+        self.kernel_version = kernel_version
+        self.causal_time = causal_time
+        self.linear_pad = linear_pad
+        self.gate = gate
+        self.local_fuse = local_fuse
+        self.n_modes = n_modes
+        self.pi = nn.Linear(dim, dim)
+        self.po = nn.Linear(dim, dim)
+
+        if kernel_version == "separable":
+            self.a_t = nn.Parameter(torch.rand(n_heads) * 0.05 + 0.01)
+            self.a_s = nn.Parameter(torch.rand(n_heads) * 0.05 + 0.01)
+            self.w_t = nn.Parameter(torch.rand(n_heads) * 2.0)
+            self.w_s = nn.Parameter(torch.rand(n_heads) * 2.0)
+            self.p_t = nn.Parameter(torch.zeros(n_heads))
+            self.p_s = nn.Parameter(torch.zeros(n_heads))
+            self.register_buffer("dt", (torch.arange(T) - T // 2).float(), persistent=False)
+            self.register_buffer("dy", (torch.arange(H) - H // 2).float(), persistent=False)
+            self.register_buffer("dx", (torch.arange(W) - W // 2).float(), persistent=False)
+        elif kernel_version == "dispersion":
+            # Per (head, mode): damping alpha = softplus(a0 + a1*|k|) (>0 => |lambda|<1,
+            # unconditionally stable); phase Omega = vx*kx + vy*ky + beta*|k|; input/
+            # output gains B, C. |k| grows with spatial frequency so a1>0 damps fast
+            # (small-scale) structure more, like physical viscosity.
+            sh = (n_heads, n_modes)
+            self.a0 = nn.Parameter(torch.full(sh, 0.5))
+            self.a1 = nn.Parameter(torch.full(sh, 0.1))
+            self.vx = nn.Parameter(torch.zeros(sh))
+            self.vy = nn.Parameter(torch.zeros(sh))
+            self.beta = nn.Parameter(torch.zeros(sh))
+            self.Bg = nn.Parameter(torch.ones(sh))
+            self.Cg = nn.Parameter(torch.randn(sh) * (n_modes ** -0.5))
+        else:
+            raise ValueError(f"unknown kernel_version {kernel_version!r}")
+
+        if local_fuse:
+            # Depthwise 3x3 per (head, channel); grouped conv over the spatial plane.
+            self.local = nn.Conv2d(dim, dim, 3, padding=1, groups=dim, bias=False)
+        if gate:
+            self.gate_fc = nn.Linear(self.dh, self.dh)
+
+    # ---- separable (v1) kernels ---------------------------------------------
+    def _kernels_1d(self):
+        kt = _damped_cos(self.a_t, self.w_t, self.p_t, self.dt)   # [nh, T]
+        ky = _damped_cos(self.a_s, self.w_s, self.p_s, self.dy)   # [nh, H]
+        kx = _damped_cos(self.a_s, self.w_s, self.p_s, self.dx)   # [nh, W]
+        if self.causal_time:
+            kt = kt * (self.dt >= 0).to(kt.dtype)[None, :]        # drop future (dt<0) taps
+        return kt, ky, kx
+
+    def kernels(self):
+        """Full centered 3D kernel (v1 circular-FFT path)."""
+        kt, ky, kx = self._kernels_1d()
+        k = kt[:, :, None, None] * ky[:, None, :, None] * kx[:, None, None, :]
+        return torch.fft.ifftshift(k, dim=(1, 2, 3))
+
+    def _lin_conv_axis(self, h, k1d, axis, n):
+        """1D "same" conv of h along ``axis`` with the centered per-head kernel
+        k1d [nh, n] (sampled at d = arange(n)-n//2).
+
+          linear_pad on  -> L = 2n-1, natural kernel placement + center crop:
+                            true zero-padded (non-circular) convolution, so a
+                            symmetric kernel stays symmetric and a causal kernel
+                            (dt<0 taps zeroed) reads only the past -- no torus wrap.
+          linear_pad off -> L = n, ifftshift placement + [0,n) crop: the v1
+                            circular convolution (wraps frame 0 <-> T-1)."""
+        if self.linear_pad:
+            L = 2 * n - 1
+            kb = h.new_zeros(self.nh, L)
+            kb[:, :n] = k1d.to(kb.dtype)                  # k1d[j] at lag (j - n//2)
+            start = n // 2                                # center crop of the full conv
+        else:
+            L = n
+            d = torch.arange(n, device=k1d.device) - n // 2
+            kb = h.new_zeros(self.nh, L)
+            kb[:, d.long() % L] = k1d.to(kb.dtype)        # ifftshift: zero-lag -> index 0
+            start = 0
+        shp = [1, self.nh] + [1] * (h.dim() - 2)
+        shp[axis] = L // 2 + 1
+        Kf = torch.fft.rfft(kb, n=L, dim=1).reshape(shp)
+        Hf = torch.fft.rfft(h, n=L, dim=axis)
+        y = torch.fft.irfft(Hf * Kf, n=L, dim=axis)
+        return y.narrow(axis, start, n)
+
+    def _wave_separable(self, h):  # h: [B,nh,T,H,W,dh]
+        if not (self.causal_time or self.linear_pad):
+            # exact v1 joint circular rfftn over (T,H,W)
+            K = torch.fft.rfftn(self.kernels(), s=(self.T, self.H, self.W),
+                                dim=(1, 2, 3)).unsqueeze(0).unsqueeze(-1)
+            X = torch.fft.rfftn(h, dim=(2, 3, 4))
+            return torch.fft.irfftn(X * K, s=(self.T, self.H, self.W), dim=(2, 3, 4))
+        kt, ky, kx = self._kernels_1d()
+        h = self._lin_conv_axis(h, ky, 3, self.H)     # y
+        h = self._lin_conv_axis(h, kx, 4, self.W)     # x
+        h = self._lin_conv_axis(h, kt, 2, self.T)     # time
+        return h
+
+    # ---- dispersion (v2) transfer function ----------------------------------
+    def _transfer(self, L, Hp, Wp, device):
+        """G[nh, L, Hp, Wp] complex: temporal transfer per spatial-freq cell,
+        G(w,k) = sum_m C_m B_m / (1 - lambda_m(k) e^{-i w}) -- the frequency
+        response of z_t = lambda z_{t-1} + B x_t summed over modes."""
+        ky = (2 * math.pi) * torch.fft.fftfreq(Hp, device=device)     # [Hp]
+        kx = (2 * math.pi) * torch.fft.fftfreq(Wp, device=device)     # [Wp]
+        knorm = torch.sqrt(kx[None, :] ** 2 + ky[:, None] ** 2)       # [Hp,Wp]
+        w = (2 * math.pi) * torch.arange(L, device=device) / L        # [L]
+        eiw = torch.exp(-1j * w)                                      # [L]
+        G = torch.zeros(self.nh, L, Hp, Wp, dtype=torch.cfloat, device=device)
+        for m in range(self.n_modes):
+            alpha = F.softplus(self.a0[:, m][:, None, None] + self.a1[:, m][:, None, None] * knorm)
+            Omega = (self.vx[:, m][:, None, None] * kx[None, None, :]
+                     + self.vy[:, m][:, None, None] * ky[None, :, None]
+                     + self.beta[:, m][:, None, None] * knorm)        # [nh,Hp,Wp]
+            lam = torch.exp(-alpha) * torch.exp(1j * Omega)           # [nh,Hp,Wp], |lam|<1
+            denom = 1 - lam[:, None, :, :] * eiw[None, :, None, None]  # [nh,L,Hp,Wp]
+            gain = (self.Cg[:, m] * self.Bg[:, m])[:, None, None, None]
+            G = G + gain.to(torch.cfloat) / denom
+        return G
+
+    def _wave_dispersion(self, h):  # h: [B,nh,T,H,W,dh]
+        Hp = 2 * self.H if self.linear_pad else self.H   # spatial zero-pad kills advection wrap
+        Wp = 2 * self.W if self.linear_pad else self.W
+        L = 2 * self.T                                   # temporal zero-pad => causal linear conv
+        Xs = torch.fft.fft2(h, s=(Hp, Wp), dim=(3, 4))   # [B,nh,T,Hp,Wp,dh] complex
+        Xt = torch.fft.fft(Xs, n=L, dim=2)               # over time -> [B,nh,L,Hp,Wp,dh]
+        G = self._transfer(L, Hp, Wp, h.device)[None, :, :, :, :, None]
+        Yt = torch.fft.ifft(Xt * G, n=L, dim=2)[:, :, :self.T]
+        Ys = torch.fft.ifft2(Yt, dim=(3, 4))[..., :self.H, :self.W, :]
+        return Ys.real
+
+    # ---- O(1)-in-T streaming recurrence (dispersion path only) --------------
+    def _dispersion_lam(self, device):
+        """Per-mode complex temporal pole lam[n_modes, nh, Hp, Wp] -- the SAME
+        lambda(k) = exp(-alpha(k)) * exp(i*Omega(k)) that ``_transfer`` builds,
+        so the recurrence below reproduces ``forward``'s dispersion math."""
+        Hp = 2 * self.H if self.linear_pad else self.H
+        Wp = 2 * self.W if self.linear_pad else self.W
+        ky = (2 * math.pi) * torch.fft.fftfreq(Hp, device=device)      # [Hp]
+        kx = (2 * math.pi) * torch.fft.fftfreq(Wp, device=device)      # [Wp]
+        knorm = torch.sqrt(kx[None, :] ** 2 + ky[:, None] ** 2)        # [Hp,Wp]
+        lams = []
+        for m in range(self.n_modes):
+            alpha = F.softplus(self.a0[:, m][:, None, None] + self.a1[:, m][:, None, None] * knorm)
+            Omega = (self.vx[:, m][:, None, None] * kx[None, None, :]
+                     + self.vy[:, m][:, None, None] * ky[None, :, None]
+                     + self.beta[:, m][:, None, None] * knorm)         # [nh,Hp,Wp]
+            lams.append(torch.exp(-alpha) * torch.exp(1j * Omega))     # [nh,Hp,Wp], |lam|<1
+        return torch.stack(lams, 0), Hp, Wp                            # [n_modes,nh,Hp,Wp]
+
+    def init_state(self, B, device):
+        """Streaming state for ``step()`` (dispersion path only): complex zeros of
+        shape [B, n_modes, nh, Hp, Wp, dh]. Mirrors ``SSMLite.init_state(B, device)``
+        so the sanity harness can drive both mixers identically. O(1) in T."""
+        assert self.kernel_version == "dispersion", "step() is dispersion-only"
+        Hp = 2 * self.H if self.linear_pad else self.H
+        Wp = 2 * self.W if self.linear_pad else self.W
+        return torch.zeros(B, self.n_modes, self.nh, Hp, Wp, self.dh,
+                           dtype=torch.cfloat, device=device)
+
+    def step(self, x_t, state):
+        """Advance one frame of the dispersion wave recurrence. ``x_t``: [B, H*W, D]
+        (raw input for frame t); returns ([B, H*W, D], new_state).
+
+        Per mode m and spatial-frequency cell k=(kx,ky):
+            z_t^m(k) = lam_m(k) * z_{t-1}^m(k) + Bg_m * x_hat_t(k)   # Bg = input gain
+            out_hat(k) = sum_m Cg_m * z_t^m(k)                       # Cg = output gain
+        then iFFT2 over the (Hp,Wp) spatial spectrum, crop to (H,W), take Re, and
+        apply ``po``. This is the O(d_state)-memory-in-T equivalent of the
+        frequency-domain transfer in ``_wave_dispersion`` -- they agree up to the
+        |lam|^{T+1} time-aliasing that forward's L=2T zero-pad leaves behind
+        (negligible for stable poles; verified in sanity_check.py to < 1e-3)."""
+        assert self.kernel_version == "dispersion", "step() is dispersion-only"
+        B, S, D = x_t.shape
+        h = self.pi(x_t).view(B, self.H, self.W, self.nh, self.dh).permute(0, 3, 1, 2, 4)
+        h = h.float()                                                  # [B,nh,H,W,dh]
+        lam, Hp, Wp = self._dispersion_lam(x_t.device)                 # [n_modes,nh,Hp,Wp]
+        x_hat = torch.fft.fft2(h, s=(Hp, Wp), dim=(2, 3))              # [B,nh,Hp,Wp,dh] cfloat
+        Bg = self.Bg.t()[None, :, :, None, None, None]                 # [1,n_modes,nh,1,1,1]
+        Cg = self.Cg.t()[None, :, :, None, None, None]                 # [1,n_modes,nh,1,1,1]
+        lam_b = lam[None, :, :, :, :, None]                            # [1,n_modes,nh,Hp,Wp,1]
+        state = lam_b * state + Bg.to(torch.cfloat) * x_hat[:, None]   # [B,n_modes,nh,Hp,Wp,dh]
+        out_hat = (Cg.to(torch.cfloat) * state).sum(1)                 # [B,nh,Hp,Wp,dh]
+        out = torch.fft.ifft2(out_hat, dim=(2, 3))[..., :self.H, :self.W, :].real
+        out = out.permute(0, 2, 3, 1, 4).reshape(B, S, D)              # (y,x,nh,dh) -> [B,H*W,D]
+        return self.po(out.to(x_t.dtype)), state
+
+    # ---- shared post-ops (gate + local fuse) --------------------------------
+    def _apply_local(self, out, h):
+        B = h.shape[0]
+        hp = h.permute(0, 2, 1, 5, 3, 4).reshape(B * self.T, self.nh * self.dh, self.H, self.W)
+        loc = self.local(hp).reshape(B, self.T, self.nh, self.dh, self.H, self.W)
+        loc = loc.permute(0, 2, 1, 4, 5, 3)              # [B,nh,T,H,W,dh]
+        return out + loc
+
+    def _apply_gate(self, out, h):
+        pooled = h.mean(dim=(2, 3, 4))                    # [B,nh,dh] per-head content summary
+        g = torch.sigmoid(self.gate_fc(pooled))           # [B,nh,dh]
+        return out * g[:, :, None, None, None, :]
+
+    def forward(self, x):  # x: [B, N, D], N = T*H*W
+        B, N, D = x.shape
+        h = self.pi(x).view(B, self.T, self.H, self.W, self.nh, self.dh).permute(0, 4, 1, 2, 3, 5)
+        h = h.float()
+        if self.kernel_version == "dispersion":
+            out = self._wave_dispersion(h)
+        else:
+            out = self._wave_separable(h)
+        if self.local_fuse:
+            out = self._apply_local(out, h)
+        if self.gate:
+            out = self._apply_gate(out, h)
+        out = out.permute(0, 2, 3, 4, 1, 5).reshape(B, N, D)
+        return self.po(out.to(x.dtype))
+
+
+class AttnMix(nn.Module):
+    """Full attention baseline over flattened tokens. Position comes only from the
+    shared FactorizedPosEmb at the model input -- the v1 per-layer [1,N,dim] table
+    is deleted so attention no longer gets a free positional-memory advantage.
+
+    causal: temporal causal mask -- a token in frame t attends only to tokens in
+    frames <= t (spatial attention within/behind the current frame stays full)."""
+
+    def __init__(self, dim, n_heads, T, H, W, causal=False):
+        super().__init__()
+        self.nh = n_heads
+        self.T, self.H, self.W = T, H, W
+        self.causal = causal
+        self.qkv = nn.Linear(dim, 3 * dim)
+        self.po = nn.Linear(dim, dim)
+        if causal:
+            frame = torch.arange(T * H * W) // (H * W)             # frame id per token
+            mask = frame[None, :] <= frame[:, None]                # [N,N] bool, keep <= t
+            self.register_buffer("attn_mask", mask, persistent=False)
+
+    def forward(self, x):
+        B, N, D = x.shape
+        q, k, v = self.qkv(x).chunk(3, dim=-1)
+        q, k, v = (t.view(B, N, self.nh, D // self.nh).transpose(1, 2) for t in (q, k, v))
+        mask = self.attn_mask if self.causal else None
+        y = F.scaled_dot_product_attention(q, k, v, attn_mask=mask)
+        y = y.transpose(1, 2).reshape(B, N, D)
+        return self.po(y)
+
+
+class Block(nn.Module):
+    def __init__(self, mix, dim, ffn_mult=4.0):
+        super().__init__()
+        self.n1 = RMSNorm(dim)
+        self.mix = mix
+        self.n2 = RMSNorm(dim)
+        self.ffn = FFN(dim, mult=ffn_mult)
+
+    def forward(self, x):
+        x = x + self.mix(self.n1(x))
+        return x + self.ffn(self.n2(x))
+
+
+class VideoPredictor(nn.Module):
+    """Frames [B,T,3,H,W] -> per-cell tokens -> mix -> predict next frame.
+
+    residual: predict the next frame as last_frame + delta, delta = head(last
+              tokens) with the head's final linear zero-initialized, so training
+              starts exactly at the copy-last baseline instead of learning RGB
+              reconstruction from scratch. (default ON for v2; off reproduces v1.)
+    kind: "wave" | "attn" | "ssm"."""
+
+    def __init__(self, dim, n_layers, n_heads, T, H, W, kind,
+                 causal=False, residual=True, ffn_mult=4.0,
+                 kernel_version="separable", linear_pad=False,
+                 gate=False, local_fuse=False):
+        super().__init__()
+        self.T, self.H, self.W = T, H, W
+        self.kind = kind
+        self.residual = residual
+        self.embed = nn.Conv2d(3, dim, 3, padding=1)
+        self.posemb = FactorizedPosEmb(dim, T, H, W)   # shared, all arms, always on
+        blocks = []
+        for _ in range(n_layers):
+            if kind == "wave":
+                mix = WaveMix3D(dim, n_heads, T, H, W, kernel_version=kernel_version,
+                                causal_time=causal, linear_pad=linear_pad,
+                                gate=gate, local_fuse=local_fuse)
+            elif kind == "attn":
+                mix = AttnMix(dim, n_heads, T, H, W, causal=causal)
+            elif kind == "ssm":
+                from ssm_lite import SSMLite
+                mix = SSMLite(dim, n_heads, T, H, W, causal=causal)
+            else:
+                raise ValueError(f"unknown kind {kind!r}")
+            blocks.append(Block(mix, dim, ffn_mult=ffn_mult))
+        self.blocks = nn.ModuleList(blocks)
+        self.norm = RMSNorm(dim)
+        self.head = nn.Linear(dim, 3)
+        if residual:
+            nn.init.zeros_(self.head.weight)
+            nn.init.zeros_(self.head.bias)
+        self.use_ckpt = False
+
+    def forward(self, frames):  # frames: [B, T, 3, H, W] (context frames)
+        B, T, C, H, W = frames.shape
+        f = frames.reshape(B * T, C, H, W)
+        e = self.embed(f).reshape(B, T, self.H * self.W, -1).reshape(B, T * self.H * self.W, -1)
+        x = self.posemb(e)
+        for blk in self.blocks:
+            if self.use_ckpt and self.training:
+                x = torch.utils.checkpoint.checkpoint(blk, x, use_reentrant=False)
+            else:
+                x = blk(x)
+        x = self.norm(x)
+        last = x[:, (self.T - 1) * self.H * self.W: self.T * self.H * self.W]  # [B, HW, D]
+        delta = self.head(last).reshape(B, self.H, self.W, 3).permute(0, 3, 1, 2)  # [B,3,H,W]
+        if self.residual:
+            return frames[:, -1] + delta
+        return delta
+
+    # ---- O(1)-in-T streaming rollout (wave/dispersion only) -----------------
+    def stream_init(self, B, device):
+        """Per-layer WaveMix3D streaming state (list, one entry per block)."""
+        assert self.kind == "wave", "stream_step is wave-only"
+        return [blk.mix.init_state(B, device) for blk in self.blocks]
+
+    def stream_step(self, frame, states, t_index):
+        """Ingest ONE frame [B,3,H,W] and predict the next, threading the O(1)
+        recurrence state through every block. ``t_index`` is the absolute frame
+        index; the temporal positional embedding is clamped to pt[min(t,T-1)] --
+        a documented steady-state choice so rollout can run past T frames (the
+        recurrence itself is time-invariant, so this only affects the additive
+        input phase, not the dynamics). Returns (next_frame [B,3,H,W], states)."""
+        B = frame.shape[0]
+        e = self.embed(frame).reshape(B, self.H * self.W, -1)            # [B,HW,D]
+        pe = self.posemb
+        tpos = min(t_index, self.T - 1)
+        spatial = (pe.py[:, None, :] + pe.px[None, :, :]).reshape(self.H * self.W, -1)
+        x = e + pe.pt[tpos][None, None, :] + spatial[None]
+        for i, blk in enumerate(self.blocks):
+            m, states[i] = blk.mix.step(blk.n1(x), states[i])
+            x = x + m
+            x = x + blk.ffn(blk.n2(x))
+        x = self.norm(x)
+        delta = self.head(x).reshape(B, self.H, self.W, 3).permute(0, 3, 1, 2)
+        nxt = frame + delta if self.residual else delta
+        return nxt, states

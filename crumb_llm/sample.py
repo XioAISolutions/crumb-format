@@ -15,20 +15,26 @@ import torch
 
 from .baseline import TinyTransformerLM, TransformerConfig
 from .model import WaveFieldLM, WaveFieldConfig
-from .tokenizer import ByteTokenizer, CharTokenizer
+from .tokenizer import ByteTokenizer, load_tokenizer
 
 
 def load_checkpoint(ckpt_dir: str | Path):
     p = Path(ckpt_dir)
-    ckpt = torch.load(p / "ckpt.pt", map_location="cpu", weights_only=False)
+    if not (p / "ckpt.pt").exists():
+        if (p / "config.json").exists():
+            from .hub import load_hub_model
+
+            return load_hub_model(p)
+        raise FileNotFoundError(f"no ckpt.pt or Hub config.json in {p}")
+    # weights_only=True restricts unpickling to tensors + basic Python types,
+    # avoiding arbitrary code execution from untrusted checkpoint files.
+    ckpt = torch.load(p / "ckpt.pt", map_location="cpu", weights_only=True)
     tok_path = p / "tokenizer.json"
-    tok_type = ckpt.get("tokenizer_type", "byte")
-    if tok_type == "byte":
-        tok = ByteTokenizer.load(tok_path) if tok_path.exists() else ByteTokenizer()
-    elif tok_type == "char":
-        tok = CharTokenizer.load(tok_path)
+    if tok_path.exists():
+        tok = load_tokenizer(tok_path)
     else:
-        raise ValueError(f"unknown tokenizer type: {tok_type!r}")
+        # Legacy checkpoints (byte tokenizer didn't always write the sidecar).
+        tok = ByteTokenizer()
     arch = ckpt.get("arch", "wave_field")
     if arch == "wave_field":
         cfg = WaveFieldConfig(**ckpt["model_config"])

@@ -48,12 +48,34 @@ from typing import Iterable
 import torch
 from torch import Tensor
 
-# Reuse the canonical parser from cli/crumb.py.
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_REPO_ROOT / "cli"))
-from crumb import parse_crumb  # type: ignore  # noqa: E402
-
 from .tokenizer import ByteTokenizer  # noqa: E402
+
+
+def _get_parse_crumb():
+    """Lazy-import the canonical crumb parser.
+
+    The standalone ``crumb-llm`` install doesn't pull in crumb-format,
+    so this can't be a top-level import. Resolution order:
+      1. Installed ``crumb`` module (if crumb-format is on path)
+      2. The sibling ``cli/crumb.py`` in the parent repo (dev checkouts)
+      3. Raise a clear error pointing at the [crumb] extra.
+    """
+    try:
+        from crumb import parse_crumb  # type: ignore
+        return parse_crumb
+    except ImportError:
+        pass
+    repo_root = Path(__file__).resolve().parent.parent
+    cli_dir = repo_root / "cli"
+    if (cli_dir / "crumb.py").exists():
+        sys.path.insert(0, str(cli_dir))
+        from crumb import parse_crumb  # type: ignore
+        return parse_crumb
+    raise ImportError(
+        "crumb_llm.crumb_adapter requires the `crumb` parser. Install with:\n"
+        "    pip install 'crumb-llm[crumb]'\n"
+        "or `pip install crumb-format`."
+    )
 
 
 _FOLD_RE = re.compile(r"^fold:([a-zA-Z0-9_-]+)/(summary|full)$")
@@ -111,7 +133,7 @@ class CrumbPriorBuilder:
     # ── Main entry ───────────────────────────────────────────────────
 
     def build(self, crumb_text: str) -> CrumbPriors:
-        parsed = parse_crumb(crumb_text)
+        parsed = _get_parse_crumb()(crumb_text)
         headers: dict[str, str] = parsed["headers"]
         sections: dict[str, list[str]] = parsed["sections"]
 

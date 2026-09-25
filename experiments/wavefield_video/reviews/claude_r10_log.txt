@@ -1,0 +1,24 @@
+All wiring is consistent across both files. Since python/bash execution is session-gated here, the operator runs the proofs via `bash run_smoke_r10.sh`. Here's what I implemented.
+
+## Summary
+
+All edits in `train_compare.py` + `data.py`, no commits. Every knob is **default-off / no-op** — the default pixel path is byte-identical except rollout-eval now sub-batches seeds (metric-preserving).
+
+**(1) `--resid-balanced`** (Opus leak #1) — in `motion_balanced_loss`, restricts the `0.25·resid` term to moving pixels. The insight that made this a 2-line change:
+
+`★ Insight ─────────────────────────────────────`
+`MSE(pred-last, target-last)` is algebraically `MSE(pred, target)` — the `last` cancels — so the "residual" term was silently a **full-frame** MSE all along. That's exactly why it re-imported the copy-last shortcut and diluted ∝ `moving_frac` (~4× weaker at g32). Restricting it to `E[moving]` makes it grid-invariant.
+`─────────────────────────────────────────────────`
+
+**(2) `--motion-weighted`** (Astra soft variant) — replaces the hard moving mask with `w = clamp(|Δ|/(mean|Δ|+eps), 1, w_max)` applied to the motion term; static pixels clamp to `w=1`. Composable with (1). `--motion-w-max` default 10.
+
+**(3) `--radius`/`--speed`** — passthrough to `data.make_clip_batch` (defaults = `RADIUS`/`SPEED`). Also scaled two dependents so the geometry control isn't confounded: collision `CONTACT` (`2r`) and the eval divergence thresholds (`div_thresh_px = radius`, `id_tol = 2·radius`).
+
+**(4) `--eval-chunk`** (default 4) — `rollout_eval` forwards ≤`eval_chunk` seeds at once as independent rollouts, combining via seed-weighted MSE mean (exact) + seed-axis centroid concat. Auto-batch OOM handler now shrinks `eval_chunk` first (keeps all seeds → metric unchanged), dropping `eval_seeds` only at chunk=1.
+
+**(5) Deliverables** — `run_smoke_r10.sh` proves: loss unit tests (default byte-identical + both knobs match spec), each flag wired NaN-free, `--radius` grows the moving footprint, chunked rollout ≡ all-at-once (chunk=1/2/S agree within FP), and deterministic default-path regression with documented defaults. `IMPL_NOTES_R10.md` carries the exact B / C / geometry (+ optional D) retune commands built on the `run_deep1.sh` g32 config.
+
+Two things worth flagging for when you review the runs:
+- **`--motion-weighted` overlaps `e_stat`**: static pixels count in both `0.5·e_move` (at w=1) and `0.5·e_stat`. That's faithful to Astra's `L_static + λ·L_motion_soft`, and I documented it — but if you'd prefer the soft term to *exclude* static pixels entirely (pure replacement of the hard mask), that's a one-line change. Your call on which semantics you want for the retune.
+- The default `--eval-chunk 4` means the default rollout now executes in 8 sub-batches of 4 (for `eval_seeds=32`) instead of one batch of 32 — metric-equivalent but a real change to the execution path, which is the intended OOM fix.
+EXIT-0

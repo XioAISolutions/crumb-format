@@ -1,0 +1,5 @@
+R13 TASK: streaming-path hardening + checkpoint salvage mode. Read wfvideo.py (streaming/recurrent step), IMPL_NOTES_R5.md, run_smoke_v3.sh, PRODUCT_SPEC_brainsnn.md (streaming gap note). No commits.
+(1) Add gate + local_fuse support to the recurrent/windowed STREAMING step so a gate+fuse checkpoint streams equivalently to its windowed forward (verify like run_smoke_v3: step()==forward() to 1e-3, causality, stability over 384+ frames).
+(2) train_compare.py: --eval-only mode: load a checkpoint (+ result JSON for config), run ONLY eval + rollout-eval (+ semantic if available), write result JSON suffix _evalonly. No training. Must honor --eval-chunk.
+(3) run_smoke_r13.sh: streaming gate+fuse equivalence; eval-only reproduces a tiny trained run's inline eval numbers (train 20 steps, then --eval-only, diff).
+(4) IMPL_NOTES_R13.md: exact box commands to (a) salvage runs_deep/ckpt_attn_a1g32b.pt and runs_deep/ckpt_wave_w1g64.pt via --eval-only, (b) stream a gate+fuse model and diff vs windowed.

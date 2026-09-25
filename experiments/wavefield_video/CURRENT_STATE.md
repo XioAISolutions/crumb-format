@@ -1,0 +1,8 @@
+# STATE OF THE OCEAN — 2026-09-25 (late night)
+Objective: crumb-video on crumb-format — wave-field video model: O(N log N) dispersion kernels (separable damped-cosine FFT), 3 params/head, streaming recurrence z_t(k)=lam(k)z_{t-1}(k)+B*x_t(k), single RTX 4090 24GB.
+Pixel track (balls, 16/32 grids): g16 wave ~2x better than attention on fair protocol (5/5 seeds). g32 wave UNDER-MOTION COLLAPSE (copy_ratio 0.115) diagnosed as objective arithmetic (resid-term dilution + K-ramp on emptier canvas); retune matrix (7 runs) executing now (resid-balanced, motion-weighted, K-fixed controls, no-collisions, geometry control).
+Latent track (AE 16x compression, 8x8x64 latents): both arms fade to black in decoded pixels — earlier pixel-MSE 'wins over freezing' were darkness artifacts. Semantic metric (blob count/position matching, anti-cheat tested) now built in r12 to prevent metric-fooling.
+Difficulty ladder built + queued: D1 speed 2x, D2 8 balls, D3 12 balls + speed, D4 radius 0.8, D5 grid 64 + 8 balls, D6 1024-frame horizon.
+Known gaps: streaming path lacks gate/fuse support; no fused single-step Triton streaming kernel yet (spec exists); eval-OOM fixed (chunked); two lost evals salvageable from checkpoints.
+Ambition: long-form coherent stylized video that beats frontier models exactly where they break (multi-minute coherence), product path = brainsnn.com (the-brain repo, Railway auto-deploy), 4090-only economics, 24/7 ops.
+ASK: How to HARDEN and BETTER this system at this point. Ranked, concrete: (a) objective/architecture, (b) engineering rigor/reproducibility, (c) evaluation integrity, (d) productization. What are we missing or mis-investing in? Give the next 5-10 moves with expected payoff and kill-criteria. Plain markdown.
