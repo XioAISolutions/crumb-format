@@ -1,0 +1,209 @@
+# Wave Field LLM - Large Instruction-Tuned Model Configuration
+# 1.5B parameters - Instruction-following and chat-optimized
+
+model:
+  name: wavefield-large-instruct
+  version: 1.0.0
+  description: "Instruction-tuned Wave Field LLM for chat and task completion"
+  base_model: "wavefield-large"
+  specialization: "instruction"
+  
+  architecture:
+    dim: 2048                  # Hidden dimension
+    n_layers: 32               # Number of transformer layers
+    n_heads: 32                # Number of attention heads
+    field_size: 2048           # Wave field size
+    vocab_size: 50257          # GPT-2 tokenizer vocab size
+    max_seq_len: 32768         # Very long context for instructions
+    dropout: 0.1               # Dropout rate
+    use_flash_attention: true  # Flash attention (requires GPU)
+    
+  wave_field:
+    wave_dim: 256              # Wave dimension
+    num_frequencies: 64        # Number of frequency components
+    phase_shift: true          # Enable phase shifting
+    amplitude_modulation: true # Enable amplitude modulation
+
+training:
+  # Training strategy: Start from wavefield-large checkpoint
+  resume_from: "models/wavefield-large/checkpoint-best.pt"
+  
+  # Multi-stage instruction tuning
+  stages:
+    - name: "supervised_finetuning"
+      total_tokens: 50_000_000_000   # 50B tokens
+      learning_rate: 1.0e-4
+      max_steps: 50000
+      
+    - name: "reward_modeling"
+      total_tokens: 10_000_000_000   # 10B tokens
+      learning_rate: 5.0e-5
+      max_steps: 10000
+      
+    - name: "reinforcement_learning"
+      total_tokens: 20_000_000_000   # 20B tokens
+      learning_rate: 3.0e-5
+      max_steps: 20000
+  
+  # Training budget (total)
+  total_tokens: 80_000_000_000   # 80B tokens
+  batch_size: 32                  # Per-device batch size
+  gradient_accumulation: 64       # Gradient accumulation steps
+  effective_batch_size: 2048      # batch_size * gradient_accumulation
+  
+  # Optimization
+  learning_rate: 1.0e-4          # Lower LR for instruction tuning
+  min_learning_rate: 1.0e-5
+  weight_decay: 0.1
+  beta1: 0.9
+  beta2: 0.95
+  grad_clip: 1.0
+  
+  # Learning rate schedule
+  warmup_steps: 1000
+  max_steps: 80000
+  lr_decay_style: "cosine"
+  
+  # Precision
+  mixed_precision: "bf16"
+  
+  # Checkpointing
+  save_interval: 2000
+  eval_interval: 1000
+  keep_last_n_checkpoints: 20
+  
+  # Early stopping
+  early_stopping_patience: 20
+  early_stopping_metric: "instruction_following_score"
+  
+  # Advanced optimization
+  use_fused_adam: true
+  use_gradient_checkpointing: true
+
+dataset:
+  # Instruction-focused dataset mixture (weights sum to 1.0)
+  mix:
+    # Instruction datasets
+    flan: 0.25                 # FLAN instruction dataset
+    dolly: 0.15                # Databricks Dolly
+    oasst: 0.15                # OpenAssistant conversations
+    sharegpt: 0.10             # ShareGPT conversations
+    
+    # Task-specific datasets
+    code_instructions: 0.10    # Code generation instructions
+    math_instructions: 0.08    # Math problem solving
+    reasoning_chains: 0.07     # Chain-of-thought reasoning
+    
+    # Safety and alignment
+    helpful_harmless: 0.05     # Helpful and harmless responses
+    constitutional_ai: 0.05    # Constitutional AI principles
+  
+  # Data processing
+  seq_length: 32768            # Very long sequences
+  num_workers: 32
+  prefetch_factor: 4
+  
+  # Validation
+  val_split: 0.002
+  val_samples: 100000
+  
+  # Instruction-specific preprocessing
+  format_style: "chat"         # chat, instruction, or mixed
+  system_prompt: true
+  multi_turn: true
+  max_turns: 10
+
+hardware:
+  # Hardware requirements
+  min_gpus: 16
+  recommended_gpus: 32
+  gpu_memory_gb: 80
+  cpu_cores: 128
+  ram_gb: 512
+
+logging:
+  # Logging configuration
+  log_interval: 100
+  wandb_project: "wavefield-llm-instruct"
+  wandb_entity: null
+  tensorboard: true
+  log_dir: "logs/wavefield-large-instruct"
+
+evaluation:
+  # Instruction-following evaluation benchmarks
+  benchmarks:
+    - "alpaca_eval"            # Instruction following
+    - "mt_bench"               # Multi-turn conversations
+    - "vicuna_bench"           # Chat quality
+    - "truthfulqa"             # Truthfulness
+    - "mmlu"                   # Knowledge
+    - "humaneval"              # Code generation
+    - "gsm8k"                  # Math reasoning
+    - "bbh"                    # Big-Bench Hard
+  
+  # Evaluation frequency
+  eval_during_training: true
+  eval_steps: 1000
+  
+  # Human evaluation
+  human_eval_enabled: true
+  human_eval_frequency: 5000
+  human_eval_samples: 100
+
+distributed:
+  # Distributed training settings
+  backend: "nccl"
+  find_unused_parameters: false
+  gradient_as_bucket_view: true
+  static_graph: true
+  
+  # FSDP settings
+  use_fsdp: true
+  fsdp_sharding_strategy: "FULL_SHARD"
+  fsdp_cpu_offload: false
+  fsdp_backward_prefetch: "BACKWARD_PRE"
+  fsdp_auto_wrap_policy: "transformer_auto_wrap_policy"
+
+# Instruction tuning specific features
+instruction_features:
+  # Chat template
+  chat_template: |
+    <|system|>
+    {system_message}
+    <|user|>
+    {user_message}
+    <|assistant|>
+    {assistant_message}
+  
+  # Special tokens
+  special_tokens:
+    - "<|system|>"
+    - "<|user|>"
+    - "<|assistant|>"
+    - "<|end|>"
+  
+  # Safety features
+  safety:
+    content_filtering: true
+    toxicity_threshold: 0.5
+    pii_detection: true
+    jailbreak_detection: true
+  
+  # RLHF settings (for RL stage)
+  rlhf:
+    reward_model: "models/wavefield-reward-model"
+    ppo_epochs: 4
+    kl_penalty: 0.1
+    value_loss_coef: 0.1
+    entropy_coef: 0.01
+    clip_range: 0.2
+    
+  # Response quality
+  quality:
+    min_response_length: 10
+    max_response_length: 2048
+    temperature: 0.7
+    top_p: 0.9
+    repetition_penalty: 1.1
+
+# Made with Bob

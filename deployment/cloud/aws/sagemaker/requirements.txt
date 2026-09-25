@@ -1,0 +1,13 @@
+# Wave Field LLM - SageMaker Dependencies
+
+# AWS SDK
+boto3>=1.28.0
+sagemaker>=2.190.0
+
+# ML Framework
+torch>=2.0.0
+transformers>=4.35.0
+
+# Utilities
+numpy>=1.24.0
+pandas>=2.0.0

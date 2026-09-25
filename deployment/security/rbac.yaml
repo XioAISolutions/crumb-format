@@ -1,0 +1,370 @@
+# Kubernetes RBAC Configuration for Wave Field LLM
+# Production-grade role-based access control
+
+---
+# Namespace for Wave Field LLM
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wavefield-llm
+  labels:
+    name: wavefield-llm
+    environment: production
+
+---
+# Service Account for API pods
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wavefield-api
+  namespace: wavefield-llm
+  labels:
+    app: wavefield-llm
+    component: api
+
+---
+# Service Account for inference pods
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wavefield-inference
+  namespace: wavefield-llm
+  labels:
+    app: wavefield-llm
+    component: inference
+
+---
+# Service Account for monitoring
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wavefield-monitoring
+  namespace: wavefield-llm
+  labels:
+    app: wavefield-llm
+    component: monitoring
+
+---
+# Role for API pods (limited permissions)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wavefield-api-role
+  namespace: wavefield-llm
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+    resourceNames: ["wavefield-api-secrets"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list"]
+
+---
+# Role for inference pods
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wavefield-inference-role
+  namespace: wavefield-llm
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+    resourceNames: ["wavefield-model-secrets"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+
+---
+# Role for monitoring
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wavefield-monitoring-role
+  namespace: wavefield-llm
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+
+---
+# RoleBinding for API
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wavefield-api-rolebinding
+  namespace: wavefield-llm
+subjects:
+  - kind: ServiceAccount
+    name: wavefield-api
+    namespace: wavefield-llm
+roleRef:
+  kind: Role
+  name: wavefield-api-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding for inference
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wavefield-inference-rolebinding
+  namespace: wavefield-llm
+subjects:
+  - kind: ServiceAccount
+    name: wavefield-inference
+    namespace: wavefield-llm
+roleRef:
+  kind: Role
+  name: wavefield-inference-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding for monitoring
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wavefield-monitoring-rolebinding
+  namespace: wavefield-llm
+subjects:
+  - kind: ServiceAccount
+    name: wavefield-monitoring
+    namespace: wavefield-llm
+roleRef:
+  kind: Role
+  name: wavefield-monitoring-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ClusterRole for cross-namespace monitoring
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: wavefield-cluster-monitoring
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "nodes/metrics", "nodes/stats"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list"]
+
+---
+# ClusterRoleBinding for monitoring
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: wavefield-cluster-monitoring-binding
+subjects:
+  - kind: ServiceAccount
+    name: wavefield-monitoring
+    namespace: wavefield-llm
+roleRef:
+  kind: ClusterRole
+  name: wavefield-cluster-monitoring
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Admin role for operators
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wavefield-admin-role
+  namespace: wavefield-llm
+rules:
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+
+---
+# Developer role (read-only + logs)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wavefield-developer-role
+  namespace: wavefield-llm
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "pods/log", "services", "configmaps"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets", "statefulsets"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs", "cronjobs"]
+    verbs: ["get", "list", "watch"]
+
+---
+# Read-only role for auditors
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wavefield-auditor-role
+  namespace: wavefield-llm
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps", "events"]
+    verbs: ["get", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "list"]
+
+---
+# Pod Security Policy (if PSP is enabled)
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: wavefield-restricted
+  annotations:
+    seccomp.security.alpha.kubernetes.io/allowedProfileNames: 'runtime/default'
+    apparmor.security.beta.kubernetes.io/allowedProfileNames: 'runtime/default'
+spec:
+  privileged: false
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+  volumes:
+    - 'configMap'
+    - 'emptyDir'
+    - 'projected'
+    - 'secret'
+    - 'downwardAPI'
+    - 'persistentVolumeClaim'
+  hostNetwork: false
+  hostIPC: false
+  hostPID: false
+  runAsUser:
+    rule: 'MustRunAsNonRoot'
+  seLinux:
+    rule: 'RunAsAny'
+  supplementalGroups:
+    rule: 'RunAsAny'
+  fsGroup:
+    rule: 'RunAsAny'
+  readOnlyRootFilesystem: false
+
+---
+# Network Policy - restrict ingress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wavefield-api-netpol
+  namespace: wavefield-llm
+spec:
+  podSelector:
+    matchLabels:
+      app: wavefield-api
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+        - podSelector:
+            matchLabels:
+              app: wavefield-api
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: wavefield-inference
+      ports:
+        - protocol: TCP
+          port: 8001
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+
+---
+# Network Policy - inference pods
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: wavefield-inference-netpol
+  namespace: wavefield-llm
+spec:
+  podSelector:
+    matchLabels:
+      app: wavefield-inference
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: wavefield-api
+      ports:
+        - protocol: TCP
+          port: 8001
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 53
+        - protocol: UDP
+          port: 53
+
+# Made with Bob

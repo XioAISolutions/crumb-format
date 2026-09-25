@@ -1,0 +1,102 @@
+# Lightweight CPU-only Dockerfile for Wave Field LLM
+# Optimized for minimal size and CPU inference
+
+# ============================================================================
+# Stage 1: Builder
+# ============================================================================
+FROM python:3.11-slim as builder
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+# Install minimal build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Copy requirements
+COPY requirements.txt /tmp/requirements.txt
+
+# Install minimal dependencies (exclude heavy packages)
+WORKDIR /tmp
+RUN grep -v "torch\|tensorflow\|jax" requirements.txt > requirements-minimal.txt || true && \
+    pip install --no-cache-dir -r requirements-minimal.txt
+
+# Install PyTorch CPU-only (smallest version)
+RUN pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
+
+# Copy and install application
+COPY crumb_llm/ /app/crumb_llm/
+COPY api/ /app/api/
+COPY setup.py /app/
+COPY README.md /app/
+
+WORKDIR /app
+RUN pip install --no-cache-dir -e .
+
+# ============================================================================
+# Stage 2: Minimal Runtime
+# ============================================================================
+FROM python:3.11-slim
+
+# Metadata
+LABEL maintainer="Wave Field LLM Team"
+LABEL description="Lightweight CPU-only Wave Field LLM"
+LABEL version="1.0.0"
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    WAVE_FIELD_ENV=production \
+    WAVE_FIELD_LOG_LEVEL=INFO \
+    OMP_NUM_THREADS=4 \
+    MKL_NUM_THREADS=4
+
+# Install only essential runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r wavefield && \
+    useradd -r -g wavefield -u 1000 -m wavefield
+
+# Copy from builder
+COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app /app
+
+# Create directories
+RUN mkdir -p /app/models /app/data /app/logs /app/cache && \
+    chown -R wavefield:wavefield /app
+
+WORKDIR /app
+
+# Copy entrypoint
+COPY deployment/docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && chown wavefield:wavefield /entrypoint.sh
+
+USER wavefield
+
+EXPOSE 8000
+
+# Lighter health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+VOLUME ["/app/models", "/app/data", "/app/logs"]
+
+ENTRYPOINT ["/entrypoint.sh"]
+
+# CPU-optimized command
+CMD ["python", "-m", "api.server", "--host", "0.0.0.0", "--port", "8000", "--device", "cpu", "--workers", "4"]
+
+# Made with Bob

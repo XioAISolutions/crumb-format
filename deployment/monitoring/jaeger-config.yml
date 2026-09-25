@@ -1,0 +1,283 @@
+# Jaeger Configuration for Wave Field LLM
+# Production-grade distributed tracing with sampling strategies and storage backend
+
+# Collector configuration
+collector:
+  # gRPC server configuration
+  grpc-server:
+    host-port: 0.0.0.0:14250
+    max-message-size: 4194304
+    max-connection-age: 5m
+    max-connection-age-grace: 5m
+  
+  # HTTP server configuration
+  http-server:
+    host-port: 0.0.0.0:14268
+  
+  # Zipkin compatibility
+  zipkin:
+    host-port: 0.0.0.0:9411
+    keep-alive: true
+    max-request-body-size: 10485760
+  
+  # Queue configuration
+  queue:
+    size: 10000
+    num-workers: 100
+  
+  # Sampling strategies
+  sampling:
+    strategies-file: /etc/jaeger/sampling-strategies.json
+    strategies-reload-interval: 1m
+
+# Query service configuration
+query:
+  # Server configuration
+  grpc-server:
+    host-port: 0.0.0.0:16685
+  
+  http-server:
+    host-port: 0.0.0.0:16686
+  
+  # UI configuration
+  ui-config: /etc/jaeger/ui-config.json
+  
+  # Base path for UI
+  base-path: /jaeger
+  
+  # Query timeout
+  query-timeout: 30s
+  
+  # Max clock skew adjustment
+  max-clock-skew-adjustment: 0s
+
+# Storage configuration
+storage:
+  # Storage type: elasticsearch, cassandra, kafka, memory, badger
+  type: elasticsearch
+  
+  # Elasticsearch configuration
+  elasticsearch:
+    # Server URLs
+    server-urls: https://elasticsearch:9200
+    
+    # Authentication
+    username: ${ES_USERNAME}
+    password: ${ES_PASSWORD}
+    
+    # TLS configuration
+    tls:
+      enabled: true
+      ca: /etc/jaeger/certs/ca.crt
+      cert: /etc/jaeger/certs/client.crt
+      key: /etc/jaeger/certs/client.key
+      skip-host-verify: false
+    
+    # Index configuration
+    index-prefix: jaeger
+    use-aliases: true
+    create-index-templates: true
+    version: 7
+    
+    # Sharding
+    num-shards: 5
+    num-replicas: 2
+    
+    # Bulk processing
+    bulk:
+      size: 5000000
+      workers: 10
+      actions: 1000
+      flush-interval: 200ms
+    
+    # Timeouts
+    timeout: 30s
+    max-span-age: 72h
+    
+    # Adaptive sampling
+    adaptive-sampling:
+      lookback: 1m
+      sampling-cache-ttl: 1m
+    
+    # Tags as fields
+    tags-as-fields:
+      all: false
+      include: "http.status_code,error,http.method,http.url"
+      config-file: /etc/jaeger/tags-as-fields.json
+    
+    # Archive configuration
+    use-ilm: true
+    ilm-policy-name: jaeger-ilm-policy
+
+# Agent configuration (for sidecar deployment)
+agent:
+  # Processor configuration
+  processor:
+    jaeger-binary:
+      server-host-port: 0.0.0.0:6832
+      server-max-packet-size: 65000
+      server-queue-size: 1000
+      workers: 10
+    
+    jaeger-compact:
+      server-host-port: 0.0.0.0:6831
+      server-max-packet-size: 65000
+      server-queue-size: 1000
+      workers: 10
+    
+    zipkin-compact:
+      server-host-port: 0.0.0.0:5775
+      server-queue-size: 1000
+      workers: 10
+  
+  # Reporter configuration
+  reporter:
+    type: grpc
+    grpc:
+      host-port: jaeger-collector:14250
+      tls:
+        enabled: true
+        ca: /etc/jaeger/certs/ca.crt
+        cert: /etc/jaeger/certs/client.crt
+        key: /etc/jaeger/certs/client.key
+    
+    # Retry configuration
+    retry:
+      max-backoff: 30s
+    
+    # Queue configuration
+    queue:
+      size: 10000
+
+# Ingester configuration (for Kafka integration)
+ingester:
+  parallelism: 1000
+  deadlock-interval: 1m
+  
+  kafka:
+    consumer:
+      brokers:
+        - kafka-1:9092
+        - kafka-2:9092
+        - kafka-3:9092
+      topic: jaeger-spans
+      group-id: jaeger-ingester
+      client-id: jaeger-ingester
+      
+      # Authentication
+      authentication: plaintext
+      
+      # Protocol version
+      protocol-version: 2.0.0
+      
+      # Fetch configuration
+      fetch-min-bytes: 1
+      fetch-max-wait: 500ms
+      
+      # Offset configuration
+      initial-offset: latest
+      
+      # Session configuration
+      session-timeout: 10s
+      heartbeat-interval: 3s
+      
+      # Rebalance configuration
+      rebalance-timeout: 60s
+
+# Sampling strategies file: /etc/jaeger/sampling-strategies.json
+# {
+#   "service_strategies": [
+#     {
+#       "service": "wavefield-api",
+#       "type": "probabilistic",
+#       "param": 0.1
+#     },
+#     {
+#       "service": "wavefield-inference",
+#       "type": "probabilistic",
+#       "param": 0.5
+#     },
+#     {
+#       "service": "wavefield-cache",
+#       "type": "ratelimiting",
+#       "param": 100
+#     }
+#   ],
+#   "default_strategy": {
+#     "type": "probabilistic",
+#     "param": 0.01
+#   },
+#   "per_operation_strategies": [
+#     {
+#       "service": "wavefield-api",
+#       "operation": "/health",
+#       "type": "probabilistic",
+#       "param": 0.001
+#     },
+#     {
+#       "service": "wavefield-api",
+#       "operation": "/v1/inference",
+#       "type": "probabilistic",
+#       "param": 0.2
+#     }
+#   ]
+# }
+
+# Metrics configuration
+metrics:
+  backend: prometheus
+  http-route: /metrics
+  
+  # Prometheus configuration
+  prometheus:
+    namespace: jaeger
+    subsystem: collector
+    
+    # Buckets for histograms
+    buckets:
+      - 0.001
+      - 0.005
+      - 0.01
+      - 0.05
+      - 0.1
+      - 0.5
+      - 1.0
+      - 5.0
+      - 10.0
+
+# Logging configuration
+log-level: info
+log-format: json
+
+# Health check configuration
+health-check:
+  http-port: 14269
+
+# Admin configuration
+admin:
+  http:
+    host-port: 0.0.0.0:14269
+
+# Downsampling configuration
+downsampling:
+  ratio: 0.1
+  hash-salt: "wavefield-llm-salt"
+
+# Dependencies configuration
+dependencies:
+  # Dependency calculation interval
+  calculation-interval: 1m
+  
+  # Lookback period
+  lookback: 24h
+
+# Multi-tenancy configuration
+multi-tenancy:
+  enabled: true
+  header: "X-Tenant-ID"
+  tenants:
+    - production
+    - staging
+    - development
+
+# Made with Bob

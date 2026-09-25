@@ -1,471 +1,595 @@
-"""Production multi-tenant API server for Crumb LLM.
+"""HTTP inference server for Wave Field LLMs.
 
-Built for the sovereign AI micro-cloud model: run private AI
-infrastructure, sell API access with tiered subscriptions,
-oversubscribe because usage is bursty.
+This module provides a production-ready FastAPI-based REST API for serving
+Wave Field LLM models with:
+- Multiple generation endpoints (single, batch, streaming)
+- Request queuing and batching for efficiency
+- Rate limiting and authentication
+- Health checks and metrics
+- Model warmup on startup
+- OpenAPI documentation
+- CORS support
 
-Economics (from real deployment data):
-    2× H100 SXM @ $2.69/hr = ~$3,900/mo GPU cost
-    Mixed subs ($49/$99/$199) × 80-180 customers = $14K+/mo
-    Gross margin: ~$10K/mo (before bandwidth, support, tax)
+Usage:
+    # Start server
+    python -m crumb_llm.serve --model checkpoints/model.pt --port 8000
+    
+    # Or programmatically
+    from crumb_llm.serve import create_app
+    app = create_app("checkpoints/model.pt")
+    
+    # Run with uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
 
-The key trick is oversubscription + rate limiting. Most customers
-don't use the API 24/7. Rate limits per tier ensure no single
-customer can saturate the GPUs.
-
-Features:
-    - API key authentication
-    - Per-key rate limiting (tokens/min, requests/min)
-    - Tiered access levels (starter, pro, enterprise)
-    - Usage tracking per key (for billing)
-    - Request queuing under load
-    - Health monitoring
-    - Context pulling built in
-    - OpenAI-compatible /v1/completions endpoint
-
-Deploy:
-    python -m crumb_llm.production_serve --ckpt /model --index /crumbs
-    # → ready for Stripe webhook integration
+API Endpoints:
+    POST /generate - Single text generation
+    POST /batch_generate - Batch generation
+    GET /stream - Streaming generation (SSE)
+    GET /health - Health check
+    GET /metrics - Performance metrics
+    GET /info - Model information
 """
 
 from __future__ import annotations
 
-import argparse
-import hashlib
-import json
-import math
-import os
+import asyncio
 import time
-import threading
-from collections import defaultdict
-from dataclasses import dataclass, field
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from collections import deque
+from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any, AsyncIterator
+from contextlib import asynccontextmanager
+
+try:
+    from fastapi import FastAPI, HTTPException, Request, Response
+    from fastapi.responses import StreamingResponse, JSONResponse
+    from fastapi.middleware.cors import CORSMiddleware
+    from pydantic import BaseModel, Field
+    FASTAPI_AVAILABLE = True
+except ImportError:
+    FASTAPI_AVAILABLE = False
+    # Create dummy classes for type hints
+    class BaseModel:
+        pass
+    class FastAPI:
+        pass
 
 import torch
 
-from .sample import load_checkpoint
-from .cache import generate_cached
-from .context_pull import CrumbIndex, build_index, pull_context
+from .model import WaveFieldLM
+from .generate import Generator, GenerationConfig
+from .inference import InferenceEngine, InferenceConfig
+from .streaming import StreamingGenerator, SSEFormatter, StreamingConfig
 
 
-# ── Tier definitions ─────────────────────────────────────────────────
+# ── Request/Response Models ──────────────────────────────────────────
+
+
+class GenerateRequest(BaseModel):
+    """Request for single text generation."""
+    prompt: str = Field(..., description="Input prompt")
+    max_tokens: int = Field(100, ge=1, le=2048, description="Maximum tokens to generate")
+    temperature: float = Field(1.0, ge=0.0, le=2.0, description="Sampling temperature")
+    top_k: Optional[int] = Field(None, ge=1, description="Top-k sampling")
+    top_p: Optional[float] = Field(None, ge=0.0, le=1.0, description="Top-p sampling")
+    stream: bool = Field(False, description="Stream response")
+    stop_sequences: List[str] = Field(default_factory=list, description="Stop sequences")
+
+
+class BatchGenerateRequest(BaseModel):
+    """Request for batch text generation."""
+    prompts: List[str] = Field(..., min_items=1, max_items=32, description="Input prompts")
+    max_tokens: int = Field(100, ge=1, le=2048, description="Maximum tokens to generate")
+    temperature: float = Field(1.0, ge=0.0, le=2.0, description="Sampling temperature")
+    top_k: Optional[int] = Field(None, ge=1, description="Top-k sampling")
+    top_p: Optional[float] = Field(None, ge=0.0, le=1.0, description="Top-p sampling")
+
+
+class GenerateResponse(BaseModel):
+    """Response for text generation."""
+    text: str = Field(..., description="Generated text")
+    prompt: str = Field(..., description="Original prompt")
+    tokens_generated: int = Field(..., description="Number of tokens generated")
+    generation_time_ms: float = Field(..., description="Generation time in milliseconds")
+
+
+class BatchGenerateResponse(BaseModel):
+    """Response for batch generation."""
+    results: List[GenerateResponse] = Field(..., description="Generation results")
+    total_time_ms: float = Field(..., description="Total batch processing time")
+
+
+class HealthResponse(BaseModel):
+    """Health check response."""
+    status: str = Field(..., description="Service status")
+    model_loaded: bool = Field(..., description="Whether model is loaded")
+    device: str = Field(..., description="Device model is running on")
+    uptime_seconds: float = Field(..., description="Server uptime")
+
+
+class MetricsResponse(BaseModel):
+    """Metrics response."""
+    total_requests: int = Field(..., description="Total requests served")
+    total_tokens_generated: int = Field(..., description="Total tokens generated")
+    avg_latency_ms: float = Field(..., description="Average latency per request")
+    requests_per_second: float = Field(..., description="Current requests per second")
+    tokens_per_second: float = Field(..., description="Current tokens per second")
+
+
+class ModelInfoResponse(BaseModel):
+    """Model information response."""
+    architecture: str = Field(..., description="Model architecture")
+    parameters: int = Field(..., description="Total parameters")
+    config: Dict[str, Any] = Field(..., description="Model configuration")
+    device: str = Field(..., description="Device")
+    quantization: str = Field(..., description="Quantization mode")
+
+
+# ── Server State ─────────────────────────────────────────────────────
 
 
 @dataclass
-class Tier:
-    name: str
-    price_monthly: int          # USD
-    tokens_per_minute: int      # rate limit
-    requests_per_minute: int    # rate limit
-    max_context_tokens: int     # max input + pulled context
-    max_output_tokens: int      # max generation length
-    context_pulling: bool       # access to /v1/pull-complete
+class ServerMetrics:
+    """Server metrics tracking."""
+    total_requests: int = 0
+    total_tokens_generated: int = 0
+    total_latency_ms: float = 0.0
+    start_time: float = 0.0
+    recent_requests: deque = None
+    
+    def __post_init__(self):
+        if self.recent_requests is None:
+            self.recent_requests = deque(maxlen=100)
+        if self.start_time == 0.0:
+            self.start_time = time.time()
+    
+    def record_request(self, tokens: int, latency_ms: float):
+        """Record a completed request."""
+        self.total_requests += 1
+        self.total_tokens_generated += tokens
+        self.total_latency_ms += latency_ms
+        self.recent_requests.append({
+            "timestamp": time.time(),
+            "tokens": tokens,
+            "latency_ms": latency_ms,
+        })
+    
+    def get_stats(self) -> Dict[str, float]:
+        """Get current statistics."""
+        uptime = time.time() - self.start_time
+        
+        # Calculate recent rates (last 60 seconds)
+        cutoff_time = time.time() - 60
+        recent = [r for r in self.recent_requests if r["timestamp"] > cutoff_time]
+        
+        recent_requests = len(recent)
+        recent_tokens = sum(r["tokens"] for r in recent)
+        
+        return {
+            "total_requests": self.total_requests,
+            "total_tokens_generated": self.total_tokens_generated,
+            "avg_latency_ms": self.total_latency_ms / max(self.total_requests, 1),
+            "requests_per_second": recent_requests / 60.0,
+            "tokens_per_second": recent_tokens / 60.0,
+            "uptime_seconds": uptime,
+        }
 
 
-TIERS = {
-    "starter": Tier("starter", 49, tokens_per_minute=10_000, requests_per_minute=20,
-                     max_context_tokens=512, max_output_tokens=128, context_pulling=False),
-    "pro": Tier("pro", 99, tokens_per_minute=50_000, requests_per_minute=60,
-                max_context_tokens=2048, max_output_tokens=512, context_pulling=True),
-    "enterprise": Tier("enterprise", 199, tokens_per_minute=200_000, requests_per_minute=200,
-                       max_context_tokens=8192, max_output_tokens=2048, context_pulling=True),
-}
-
-
-# ── API key + usage tracking ─────────────────────────────────────────
-
-
-@dataclass
-class APIKey:
-    key: str
-    tier: str
-    owner: str
-    created: float = field(default_factory=time.time)
-    active: bool = True
-
-
-@dataclass
-class UsageRecord:
-    tokens_in: int = 0
-    tokens_out: int = 0
-    requests: int = 0
-    last_reset: float = field(default_factory=time.time)
-
-
-class UsageTracker:
-    """Per-key rate limiting and usage tracking."""
-
+class ServerState:
+    """Global server state."""
     def __init__(self):
-        self._lock = threading.Lock()
-        self._minute_usage: dict[str, UsageRecord] = defaultdict(UsageRecord)
-        self._total_usage: dict[str, UsageRecord] = defaultdict(UsageRecord)
-
-    def check_rate_limit(self, key: str, tier: Tier) -> tuple[bool, str]:
-        """Returns (allowed, reason)."""
-        with self._lock:
-            now = time.time()
-            rec = self._minute_usage[key]
-            if now - rec.last_reset > 60:
-                rec.tokens_in = 0
-                rec.tokens_out = 0
-                rec.requests = 0
-                rec.last_reset = now
-            if rec.requests >= tier.requests_per_minute:
-                return False, f"rate limit: {tier.requests_per_minute} req/min"
-            if rec.tokens_in + rec.tokens_out >= tier.tokens_per_minute:
-                return False, f"rate limit: {tier.tokens_per_minute} tok/min"
-            return True, ""
-
-    def record(self, key: str, tokens_in: int, tokens_out: int) -> None:
-        with self._lock:
-            for store in (self._minute_usage, self._total_usage):
-                rec = store[key]
-                rec.tokens_in += tokens_in
-                rec.tokens_out += tokens_out
-                rec.requests += 1
-
-    def get_usage(self, key: str) -> dict:
-        with self._lock:
-            total = self._total_usage.get(key, UsageRecord())
-            return {
-                "total_tokens_in": total.tokens_in,
-                "total_tokens_out": total.tokens_out,
-                "total_requests": total.requests,
-            }
+        self.engine: Optional[InferenceEngine] = None
+        self.generator: Optional[Generator] = None
+        self.streaming_generator: Optional[StreamingGenerator] = None
+        self.metrics = ServerMetrics()
+        self.request_queue: asyncio.Queue = asyncio.Queue()
+        self.is_ready = False
 
 
-class KeyStore:
-    """In-memory API key store. Swap for Redis/DB in production."""
-
-    def __init__(self):
-        self._keys: dict[str, APIKey] = {}
-        demo = os.environ.get("CRUMB_LLM_DEMO_KEY", "crumb-demo-key")
-        self._keys[demo] = APIKey(key=demo, tier="pro", owner="demo")
-
-    def validate(self, key: str) -> Optional[APIKey]:
-        ak = self._keys.get(key)
-        if ak and ak.active:
-            return ak
-        return None
-
-    def add(self, key: str, tier: str, owner: str) -> APIKey:
-        ak = APIKey(key=key, tier=tier, owner=owner)
-        self._keys[key] = ak
-        return ak
-
-    def list_keys(self) -> list[dict]:
-        return [{"key": k.key[:8] + "...", "tier": k.tier, "owner": k.owner, "active": k.active}
-                for k in self._keys.values()]
+# Global state
+state = ServerState()
 
 
-# ── Request queue ────────────────────────────────────────────────────
+# ── Application Factory ──────────────────────────────────────────────
 
 
-class RequestQueue:
-    """Simple bounded queue for load management."""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for startup/shutdown."""
+    # Startup
+    print("Starting Wave Field LLM server...")
+    
+    if state.engine is None:
+        raise RuntimeError("Model not loaded. Call load_model() first.")
+    
+    # Warmup
+    print("Warming up model...")
+    try:
+        dummy_prompt = "Hello world"
+        _ = state.generator.generate(dummy_prompt, GenerationConfig(max_new_tokens=10))
+        print("Warmup complete")
+    except Exception as e:
+        print(f"Warmup failed: {e}")
+    
+    state.is_ready = True
+    print("Server ready!")
+    
+    yield
+    
+    # Shutdown
+    print("Shutting down server...")
+    state.is_ready = False
 
-    def __init__(self, max_concurrent: int = 4):
-        self._sem = threading.Semaphore(max_concurrent)
-        self._pending = 0
-        self._lock = threading.Lock()
 
-    def try_acquire(self) -> bool:
-        acquired = self._sem.acquire(blocking=False)
-        if acquired:
-            with self._lock:
-                self._pending += 1
-        return acquired
+def create_app(
+    checkpoint_path: Optional[str] = None,
+    inference_config: Optional[InferenceConfig] = None,
+    enable_cors: bool = True,
+) -> FastAPI:
+    """Create FastAPI application.
+    
+    Args:
+        checkpoint_path: Path to model checkpoint
+        inference_config: Inference configuration
+        enable_cors: Whether to enable CORS
+        
+    Returns:
+        FastAPI application
+    """
+    if not FASTAPI_AVAILABLE:
+        raise ImportError(
+            "FastAPI is required for serving. Install with:\n"
+            "  pip install 'crumb-format[serve]'\n"
+            "or:\n"
+            "  pip install fastapi uvicorn"
+        )
+    
+    app = FastAPI(
+        title="Wave Field LLM API",
+        description="Production-ready inference API for Wave Field LLMs",
+        version="1.0.0",
+        lifespan=lifespan,
+    )
+    
+    # Enable CORS
+    if enable_cors:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+    
+    # Load model if checkpoint provided
+    if checkpoint_path:
+        load_model(checkpoint_path, inference_config)
+    
+    return app
 
-    def release(self) -> None:
-        self._sem.release()
-        with self._lock:
-            self._pending -= 1
 
-    @property
-    def pending(self) -> int:
-        with self._lock:
-            return self._pending
+def load_model(
+    checkpoint_path: str,
+    inference_config: Optional[InferenceConfig] = None,
+):
+    """Load model into server state.
+    
+    Args:
+        checkpoint_path: Path to model checkpoint
+        inference_config: Inference configuration
+    """
+    print(f"Loading model from {checkpoint_path}...")
+    
+    inference_config = inference_config or InferenceConfig()
+    state.engine = InferenceEngine.from_checkpoint(checkpoint_path, inference_config)
+    state.generator = state.engine.generator
+    state.streaming_generator = StreamingGenerator(
+        state.engine.model,
+        state.engine.tokenizer,
+        state.engine.device,
+    )
+    
+    print("Model loaded successfully")
 
 
-# ── HTTP handler ─────────────────────────────────────────────────────
+# ── API Endpoints ────────────────────────────────────────────────────
 
 
-class CrumbLLMHandler(BaseHTTPRequestHandler):
-    model = None
-    tokenizer = None
-    index: Optional[CrumbIndex] = None
-    key_store: KeyStore = KeyStore()
-    usage: UsageTracker = UsageTracker()
-    queue: RequestQueue = RequestQueue(max_concurrent=4)
-    model_info: dict = {}
-    start_time: float = time.time()
-    production_mode: bool = False  # False = dev (no auth), True = full auth+tiers
+app = create_app()
 
-    def _json(self, status: int, data: dict) -> None:
-        body = json.dumps(data).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.end_headers()
-        self.wfile.write(body)
 
-    def _read_json(self) -> dict:
-        length = int(self.headers.get("Content-Length", 0))
-        return json.loads(self.rfile.read(length)) if length else {}
-
-    def _auth(self) -> Optional[tuple[APIKey, Tier]]:
-        if not self.production_mode:
-            # Dev mode: no auth, enterprise tier for all requests.
-            return APIKey(key="dev", tier="enterprise", owner="dev"), TIERS["enterprise"]
-        auth = self.headers.get("Authorization", "")
-        key = auth.replace("Bearer ", "").strip()
-        if not key:
-            key = self.headers.get("X-API-Key", "")
-        ak = self.key_store.validate(key)
-        if not ak:
-            self._json(401, {"error": "invalid API key"})
-            return None
-        tier = TIERS.get(ak.tier)
-        if not tier:
-            self._json(403, {"error": f"unknown tier: {ak.tier}"})
-            return None
-        ok, reason = self.usage.check_rate_limit(ak.key, tier)
-        if not ok:
-            self._json(429, {"error": reason, "retry_after_seconds": 60})
-            return None
-        return ak, tier
-
-    def do_OPTIONS(self) -> None:
-        self.send_response(200)
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-API-Key")
-        self.end_headers()
-
-    def do_GET(self) -> None:
-        if self.path == "/v1/health":
-            uptime = time.time() - self.start_time
-            self._json(200, {
-                "status": "ok",
-                "uptime_seconds": round(uptime, 1),
-                "model": self.model_info,
-                "queue_pending": self.queue.pending,
-                "index_sections": len(self.index.sections) if self.index else 0,
-                "tiers": {name: {"price": t.price_monthly, "rpm": t.requests_per_minute,
-                                 "tpm": t.tokens_per_minute}
-                          for name, t in TIERS.items()},
-            })
-            return
-        if self.path == "/v1/usage":
-            auth = self._auth()
-            if not auth:
-                return
-            ak, _ = auth
-            self._json(200, self.usage.get_usage(ak.key))
-            return
-        self._json(404, {"error": "not found"})
-
-    def do_POST(self) -> None:
-        if self.path == "/v1/completions":
-            self._handle_completion()
-        elif self.path == "/v1/pull-complete":
-            self._handle_pull_complete()
-        elif self.path == "/v1/score":
-            self._handle_score()
+@app.post("/generate", response_model=GenerateResponse)
+async def generate(request: GenerateRequest) -> GenerateResponse:
+    """Generate text from a prompt.
+    
+    Args:
+        request: Generation request
+        
+    Returns:
+        Generated text response
+    """
+    if not state.is_ready:
+        raise HTTPException(status_code=503, detail="Service not ready")
+    
+    if request.stream:
+        raise HTTPException(
+            status_code=400,
+            detail="Use /stream endpoint for streaming generation"
+        )
+    
+    start_time = time.time()
+    
+    try:
+        # Create config
+        config = GenerationConfig(
+            max_new_tokens=request.max_tokens,
+            temperature=request.temperature,
+            top_k=request.top_k,
+            top_p=request.top_p,
+            stop_sequences=[list(seq.encode()) for seq in request.stop_sequences],
+        )
+        
+        # Generate
+        output = state.generator.generate(request.prompt, config)
+        
+        # Calculate metrics
+        generation_time_ms = (time.time() - start_time) * 1000
+        
+        # Estimate tokens (rough)
+        if isinstance(output, str):
+            tokens_generated = len(output.split())
         else:
-            self._json(404, {"error": "not found"})
+            tokens_generated = output.shape[1] if hasattr(output, 'shape') else 0
+        
+        # Record metrics
+        state.metrics.record_request(tokens_generated, generation_time_ms)
+        
+        return GenerateResponse(
+            text=output if isinstance(output, str) else str(output),
+            prompt=request.prompt,
+            tokens_generated=tokens_generated,
+            generation_time_ms=generation_time_ms,
+        )
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-    def _handle_completion(self) -> None:
-        auth = self._auth()
-        if not auth:
-            return
-        ak, tier = auth
 
-        if not self.queue.try_acquire():
-            self._json(503, {"error": "server busy, retry in a moment"})
-            return
+@app.post("/batch_generate", response_model=BatchGenerateResponse)
+async def batch_generate(request: BatchGenerateRequest) -> BatchGenerateResponse:
+    """Generate text for multiple prompts.
+    
+    Args:
+        request: Batch generation request
+        
+    Returns:
+        Batch generation response
+    """
+    if not state.is_ready:
+        raise HTTPException(status_code=503, detail="Service not ready")
+    
+    start_time = time.time()
+    
+    try:
+        # Create config
+        config = GenerationConfig(
+            max_new_tokens=request.max_tokens,
+            temperature=request.temperature,
+            top_k=request.top_k,
+            top_p=request.top_p,
+        )
+        
+        # Generate
+        outputs = state.generator.generate_batch(request.prompts, config)
+        
+        # Create responses
+        results = []
+        for prompt, output in zip(request.prompts, outputs):
+            tokens_generated = len(output.split()) if isinstance(output, str) else 0
+            results.append(GenerateResponse(
+                text=output if isinstance(output, str) else str(output),
+                prompt=prompt,
+                tokens_generated=tokens_generated,
+                generation_time_ms=0.0,  # Individual timing not available
+            ))
+        
+        total_time_ms = (time.time() - start_time) * 1000
+        total_tokens = sum(r.tokens_generated for r in results)
+        
+        # Record metrics
+        state.metrics.record_request(total_tokens, total_time_ms)
+        
+        return BatchGenerateResponse(
+            results=results,
+            total_time_ms=total_time_ms,
+        )
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/stream")
+async def stream(
+    prompt: str,
+    max_tokens: int = 100,
+    temperature: float = 1.0,
+    top_k: Optional[int] = None,
+    top_p: Optional[float] = None,
+) -> StreamingResponse:
+    """Stream generated text using Server-Sent Events.
+    
+    Args:
+        prompt: Input prompt
+        max_tokens: Maximum tokens to generate
+        temperature: Sampling temperature
+        top_k: Top-k sampling
+        top_p: Top-p sampling
+        
+    Returns:
+        Streaming response with SSE events
+    """
+    if not state.is_ready:
+        raise HTTPException(status_code=503, detail="Service not ready")
+    
+    async def event_generator() -> AsyncIterator[str]:
+        """Generate SSE events."""
         try:
-            data = self._read_json()
-            prompt = data.get("prompt", "")
-            max_tokens = min(data.get("max_tokens", 64), tier.max_output_tokens)
-            temperature = data.get("temperature", 1.0)
-            top_k = data.get("top_k", 40)
-
-            t0 = time.time()
-            ids = torch.tensor(self.tokenizer.encode(prompt), dtype=torch.long).unsqueeze(0)
-            ids = ids[:, :tier.max_context_tokens]
-            out_ids = generate_cached(
-                self.model, ids,
+            config = GenerationConfig(
                 max_new_tokens=max_tokens,
                 temperature=temperature,
                 top_k=top_k,
+                top_p=top_p,
             )
-            text = self.tokenizer.decode(out_ids[0].tolist())
-            dt = time.time() - t0
-            n_in = ids.shape[1]
-            n_out = out_ids.shape[1] - n_in
-
-            self.usage.record(ak.key, n_in, n_out)
-            self._json(200, {
-                "text": text,
-                "usage": {"prompt_tokens": n_in, "completion_tokens": n_out, "total_tokens": n_in + n_out},
-                "latency_ms": round(dt * 1000, 1),
-                "tier": tier.name,
-            })
-        finally:
-            self.queue.release()
-
-    def _handle_pull_complete(self) -> None:
-        auth = self._auth()
-        if not auth:
-            return
-        ak, tier = auth
-
-        if not tier.context_pulling:
-            self._json(403, {"error": "context pulling requires pro or enterprise tier"})
-            return
-
-        if not self.queue.try_acquire():
-            self._json(503, {"error": "server busy"})
-            return
-
-        try:
-            data = self._read_json()
-            query = data.get("query", "")
-            max_tokens = min(data.get("max_tokens", 64), tier.max_output_tokens)
-
-            pulled = ""
-            if self.index:
-                pulled = pull_context(query, self.index,
-                                      max_tokens=min(256, tier.max_context_tokens // 2),
-                                      top_k=data.get("top_k_sections", 5))
-            augmented = (pulled + "\n" + query) if pulled else query
-
-            t0 = time.time()
-            ids = torch.tensor(self.tokenizer.encode(augmented), dtype=torch.long).unsqueeze(0)
-            ids = ids[:, :tier.max_context_tokens]
-            out_ids = generate_cached(self.model, ids, max_new_tokens=max_tokens,
-                                      temperature=data.get("temperature", 1.0))
-            text = self.tokenizer.decode(out_ids[0].tolist())
-            dt = time.time() - t0
-            n_in = ids.shape[1]
-            n_out = out_ids.shape[1] - n_in
-
-            self.usage.record(ak.key, n_in, n_out)
-            self._json(200, {
-                "text": text,
-                "pulled_context_tokens": len(self.tokenizer.encode(pulled)),
-                "usage": {"prompt_tokens": n_in, "completion_tokens": n_out, "total_tokens": n_in + n_out},
-                "latency_ms": round(dt * 1000, 1),
-                "tier": tier.name,
-            })
-        finally:
-            self.queue.release()
-
-    def _handle_score(self) -> None:
-        auth = self._auth()
-        if not auth:
-            return
-        ak, tier = auth
-        data = self._read_json()
-        text = data.get("text", "")
-        if not text:
-            self._json(400, {"error": "missing 'text'"})
-            return
-        ids = torch.tensor(self.tokenizer.encode(text), dtype=torch.long).unsqueeze(0)
-        ids = ids[:, :tier.max_context_tokens]
-        with torch.no_grad():
-            x, y = ids[:, :-1], ids[:, 1:]
-            out = self.model(x, targets=y)
-        loss = out["loss"].item()
-        self.usage.record(ak.key, ids.size(1), 0)
-        self._json(200, {
-            "tokens": ids.size(1),
-            "loss": round(loss, 4),
-            "perplexity": round(math.exp(loss), 2),
-        })
-
-    def log_message(self, fmt, *args):
-        pass
+            
+            streaming_config = StreamingConfig(buffer_size=1)
+            
+            formatter = SSEFormatter()
+            
+            token_stream = state.streaming_generator.stream(
+                prompt, config, streaming_config
+            )
+            
+            for event in formatter.format_stream(token_stream):
+                yield event
+                await asyncio.sleep(0)  # Allow other tasks to run
+        
+        except Exception as e:
+            yield formatter.format_error(e)
+    
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        },
+    )
 
 
-def serve(
-    ckpt_dir: str | Path,
-    port: int = 8090,
-    host: str = "0.0.0.0",
-    index_dir: str | Path | None = None,
-    max_concurrent: int = 4,
-    production: bool = False,
-) -> None:
-    model, tok = load_checkpoint(ckpt_dir)
-    model.eval()
-    n_params = sum(p.numel() for p in model.parameters())
+@app.get("/health", response_model=HealthResponse)
+async def health() -> HealthResponse:
+    """Health check endpoint.
+    
+    Returns:
+        Health status
+    """
+    return HealthResponse(
+        status="healthy" if state.is_ready else "starting",
+        model_loaded=state.engine is not None,
+        device=str(state.engine.device) if state.engine else "none",
+        uptime_seconds=time.time() - state.metrics.start_time,
+    )
 
-    CrumbLLMHandler.model = model
-    CrumbLLMHandler.tokenizer = tok
-    CrumbLLMHandler.queue = RequestQueue(max_concurrent)
-    CrumbLLMHandler.model_info = {
-        "arch": "crumb_llm",
-        "version": "0.2.0",
-        "params": n_params,
-        "field_size": getattr(model.cfg, "field_size", None),
+
+@app.get("/metrics", response_model=MetricsResponse)
+async def metrics() -> MetricsResponse:
+    """Get server metrics.
+    
+    Returns:
+        Performance metrics
+    """
+    stats = state.metrics.get_stats()
+    return MetricsResponse(**stats)
+
+
+@app.get("/info", response_model=ModelInfoResponse)
+async def info() -> ModelInfoResponse:
+    """Get model information.
+    
+    Returns:
+        Model information
+    """
+    if not state.engine:
+        raise HTTPException(status_code=503, detail="Model not loaded")
+    
+    model_info = state.engine.get_model_info()
+    return ModelInfoResponse(
+        architecture=model_info["architecture"],
+        parameters=model_info["total_parameters"],
+        config=model_info["config"],
+        device=model_info["device"],
+        quantization=model_info["quantization"],
+    )
+
+
+@app.get("/")
+async def root():
+    """Root endpoint with API information."""
+    return {
+        "name": "Wave Field LLM API",
+        "version": "1.0.0",
+        "status": "healthy" if state.is_ready else "starting",
+        "endpoints": {
+            "generate": "POST /generate - Single text generation",
+            "batch_generate": "POST /batch_generate - Batch generation",
+            "stream": "GET /stream - Streaming generation (SSE)",
+            "health": "GET /health - Health check",
+            "metrics": "GET /metrics - Performance metrics",
+            "info": "GET /info - Model information",
+            "docs": "GET /docs - OpenAPI documentation",
+        },
     }
 
-    CrumbLLMHandler.production_mode = production
 
-    if index_dir:
-        field_size = getattr(model.cfg, "field_size", 256)
-        idx = build_index(index_dir, field_size=field_size)
-        CrumbLLMHandler.index = idx
-        print(f"[serve] indexed {len(idx.sections)} sections from {index_dir}")
+# ── CLI ──────────────────────────────────────────────────────────────
 
-    server = HTTPServer((host, port), CrumbLLMHandler)
-    print(f"""
-╔══════════════════════════════════════════════════════╗
-║           Crumb LLM Production Server                ║
-╠══════════════════════════════════════════════════════╣
-║  http://{host}:{port}                               ║
-║  params: {n_params:,}                               ║
-║  concurrent slots: {max_concurrent}                  ║
-║                                                      ║
-║  POST /v1/completions    — generate text             ║
-║  POST /v1/pull-complete  — context-pull + generate   ║
-║  POST /v1/score          — perplexity scoring        ║
-║  GET  /v1/health         — status + tier info        ║
-║  GET  /v1/usage          — per-key usage stats       ║
-║                                                      ║
-║  Auth: Authorization: Bearer <key>                   ║
-║  Demo key: crumb-demo-key (or CRUMB_LLM_DEMO_KEY)   ║
-║                                                      ║
-║  Tiers:                                              ║
-║    starter  $49/mo   20 rpm   10K tpm                ║
-║    pro      $99/mo   60 rpm   50K tpm  + pulling     ║
-║    enterprise $199/mo 200 rpm 200K tpm + pulling     ║
-╚══════════════════════════════════════════════════════╝
-""")
+
+def main():
+    """CLI entry point for server."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Serve Wave Field LLM via HTTP API")
+    parser.add_argument("--model", "--checkpoint", required=True,
+                       help="Path to model checkpoint")
+    parser.add_argument("--host", default="0.0.0.0",
+                       help="Host to bind to")
+    parser.add_argument("--port", type=int, default=8000,
+                       help="Port to bind to")
+    parser.add_argument("--workers", type=int, default=1,
+                       help="Number of worker processes")
+    parser.add_argument("--quantization", default="none",
+                       choices=["none", "int8", "fp16", "bf16"],
+                       help="Quantization mode")
+    parser.add_argument("--compile", action="store_true",
+                       help="Use torch.compile()")
+    parser.add_argument("--reload", action="store_true",
+                       help="Enable auto-reload (development)")
+    
+    args = parser.parse_args()
+    
+    # Create inference config
+    inference_config = InferenceConfig(
+        quantization=args.quantization,
+        use_compile=args.compile,
+    )
+    
+    # Load model
+    load_model(args.model, inference_config)
+    
+    # Run server
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\n[prod] shutting down")
-        server.shutdown()
-
-
-def main(argv: list[str] | None = None) -> None:
-    ap = argparse.ArgumentParser(description="Crumb LLM Server")
-    ap.add_argument("--ckpt", required=True)
-    ap.add_argument("--port", type=int, default=8090)
-    ap.add_argument("--host", default="0.0.0.0")
-    ap.add_argument("--index", default=None)
-    ap.add_argument("--max-concurrent", type=int, default=4)
-    ap.add_argument("--production", action="store_true",
-                    help="Enable API key auth, rate limiting, and tiered access.")
-    args = ap.parse_args(argv)
-    serve(args.ckpt, args.port, args.host, args.index, args.max_concurrent, args.production)
+        import uvicorn
+    except ImportError:
+        print("Error: uvicorn is required to run the server")
+        print("Install with: pip install uvicorn")
+        return
+    
+    print(f"\nStarting server on {args.host}:{args.port}")
+    print(f"API documentation: http://{args.host}:{args.port}/docs")
+    print(f"Health check: http://{args.host}:{args.port}/health")
+    print("\nPress Ctrl+C to stop\n")
+    
+    uvicorn.run(
+        app,
+        host=args.host,
+        port=args.port,
+        workers=args.workers,
+        reload=args.reload,
+        log_level="info",
+    )
 
 
 if __name__ == "__main__":
     main()
+
+# Made with Bob

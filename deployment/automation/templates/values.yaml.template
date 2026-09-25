@@ -1,0 +1,419 @@
+# Wave Field LLM - Helm Chart Values Template
+# This file contains configuration values for Helm deployment
+
+# Global settings
+global:
+  environment: production
+  region: us-east-1
+  domain: wavefield-llm.example.com
+
+# Application configuration
+app:
+  name: wavefield-llm
+  version: 1.0.0
+  image:
+    repository: 123456789012.dkr.ecr.us-east-1.amazonaws.com/wavefield-llm
+    tag: latest
+    pullPolicy: IfNotPresent
+  
+  # Replica configuration
+  replicaCount: 3
+  
+  # Resource limits
+  resources:
+    requests:
+      cpu: 2000m
+      memory: 8Gi
+      nvidia.com/gpu: 1
+    limits:
+      cpu: 4000m
+      memory: 16Gi
+      nvidia.com/gpu: 1
+  
+  # Environment variables
+  env:
+    - name: LOG_LEVEL
+      value: "INFO"
+    - name: MODEL_NAME
+      value: "wavefield-small"
+    - name: MAX_SEQUENCE_LENGTH
+      value: "2048"
+    - name: BATCH_SIZE
+      value: "16"
+  
+  # Secrets
+  secrets:
+    - name: DB_PASSWORD
+      secretName: db-credentials
+      secretKey: password
+    - name: REDIS_PASSWORD
+      secretName: redis-credentials
+      secretKey: password
+    - name: API_KEY
+      secretName: api-keys
+      secretKey: admin-api-key
+
+# Service configuration
+service:
+  type: LoadBalancer
+  port: 80
+  targetPort: 8000
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+  hosts:
+    - host: api.wavefield-llm.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: wavefield-llm-tls
+      hosts:
+        - api.wavefield-llm.example.com
+
+# Autoscaling configuration
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Health checks
+healthCheck:
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  readinessProbe:
+    httpGet:
+      path: /ready
+      port: 8000
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+# Pod security policy
+podSecurityPolicy:
+  enabled: true
+  allowPrivilegeEscalation: false
+  requiredDropCapabilities:
+    - ALL
+
+# Network policy
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5432  # PostgreSQL
+        - protocol: TCP
+          port: 6379  # Redis
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 443  # HTTPS
+
+# Database configuration
+database:
+  enabled: true
+  host: postgres.example.com
+  port: 5432
+  name: wavefield_production
+  poolSize: 20
+  maxOverflow: 40
+  sslMode: require
+
+# Redis configuration
+redis:
+  enabled: true
+  host: redis.example.com
+  port: 6379
+  db: 0
+  maxConnections: 100
+  ssl: true
+
+# Storage configuration
+storage:
+  type: s3  # s3, gcs, or azure
+  bucket: wavefield-models-production
+  region: us-east-1
+  
+  # Persistent volume for model cache
+  persistentVolume:
+    enabled: true
+    storageClass: gp3
+    size: 100Gi
+    accessMode: ReadWriteOnce
+    mountPath: /models
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  
+  # Prometheus
+  prometheus:
+    enabled: true
+    port: 9090
+    path: /metrics
+    scrapeInterval: 30s
+  
+  # Grafana
+  grafana:
+    enabled: true
+    adminPassword: <CHANGE_ME>
+    dashboards:
+      - system-overview
+      - model-performance
+  
+  # Jaeger tracing
+  jaeger:
+    enabled: true
+    endpoint: http://jaeger-collector:14268/api/traces
+    samplingRate: 0.1
+
+# Logging configuration
+logging:
+  enabled: true
+  level: INFO
+  format: json
+  
+  # Loki
+  loki:
+    enabled: true
+    url: http://loki:3100
+
+# Backup configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retentionDays: 30
+  storage:
+    type: s3
+    bucket: wavefield-backups-production
+    path: /backups
+
+# Alerting configuration
+alerting:
+  enabled: true
+  
+  # Slack
+  slack:
+    enabled: true
+    webhookUrl: <CHANGE_ME>
+    channel: "#alerts-production"
+  
+  # PagerDuty
+  pagerduty:
+    enabled: true
+    integrationKey: <CHANGE_ME>
+  
+  # Email
+  email:
+    enabled: true
+    smtpHost: smtp.example.com
+    smtpPort: 587
+    from: alerts@example.com
+    to:
+      - ops@example.com
+      - oncall@example.com
+
+# Service mesh (Istio)
+serviceMesh:
+  enabled: false
+  istio:
+    enabled: false
+    mtls: true
+    trafficPolicy:
+      connectionPool:
+        tcp:
+          maxConnections: 100
+        http:
+          http1MaxPendingRequests: 100
+          http2MaxRequests: 100
+      outlierDetection:
+        consecutiveErrors: 5
+        interval: 30s
+        baseEjectionTime: 30s
+
+# Feature flags
+features:
+  streaming: true
+  batchInference: true
+  quantization: true
+  caching: true
+  metrics: true
+  tracing: true
+  profiling: false
+
+# Performance tuning
+performance:
+  cacheTTL: 3600
+  cacheMaxSize: 10000
+  connectionPoolSize: 100
+  requestTimeout: 120
+  inferenceTimeout: 60
+  maxConcurrentRequests: 1000
+
+# Rate limiting
+rateLimit:
+  enabled: true
+  requestsPerMinute: 1000
+  burstSize: 100
+
+# CORS configuration
+cors:
+  enabled: true
+  allowOrigins:
+    - https://wavefield-llm.example.com
+    - https://app.wavefield-llm.example.com
+  allowMethods:
+    - GET
+    - POST
+    - PUT
+    - DELETE
+  allowHeaders:
+    - Content-Type
+    - Authorization
+  exposeHeaders:
+    - X-Request-ID
+  maxAge: 3600
+
+# Node affinity
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node.kubernetes.io/instance-type
+              operator: In
+              values:
+                - g4dn.xlarge
+                - g4dn.2xlarge
+                - p3.2xlarge
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - wavefield-llm
+          topologyKey: kubernetes.io/hostname
+
+# Tolerations for GPU nodes
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+
+# Init containers
+initContainers:
+  - name: model-downloader
+    image: amazon/aws-cli:latest
+    command:
+      - sh
+      - -c
+      - |
+        aws s3 sync s3://wavefield-models-production/wavefield-small /models/
+    volumeMounts:
+      - name: models
+        mountPath: /models
+
+# Sidecar containers
+sidecars:
+  - name: log-forwarder
+    image: fluent/fluent-bit:latest
+    volumeMounts:
+      - name: logs
+        mountPath: /var/log
+
+# ConfigMaps
+configMaps:
+  app-config:
+    data:
+      config.yaml: |
+        model:
+          name: wavefield-small
+          version: 1.0.0
+          max_sequence_length: 2048
+        server:
+          host: 0.0.0.0
+          port: 8000
+          workers: 4
+        cache:
+          enabled: true
+          ttl: 3600
+
+# Additional labels
+labels:
+  app: wavefield-llm
+  component: inference
+  tier: backend
+  managed-by: helm
+
+# Additional annotations
+annotations:
+  deployment.kubernetes.io/revision: "1"
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "9090"
+  prometheus.io/path: "/metrics"

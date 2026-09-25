@@ -1,0 +1,124 @@
+# Wave Field LLM - Terraform Variables Example
+# Copy this file to terraform.tfvars and customize for your environment
+
+# Project Configuration
+project_name = "wavefield-llm"
+environment  = "prod"
+aws_region   = "us-east-1"
+
+# Network Configuration
+vpc_cidr = "10.0.0.0/16"
+
+# EKS Configuration
+cluster_name       = "wavefield-llm-cluster"
+kubernetes_version = "1.28"
+eks_public_access  = true
+eks_public_access_cidrs = [
+  "0.0.0.0/0" # Restrict this to your IP ranges in production
+]
+
+# General Node Group
+general_instance_types = ["t3.xlarge", "t3a.xlarge"]
+general_desired_size   = 3
+general_min_size       = 2
+general_max_size       = 10
+
+# GPU Node Group
+gpu_instance_types = ["g5.xlarge", "g5.2xlarge"]
+gpu_desired_size   = 1
+gpu_min_size       = 0
+gpu_max_size       = 5
+
+# Spot Node Group
+spot_instance_types = ["t3.large", "t3a.large", "t3.xlarge", "t3a.xlarge"]
+spot_desired_size   = 2
+spot_min_size       = 0
+spot_max_size       = 20
+
+# RDS Configuration
+postgres_version        = "15.4"
+db_instance_class       = "db.r6g.xlarge"
+db_allocated_storage    = 100
+db_max_allocated_storage = 1000
+db_name                 = "wavefieldllm"
+db_username             = "dbadmin"
+db_password             = "CHANGE_ME_STRONG_PASSWORD_MIN_16_CHARS" # Use AWS Secrets Manager in production
+db_backup_retention_days = 30
+create_read_replica     = true
+db_replica_instance_class = "db.r6g.large"
+
+# ElastiCache Redis Configuration
+redis_version               = "7.0"
+redis_node_type             = "cache.r6g.large"
+redis_num_cache_nodes       = 3
+redis_auth_token            = "CHANGE_ME_STRONG_TOKEN_MIN_16_CHARS" # Use AWS Secrets Manager in production
+redis_snapshot_retention_limit = 7
+
+# DNS Configuration
+domain_name          = "wavefield-llm.example.com"
+create_route53_zone  = false # Set to true if you want Terraform to create the hosted zone
+
+# CloudFront Configuration
+cloudfront_price_class = "PriceClass_100" # Use PriceClass_All for global distribution
+
+# Logging Configuration
+log_retention_days = 90
+
+# Alerting Configuration
+alert_emails = [
+  "ops-team@example.com",
+  "ml-team@example.com"
+]
+
+# Security Configuration
+enable_deletion_protection = true
+allowed_cidr_blocks = [
+  "0.0.0.0/0" # Restrict this to your IP ranges in production
+]
+
+# Compliance Configuration
+enable_hipaa_compliance = false
+enable_soc2_compliance  = false
+enable_gdpr_compliance  = false
+
+# Disaster Recovery Configuration
+enable_cross_region_backup = false
+backup_region              = "us-west-2"
+
+# Cost Optimization
+enable_spot_instances  = true
+enable_savings_plans   = true
+
+# Tagging Configuration
+additional_tags = {
+  Department = "Engineering"
+  Team       = "ML Platform"
+  Project    = "Wave Field LLM"
+}
+cost_center = "ml-infrastructure"
+owner       = "ml-team"
+
+# Monitoring Configuration
+enable_enhanced_monitoring    = true
+enable_performance_insights   = true
+
+# Auto Scaling Configuration
+enable_cluster_autoscaler          = true
+enable_horizontal_pod_autoscaler   = true
+
+# Network Security
+enable_vpc_flow_logs = true
+enable_waf           = true
+enable_shield        = false # AWS Shield Advanced has additional costs
+
+# Encryption Configuration
+enable_encryption_at_rest     = true
+enable_encryption_in_transit  = true
+
+# Blue-Green Deployment
+enable_blue_green_deployment         = false
+blue_green_traffic_shift_percentage  = 10
+
+# Multi-Region Configuration
+enable_multi_region = false
+secondary_regions   = []

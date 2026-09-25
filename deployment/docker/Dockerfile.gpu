@@ -1,0 +1,140 @@
+# GPU-optimized Dockerfile for Wave Field LLM
+# Supports NVIDIA CUDA for accelerated inference
+
+# ============================================================================
+# Stage 1: Builder - Compile dependencies
+# ============================================================================
+FROM nvidia/cuda:12.1.0-cudnn8-devel-ubuntu22.04 as builder
+
+# Set build arguments
+ARG DEBIAN_FRONTEND=noninteractive
+ARG PYTHON_VERSION=3.11
+
+# Install Python and build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python${PYTHON_VERSION} \
+    python${PYTHON_VERSION}-dev \
+    python${PYTHON_VERSION}-venv \
+    python3-pip \
+    build-essential \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create symlinks for python
+RUN ln -sf /usr/bin/python${PYTHON_VERSION} /usr/bin/python && \
+    ln -sf /usr/bin/python${PYTHON_VERSION} /usr/bin/python3
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip and install build tools
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel
+
+# Copy requirements
+COPY requirements.txt /tmp/requirements.txt
+COPY pyproject.toml /tmp/pyproject.toml
+
+# Install Python dependencies
+WORKDIR /tmp
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install PyTorch with CUDA support
+RUN pip install --no-cache-dir torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Install additional GPU acceleration libraries
+RUN pip install --no-cache-dir \
+    flash-attn \
+    xformers \
+    triton \
+    bitsandbytes
+
+# Copy application code
+COPY crumb_llm/ /app/crumb_llm/
+COPY api/ /app/api/
+COPY cli/ /app/cli/
+COPY setup.py /app/
+COPY README.md /app/
+
+# Install the application
+WORKDIR /app
+RUN pip install --no-cache-dir -e .
+
+# ============================================================================
+# Stage 2: Runtime - GPU-enabled production image
+# ============================================================================
+FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+
+# Metadata
+LABEL maintainer="Wave Field LLM Team"
+LABEL description="GPU-accelerated Wave Field LLM deployment"
+LABEL version="1.0.0"
+LABEL cuda.version="12.1.0"
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    WAVE_FIELD_ENV=production \
+    WAVE_FIELD_LOG_LEVEL=INFO \
+    CUDA_VISIBLE_DEVICES=0 \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility \
+    TORCH_CUDA_ARCH_LIST="7.0 7.5 8.0 8.6 8.9 9.0+PTX"
+
+# Install Python and runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 \
+    python3.11-venv \
+    libgomp1 \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create symlinks for python
+RUN ln -sf /usr/bin/python3.11 /usr/bin/python && \
+    ln -sf /usr/bin/python3.11 /usr/bin/python3
+
+# Create non-root user
+RUN groupadd -r wavefield && \
+    useradd -r -g wavefield -u 1000 -m -s /bin/bash wavefield
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy application from builder
+COPY --from=builder /app /app
+
+# Create necessary directories
+RUN mkdir -p /app/models /app/data /app/logs /app/cache && \
+    chown -R wavefield:wavefield /app
+
+# Set working directory
+WORKDIR /app
+
+# Copy entrypoint script
+COPY deployment/docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh && chown wavefield:wavefield /entrypoint.sh
+
+# Switch to non-root user
+USER wavefield
+
+# Expose API port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+# Volume mounts
+VOLUME ["/app/models", "/app/data", "/app/logs"]
+
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Default command: run API server with GPU optimization
+CMD ["python", "-m", "api.server", "--host", "0.0.0.0", "--port", "8000", "--device", "cuda"]
+
+# Made with Bob

@@ -1,0 +1,115 @@
+# Wave Field LLM - Small Model Configuration
+# 25M parameters - Balanced model for general use
+
+model:
+  name: wavefield-small
+  version: 1.0.0
+  description: "Small Wave Field LLM for general-purpose language tasks"
+  
+  architecture:
+    dim: 512                   # Hidden dimension
+    n_layers: 8                # Number of transformer layers
+    n_heads: 8                 # Number of attention heads
+    field_size: 512            # Wave field size
+    vocab_size: 50257          # GPT-2 tokenizer vocab size
+    max_seq_len: 4096          # Maximum sequence length
+    dropout: 0.1               # Dropout rate
+    use_flash_attention: true  # Flash attention (requires GPU)
+    
+  wave_field:
+    wave_dim: 64               # Wave dimension
+    num_frequencies: 16        # Number of frequency components
+    phase_shift: true          # Enable phase shifting
+    amplitude_modulation: true # Enable amplitude modulation
+
+training:
+  # Training budget
+  total_tokens: 100_000_000_000  # 100B tokens
+  batch_size: 256                 # Per-device batch size
+  gradient_accumulation: 8        # Gradient accumulation steps
+  effective_batch_size: 2048      # batch_size * gradient_accumulation
+  
+  # Optimization
+  learning_rate: 6.0e-4
+  min_learning_rate: 6.0e-5
+  weight_decay: 0.1
+  beta1: 0.9
+  beta2: 0.95
+  grad_clip: 1.0
+  
+  # Learning rate schedule
+  warmup_steps: 5000
+  max_steps: 200000
+  lr_decay_style: "cosine"
+  
+  # Precision
+  mixed_precision: "bf16"      # bf16 for better stability
+  
+  # Checkpointing
+  save_interval: 2000
+  eval_interval: 1000
+  keep_last_n_checkpoints: 10
+  
+  # Early stopping
+  early_stopping_patience: 20
+  early_stopping_metric: "val_loss"
+
+dataset:
+  # Dataset mixture (weights sum to 1.0)
+  mix:
+    c4: 0.35                   # C4 web corpus
+    wikipedia: 0.15            # Wikipedia
+    books: 0.15                # Books corpus
+    github: 0.12               # GitHub code
+    arxiv: 0.10                # ArXiv papers
+    stackexchange: 0.08        # StackExchange
+    openwebtext: 0.05          # OpenWebText
+  
+  # Data processing
+  seq_length: 4096
+  num_workers: 8
+  prefetch_factor: 4
+  
+  # Validation
+  val_split: 0.005
+  val_samples: 50000
+
+hardware:
+  # Hardware requirements
+  min_gpus: 4
+  recommended_gpus: 8
+  gpu_memory_gb: 24
+  cpu_cores: 32
+  ram_gb: 128
+
+logging:
+  # Logging configuration
+  log_interval: 50
+  wandb_project: "wavefield-llm"
+  wandb_entity: null
+  tensorboard: true
+  log_dir: "logs/wavefield-small"
+
+evaluation:
+  # Evaluation benchmarks
+  benchmarks:
+    - "perplexity"
+    - "lambada"
+    - "hellaswag"
+    - "winogrande"
+    - "arc_easy"
+    - "arc_challenge"
+    - "mmlu"
+  
+  # Evaluation frequency
+  eval_during_training: true
+  eval_steps: 1000
+
+distributed:
+  # Distributed training settings
+  backend: "nccl"
+  find_unused_parameters: false
+  gradient_as_bucket_view: true
+  static_graph: true
+
+# Made with Bob

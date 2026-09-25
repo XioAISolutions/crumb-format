@@ -1,0 +1,50 @@
+apiVersion: v2
+name: wavefield-llm
+description: A Helm chart for Wave Field LLM deployment on Kubernetes
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+keywords:
+  - llm
+  - machine-learning
+  - ai
+  - inference
+  - wave-field
+
+home: https://github.com/wavefield/llm
+sources:
+  - https://github.com/wavefield/llm
+
+maintainers:
+  - name: Wave Field Team
+    email: team@wavefield.ai
+
+icon: https://wavefield.ai/icon.png
+
+dependencies:
+  - name: redis
+    version: "17.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  
+  - name: postgresql
+    version: "12.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  
+  - name: prometheus
+    version: "15.x.x"
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: prometheus.enabled
+  
+  - name: grafana
+    version: "6.x.x"
+    repository: https://grafana.github.io/helm-charts
+    condition: grafana.enabled
+
+annotations:
+  category: MachineLearning
+  licenses: Apache-2.0
+
+# Made with Bob

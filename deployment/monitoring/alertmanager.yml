@@ -1,0 +1,371 @@
+# Alertmanager Configuration for Wave Field LLM
+# Production-grade alert routing, grouping, and notification management
+
+global:
+  # Global SMTP configuration for email alerts
+  smtp_smarthost: 'smtp.example.com:587'
+  smtp_from: 'alerts@wavefield-llm.example.com'
+  smtp_auth_username: 'alerts@wavefield-llm.example.com'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+  
+  # Slack webhook URL (can be overridden per route)
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+  
+  # PagerDuty integration key
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+  
+  # Default resolve timeout
+  resolve_timeout: 5m
+  
+  # HTTP configuration
+  http_config:
+    follow_redirects: true
+    enable_http2: true
+
+# Templates for alert notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree for alert routing
+route:
+  # Default receiver for all alerts
+  receiver: 'default-receiver'
+  
+  # Group alerts by these labels
+  group_by: ['alertname', 'cluster', 'service']
+  
+  # Wait time before sending initial notification
+  group_wait: 30s
+  
+  # Wait time before sending notification about new alerts in group
+  group_interval: 5m
+  
+  # Wait time before re-sending notification
+  repeat_interval: 4h
+  
+  # Child routes with specific routing rules
+  routes:
+    # Critical alerts - page immediately
+    - match:
+        severity: critical
+      receiver: 'pagerduty-critical'
+      group_wait: 10s
+      group_interval: 1m
+      repeat_interval: 30m
+      continue: true
+      routes:
+        # Database critical alerts
+        - match:
+            service: database
+          receiver: 'pagerduty-database-team'
+          group_by: ['alertname', 'instance']
+        
+        # API critical alerts
+        - match:
+            service: api
+          receiver: 'pagerduty-api-team'
+          group_by: ['alertname', 'endpoint']
+        
+        # Infrastructure critical alerts
+        - match:
+            service: infrastructure
+          receiver: 'pagerduty-infra-team'
+          group_by: ['alertname', 'node']
+    
+    # High severity alerts - notify immediately
+    - match:
+        severity: high
+      receiver: 'slack-high-priority'
+      group_wait: 30s
+      group_interval: 2m
+      repeat_interval: 1h
+      continue: true
+    
+    # Warning alerts - batch and notify
+    - match:
+        severity: warning
+      receiver: 'slack-warnings'
+      group_wait: 5m
+      group_interval: 10m
+      repeat_interval: 12h
+    
+    # Info alerts - daily digest
+    - match:
+        severity: info
+      receiver: 'email-daily-digest'
+      group_wait: 1h
+      group_interval: 24h
+      repeat_interval: 24h
+    
+    # Performance degradation alerts
+    - match:
+        category: performance
+      receiver: 'slack-performance'
+      group_by: ['alertname', 'service', 'metric']
+      group_wait: 2m
+      group_interval: 5m
+      repeat_interval: 2h
+    
+    # Cost alerts
+    - match:
+        category: cost
+      receiver: 'email-finance-team'
+      group_wait: 1h
+      group_interval: 6h
+      repeat_interval: 24h
+    
+    # Security alerts
+    - match:
+        category: security
+      receiver: 'pagerduty-security'
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 15m
+      continue: true
+      routes:
+        - match:
+            severity: critical
+          receiver: 'slack-security-critical'
+    
+    # Backup and DR alerts
+    - match:
+        category: backup
+      receiver: 'slack-ops-team'
+      group_wait: 10m
+      group_interval: 1h
+      repeat_interval: 6h
+    
+    # Model performance alerts
+    - match:
+        category: model
+      receiver: 'slack-ml-team'
+      group_by: ['alertname', 'model_version']
+      group_wait: 5m
+      group_interval: 15m
+      repeat_interval: 4h
+
+# Inhibition rules - suppress alerts based on other active alerts
+inhibit_rules:
+  # Inhibit warning if critical alert is firing
+  - source_match:
+      severity: critical
+    target_match:
+      severity: warning
+    equal: ['alertname', 'instance']
+  
+  # Inhibit high if critical is firing
+  - source_match:
+      severity: critical
+    target_match:
+      severity: high
+    equal: ['alertname', 'service']
+  
+  # Inhibit node alerts if cluster is down
+  - source_match:
+      alertname: ClusterDown
+    target_match_re:
+      alertname: '(NodeDown|NodeHighCPU|NodeHighMemory)'
+    equal: ['cluster']
+  
+  # Inhibit pod alerts if node is down
+  - source_match:
+      alertname: NodeDown
+    target_match_re:
+      alertname: '(PodCrashLooping|PodNotReady|PodHighMemory)'
+    equal: ['node']
+  
+  # Inhibit service alerts if API gateway is down
+  - source_match:
+      alertname: APIGatewayDown
+    target_match_re:
+      alertname: '(HighLatency|HighErrorRate|LowThroughput)'
+    equal: ['cluster']
+
+# Receivers - notification integrations
+receivers:
+  # Default receiver
+  - name: 'default-receiver'
+    slack_configs:
+      - channel: '#wavefield-alerts'
+        title: 'Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+        send_resolved: true
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+  
+  # PagerDuty for critical alerts
+  - name: 'pagerduty-critical'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY_CRITICAL}'
+        severity: 'critical'
+        description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        details:
+          firing: '{{ .Alerts.Firing | len }}'
+          resolved: '{{ .Alerts.Resolved | len }}'
+          cluster: '{{ .GroupLabels.cluster }}'
+          service: '{{ .GroupLabels.service }}'
+  
+  # PagerDuty for database team
+  - name: 'pagerduty-database-team'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY_DATABASE}'
+        severity: '{{ .CommonLabels.severity }}'
+        description: 'Database Alert: {{ .GroupLabels.alertname }}'
+  
+  # PagerDuty for API team
+  - name: 'pagerduty-api-team'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY_API}'
+        severity: '{{ .CommonLabels.severity }}'
+        description: 'API Alert: {{ .GroupLabels.alertname }}'
+  
+  # PagerDuty for infrastructure team
+  - name: 'pagerduty-infra-team'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY_INFRA}'
+        severity: '{{ .CommonLabels.severity }}'
+        description: 'Infrastructure Alert: {{ .GroupLabels.alertname }}'
+  
+  # PagerDuty for security team
+  - name: 'pagerduty-security'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY_SECURITY}'
+        severity: 'critical'
+        description: 'SECURITY ALERT: {{ .GroupLabels.alertname }}'
+  
+  # Slack for high priority alerts
+  - name: 'slack-high-priority'
+    slack_configs:
+      - channel: '#wavefield-high-priority'
+        title: '🔴 High Priority: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Severity:* {{ .CommonLabels.severity }}
+          *Service:* {{ .GroupLabels.service }}
+          *Firing Alerts:* {{ .Alerts.Firing | len }}
+        send_resolved: true
+        color: 'danger'
+        actions:
+          - type: button
+            text: 'View in Grafana'
+            url: '{{ .CommonAnnotations.grafana_url }}'
+          - type: button
+            text: 'View Runbook'
+            url: '{{ .CommonAnnotations.runbook_url }}'
+  
+  # Slack for warnings
+  - name: 'slack-warnings'
+    slack_configs:
+      - channel: '#wavefield-warnings'
+        title: '⚠️ Warning: {{ .GroupLabels.alertname }}'
+        text: '{{ .CommonAnnotations.description }}'
+        send_resolved: true
+        color: 'warning'
+  
+  # Slack for performance alerts
+  - name: 'slack-performance'
+    slack_configs:
+      - channel: '#wavefield-performance'
+        title: '📊 Performance Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          *Metric:* {{ .GroupLabels.metric }}
+          *Service:* {{ .GroupLabels.service }}
+          *Current Value:* {{ .CommonAnnotations.current_value }}
+          *Threshold:* {{ .CommonAnnotations.threshold }}
+        send_resolved: true
+  
+  # Slack for ML team
+  - name: 'slack-ml-team'
+    slack_configs:
+      - channel: '#wavefield-ml-team'
+        title: '🤖 Model Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          *Model Version:* {{ .GroupLabels.model_version }}
+          *Issue:* {{ .CommonAnnotations.description }}
+          *Impact:* {{ .CommonAnnotations.impact }}
+        send_resolved: true
+  
+  # Slack for ops team
+  - name: 'slack-ops-team'
+    slack_configs:
+      - channel: '#wavefield-ops'
+        title: '🔧 Operations Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ .CommonAnnotations.description }}'
+        send_resolved: true
+  
+  # Slack for security critical
+  - name: 'slack-security-critical'
+    slack_configs:
+      - channel: '#wavefield-security'
+        title: '🚨 CRITICAL SECURITY ALERT: {{ .GroupLabels.alertname }}'
+        text: |
+          *IMMEDIATE ACTION REQUIRED*
+          {{ .CommonAnnotations.description }}
+          *Affected Systems:* {{ .CommonAnnotations.affected_systems }}
+          *Recommended Action:* {{ .CommonAnnotations.recommended_action }}
+        send_resolved: true
+        color: 'danger'
+  
+  # Email for daily digest
+  - name: 'email-daily-digest'
+    email_configs:
+      - to: 'team@wavefield-llm.example.com'
+        subject: 'Wave Field LLM Daily Alert Digest'
+        html: |
+          <h2>Daily Alert Summary</h2>
+          <p>Total Alerts: {{ .Alerts | len }}</p>
+          {{ range .Alerts }}
+          <h3>{{ .Labels.alertname }}</h3>
+          <p>{{ .Annotations.description }}</p>
+          <hr>
+          {{ end }}
+        send_resolved: false
+  
+  # Email for finance team
+  - name: 'email-finance-team'
+    email_configs:
+      - to: 'finance@wavefield-llm.example.com'
+        subject: 'Wave Field LLM Cost Alert: {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>Cost Alert</h2>
+          <p><strong>Alert:</strong> {{ .GroupLabels.alertname }}</p>
+          <p><strong>Description:</strong> {{ .CommonAnnotations.description }}</p>
+          <p><strong>Current Cost:</strong> {{ .CommonAnnotations.current_cost }}</p>
+          <p><strong>Budget:</strong> {{ .CommonAnnotations.budget }}</p>
+          <p><strong>Recommendation:</strong> {{ .CommonAnnotations.recommendation }}</p>
+        send_resolved: true
+
+# Time intervals for muting alerts (maintenance windows)
+time_intervals:
+  - name: 'business-hours'
+    time_intervals:
+      - times:
+          - start_time: '09:00'
+            end_time: '17:00'
+        weekdays: ['monday:friday']
+        location: 'America/New_York'
+  
+  - name: 'off-hours'
+    time_intervals:
+      - times:
+          - start_time: '17:00'
+            end_time: '09:00'
+        weekdays: ['monday:friday']
+        location: 'America/New_York'
+      - weekdays: ['saturday', 'sunday']
+        location: 'America/New_York'
+  
+  - name: 'maintenance-window'
+    time_intervals:
+      - times:
+          - start_time: '02:00'
+            end_time: '04:00'
+        weekdays: ['sunday']
+        location: 'America/New_York'
+
+# Mute time intervals (apply to specific routes)
+mute_time_intervals:
+  - 'maintenance-window'
+
+# Made with Bob

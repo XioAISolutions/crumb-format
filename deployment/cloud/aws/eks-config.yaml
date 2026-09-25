@@ -1,0 +1,35 @@
+
+# AWS EKS Configuration for Wave Field LLM
+# This file can be used with eksctl for quick cluster creation
+
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: wavefield-llm-cluster
+  region: us-east-1
+  version: "1.28"
+  tags:
+    Environment: production
+    Project: WaveFieldLLM
+    ManagedBy: eksctl
+
+# VPC Configuration
+vpc:
+  cidr: 10.0.0.0/16
+  nat:
+    gateway: HighlyAvailable
+  clusterEndpoints:
+    publicAccess: true
+    privateAccess: true
+
+# IAM Configuration
+iam:
+  withOIDC: true
+  serviceAccounts:
+  - metadata:
+      name: wavefield-llm
+      namespace: wavefield
+    attachPolicyARNs:
+    - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+    - arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy

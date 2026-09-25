@@ -1,0 +1,164 @@
+# Wave Field LLM - Medium CRUMB-Specialized Model Configuration
+# 350M parameters - Optimized for CRUMB format understanding and generation
+
+model:
+  name: wavefield-medium-crumb
+  version: 1.0.0
+  description: "CRUMB-specialized Wave Field LLM for structured context management"
+  base_model: "wavefield-medium"
+  specialization: "crumb"
+  
+  architecture:
+    dim: 1024                  # Hidden dimension
+    n_layers: 24               # Number of transformer layers
+    n_heads: 16                # Number of attention heads
+    field_size: 1024           # Wave field size
+    vocab_size: 50257          # GPT-2 tokenizer vocab size
+    max_seq_len: 16384         # Longer context for CRUMB files
+    dropout: 0.1               # Dropout rate
+    use_flash_attention: true  # Flash attention (requires GPU)
+    
+  wave_field:
+    wave_dim: 128              # Wave dimension
+    num_frequencies: 32        # Number of frequency components
+    phase_shift: true          # Enable phase shifting
+    amplitude_modulation: true # Enable amplitude modulation
+
+training:
+  # Training strategy: Start from wavefield-medium checkpoint
+  resume_from: "models/wavefield-medium/checkpoint-best.pt"
+  
+  # Training budget (fine-tuning)
+  total_tokens: 100_000_000_000  # 100B tokens
+  batch_size: 64                  # Per-device batch size
+  gradient_accumulation: 32       # Gradient accumulation steps
+  effective_batch_size: 2048      # batch_size * gradient_accumulation
+  
+  # Optimization
+  learning_rate: 2.0e-4          # Lower LR for fine-tuning
+  min_learning_rate: 2.0e-5
+  weight_decay: 0.1
+  beta1: 0.9
+  beta2: 0.95
+  grad_clip: 1.0
+  
+  # Learning rate schedule
+  warmup_steps: 5000
+  max_steps: 200000
+  lr_decay_style: "cosine"
+  
+  # Precision
+  mixed_precision: "bf16"
+  
+  # Checkpointing
+  save_interval: 5000
+  eval_interval: 2500
+  keep_last_n_checkpoints: 15
+  
+  # Early stopping
+  early_stopping_patience: 25
+  early_stopping_metric: "crumb_validation_score"
+  
+  # Advanced optimization
+  use_fused_adam: true
+  use_gradient_checkpointing: true
+
+dataset:
+  # CRUMB-focused dataset mixture (weights sum to 1.0)
+  mix:
+    crumb_files: 0.30          # Real CRUMB files
+    synthetic_crumb: 0.20      # Synthetic CRUMB data
+    github_issues: 0.15        # GitHub issues/PRs
+    documentation: 0.10        # Technical documentation
+    task_descriptions: 0.10    # Task/project descriptions
+    code_with_context: 0.10    # Code with contextual info
+    c4: 0.05                   # General text
+  
+  # Data processing
+  seq_length: 16384            # Long sequences for CRUMB
+  num_workers: 16
+  prefetch_factor: 4
+  
+  # Validation
+  val_split: 0.003
+  val_samples: 50000
+  
+  # CRUMB-specific preprocessing
+  preserve_structure: true
+  validate_crumb_format: true
+  include_metadata: true
+  parse_references: true
+
+hardware:
+  # Hardware requirements
+  min_gpus: 8
+  recommended_gpus: 16
+  gpu_memory_gb: 40
+  cpu_cores: 64
+  ram_gb: 256
+
+logging:
+  # Logging configuration
+  log_interval: 100
+  wandb_project: "wavefield-llm-crumb"
+  wandb_entity: null
+  tensorboard: true
+  log_dir: "logs/wavefield-medium-crumb"
+
+evaluation:
+  # CRUMB-specific evaluation benchmarks
+  benchmarks:
+    - "crumb_validation"       # CRUMB format validation
+    - "crumb_generation"       # CRUMB generation quality
+    - "crumb_parsing"          # CRUMB parsing accuracy
+    - "reference_resolution"   # Reference resolution
+    - "context_compression"    # Context compression ratio
+    - "handoff_quality"        # Handoff quality metrics
+    - "perplexity"             # General perplexity
+  
+  # Evaluation frequency
+  eval_during_training: true
+  eval_steps: 2500
+  
+  # CRUMB evaluation settings
+  crumb_eval_samples: 1000
+  crumb_eval_strict: true
+  crumb_eval_versions: ["1.2", "1.3", "1.4"]
+
+distributed:
+  # Distributed training settings
+  backend: "nccl"
+  find_unused_parameters: false
+  gradient_as_bucket_view: true
+  static_graph: true
+  
+  # FSDP settings
+  use_fsdp: true
+  fsdp_sharding_strategy: "FULL_SHARD"
+  fsdp_cpu_offload: false
+  fsdp_backward_prefetch: "BACKWARD_PRE"
+
+# CRUMB-specific training features
+crumb_features:
+  # Augmentation strategies
+  augmentation:
+    reference_masking: 0.15    # Mask references for prediction
+    structure_perturbation: 0.10  # Perturb structure slightly
+    metadata_dropout: 0.05     # Drop metadata fields
+  
+  # Loss weighting
+  loss_weights:
+    format_validation: 2.0     # Higher weight for format
+    reference_accuracy: 1.5    # Higher weight for references
+    content_quality: 1.0       # Standard weight for content
+  
+  # Special tokens
+  special_tokens:
+    - "<crumb>"
+    - "</crumb>"
+    - "<ref>"
+    - "</ref>"
+    - "<meta>"
+    - "</meta>"
+
+# Made with Bob

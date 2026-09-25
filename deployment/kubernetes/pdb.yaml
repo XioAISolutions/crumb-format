@@ -1,0 +1,52 @@
+# Pod Disruption Budget for Wave Field LLM
+# Ensures high availability during voluntary disruptions
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: wavefield-llm-pdb
+  namespace: wavefield
+  labels:
+    app: wavefield-llm
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: wavefield-llm
+      component: api
+  unhealthyPodEvictionPolicy: AlwaysAllow
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: wavefield-llm-gpu-pdb
+  namespace: wavefield
+  labels:
+    app: wavefield-llm
+    component: gpu
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: wavefield-llm
+      component: api-gpu
+  unhealthyPodEvictionPolicy: AlwaysAllow
+
+---
+# Alternative: maxUnavailable approach
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: wavefield-llm-pdb-max
+  namespace: wavefield
+  labels:
+    app: wavefield-llm
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: wavefield-llm
+      component: api
+
+# Made with Bob

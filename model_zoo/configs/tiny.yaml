@@ -1,0 +1,103 @@
+# Wave Field LLM - Tiny Model Configuration
+# 230K parameters - For experimentation and testing
+
+model:
+  name: wavefield-tiny
+  version: 1.0.0
+  description: "Tiny Wave Field LLM for rapid experimentation and testing"
+  
+  architecture:
+    dim: 96                    # Hidden dimension
+    n_layers: 3                # Number of transformer layers
+    n_heads: 4                 # Number of attention heads
+    field_size: 256            # Wave field size
+    vocab_size: 50257          # GPT-2 tokenizer vocab size
+    max_seq_len: 2048          # Maximum sequence length
+    dropout: 0.1               # Dropout rate
+    use_flash_attention: false # Flash attention (requires GPU)
+    
+  wave_field:
+    wave_dim: 32               # Wave dimension
+    num_frequencies: 8         # Number of frequency components
+    phase_shift: true          # Enable phase shifting
+    amplitude_modulation: true # Enable amplitude modulation
+
+training:
+  # Training budget
+  total_tokens: 10_000_000_000  # 10B tokens
+  batch_size: 512                # Per-device batch size
+  gradient_accumulation: 4       # Gradient accumulation steps
+  effective_batch_size: 2048     # batch_size * gradient_accumulation
+  
+  # Optimization
+  learning_rate: 3.0e-4
+  min_learning_rate: 3.0e-5
+  weight_decay: 0.1
+  beta1: 0.9
+  beta2: 0.95
+  grad_clip: 1.0
+  
+  # Learning rate schedule
+  warmup_steps: 2000
+  max_steps: 50000
+  lr_decay_style: "cosine"
+  
+  # Precision
+  mixed_precision: "fp16"      # fp16, bf16, or fp32
+  
+  # Checkpointing
+  save_interval: 1000
+  eval_interval: 500
+  keep_last_n_checkpoints: 5
+  
+  # Early stopping
+  early_stopping_patience: 10
+  early_stopping_metric: "val_loss"
+
+dataset:
+  # Dataset mixture (weights sum to 1.0)
+  mix:
+    c4: 0.40                   # C4 web corpus
+    wikipedia: 0.15            # Wikipedia
+    books: 0.15                # Books corpus
+    github: 0.10               # GitHub code
+    arxiv: 0.10                # ArXiv papers
+    stackexchange: 0.10        # StackExchange
+  
+  # Data processing
+  seq_length: 2048
+  num_workers: 4
+  prefetch_factor: 2
+  
+  # Validation
+  val_split: 0.01
+  val_samples: 10000
+
+hardware:
+  # Hardware requirements
+  min_gpus: 1
+  recommended_gpus: 2
+  gpu_memory_gb: 8
+  cpu_cores: 8
+  ram_gb: 32
+
+logging:
+  # Logging configuration
+  log_interval: 10
+  wandb_project: "wavefield-llm"
+  wandb_entity: null
+  tensorboard: true
+  log_dir: "logs/wavefield-tiny"
+
+evaluation:
+  # Evaluation benchmarks
+  benchmarks:
+    - "perplexity"
+    - "lambada"
+    - "hellaswag"
+  
+  # Evaluation frequency
+  eval_during_training: true
+  eval_steps: 500
+
+# Made with Bob
