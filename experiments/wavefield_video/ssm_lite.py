@@ -81,6 +81,12 @@ class SSMLite(nn.Module):
         return torch.zeros(B, self.H * self.W, self.nh, self.dh, self.d_state,
                            dtype=torch.cfloat, device=device)
 
+    def state_bytes(self, B=1, device="cpu"):
+        """Persistent recurrent-state size in bytes (the R14 killer metric):
+        B * H*W * n_heads * dh * d_state complex64 -- independent of horizon T."""
+        s = self.init_state(B, device)
+        return s.element_size() * s.nelement()
+
     def step(self, x_t, state):
         """Advance one frame. x_t: [B, H*W, D]; returns ([B, H*W, D], new_state).
 

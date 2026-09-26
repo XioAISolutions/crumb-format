@@ -1,0 +1,39 @@
+The M0 build is complete. Every deliverable is written and reviewed; the one thing I could **not** do is execute — this sandbox gates `python`/`bash run_m0_smoke.sh` and each attempt returned "requires approval." So the code is done but the numbers are pending your approved run.
+
+## What I built (all under `crumb_coherence/`, no commits)
+
+| File | Contents |
+|---|---|
+| `core.py` | Every §6 function + `SpectralCoherenceEngine`, `StatsEMAEngine`, `CoherenceState` — exact §1 interface |
+| `adapters.py` | `wrap_generator` — pipeline-agnostic decorator, threads state via closure |
+| `metrics.py` | `lowband_trajectory_variance`, `delta_e_vs_ref` (full CIEDE2000), `highfreq_ssim` (windowed SSIM on high-pass residual), `temporal_flicker` |
+| `tests/test_core.py` | The 4 required invariants + extras |
+| `scripts/run_m0.py` | M0 synthetic-drift harness |
+| `run_m0_smoke.sh` | CPU-only: tests → harness |
+| `IMPL_NOTES_M0.md` | Exact commands + design rationale |
+
+## The one command to verify everything
+
+```bash
+cd /Users/slavaz/crumb-format/experiments/wavefield_video
+bash run_m0_smoke.sh
+```
+
+This runs the unit tests (byte-identical `alpha=0`; `process_segment == process_frame`; cut-guard fires; `state_bytes` = 62 424 B @512, 24 B dc_only) then the M0 harness (stats-EMA + spectral dc_only/magnitude/complex, reporting drift-reduction %, hf-SSIM, motion %, state bytes, PASS/fail vs the ≥60% / ssim≥0.98 / motion-within-5% gate).
+
+`★ Insight ─────────────────────────────────────`
+Two spec subtleties drove the trickiest code. (1) **rfft2 asymmetry**: width holds only non-negative freqs (low band = plain `[:kw]` slice) but height wraps negative freqs to the end — so the low-band box needs `fftshift`→center-crop→`ifftshift`, and DC ends up at box row `kh//2`, not `[0,0]`. (2) **The 24-byte `dc_only` claim forces a 1×1 anchor** — I made the engine collapse the box to 1×1 in that mode, so `state_bytes` hits exactly 24 rather than approximately.
+`─────────────────────────────────────────────────`
+
+## One thing I want your judgment on (spec §3.2)
+
+The spec explicitly calls `target_lowband` the **load-bearing decision** — "do not accept the default blindly." I shipped the three modes faithfully, but there's a genuine product fork the spec leaves open in `core.py`:
+
+> for a **locked-camera** product you may want to also stabilize the *lowest phase ring* (freezing coarse layout jitter), whereas the current `magnitude` default keeps **all** phase free (right for **moving-camera** content).
+
+Right now `magnitude` = `|anchor| · (Xlo/|Xlo|)` — 100% of phase stays free. If your brainsnn.com target is mostly static/orbiting shots, a variant that blends in a little low-ring phase anchoring could remove coarse layout wobble that pure-magnitude leaves in. That's a 3-5 line change to `target_lowband` and a real behavioral tradeoff. **Do you want the moving-camera default as-is, or should I add a `phase_lock_rings` knob for the locked-camera case before M1?**
+
+A few flags for full honesty:
+- I **couldn't run it**, so the M0 verdict table and test-pass are unverified. If a run surfaces a bug I'll fix it.
+- At 64×64 the balls (σ≈1.6 px) are largely *high*-frequency, so `complex` may not dramatically freeze them — the "complex freezes motion" story may show weakly at this scale. The harness reports it either way; I noted this in the notes rather than tuning the grid to force the narrative.
+EXIT-0

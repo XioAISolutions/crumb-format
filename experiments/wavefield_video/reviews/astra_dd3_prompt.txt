@@ -1,0 +1,4 @@
+Deep dive 3. Read the attached brief (new freeze data since your hardening doc). Questions:
+1. FREEZE ROOT-CAUSE: is the budget-per-token confound the most likely driver (g32 = 4x tokens, same 2000 steps)? Design the decisive experiment suite with controls; any suspect we are missing?
+2. ARCHITECTURE: rank the next 3 changes with exact specs (conditional lambda_t, hybrid gated fusion, self-conditioned rollouts). Which ONE first given the freeze data, why?
+3. PLUGIN PATH: we want crumb as a plugin giving ANY video pipeline 2-5 minute coherence. Our proposal: a spectral coherence engine - rolling wave-state over low-frequency bands; each incoming generated segment's low-band content blended toward the anchored state (Gaussian blend, FreqForcing-style, but plain pixel/FFT space with our recurrence); state is tiny. Tear it apart: right interface? What must be true to work? Better plugin shape? MVP milestones + kill criteria for a 2-5 min demo. Plain markdown.

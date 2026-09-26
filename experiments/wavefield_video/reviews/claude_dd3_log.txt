@@ -1,0 +1,22 @@
+Both documents are written (no commits, per your instruction):
+
+- **`DEEP_DIVE_3_opus.md`** — freeze root-cause + airtight budget suite + architecture ranking
+- **`PLUGIN_SPEC_crumb_coherence.md`** — the spectral coherence engine plugin
+
+## What the analysis concluded
+
+**Root-cause (Q1).** The new data forces a reframe:
+- The **geometry control failing** (moving_frac 0.09→0.55, still frozen) **kills the DEEP_DIVE_2 dilution story** — which is exactly why the objective patches did nothing. They fixed a leak that wasn't binding.
+- **"Budget per token" is the right smell but a wrong mechanism.** The wave operators are *spatially shared*, so g32 feeds them 4× *more* samples/step, not fewer — they aren't undertrained in the naive sense. The real grid-coupled levers are **`OneCycleLR(total_steps=a.steps)` (line 724) annealing LR to ≈0 before the copy-last escape finishes**, plus two novel, un-flagged numerics suspects: **bf16 spectral underflow** (the `.float()` at wfvideo.py:313 is *after* the bf16 `pi` matmul) and **AdamW weight-decay dragging the zero-init head back to copy-last**.
+- I ruled out (with code citations) normalization (RMSNorm is per-token) and kernel init (continuous in `k`).
+- **The cheapest decisive experiment**: a **deterministic-future** run — if the future is deterministic and it *still* freezes, freeze is provably not the loss optimum → trainability. (If your R10 `_g32_K1_nocoll` arm was in the "all froze" matrix, this may already be answered.)
+- The suite is a **one-knob-per-arm factorial** that separates the four axes the brief's single "8000-step" run confounds (steps / schedule shape / samples-per-step / precision), with a 2-line grad-norm+copy_ratio instrumentation as the smoking gun, and a decision table mapping each outcome to a fix.
+
+**Architecture (Q2).** Given a one-step map that won't move, HARDENING's ranking **inverts**: build **hybrid gated fusion (`local_wave`) first** — it's already scaffolded (`FusedMix`), the local path gives an *easy* motion gradient that bypasses the fragile global FFT operator (directly attacks the freeze), and it doubles as the decisive `local+wave` vs `local+ssm` experiment. Conditional-λ and self-conditioned rollouts are ranked 2nd/3rd and gated behind the freeze being fixed (self-conditioning can't unfreeze a copy-last model).
+
+## One decision I deliberately left for you
+
+In `PLUGIN_SPEC_crumb_coherence.md §3.2`, the `target_lowband(Xlo, anchor, anchor_mode)` function is the **load-bearing choice**: anchoring the full complex low band *freezes motion* (the plugin's own version of the g32 freeze), while anchoring **magnitude-only** fixes exposure/color drift but keeps phase (motion) free. I shipped `"magnitude"` as the default and wrote the reasoning, but **the exact crossover — how much low-band phase to touch for a locked-camera vs moving-camera product — is a genuine product decision worth your judgment** rather than accepting the default. That's the 5–10 lines where your domain call actually shapes the feature.
+
+Want me to sketch a runnable reference implementation of `SpectralCoherenceEngine` + the stats-EMA baseline so M0 can be exercised, or draft the 2-line training-loop instrumentation diff for the freeze suite?
+EXIT-0

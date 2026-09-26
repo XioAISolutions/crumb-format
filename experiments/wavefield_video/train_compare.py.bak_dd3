@@ -548,10 +548,6 @@ def main():
     ap.add_argument("--grid", type=int, default=32)
     ap.add_argument("--frames", type=int, default=17)
     ap.add_argument("--batch", type=int, default=128)
-    ap.add_argument("--const-lr", action="store_true", help="constant LR (LambdaLR==1) instead of OneCycle")
-    ap.add_argument("--fp32", action="store_true", help="disable bf16 autocast (fp32 train+eval)")
-    ap.add_argument("--no-decay-norm-head", action="store_true", help="exclude norm/bias/head from AdamW weight decay")
-    ap.add_argument("--telemetry-every", type=int, default=25, help="log head grad-norm + batch copy_ratio every N steps (0=off)")
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--ffn-mult", type=float, default=4.0)
     ap.add_argument("--target-params", type=int, default=0, help="auto-match ffn_mult to this")
@@ -723,22 +719,9 @@ def main():
         print("STREAM-DONE " + json.dumps(res), flush=True)
         return
 
-    if a.no_decay_norm_head:
-        _dec, _nodec = [], []
-        for _n, _p in pmodel.named_parameters():
-            if not _p.requires_grad:
-                continue
-            _is_nodec = _n.endswith("bias") or ("norm" in _n) or (_n.split(".")[-2] == "head")
-            (_nodec if _is_nodec else _dec).append(_p)
-        opt = torch.optim.AdamW([{"params": _dec, "weight_decay": 0.01},
-                                 {"params": _nodec, "weight_decay": 0.0}], lr=a.lr)
-    else:
-        opt = torch.optim.AdamW([p for p in pmodel.parameters() if p.requires_grad],
-                                lr=a.lr, weight_decay=0.01)
-    if a.const_lr:
-        sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: 1.0)
-    else:
-        sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=a.lr, total_steps=a.steps)
+    opt = torch.optim.AdamW([p for p in pmodel.parameters() if p.requires_grad],
+                            lr=a.lr, weight_decay=0.01)
+    sched = torch.optim.lr_scheduler.OneCycleLR(opt, max_lr=a.lr, total_steps=a.steps)
     # Rollout depth. --rollout-ramp holds K=3 through the first half then ramps
     # linearly to 8 over the second half (curriculum: short horizons first, then
     # push long-horizon stability once the one-step map is decent). We must always
@@ -780,7 +763,7 @@ def main():
                                       return_moving=a.motion_loss, move_thresh=a.move_thresh)
                 clips, moving = (gen if a.motion_loss else (gen, None))
                 ctx = clips[:, :a.frames].clone()
-                with torch.autocast(device_type=dev, dtype=torch.bfloat16, enabled=(dev == "cuda" and not a.fp32)):
+                with torch.autocast(device_type=dev, dtype=torch.bfloat16, enabled=(dev == "cuda")):
                     if a.latent:
                         # Encode the whole clip once with the frozen AE (no grad),
                         # then run the SAME K-step rollout loss but in latent space:
@@ -817,17 +800,6 @@ def main():
                                 win = torch.cat([win[:, 1:], pred.detach().unsqueeze(1)], 1)
                 opt.zero_grad(set_to_none=True)
                 loss.backward()
-                if a.telemetry_every and step % a.telemetry_every == 0:
-                    with torch.no_grad():
-                        _hw = next((_p.grad.norm().item() for _n, _p in pmodel.named_parameters()
-                                    if _n.split(".")[-2] == "head" and _p.grad is not None), float("nan"))
-                        _tcr = ((pred.float() - ctx[:, -1]).norm() / ((tgt_k.float() - ctx[:, -1]).norm() + 1e-9)).item()
-                        # Gate diagnostic (fused arms only): mean g per layer; g->1
-                        # means the persistent global (wave/ssm) state is dead weight.
-                        _gm = pmodel.gate_means() if hasattr(pmodel, "gate_means") else []
-                    _gtxt = (" gate_g=[" + ",".join(f"{v:.3f}" for v in _gm) + "]") if _gm else ""
-                    print(f"TELE step={step} lr={sched.get_last_lr()[0]:.2e} "
-                          f"head_gn={_hw:.4e} copy_r={_tcr:.4f}{_gtxt}", flush=True)
                 torch.nn.utils.clip_grad_norm_(pmodel.parameters(), 1.0)
                 opt.step()
                 sched.step()
@@ -867,7 +839,7 @@ def main():
                                             seed=90000 + i, kicks=a.kicks, collisions=a.collisions,
                                             radius=a.radius, speed=a.speed, nb=a.n_balls)
                     ctx, tgt = clips[:, :a.frames], clips[:, a.frames]
-                    with torch.autocast(device_type=dev, dtype=torch.bfloat16, enabled=(dev == "cuda" and not a.fp32)):
+                    with torch.autocast(device_type=dev, dtype=torch.bfloat16, enabled=(dev == "cuda")):
                         pred = m(ctx)
                     p, last = pred.float(), ctx[:, -1]
                     se += F.mse_loss(p, tgt).item()

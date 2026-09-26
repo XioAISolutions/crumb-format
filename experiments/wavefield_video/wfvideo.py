@@ -258,6 +258,15 @@ class WaveMix3D(nn.Module):
         return torch.zeros(B, self.n_modes, self.nh, Hp, Wp, self.dh,
                            dtype=torch.cfloat, device=device)
 
+    def state_bytes(self, B=1, device="cpu"):
+        """Persistent recurrent-state size in bytes (the R14 killer metric). Only
+        the dispersion path has an O(1)-in-T recurrence; the separable path is not
+        streamable, so it reports 0 (it is never used as a streaming arm)."""
+        if self.kernel_version != "dispersion":
+            return 0
+        s = self.init_state(B, device)
+        return s.element_size() * s.nelement()
+
     def step(self, x_t, state):
         """Advance one frame of the dispersion wave recurrence. ``x_t``: [B, H*W, D]
         (raw input for frame t); returns ([B, H*W, D], new_state).
@@ -343,6 +352,83 @@ class AttnMix(nn.Module):
         y = y.transpose(1, 2).reshape(B, N, D)
         return self.po(y)
 
+    def state_bytes(self, B=1, device="cpu"):
+        """Attention has NO persistent recurrent state -- its 'memory' is the whole
+        T-frame window it re-attends every step, which the model must keep O(T·H·W·
+        dim). That bounded window is reported separately as ``window_bytes``; the
+        persistent (horizon-independent) state is 0. This asymmetry is the point."""
+        return 0
+
+
+class FusedMix(nn.Module):
+    """Gated fusion of a finite-context LOCAL path and a persistent GLOBAL memory
+    path (HARDENING_astra.md Rank 2):  h = g*h_local + (1-g)*h_global, with
+    g = sigmoid(Linear([h_local; h_global])).
+
+      fuse="local_ssm"  -> global = SSMLite            (generic diagonal SSM)
+      fuse="local_wave" -> global = WaveMix3D dispersion (the structured wave state)
+
+    The local path is *causal* windowed attention (window = T): finite context, so
+    it cannot see past the T most-recent frames. The global path is the O(1)-in-T
+    recurrence that CAN carry information across an arbitrarily long occlusion.
+
+    Streaming (``step``): the global path advances its O(1) recurrence; the local
+    path keeps a rolling buffer of the last T frames of (normed) tokens and
+    recomputes causal attention over them. Only the global recurrence is the
+    *persistent* state (``state_bytes``); the local buffer is bounded O(T) and is
+    reported as ``window_bytes``. Because the local attention is causal, ingesting a
+    T-frame clip one frame at a time reproduces ``forward`` on that clip at the last
+    frame (checked by test_fusion_r14.py, mirroring sanity_check.py test 8b)."""
+
+    def __init__(self, dim, n_heads, T, H, W, fuse, causal=True, linear_pad=True):
+        super().__init__()
+        self.dim, self.nh = dim, n_heads
+        self.T, self.H, self.W = T, H, W
+        self.fuse = fuse
+        self.local = AttnMix(dim, n_heads, T, H, W, causal=True)   # always causal for streaming parity
+        if fuse == "local_ssm":
+            from ssm_lite import SSMLite
+            self.glob = SSMLite(dim, n_heads, T, H, W, causal=causal)
+        elif fuse == "local_wave":
+            self.glob = WaveMix3D(dim, n_heads, T, H, W, kernel_version="dispersion",
+                                  causal_time=causal, linear_pad=linear_pad,
+                                  gate=False, local_fuse=False)
+        else:
+            raise ValueError(f"unknown fuse {fuse!r} (want local_ssm | local_wave)")
+        self.gate = nn.Linear(2 * dim, dim)
+        self._gate_mean = None            # diagnostic: mean g of the last forward/step
+
+    def _fuse(self, hl, hg):
+        g = torch.sigmoid(self.gate(torch.cat([hl, hg], dim=-1)))
+        # Diagnostic only (DEEP_DIVE_3 Rank 1): mean gate value -- "is the global
+        # state pulling its weight?". g routes toward the LOCAL path, so mean g -> 1
+        # means the wave/ssm persistent state is dead weight. Detached so it never
+        # enters autograd and cannot perturb training or the default (fuse=none) path.
+        self._gate_mean = g.detach().mean()
+        return g * hl + (1.0 - g) * hg
+
+    def forward(self, x):  # x: [B, N, D], N = T*H*W
+        return self._fuse(self.local(x), self.glob(x))
+
+    # ---- O(1)-in-T streaming (global) + O(T) rolling window (local) ----------
+    def init_state(self, B, device):
+        return {"glob": self.glob.init_state(B, device),
+                "buf": torch.zeros(B, self.T, self.H * self.W, self.dim, device=device)}
+
+    def step(self, x_t, state):
+        """x_t: [B, H*W, D] (current frame's normed tokens) -> ([B,H*W,D], state)."""
+        B, S, D = x_t.shape
+        hg, gstate = self.glob.step(x_t, state["glob"])
+        buf = state["buf"].to(x_t.dtype)
+        buf = torch.cat([buf[:, 1:], x_t.unsqueeze(1)], dim=1)     # slide: current at last slot
+        hl_full = self.local(buf.reshape(B, self.T * S, D))        # causal attn over the window
+        hl = hl_full[:, (self.T - 1) * S: self.T * S]              # current frame's output
+        return self._fuse(hl, hg), {"glob": gstate, "buf": buf}
+
+    def state_bytes(self, B=1, device="cpu"):
+        # Persistent (horizon-independent) memory is the global recurrence ONLY.
+        return self.glob.state_bytes(B, device)
+
 
 class Block(nn.Module):
     def __init__(self, mix, dim, ffn_mult=4.0):
@@ -369,16 +455,28 @@ class VideoPredictor(nn.Module):
     def __init__(self, dim, n_layers, n_heads, T, H, W, kind,
                  causal=False, residual=True, ffn_mult=4.0,
                  kernel_version="separable", linear_pad=False,
-                 gate=False, local_fuse=False):
+                 gate=False, local_fuse=False, fuse="none"):
         super().__init__()
         self.T, self.H, self.W = T, H, W
         self.kind = kind
+        self.fuse = fuse
         self.residual = residual
         self.embed = nn.Conv2d(3, dim, 3, padding=1)
         self.posemb = FactorizedPosEmb(dim, T, H, W)   # shared, all arms, always on
+        if fuse != "none":
+            # Hybrid arm: the global memory kind must agree with --kind so config,
+            # streaming, and state-byte accounting all name the same operator.
+            want = {"local_ssm": "ssm", "local_wave": "wave"}.get(fuse)
+            if want is None:
+                raise ValueError(f"unknown fuse {fuse!r}")
+            if kind != want:
+                raise ValueError(f"--fuse {fuse} requires --kind {want} (got {kind})")
         blocks = []
         for _ in range(n_layers):
-            if kind == "wave":
+            if fuse != "none":
+                mix = FusedMix(dim, n_heads, T, H, W, fuse,
+                               causal=causal, linear_pad=linear_pad)
+            elif kind == "wave":
                 mix = WaveMix3D(dim, n_heads, T, H, W, kernel_version=kernel_version,
                                 causal_time=causal, linear_pad=linear_pad,
                                 gate=gate, local_fuse=local_fuse)
@@ -415,11 +513,33 @@ class VideoPredictor(nn.Module):
             return frames[:, -1] + delta
         return delta
 
-    # ---- O(1)-in-T streaming rollout (wave/dispersion only) -----------------
+    # ---- O(1)-in-T streaming rollout (wave / ssm / local+global hybrids) -----
+    def _streamable(self):
+        return self.fuse != "none" or self.kind in ("wave", "ssm")
+
     def stream_init(self, B, device):
-        """Per-layer WaveMix3D streaming state (list, one entry per block)."""
-        assert self.kind == "wave", "stream_step is wave-only"
+        """Per-layer streaming state (list, one entry per block). Supported for the
+        recurrent arms: wave (dispersion), ssm, and the local+ssm / local+wave
+        hybrids. Attention has no recurrence and must roll out windowed instead."""
+        assert self._streamable(), "stream_step needs a recurrent arm (wave/ssm/fused)"
         return [blk.mix.init_state(B, device) for blk in self.blocks]
+
+    def persistent_state_bytes(self, B=1, device="cpu"):
+        """Total persistent recurrent-state bytes across blocks (0 for attention)."""
+        return sum(blk.mix.state_bytes(B, device) for blk in self.blocks)
+
+    def gate_means(self):
+        """Per-layer mean gate value g from the most recent forward pass (empty for
+        non-fused arms). g -> 1 => local causal path dominates, the persistent global
+        (wave/ssm) state is dead weight (DEEP_DIVE_3 Rank 1 kill signal); g -> 0 =>
+        the model routes through the persistent global memory. Reads the detached
+        scalar cached in FusedMix._fuse, so it must be called after a forward()."""
+        out = []
+        for blk in self.blocks:
+            gm = getattr(blk.mix, "_gate_mean", None)
+            if gm is not None:
+                out.append(float(gm))
+        return out
 
     def stream_step(self, frame, states, t_index):
         """Ingest ONE frame [B,3,H,W] and predict the next, threading the O(1)
