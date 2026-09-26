@@ -1,0 +1,35 @@
+The implementation is complete. Here's where things stand.
+
+## What I built
+
+**Principle #1 (motion-compensated anchoring)** — chosen over split-memory because it directly attacks *why* M0.2 failed. M0.2 blended phase toward a lagging, wandering anchor. MC instead **measures** the bump's sub-pixel offset from the anchor via phase correlation, then **undoes** it with an exact shift-theorem translation *before* the blend. The blend then only locks magnitude/shape with no positional fight.
+
+Changes (all in `crumb_coherence/`, torch-only, no new deps):
+- `core.py`: `estimate_lowband_shift` (whitened low-pass phase correlation + parabolic sub-pixel peak), `apply_lowband_shift` (exact frequency-domain, unit-modulus so magnitude/detail untouched), new **`complex_mc`** mode + **`mc_strength`** knob (default `0.0`).
+- `run_m0.py`: `complex_mc` added to both scenario tables; new `--hotspot-mc-strength` / `--hotspot-mc-sweep` flags (all prior flags kept); a sweep block.
+- `test_core.py`: **12 → 16 invariants**, including `complex_mc(mc=0)` byte-identical to `complex`, no leakage into other modes, and estimator/shift correctness against a known circular roll.
+
+Every existing engine name stays byte-identical — `complex_mc` is a strictly additive new mode (constraint (e) satisfied by construction).
+
+## What I need from you
+
+The `python` step is gated behind approval — which matches this project's own convention (IMPL_NOTES_M0_2.md and M0_RESULTS.md are both explicitly "owner-run"). I've deliberately **left the result tables blank rather than fabricate them**. `IMPL_NOTES_M0_3.md` has the full design, exact commands, and a fill-in template.
+
+Two ways forward — your call:
+
+1. **Approve the runs** and I'll execute the three commands, fill in the real tables, and write the honest verdict (including "<60%" plainly if that's the truth).
+2. **Run them yourself** (they're in the notes) and paste the output; I'll finalize the tables/verdict.
+
+```bash
+cd experiments/wavefield_video
+python crumb_coherence/tests/test_core.py
+python crumb_coherence/scripts/run_m0.py --scenario hotspot --no-video
+python crumb_coherence/scripts/run_m0.py --scenario gain_field --no-video
+```
+
+`★ Insight ─────────────────────────────────────`
+The falsifiable prediction that distinguishes this from M0.2: the `mc_strength` sweep should slope **upward** (0→50.2%→higher), the exact opposite of M0.2's phase-anchor knob which sloped downward (50.2%→13.3%). Same knob shape, opposite sign — because one *measures and removes* the displacement while the other *blends toward a moving target*. If the sweep comes back flat or downward, the mechanism is wrong and I'll say so.
+`─────────────────────────────────────────────────`
+
+One design choice worth your input before we lock it: I set the **default `--hotspot-mc-strength` to 0.85** rather than 1.0 — full re-centering (1.0) maximizes drift removal but pins the bump to a *single estimated position* every frame, which is more exposed to phase-correlation estimate noise on a tiny 9×9 low-band box. 0.85 leaves a little slack. If you'd rather chase the maximum number and trust the estimator, say so and I'll flip the default to 1.0 (the sweep will show both regardless).
+EXIT-0

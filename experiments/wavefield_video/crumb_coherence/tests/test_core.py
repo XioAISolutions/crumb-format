@@ -13,7 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
 
 from crumb_coherence import (          # noqa: E402
     SpectralCoherenceEngine, StatsEMAEngine, target_lowband, low_band_box,
-    phase_band_weight,
+    phase_band_weight, estimate_lowband_shift, apply_lowband_shift,
 )
 
 torch.manual_seed(0)
@@ -25,7 +25,7 @@ def _clip(T=6, H=32, W=32):
 
 # --- invariant (i): alpha=0 is a byte-identical no-op ---------------------- #
 def test_alpha0_byte_identical_spectral():
-    for mode in ("magnitude", "dc_only", "complex"):
+    for mode in ("magnitude", "dc_only", "complex", "complex_mc"):
         eng = SpectralCoherenceEngine(alpha=0.0, anchor_mode=mode)
         st = eng.init_state(32, 32)
         x = _clip()
@@ -45,8 +45,10 @@ def test_alpha0_byte_identical_stats():
 def test_segment_equals_frame_loop():
     for Eng, mode in [(SpectralCoherenceEngine, "magnitude"),
                       (SpectralCoherenceEngine, "dc_only"),
-                      (SpectralCoherenceEngine, "complex")]:
-        eng = Eng(alpha=0.5, anchor_mode=mode)
+                      (SpectralCoherenceEngine, "complex"),
+                      (SpectralCoherenceEngine, "complex_mc")]:
+        kw = {"mc_strength": 0.8} if mode == "complex_mc" else {}
+        eng = Eng(alpha=0.5, anchor_mode=mode, **kw)
         x = _clip()
         # batched
         sb = eng.init_state(32, 32)
@@ -195,6 +197,85 @@ def test_phase_band_weight_shape_and_dc():
         pass
     else:
         raise AssertionError("negative phase_anchor should raise")
+
+
+# --- invariant (M0.3): complex_mc with mc_strength=0 == complex ------------- #
+def test_mc_strength_zero_equals_complex():
+    # mc_strength=0 must be byte-identical to plain complex: the sweep anchor and
+    # the do-no-harm guarantee. (New engine name, old behaviour when off.)
+    x = _clip()
+    cx = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex")
+    mc = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                 mc_strength=0.0)
+    yc, _ = cx.process_segment(x, cx.init_state(32, 32))
+    ym, _ = mc.process_segment(x, mc.init_state(32, 32))
+    assert torch.equal(yc, ym), "complex_mc(mc=0) diverged from complex"
+
+
+def test_mc_strength_only_affects_complex_mc():
+    # A non-zero mc_strength must never leak into the other modes.
+    x = _clip()
+    for mode in ("magnitude", "dc_only", "complex"):
+        off = SpectralCoherenceEngine(alpha=0.9, anchor_mode=mode)
+        on = SpectralCoherenceEngine(alpha=0.9, anchor_mode=mode,
+                                     mc_strength=1.0)
+        yoff, _ = off.process_segment(x, off.init_state(32, 32))
+        yon, _ = on.process_segment(x, on.init_state(32, 32))
+        assert torch.equal(yoff, yon), f"mc_strength leaked into {mode}"
+    # In complex_mc it MUST change the result (it is the whole point).
+    off = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                  mc_strength=0.0)
+    on = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                 mc_strength=1.0)
+    yoff, _ = off.process_segment(x, off.init_state(32, 32))
+    yon, _ = on.process_segment(x, on.init_state(32, 32))
+    assert not torch.equal(yoff, yon), "mc_strength had no effect in complex_mc"
+    # negative mc_strength is rejected at construction
+    try:
+        SpectralCoherenceEngine(mc_strength=-0.1)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("negative mc_strength should raise")
+
+
+def test_estimate_lowband_shift_recovers_known_shift():
+    # A circular roll is an exact spectral shift; phase correlation on the low
+    # band must recover it to sub-pixel accuracy.
+    H = W = 64
+    ys = torch.arange(H).view(H, 1).float()
+    xs = torch.arange(W).view(1, W).float()
+    blob = torch.exp(-(((ys - 30) ** 2 + (xs - 34) ** 2) / (2 * 9.0 ** 2)))
+    base = blob.unsqueeze(0).expand(3, H, W).contiguous()   # [3,H,W]
+    sy, sx = 3, -2
+    shifted = torch.roll(base, shifts=(sy, sx), dims=(-2, -1))
+    a_lo = low_band_box(torch.fft.rfft2(base), 0.25)
+    x_lo = low_band_box(torch.fft.rfft2(shifted), 0.25)
+    dy, dx = estimate_lowband_shift(x_lo, a_lo, H, W)
+    assert abs(dy - sy) < 0.5, f"dy={dy} != {sy}"
+    assert abs(dx - sx) < 0.5, f"dx={dx} != {sx}"
+    # Empty anchor -> no shift (guard against the cold-start case).
+    assert estimate_lowband_shift(x_lo, torch.zeros_like(a_lo), H, W) == (0.0, 0.0)
+
+
+def test_apply_lowband_shift_is_exact_and_magnitude_preserving():
+    # apply_lowband_shift(dy,dx) must equal the low band of a real circular roll
+    # (integer shift) and must never change per-cell magnitude (unit ramp).
+    H = W = 64
+    ys = torch.arange(H).view(H, 1).float()
+    xs = torch.arange(W).view(1, W).float()
+    blob = torch.exp(-(((ys - 28) ** 2 + (xs - 36) ** 2) / (2 * 8.0 ** 2)))
+    base = blob.unsqueeze(0).expand(3, H, W).contiguous()
+    sy, sx = 4, 3
+    base_lo = low_band_box(torch.fft.rfft2(base), 0.25)
+    rolled_lo = low_band_box(torch.fft.rfft2(
+        torch.roll(base, shifts=(sy, sx), dims=(-2, -1))), 0.25)
+    applied = apply_lowband_shift(base_lo, sy, sx, H, W)
+    assert torch.allclose(applied, rolled_lo, atol=1e-4), "shift != real roll"
+    assert torch.allclose(applied.abs(), base_lo.abs(), atol=1e-5), \
+        "shift changed magnitude"
+    # dy=dx=0 is an exact identity (fast path)
+    assert torch.equal(apply_lowband_shift(base_lo, 0.0, 0.0, H, W), base_lo)
 
 
 def _run_all():

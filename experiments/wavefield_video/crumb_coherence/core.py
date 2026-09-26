@@ -135,6 +135,104 @@ def phase_band_weight(kh: int, kw: int, device="cpu") -> torch.Tensor:
 
 
 # --------------------------------------------------------------------------- #
+# Motion-compensated anchoring (§3.2, M0.3). The M0.2 falsification showed that
+# blending phase toward the EMA anchor degrades monotonically: the anchor itself
+# lags and wanders, so pulling toward it fights the true signal. MC fixes the
+# frame of reference. By the shift theorem a low-band structure displaced by p(t)
+# has coefficients Â_k·exp(-i 2π k·p) — magnitude flat, position living entirely
+# in a phase ramp linear in k. So we (1) MEASURE p(t) as the sub-pixel offset of
+# the current low band from the (near-static) anchor via low-band phase
+# correlation, then (2) UNDO it with an exact frequency-domain shift, re-centering
+# the wandering bump onto the anchor. Position drift is removed by construction;
+# the blend that follows only has to lock magnitude/shape (no positional fight).
+#
+# We estimate p against the ANCHOR (absolute offset), not by integrating
+# successive-frame velocities: velocity integration re-accumulates exactly the
+# error MC is meant to cancel.
+# --------------------------------------------------------------------------- #
+def _box_freqs(kh: int, kw: int, H: int, W: int, device="cpu"):
+    """Physical frequency (cycles/pixel) of each low-band box cell.
+
+    Height uses the fftshift layout the box lives in: box row r -> DC at kh//2,
+    so ky = (r - kh//2)/H. Width is the rfft low slice: box col c -> kx = c/W.
+    These match the put_low_band / irfft2 conventions exactly, so a phase ramp
+    built here is an exact whole-image translation after write-back.
+    """
+    ky = (torch.arange(kh, device=device, dtype=torch.float32) - kh // 2) / H
+    kx = torch.arange(kw, device=device, dtype=torch.float32) / W
+    return ky.view(kh, 1), kx.view(1, kw)
+
+
+def _parabolic_offset(cm: float, c0: float, cp: float) -> float:
+    """Sub-cell peak offset from a 3-point parabola through (cm, c0, cp).
+
+    Returns a value in (-1, 1); 0 when the samples are flat. This is the standard
+    sub-pixel refinement for a correlation peak.
+    """
+    denom = cm - 2.0 * c0 + cp
+    if abs(denom) < EPS:
+        return 0.0
+    return float(max(-1.0, min(1.0, 0.5 * (cm - cp) / denom)))
+
+
+def estimate_lowband_shift(Xlo: torch.Tensor, anchor: torch.Tensor,
+                           H: int, W: int, exclude_dc: bool = True):
+    """Sub-pixel (dy, dx) translation, in pixels, of the current low band `Xlo`
+    relative to `anchor`, via low-pass phase correlation.
+
+    Cross-power C_k = sum_c Xlo_c · conj(anchor_c) is whitened per cell
+    (C/|C|) — keeping only the phase (the position), discarding magnitude — then
+    written into an otherwise-zero full rfft2 spectrum and inverse-transformed.
+    Because only the low band is populated the correlation surface is smooth
+    (sharp fast-moving balls, spread across the spectrum, contribute almost
+    nothing), so its peak cleanly locates the wandering bump. A 3-point parabolic
+    fit on each axis gives the sub-pixel offset. DC carries no position and is
+    dropped (exclude_dc). Returns (0.0, 0.0) if the anchor is still empty.
+    """
+    kh, kw = Xlo.shape[-2], Xlo.shape[-1]
+    device = Xlo.device
+    if anchor.abs().sum().item() <= EPS:
+        return 0.0, 0.0
+    cross = (Xlo * anchor.conj()).sum(dim=0)             # [kh,kw] collapse channels
+    mag = cross.abs()
+    whitened = cross / (mag + EPS)                        # unit modulus -> phase only
+    if exclude_dc:
+        whitened[kh // 2, 0] = 0.0                        # DC: no positional info
+    Wf = W // 2 + 1
+    full = torch.zeros(1, H, Wf, dtype=torch.complex64, device=device)
+    full = put_low_band(full, whitened.unsqueeze(0))     # place box in full spectrum
+    corr = torch.fft.irfft2(full, s=(H, W))[0]           # [H,W] real surface
+    corr = torch.fft.fftshift(corr)                      # zero-shift -> image centre
+    flat = int(torch.argmax(corr).item())
+    pr, pc = divmod(flat, W)
+    dy = float(pr - H // 2)
+    dx = float(pc - W // 2)
+    if 0 < pr < H - 1:
+        dy += _parabolic_offset(float(corr[pr - 1, pc]), float(corr[pr, pc]),
+                                float(corr[pr + 1, pc]))
+    if 0 < pc < W - 1:
+        dx += _parabolic_offset(float(corr[pr, pc - 1]), float(corr[pr, pc]),
+                                float(corr[pr, pc + 1]))
+    return dy, dx
+
+
+def apply_lowband_shift(Xlo: torch.Tensor, dy: float, dx: float,
+                        H: int, W: int) -> torch.Tensor:
+    """Translate the low-band content by (dy, dx) pixels via the shift theorem.
+
+    Multiplies each cell by exp(-i 2π (ky·dy + kx·dx)); an exact whole-image
+    translation with no interpolation and no touch to magnitude — so detail
+    (high band) and per-cell energy are preserved, only position moves.
+    """
+    if dy == 0.0 and dx == 0.0:
+        return Xlo
+    kh, kw = Xlo.shape[-2], Xlo.shape[-1]
+    ky, kx = _box_freqs(kh, kw, H, W, device=Xlo.device)
+    ramp = torch.exp(-2j * torch.pi * (ky * dy + kx * dx)).to(Xlo.dtype)  # [kh,kw]
+    return Xlo * ramp
+
+
+# --------------------------------------------------------------------------- #
 # EMA anchor update (§2 step 3). First-value initialization (anchor := Xlo on
 # frame 1) removes the warmup bias that a from-zero EMA would need correcting,
 # so this is a plain leaky integrator; n_seen is kept for interface parity.
@@ -155,7 +253,7 @@ def ema_update(anchor: torch.Tensor, x: torch.Tensor, rho: float,
 # --------------------------------------------------------------------------- #
 def target_lowband(Xlo: torch.Tensor, anchor: torch.Tensor,
                    anchor_mode: str) -> torch.Tensor:
-    if anchor_mode == "complex":
+    if anchor_mode in ("complex", "complex_mc"):
         return anchor
     if anchor_mode == "magnitude":
         # Re-inject the anchored magnitude onto the frame's current phase.
@@ -208,13 +306,16 @@ class SpectralCoherenceEngine:
                  anchor_mode: str = "magnitude",
                  reset_on_cut: bool = True,
                  cut_thresh: float = 0.35,
-                 phase_anchor: float = 0.0):
-        if anchor_mode not in ("magnitude", "dc_only", "complex"):
+                 phase_anchor: float = 0.0,
+                 mc_strength: float = 0.0):
+        if anchor_mode not in ("magnitude", "dc_only", "complex", "complex_mc"):
             raise ValueError(f"unknown anchor_mode {anchor_mode!r}")
         if color_space not in ("ycbcr", "rgb"):
             raise ValueError(f"unknown color_space {color_space!r}")
         if phase_anchor < 0.0:
             raise ValueError(f"phase_anchor must be >= 0, got {phase_anchor}")
+        if mc_strength < 0.0:
+            raise ValueError(f"mc_strength must be >= 0, got {mc_strength}")
         self.cutoff_frac = cutoff_frac
         self.sigma_k_frac = sigma_k_frac
         self.alpha = alpha
@@ -228,6 +329,12 @@ class SpectralCoherenceEngine:
         # (byte-identical). It targets *positional* (low-band phase) drift — the
         # wandering-hotspot case — which the DC-centric Gaussian under-corrects.
         self.phase_anchor = phase_anchor
+        # mc_strength (M0.3): fraction of the measured current-vs-anchor low-band
+        # shift that is undone before blending, in the `complex_mc` mode only.
+        # 0.0 => complex_mc is byte-identical to complex (a clean sweep anchor and
+        # a no-op invariant). 1.0 => the wandering bump is fully re-centered onto
+        # the anchor's position each frame. Ignored by every other mode.
+        self.mc_strength = mc_strength
         self._wcache: dict = {}     # (kh,kw) -> gaussian weight
         self._pcache: dict = {}     # (kh,kw) -> flat phase weight
 
@@ -332,7 +439,19 @@ class SpectralCoherenceEngine:
         target = target_lowband(Xlo, state.anchor, self.anchor_mode)
         w = self._blend_weight(kh, kw, device)      # [kh,kw] real, <=1
         aw = (self.alpha * w).clamp(max=1.0)
-        Xlo_new = (1.0 - aw) * Xlo + aw * target
+
+        # Motion-compensated pre-shift (complex_mc, M0.3): measure how far the
+        # current low band has wandered from the anchor and undo mc_strength of it
+        # BEFORE the blend, so the bump is re-centered rather than pulled toward a
+        # lagging target. Only the low band moves (exact frequency-domain shift),
+        # so detail and motion (high band) are untouched.
+        src = Xlo
+        if (self.anchor_mode == "complex_mc" and self.mc_strength > 0.0
+                and state.n_seen > 1):
+            dy, dx = estimate_lowband_shift(Xlo, state.anchor, state.H, state.W)
+            src = apply_lowband_shift(Xlo, -self.mc_strength * dy,
+                                      -self.mc_strength * dx, state.H, state.W)
+        Xlo_new = (1.0 - aw) * src + aw * target
 
         X_new = put_low_band(X, Xlo_new)
         xc_out = torch.fft.irfft2(X_new, s=(state.H, state.W))
