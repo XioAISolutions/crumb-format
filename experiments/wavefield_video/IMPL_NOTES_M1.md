@@ -162,3 +162,12 @@ If [A] shows a clean low-band stabilization with detail + motion intact, that is
 the first real "plugin helps a generator" evidence — the integration rung of the
 plugin spec is met on available hardware. The 64x64 hotspot axis remains gated on
 training S2@64 (owner, on the box — explicitly out of scope for this CPU round).
+## ASTRA ASSESSMENT (2026-09-26) — digest + actions
+
+Verdict: M0 PASS; M1a (generator transfer, DC axis) PASS; M1b (spatial phase on real rollouts) NOT TESTED — 16² band degeneracy; M1c (non-interference) NOT TESTED.
+
+Renames: "oracle band-phase" → geometric-displacement control; "oracle component" → known-component replacement. The engine beating them = objective alignment, NOT "beating perfect information".
+Next test (top priority, queued for Claude tonight): legit-motion TRAP at 64² — big soft object translating 0.15px/f + slow illumination + independent balls, NO injected wander. Frozen config must retain >95% intentional motion, distort <5%, HF>0.98, and NOT cut clean low-band variance. Fail → "frequency-selective stabilizer", not "coherence engine".
+Demo guidance: make the FAILURE visible — long-horizon drift (identical 0–10s; raw wanders 10–30s; obvious by 30–60s) + live drift trace + fixed-reference overlay. Lead with "Long videos drift. Crumb remembers." Never lead with FFT/rho language.
+
+Red flags: (1) 16² DC degeneracy; (2) self-referential metrics need a retention metric; (3) HF-SSIM insufficient for slow large structures (flow-based temporal metric later); (4) hard-edge ringing test (impulse/thin-line); (5) guard metric-coherence vs perceptual coherence.
