@@ -1,0 +1,31 @@
+Done. Here's where M0.7 stands.
+
+## What I found on arrival
+I was mid-M0.6 when this fired. Checked the tree: **M0.6 is landed and owner-verified** — `core.py` has all four kwargs (`mc_band`/`mc_est`/`mc_smooth`/`mc_edge`), `IMPL_NOTES_M0_6.md` records the 26 green invariants and the `band=0.03, mc=0.5, corr, hard = 64.0% [DSME]` winner. The owner did the run_m0.py wiring and runs after my build round was cut. So M0.7's premise is solid, and I closed out the stale M0.6 tasks.
+
+## What I built (M0.7)
+`crumb_coherence/scripts/run_oracle.py` — four arms, **read-only reuse of the shipped helpers, zero changes under `crumb_coherence/`**:
+
+| Arm | What it isolates |
+|---|---|
+| 1 oracle component (full clean low-band swap) | the **ceiling** + (via `hf_reg`) whether the S gate is unfair |
+| 2 oracle band-phase (engine loop, oracle Δ from the injector's known centres) | **estimator error** (vs Arm 3) and **decomposition error** (vs Arm 1) |
+| 3 engine band-phase (M0.6 winner, real corr estimator) | context |
+| 4 X − B̂ + B̂_stable (component subtract from the engine's own Δ) | the "even better variant", realistic |
+
+The design point: **each arm changes exactly one variable from its neighbor**, so Arm2−Arm3 = estimator, Arm1−Arm2 = decomposition, and Arm1's raw-vs-registered hf_ref = metric fairness. CW-SSIM skipped (needs a dep) — noted, not faked.
+
+I audited the sign conventions against the existing shift-theorem tests, and confirmed Arm 2 reproduces the engine's `complex_mc` loop byte-for-byte except the Δ source.
+
+## The honest gap
+`python` is **execution-gated in this session** — same owner-run convention as every prior round (I retried; denied). So per the "no invented numbers" constraint, `IMPL_NOTES_M0_7.md` has:
+- exact commands,
+- a results table with **only Arm 3 pre-filled** (quoted from the M0.6 owner run, cited) and the oracle arms left blank,
+- clearly-labeled predictions (not measurements),
+- the full **Outcome 1/2/3/4 decision tree** with the specific numeric conditions, so once you paste the 3 remaining rows the conclusion is mechanical.
+
+**Pre-registered expectation: Outcome 3** (band-limited phase is *decomposition*-limited, not estimator-limited; S gate sound) — because M0.6 already showed corr ≫ phase-plane and the bump/ball spectral supports are disjoint. If that holds, the next lever is the component-space `X − B̂ + B̂_stable` route with a soft `W(k)` mask, **not** another estimator sweep.
+
+## To finish
+Run `python crumb_coherence/scripts/run_oracle.py --json crumb_coherence/out/oracle.json` and paste the table. I'll fill the cells and state which outcome we're in — and if it's Outcome 3, build the `W(k)`-masked component variant as M0.8.
+EXIT-0
