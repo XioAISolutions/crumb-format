@@ -226,13 +226,20 @@ def pct_drop(before: float, after: float) -> float:
 # --------------------------------------------------------------------------- #
 # Engine table (shared by both scenarios).
 # --------------------------------------------------------------------------- #
-def _engines(alpha, rho, cutoff, hotspot_alpha, hotspot_cutoff, scenario):
+def _engines(alpha, rho, cutoff, hotspot_alpha, hotspot_cutoff, scenario,
+             hotspot_phase_anchor=0.0):
     """Engine list. For the hotspot (positional/phase drift) the spectral modes
     may use a slightly wider band / stronger blend so the phase-anchoring
     `complex` mode can actually clear the bar — the `magnitude` DEFAULT is left
-    at its shipped value on purpose (it is *supposed* to leave phase free)."""
+    at its shipped value on purpose (it is *supposed* to leave phase free).
+
+    M0.2: the hotspot `complex` engine also gets phase_anchor>0 — a flat,
+    DC-excluded companion weight that anchors the *position-carrying* low-band
+    cells the DC-centric Gaussian under-corrects. It is 0 for gain_field (that
+    drift is magnitude/DC, already cleared) and 0 for every non-complex mode."""
     a = hotspot_alpha if scenario == "hotspot" else alpha
     c = hotspot_cutoff if scenario == "hotspot" else cutoff
+    pa = hotspot_phase_anchor if scenario == "hotspot" else 0.0
     return [
         ("stats-EMA baseline", StatsEMAEngine(alpha=a, rho=rho)),
         ("spectral dc_only", SpectralCoherenceEngine(
@@ -240,7 +247,8 @@ def _engines(alpha, rho, cutoff, hotspot_alpha, hotspot_cutoff, scenario):
         ("spectral magnitude", SpectralCoherenceEngine(
             alpha=a, rho=rho, cutoff_frac=c, anchor_mode="magnitude")),
         ("spectral complex", SpectralCoherenceEngine(
-            alpha=a, rho=rho, cutoff_frac=c, anchor_mode="complex")),
+            alpha=a, rho=rho, cutoff_frac=c, anchor_mode="complex",
+            phase_anchor=pa)),
     ]
 
 
@@ -256,6 +264,8 @@ def main():
     # complex mode reach the bar. Magnitude default stays shipped (phase free).
     ap.add_argument("--hotspot-alpha", type=float, default=0.95)
     ap.add_argument("--hotspot-cutoff", type=float, default=0.14)
+    # M0.2 phase-anchor strength for the hotspot complex engine (0 = shipped).
+    ap.add_argument("--hotspot-phase-anchor", type=float, default=0.0)
     ap.add_argument("--scenario", choices=["gain_field", "hotspot"], default="gain_field")
     ap.add_argument("--outdir", type=str, default=os.path.join(_ROOT, "crumb_coherence", "out"))
     ap.add_argument("--no-video", action="store_true")
@@ -283,7 +293,8 @@ def main():
           f"seed={args.seed}  balls={n_balls}")
     if args.scenario == "hotspot":
         print(f"  alpha={args.hotspot_alpha}  rho={args.rho}  "
-              f"cutoff_frac={args.hotspot_cutoff}  (hotspot overrides)")
+              f"cutoff_frac={args.hotspot_cutoff}  "
+              f"phase_anchor={args.hotspot_phase_anchor}  (hotspot overrides)")
     else:
         print(f"  alpha={args.alpha}  rho={args.rho}  cutoff_frac={cutoff}")
     print("=" * 82)
@@ -373,7 +384,8 @@ def _run_hotspot(control, drifted, control_traj, gt_pos, gt_col, cutoff, args):
 
     results = {}
     for name, eng in _engines(args.alpha, args.rho, cutoff, args.hotspot_alpha,
-                              hc, "hotspot"):
+                              hc, "hotspot",
+                              hotspot_phase_anchor=args.hotspot_phase_anchor):
         st = eng.init_state(args.grid, args.grid)
         corrected, _ = eng.process_segment(drifted, st)
         posvar_c = position_variance(lowband_energy_positions(corrected, hc))

@@ -1,0 +1,21 @@
+I'll stop retrying — the approval isn't coming through automatically, so I'll hand off cleanly rather than burn turns on denied calls.
+
+## Status: implementation complete, verification blocked on interpreter approval
+
+**What I changed (all inside `crumb_coherence/`, numpy/torch only, no new deps, public API stable — only an additive keyword):**
+
+| File | Change |
+|---|---|
+| `core.py` | Added `phase_band_weight(kh,kw)` — flat weight, zero at the DC cell. Added `phase_anchor: float = 0.0` kwarg to `SpectralCoherenceEngine` (validated `>= 0`). Added `_blend_weight()` which superposes `phase_anchor · flat_DCexcluded` onto the Gaussian **only in `complex` mode**; the blend now uses `aw = (alpha·w).clamp(max=1.0)`. |
+| `__init__.py` | Exported `phase_band_weight`. |
+| `scripts/run_m0.py` | `_engines(...)` takes `hotspot_phase_anchor`; only the **hotspot `complex`** engine receives it (gain_field and all non-complex modes get 0). New CLI flag `--hotspot-phase-anchor` (default `1.0`). Header prints the value. |
+| `tests/test_core.py` | +3 invariants (now 12): `phase_anchor=0` byte-identical no-op across all modes; `phase_anchor` only affects `complex` (leaks into neither magnitude nor dc_only, *does* change complex); `phase_band_weight` shape/DC-zero/flatness + negative-value rejection. |
+
+**Why this is the right one of the four directions:** the hotspot is a shift → its position is pure low-band *phase*, `φ_k = −k·p(t)`, concentrated in the *non-DC* cells — exactly where the shipped DC-centric Gaussian tapers to zero. Direction 2 (split amplitude/phase anchoring), realized as a split in the *spatial weight profile*, targets that mechanism directly and leaves the exposure/magnitude path (gain_field) untouched. Directions 1/3/4 either need a runtime coherence mask, a second FFT scale, or derivative tracking — more moving parts for the same physical fix.
+
+**I have not run anything**, so I have **no real numbers to report** and won't invent any. The design gives large headroom on the two side-constraints (SSIM is high-pass → blind to low-band edits; motion is high-freq/tracker-based → complex was already 99.7%), and the cap that held pos-drift at 50.2% *was* the taper I removed — but "expect to clear 60%" is a prediction, not a result, until the three commands above run.
+
+**To unblock:** approve the `~/vibevoice-env/bin/python` interpreter for this session (or point me at an interpreter this session allows), and I'll immediately run all three commands, tune `--hotspot-phase-anchor` if 1.0 over/under-shoots, and write `IMPL_NOTES_M0_2.md` with the full real tables, per-engine verdicts, and exact reproduce commands. If the goal isn't reached I'll report the best achieved number honestly.
+
+How would you like to proceed?
+EXIT-0

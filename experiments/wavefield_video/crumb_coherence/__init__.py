@@ -17,6 +17,7 @@ from .core import (
     ema_update,
     gaussian_band_weight,
     low_band_box,
+    phase_band_weight,
     put_low_band,
     rgb_to_ycbcr,
     target_lowband,
@@ -33,7 +34,8 @@ from .metrics import (
 __all__ = [
     "SpectralCoherenceEngine", "StatsEMAEngine", "CoherenceState", "StatsState",
     "rgb_to_ycbcr", "ycbcr_to_rgb", "low_band_box", "put_low_band",
-    "gaussian_band_weight", "ema_update", "target_lowband", "detect_cut",
+    "gaussian_band_weight", "phase_band_weight", "ema_update", "target_lowband",
+    "detect_cut",
     "wrap_generator", "lowband_trajectory_variance", "delta_e_vs_ref",
     "highfreq_ssim", "temporal_flicker",
 ]

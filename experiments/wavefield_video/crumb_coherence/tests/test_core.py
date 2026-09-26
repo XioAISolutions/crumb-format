@@ -13,6 +13,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
 
 from crumb_coherence import (          # noqa: E402
     SpectralCoherenceEngine, StatsEMAEngine, target_lowband, low_band_box,
+    phase_band_weight,
 )
 
 torch.manual_seed(0)
@@ -139,6 +140,61 @@ def test_state_bytes_actual_tensor_matches():
     st = eng.init_state(64, 64)
     real = st.anchor.numel() * st.anchor.element_size()
     assert real == eng.state_bytes(64, 64)
+
+
+# --- invariant (M0.2): phase_anchor default is a byte-identical no-op, and it
+#     only ever affects the complex mode ------------------------------------- #
+def test_phase_anchor_default_is_noop():
+    # phase_anchor defaults to 0.0 => identical output to explicitly passing 0.0,
+    # for every mode: the shipped behaviour is untouched.
+    x = _clip()
+    for mode in ("magnitude", "dc_only", "complex"):
+        base = SpectralCoherenceEngine(alpha=0.9, anchor_mode=mode)
+        expl = SpectralCoherenceEngine(alpha=0.9, anchor_mode=mode,
+                                       phase_anchor=0.0)
+        yb, _ = base.process_segment(x, base.init_state(32, 32))
+        ye, _ = expl.process_segment(x, expl.init_state(32, 32))
+        assert torch.equal(yb, ye), f"phase_anchor=0 not a no-op for {mode}"
+
+
+def test_phase_anchor_only_affects_complex():
+    # In magnitude / dc_only the flat phase weight must never be applied — those
+    # modes are defined to leave phase free / touch only DC.
+    x = _clip()
+    for mode in ("magnitude", "dc_only"):
+        off = SpectralCoherenceEngine(alpha=0.9, anchor_mode=mode,
+                                      phase_anchor=0.0)
+        on = SpectralCoherenceEngine(alpha=0.9, anchor_mode=mode,
+                                     phase_anchor=1.0)
+        yoff, _ = off.process_segment(x, off.init_state(32, 32))
+        yon, _ = on.process_segment(x, on.init_state(32, 32))
+        assert torch.equal(yoff, yon), f"phase_anchor leaked into {mode}"
+    # In complex mode it MUST change the result (it is the whole point).
+    off = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex",
+                                  phase_anchor=0.0)
+    on = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex",
+                                 phase_anchor=1.0)
+    yoff, _ = off.process_segment(x, off.init_state(32, 32))
+    yon, _ = on.process_segment(x, on.init_state(32, 32))
+    assert not torch.equal(yoff, yon), "phase_anchor had no effect in complex"
+
+
+def test_phase_band_weight_shape_and_dc():
+    # Flat everywhere, zero at the DC cell (box row kh//2, col 0), so it anchors
+    # the position-carrying cells without re-locking the exposure DC.
+    wp = phase_band_weight(7, 5)
+    assert wp.shape == (7, 5)
+    assert wp[7 // 2, 0].item() == 0.0
+    others = wp.clone()
+    others[7 // 2, 0] = 1.0
+    assert torch.all(others == 1.0), "phase weight not flat off-DC"
+    # negative phase_anchor is rejected at construction
+    try:
+        SpectralCoherenceEngine(phase_anchor=-0.1)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("negative phase_anchor should raise")
 
 
 def _run_all():

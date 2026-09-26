@@ -117,6 +117,24 @@ def gaussian_band_weight(kh: int, kw: int, sigma_k_frac: float,
 
 
 # --------------------------------------------------------------------------- #
+# Phase-anchoring band weight (§3.2, M0.2). The Gaussian above is DC-centric —
+# right for exposure/color (magnitude) drift, wrong for *positional* drift. A
+# wandering low-freq structure shifts by p(t): by the shift theorem its low-band
+# coefficients are Â_k·exp(-i k·p(t)) — magnitude ~constant, position living
+# entirely in the phase φ_k = -k·p(t), which GROWS with k. So position lives in
+# the non-DC cells (and most strongly at higher k), exactly where the Gaussian
+# taper is weakest. This companion weight is FLAT across the low band and ZERO at
+# DC (DC carries no position, and re-anchoring it is just more magnitude locking),
+# so phase_anchor>0 pulls the position-carrying cells toward the (near-static)
+# anchor without touching the exposure lock.
+# --------------------------------------------------------------------------- #
+def phase_band_weight(kh: int, kw: int, device="cpu") -> torch.Tensor:
+    wp = torch.ones(kh, kw, device=device, dtype=torch.float32)
+    wp[kh // 2, 0] = 0.0                            # DC cell: no positional info
+    return wp
+
+
+# --------------------------------------------------------------------------- #
 # EMA anchor update (§2 step 3). First-value initialization (anchor := Xlo on
 # frame 1) removes the warmup bias that a from-zero EMA would need correcting,
 # so this is a plain leaky integrator; n_seen is kept for interface parity.
@@ -189,11 +207,14 @@ class SpectralCoherenceEngine:
                  color_space: str = "ycbcr",
                  anchor_mode: str = "magnitude",
                  reset_on_cut: bool = True,
-                 cut_thresh: float = 0.35):
+                 cut_thresh: float = 0.35,
+                 phase_anchor: float = 0.0):
         if anchor_mode not in ("magnitude", "dc_only", "complex"):
             raise ValueError(f"unknown anchor_mode {anchor_mode!r}")
         if color_space not in ("ycbcr", "rgb"):
             raise ValueError(f"unknown color_space {color_space!r}")
+        if phase_anchor < 0.0:
+            raise ValueError(f"phase_anchor must be >= 0, got {phase_anchor}")
         self.cutoff_frac = cutoff_frac
         self.sigma_k_frac = sigma_k_frac
         self.alpha = alpha
@@ -202,7 +223,13 @@ class SpectralCoherenceEngine:
         self.anchor_mode = anchor_mode
         self.reset_on_cut = reset_on_cut
         self.cut_thresh = cut_thresh
+        # phase_anchor (M0.2): extra flat, DC-excluded anchoring weight added to
+        # the Gaussian in `complex` mode only. 0.0 => shipped behaviour exactly
+        # (byte-identical). It targets *positional* (low-band phase) drift — the
+        # wandering-hotspot case — which the DC-centric Gaussian under-corrects.
+        self.phase_anchor = phase_anchor
         self._wcache: dict = {}     # (kh,kw) -> gaussian weight
+        self._pcache: dict = {}     # (kh,kw) -> flat phase weight
 
     # -- box geometry ------------------------------------------------------ #
     def _dims(self, H: int, W: int) -> tuple[int, int]:
@@ -219,6 +246,21 @@ class SpectralCoherenceEngine:
                                      cutoff_frac=self.cutoff_frac)
             self._wcache[key] = w
         return w
+
+    def _blend_weight(self, kh: int, kw: int, device) -> torch.Tensor:
+        """Effective per-cell anchor weight w in [0,1]-ish. In `complex` mode
+        with phase_anchor>0, superpose a flat, DC-excluded phase weight onto the
+        Gaussian so the position-carrying cells get anchored too. Capped at 1 so
+        alpha*w stays a valid convex blend factor after the alpha scale."""
+        w = self._weight(kh, kw, device)
+        if self.anchor_mode != "complex" or self.phase_anchor <= 0.0:
+            return w
+        key = (kh, kw, str(device))
+        wp = self._pcache.get(key)
+        if wp is None:
+            wp = phase_band_weight(kh, kw, device=device)
+            self._pcache[key] = wp
+        return torch.clamp(w + self.phase_anchor * wp, max=1.0)
 
     # -- public interface -------------------------------------------------- #
     def init_state(self, H: int, W: int, device="cpu") -> CoherenceState:
@@ -284,10 +326,12 @@ class SpectralCoherenceEngine:
             state.cut_cooldown = max(0, state.cut_cooldown - 1)
             return frame, state
 
-        # Gaussian-weighted blend toward the driftful anchor (§2 step 4).
+        # Weighted blend toward the driftful anchor (§2 step 4). The weight is
+        # the DC-centric Gaussian, plus (complex + phase_anchor>0) a flat
+        # DC-excluded term so positional low-band phase drift is anchored too.
         target = target_lowband(Xlo, state.anchor, self.anchor_mode)
-        w = self._weight(kh, kw, device)            # [kh,kw] real
-        aw = self.alpha * w
+        w = self._blend_weight(kh, kw, device)      # [kh,kw] real, <=1
+        aw = (self.alpha * w).clamp(max=1.0)
         Xlo_new = (1.0 - aw) * Xlo + aw * target
 
         X_new = put_low_band(X, Xlo_new)
