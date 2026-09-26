@@ -1,0 +1,47 @@
+RESEARCH BRIEF M0.5 (for expert consult)
+
+SYSTEM: an ultra-compact spectral coherence plugin (k-space state, kilobytes)
+that runs alongside any frame generator. State = damped per-cell complex
+amplitude+phase. Engines so far: (i) dc_only, (ii) magnitude (amplitude-only
+anchoring), (iii) complex (slow phase EMA anchoring, rho=0.995), (iv) complex_mc
+(motion-compensated re-centering of low-band phase, new).
+
+SCENARIO (synthetic, g32/141 frames): a smooth low-band bump is injected and
+its position WANDERS (drift, lowband_pos_var ~= 44 px^2). Legitimate content:
+small balls with normal motion. Metrics: drift%pos = variance drop of the
+low-band energy position; hf_ref = high-pass SSIM of corrected vs CLEAN control
+(detail fidelity vs truth); hf_chg = same vs input (diagnostic); motion% =
+tracker motion preservation.
+
+MEASURED FRONTIER (all owner-run):
+  complex rho=0.995        50.2%  hf_ref 0.9946  motion 99.7
+  complex rho=0.997        48.2%  hf_ref 0.9945
+  complex rho=0.999        45.9%  hf_ref 0.9943
+  mc 0.5 lowband-only      70.2%  hf_ref 0.9346  (hf_chg 0.9341)
+  mc 0.5 taper=True        41.6%  hf_ref 0.9929
+  mc 0.85 lowband-only     59.4%  hf_ref 0.9297
+GATES: drift%pos >= 60 AND hf_ref >= 0.98 AND |motion-100| <= 5. No setting
+clears both primary gates.
+
+HYPOTHESES:
+H1 (band inconsistency): mc shifts low-band only -> ghosts on every edge ->
+    hf_ref damage. Fix: broadband-consistent transform.
+H2 (scale separation): the bump lives at the LOWEST band; balls at mid band.
+    A per-radial-band phase correction selective to the bump's band should
+    remove wander without touching ball detail (lineage: phase-based motion
+    processing, Wadhwa et al.; per-scale phasor analysis).
+H3 (metric semantics): under subpixel translation, pixel-level HF SSIM
+    decorrelates even for perfect consistency (floor ~0.9x) - so the right
+    "S" metric for translation-like corrections may need band-limited or
+    flow-aware comparison.
+
+QUESTIONS:
+1. Which mechanism (math sketch welcome) can reach drift>=60 with hf_ref>=0.98
+   and motion preserved, given these measurements? Consider per-band phase
+   correction, phase correlation + trajectory filtering (video stabilization
+   lineage: L1-optimal paths, Bundled Camera Paths/content-preserving warps),
+   or other. What is the minimal-change variant of our engine that should work?
+2. Is H3 correct? If the metric floor is real, what is the principled fidelity
+   metric for judging a translation-type correction (so we do not falsely fail
+   a perfect correction)?
+3. What single decisive experiment would falsify the winning mechanism fastest?

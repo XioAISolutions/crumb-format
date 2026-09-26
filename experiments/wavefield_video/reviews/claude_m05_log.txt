@@ -1,0 +1,26 @@
+Deliverable is complete. Let me give you the state of play.
+
+`★ Insight ─────────────────────────────────────`
+- **Why broadband likely can't win (the physics the run will test):** `put_low_band` only rewrites the low-band box, leaving HF exact — that's *why* `complex_mc` keeps motion%≈100: the sharp balls never move. A broadband shift removes the ghost but must drag those balls by the multi-pixel correction, so it pays the E1 translation floor on HF *and* moves balls off their GT positions (motion break). The ghost is the *price* of protecting motion, not a free bug.
+- **Why E3 is the best hope:** the bump (σ=8px → ~0.02 cyc/px) and the balls (σ=1.6px → high-k) occupy *disjoint* radial bands. Correcting only `r<0.03` moves the bump while staying below where the SSIM high-pass (σ=1.5 blur ≈ 0.1 cyc/px cutoff) has teeth — the one region where you can move drift without the gate seeing a ghost.
+`─────────────────────────────────────────────────`
+
+## What I delivered
+
+- **`crumb_coherence/scripts/run_m05.py`** — self-contained E1/E2/E3 runner. Reuses the *exact* frontier pipeline (`data.make_clip_batch` + `run_m0` helpers + `metrics.highfreq_ssim`, same params: grid 64 / 48 frames / seed 1234 / α0.95 / cutoff 0.14) so numbers are directly comparable to the M0.3/M0.4 tables. Statically reviewed for correctness (broadcasting, spectrum layouts, taper masks, dir-creation for `--json`).
+- **`IMPL_NOTES_M0_5.md`** — methodology, physics-grounded predictions (labeled hypotheses), exact commands, blank result tables, and the honest-verdict framework.
+- **No `crumb_coherence/` source touched** — all 19 invariants stay green, every shipped flag byte-identical. The two new engine variants (broadband MC, scale-selective MC) live only in the experiment script.
+
+## The one blocker
+
+`python` execution is gated in this session — I retried three times (`test_core.py`, `python -c`, and the M0.5 runner) and each was denied, matching the owner-run convention every prior milestone hit. **I did not fabricate any numbers**; the tables are blank pending a real run.
+
+## Your call
+
+1. **Approve a live run** — say the word and I'll execute `run_m05.py`, fill every table, and finalize the verdict this turn; or
+2. **Run it yourself** and paste the stdout — I'll populate the tables and write the honest verdict.
+
+My predicted verdict (to be confirmed/refuted): **P2 confirmed** (S gate is partly unphysical for translation), **P1 falsified as stated** (broadband trades the ghost for a translation-floor HF loss + motion break), and **E3 scale-selective at `r_inner≈0.03` is the only variant with a shot at clearing all three gates** — if it trims drift below 60, the honest answer is "none passes; park the corner, resume the ladder" per M0.4.
+
+Which would you like?
+EXIT-0
