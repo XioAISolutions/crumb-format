@@ -171,3 +171,37 @@ phase-ramp shift (unitary, no interpolation) + true no-op at ~zero estimated shi
 -> M0.4 fired on this.
 
 M0.3 verdict: direction VALIDATED (70.2% peak vs 50.2% anchor-only), one gate left (S).
+
+## OWNER-VERIFIED ADDENDUM: M0.4 verdict (2026-09-26, all runs by owner)
+
+K-space phase-ramp hypothesis: FALSIFIED (numerically identical output to the
+previous warp: mc=0.5 no-taper reads 70.2% / 0.9341 both before and after).
+The HF-SSIM cost is not interpolation; it is intrinsic to the pinning operation.
+
+Metric wiring corrected in run_m0.py: the hotspot S-gate now measures hf_ssim
+of corrected vs CLEAN control (truth-alignment), with hf_chg (vs input) kept
+as a non-gating diagnostic. Evidence justifying the switch: the honest complex
+engine keeps hf_ref = 0.9946 (essentially equal to hf_chg = 0.9957), i.e. a
+correct low-band correction does NOT harm HF vs truth; only the mc pinning
+degrades it (hf_ref = 0.9346), which the old in-vs-out wiring could not
+distinguish from legitimate motion.
+
+Measured frontier (hotspot, pos-drift removal vs hf_ref):
+  complex rho=0.995 (default)   50.2%  | 0.9946  <- champion, honest
+  rho=0.997                     48.2%  | 0.9945
+  rho=0.9990                    45.9%  | 0.9943
+  complex_mc 0.5 taper=True     41.6%  | 0.9929
+  complex_mc 0.5 taper=False    70.2%  | 0.9346  <- pays real HF fidelity
+  complex_mc 0.7 taper=True     37.7%  | 0.9911
+  complex_mc 0.85 taper=False   59.4%  | 0.9297
+
+Verdict: NO measured setting clears both gates (drift>=60 AND hf_ref>=0.98).
+The mc family buys drift removal with genuine fidelity damage; the taper buys
+fidelity by refusing to correct. PARK the hotspot-corner perfection: it needs
+drift-vs-motion separation (velocity-filtered anchoring), not knob tuning.
+complex at defaults remains the shipping candidate for the phase axis; the
+additive/luminance axis (gain_field) passes cleanly at 87-92%.
+
+Recommended next: do NOT spend more rounds on the hotspot corner now; resume
+the ladder (long synthetic sequence + in-loop vs post-hoc) where the passing
+axis carries product value. Revisit separation idea when an in-loop slot exists.

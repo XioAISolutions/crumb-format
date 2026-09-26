@@ -1,0 +1,19 @@
+All code is written and internally consistent; the three runs are gated behind approval (the same owner-run convention as M0.2/M0.3). You can approve them above, or run the commands from `IMPL_NOTES_M0_4.md` and paste the output — I'll fill the tables and write the honest verdict.
+
+## What M0.4 delivers
+
+**The key finding reframes the task.** The M0.3 shift was *already* an exact k-space phase ramp (`apply_lowband_shift`, unit-modulus per cell) — it never interpolated. So the hf_ssim collapse is not a spatial-warp artifact. The real cause:
+
+`★ Insight ─────────────────────────────────────`
+- **Band-overlap coupling.** `highfreq_ssim`'s high-pass (`luma - blur@σ1.5`) retains ~16% at the box's height edge and ~50% at its width edge — so the low-band box *edge* cells sit squarely inside the SSIM gate. Plain `complex` survives because its Gaussian blend weight `aw≈0` there; the rigid ramp rotated those same edge cells at *full* strength (largest phase at highest k), which is the 0.9957→0.93 drop.
+- **The bump is low-k** (σ≈2 cells), so re-centering needs only the innermost cells. Rotating the edge cells buys ~zero drift correction and costs all the HF — which is exactly what a *graded* (edge-tapered) unit-modulus shift avoids.
+`─────────────────────────────────────────────────`
+
+**Changes (all in `crumb_coherence/`, public API stable):**
+- `apply_lowband_shift(..., taper=None)` — scales the *phase* per cell, not amplitude, so it stays exactly unitary/magnitude-preserving; `taper→0` at the edge = exact identity there. `taper=None` keeps the exact rigid ramp (existing round-trip test unchanged).
+- Two knobs with byte-identical-preserving defaults: `mc_taper=True` (graded shift weighted by the band weight — "re-center only what we anchor") and `mc_deadband=1e-2` (snaps sub-threshold shifts to a **byte-exact no-op** → the explicit zero-shift-identity invariant).
+- `run_m0.py`: `complex_mc` is now **hotspot-only** — dropped from the gain_field table, so all four pre-existing gain_field rows stay byte-identical (Finding #2). Added `--hotspot-mc-taper/--no-hotspot-mc-taper` for a rigid-vs-graded hf_ssim ablation.
+- Tests **16 → 19**: taper unit-modulus/edge-identity/grading, static-clip zero-shift identity (complex_mc == complex), deadband snap-to-identity.
+
+**Honest caveat I flagged in the notes:** the taper trades the two gates against each other along its width — it should lift hf_ssim well above 0.93 (width edge fully protected) while keeping drift near 70% (bump cells still shifted), but whether *both* D≥60 and S≥0.98 clear together at mc=0.5 is exactly what the run decides. The rigid-vs-graded ablation isolates the taper as the sole cause, so the mechanism is falsifiable either way. `IMPL_NOTES_M0_3.md` was left untouched.
+EXIT-0

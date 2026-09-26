@@ -278,6 +278,78 @@ def test_apply_lowband_shift_is_exact_and_magnitude_preserving():
     assert torch.equal(apply_lowband_shift(base_lo, 0.0, 0.0, H, W), base_lo)
 
 
+# --- invariant (M0.4): graded (edge-tapered) shift is unit-modulus and grades - #
+def test_apply_lowband_shift_taper_is_unit_modulus_and_grades():
+    # The M0.4 taper scales the PHASE per cell (not the amplitude), so every cell
+    # stays unit-modulus (exactly magnitude-preserving); where taper==0 it is an
+    # exact identity (band edge the SSIM high-pass overlaps is protected), where
+    # taper==1 it equals the rigid full shift.
+    H = W = 64
+    ys = torch.arange(H).view(H, 1).float()
+    xs = torch.arange(W).view(1, W).float()
+    blob = torch.exp(-(((ys - 30) ** 2 + (xs - 33) ** 2) / (2 * 8.0 ** 2)))
+    base = blob.unsqueeze(0).expand(3, H, W).contiguous()
+    base_lo = low_band_box(torch.fft.rfft2(base), 0.25)
+    kh, kw = base_lo.shape[-2], base_lo.shape[-1]
+    sy, sx = 3.0, -2.0
+    taper = torch.ones(kh, kw)
+    taper[0, :] = 0.0                                   # protect the top edge row
+    rigid = apply_lowband_shift(base_lo, sy, sx, H, W)             # taper=None
+    graded = apply_lowband_shift(base_lo, sy, sx, H, W, taper=taper)
+    # unit-modulus: per-cell magnitude is exactly preserved by the graded ramp.
+    assert torch.allclose(graded.abs(), base_lo.abs(), atol=1e-5), \
+        "graded shift changed magnitude"
+    # taper==0 row is an exact identity (edge protected).
+    assert torch.allclose(graded[:, 0, :], base_lo[:, 0, :], atol=1e-6), \
+        "taper==0 cells were still shifted"
+    # taper==1 rows equal the rigid shift.
+    assert torch.allclose(graded[:, 1:, :], rigid[:, 1:, :], atol=1e-6), \
+        "taper==1 cells diverged from the rigid shift"
+    # and the graded shift is not the rigid one overall (the edge was protected).
+    assert not torch.allclose(graded, rigid, atol=1e-6), \
+        "taper had no effect"
+
+
+# --- invariant (M0.4): zero-shift is byte-identical to the non-mc complex path - #
+def test_complex_mc_zero_shift_is_complex_identity():
+    # A drift-free (static) stream: the bump never wanders, so the estimated shift
+    # is zero and complex_mc must be byte-identical to the non-mc `complex` path —
+    # the explicit zero-shift-identity invariant, at full mc_strength.
+    frame = torch.rand(3, 32, 32)
+    clip = frame.unsqueeze(0).expand(6, 3, 32, 32).contiguous()
+    cx = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex")
+    mc = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                 mc_strength=1.0)
+    yc, _ = cx.process_segment(clip, cx.init_state(32, 32))
+    ym, _ = mc.process_segment(clip, mc.init_state(32, 32))
+    assert torch.equal(yc, ym), "complex_mc not identity on a zero-shift stream"
+
+
+# --- invariant (M0.4): the deadband snaps a sub-threshold shift to a no-op ---- #
+def test_mc_deadband_snaps_to_identity():
+    # A huge deadband snaps every shift to an exact no-op, so complex_mc == complex
+    # even on a wandering stream; a zero deadband lets the shift through so they
+    # differ. This is the mechanism that makes ~zero-wander scenarios do no harm.
+    x = _clip()
+    cx = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex")
+    dead = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                   mc_strength=1.0, mc_deadband=1e6)
+    live = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                   mc_strength=1.0, mc_deadband=0.0)
+    yc, _ = cx.process_segment(x, cx.init_state(32, 32))
+    yd, _ = dead.process_segment(x, dead.init_state(32, 32))
+    yl, _ = live.process_segment(x, live.init_state(32, 32))
+    assert torch.equal(yc, yd), "large deadband was not a no-op (== complex)"
+    assert not torch.equal(yc, yl), "zero deadband did not let the shift through"
+    # negative mc_deadband is rejected at construction
+    try:
+        SpectralCoherenceEngine(mc_deadband=-1.0)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("negative mc_deadband should raise")
+
+
 def _run_all():
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

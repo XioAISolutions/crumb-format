@@ -227,7 +227,8 @@ def pct_drop(before: float, after: float) -> float:
 # Engine table (shared by both scenarios).
 # --------------------------------------------------------------------------- #
 def _engines(alpha, rho, cutoff, hotspot_alpha, hotspot_cutoff, scenario,
-             hotspot_phase_anchor=0.0, hotspot_mc_strength=0.0):
+             hotspot_phase_anchor=0.0, hotspot_mc_strength=0.0,
+             hotspot_mc_taper=True):
     """Engine list. For the hotspot (positional/phase drift) the spectral modes
     may use a slightly wider band / stronger blend so the phase-anchoring
     `complex` mode can actually clear the bar — the `magnitude` DEFAULT is left
@@ -240,14 +241,20 @@ def _engines(alpha, rho, cutoff, hotspot_alpha, hotspot_cutoff, scenario,
     M0.3: adds `complex_mc` — motion-compensated anchoring. It measures the
     current low band's sub-pixel offset from the anchor (low-pass phase
     correlation) and undoes mc_strength of it before the blend, re-centering the
-    wandering bump instead of pulling it toward a lagging target. In gain_field
-    (magnitude drift, no positional wander) the measured shift is ~0, so
-    complex_mc is run at full strength there as a do-no-harm check."""
+    wandering bump instead of pulling it toward a lagging target.
+
+    M0.4: `complex_mc` is a HOTSPOT-ONLY graded engine. It was previously run in
+    gain_field too "as a do-no-harm check", but the correction is hotspot-specific
+    (there is no positional wander to remove in gain_field) and its M0.3 rigid
+    ramp dropped hf_ssim there (0.9678) — an artifact of running a hotspot fix on a
+    scenario without wander. Removing it here keeps every pre-existing gain_field
+    row byte-identical. (For extra safety the engine's own mc_deadband would also
+    snap the ~zero gain_field shift to an exact no-op.) The M0.4 shift is a graded,
+    unit-modulus k-space ramp (mc_taper) protecting the SSIM-overlapping band edge."""
     a = hotspot_alpha if scenario == "hotspot" else alpha
     c = hotspot_cutoff if scenario == "hotspot" else cutoff
     pa = hotspot_phase_anchor if scenario == "hotspot" else 0.0
-    mcs = hotspot_mc_strength if scenario == "hotspot" else 1.0
-    return [
+    engines = [
         ("stats-EMA baseline", StatsEMAEngine(alpha=a, rho=rho)),
         ("spectral dc_only", SpectralCoherenceEngine(
             alpha=a, rho=rho, cutoff_frac=c, anchor_mode="dc_only")),
@@ -256,10 +263,12 @@ def _engines(alpha, rho, cutoff, hotspot_alpha, hotspot_cutoff, scenario,
         ("spectral complex", SpectralCoherenceEngine(
             alpha=a, rho=rho, cutoff_frac=c, anchor_mode="complex",
             phase_anchor=pa)),
-        ("spectral complex_mc", SpectralCoherenceEngine(
-            alpha=a, rho=rho, cutoff_frac=c, anchor_mode="complex_mc",
-            mc_strength=mcs)),
     ]
+    if scenario == "hotspot":
+        engines.append(("spectral complex_mc", SpectralCoherenceEngine(
+            alpha=a, rho=rho, cutoff_frac=c, anchor_mode="complex_mc",
+            mc_strength=hotspot_mc_strength, mc_taper=hotspot_mc_taper)))
+    return engines
 
 
 def main():
@@ -279,6 +288,11 @@ def main():
     # M0.3 motion-compensation strength for the hotspot complex_mc engine
     # (0 = byte-identical to complex; 1 = fully re-center the wandering bump).
     ap.add_argument("--hotspot-mc-strength", type=float, default=0.5)
+    # M0.4 graded (edge-tapered), unit-modulus k-space shift on the hotspot
+    # complex_mc engine (default on). --no-hotspot-mc-taper reverts to the M0.3
+    # rigid full-band ramp, for the hf_ssim before/after comparison.
+    ap.add_argument("--hotspot-mc-taper", action=argparse.BooleanOptionalAction,
+                    default=True)
     # Comma-separated sweep over mc_strength for the hotspot complex_mc engine,
     # printed as an extra block (shape of the new knob). Empty = no sweep.
     ap.add_argument("--hotspot-mc-sweep", type=str, default="0,0.5,0.85,1.0")
@@ -311,7 +325,8 @@ def main():
         print(f"  alpha={args.hotspot_alpha}  rho={args.rho}  "
               f"cutoff_frac={args.hotspot_cutoff}  "
               f"phase_anchor={args.hotspot_phase_anchor}  "
-              f"mc_strength={args.hotspot_mc_strength}  (hotspot overrides)")
+              f"mc_strength={args.hotspot_mc_strength}  "
+              f"mc_taper={args.hotspot_mc_taper}  (hotspot overrides)")
     else:
         print(f"  alpha={args.alpha}  rho={args.rho}  cutoff_frac={cutoff}")
     print("=" * 82)
@@ -397,19 +412,21 @@ def _run_hotspot(control, drifted, control_traj, gt_pos, gt_col, cutoff, args):
           f"NOT the drift axis.")
     print("-" * 82)
     print(f"{'engine':<22}{'drift%(pos)':>12}{'|ΔE|corr':>10}"
-          f"{'hf_ssim':>9}{'motion%':>9}{'segs':>6}{'state':>9}  verdict")
+          f"{'hf_ref':>9}{'hf_chg':>9}{'motion%':>9}{'segs':>6}{'state':>9}  verdict")
     print("-" * 82)
 
     results = {}
     for name, eng in _engines(args.alpha, args.rho, cutoff, args.hotspot_alpha,
                               hc, "hotspot",
                               hotspot_phase_anchor=args.hotspot_phase_anchor,
-                              hotspot_mc_strength=args.hotspot_mc_strength):
+                              hotspot_mc_strength=args.hotspot_mc_strength,
+                              hotspot_mc_taper=args.hotspot_mc_taper):
         st = eng.init_state(args.grid, args.grid)
         corrected, _ = eng.process_segment(drifted, st)
         posvar_c = position_variance(lowband_energy_positions(corrected, hc))
         de_c = float(delta_e_vs_ref(corrected).mean().item())
-        ssim = highfreq_ssim(drifted, corrected)
+        ssim_chg = highfreq_ssim(drifted, corrected)   # change vs input (diagnostic)
+        ssim = highfreq_ssim(control, corrected)       # fidelity vs CLEAN truth (gates)
         corr_traj = track_positions(corrected, gt_pos, gt_col)
         pct, n_seg, _, _ = motion_pct(control_traj, corr_traj)
         d_pos = pct_drop(posvar_drift, posvar_c)
@@ -424,26 +441,27 @@ def _run_hotspot(control, drifted, control_traj, gt_pos, gt_col, cutoff, args):
                          "M" if ok_motion else ".",
                          "E" if ok_de else "!"])
         results[name] = corrected
-        print(f"{name:<22}{d_pos:>11.1f}%{de_c:>10.3f}{ssim:>9.4f}"
+        print(f"{name:<22}{d_pos:>11.1f}%{de_c:>10.3f}{ssim:>9.4f}{ssim_chg:>9.4f}"
               f"{_fmt_motion(pct, n_seg)}{n_seg:>6}{sb:>8}B  {verdict} [{flags}]")
 
     print("-" * 82)
-    print("flags: D=drift(pos)>=60%  S=ssim>=0.98  M=motion within 5%  "
-          "E=|ΔE| bounded")
+    print("flags: D=drift(pos)>=60%  S=hf_ssim(vs CLEAN ref)>=0.98  M=motion within 5%  "
+          "E=|ΔE| bounded  (hf_chg = vs input, diagnostic only)")
 
     # M0.3 sweep: shape of the mc_strength knob on the complex_mc engine.
     sweep = [s.strip() for s in args.hotspot_mc_sweep.split(",") if s.strip()]
     if sweep:
         print("-" * 82)
         print(f"complex_mc mc_strength sweep (drift bar >=60%, motion >=97, "
-              f"ssim >=0.98):")
+              f"ssim >=0.98)  mc_taper={args.hotspot_mc_taper}:")
         print(f"{'mc_strength':<14}{'drift%(pos)':>12}{'|ΔE|corr':>10}"
               f"{'hf_ssim':>9}{'motion%':>9}{'segs':>6}  verdict")
         for s in sweep:
             mcs = float(s)
             eng = SpectralCoherenceEngine(
                 alpha=args.hotspot_alpha, rho=args.rho, cutoff_frac=hc,
-                anchor_mode="complex_mc", mc_strength=mcs)
+                anchor_mode="complex_mc", mc_strength=mcs,
+                mc_taper=args.hotspot_mc_taper)
             st = eng.init_state(args.grid, args.grid)
             corrected, _ = eng.process_segment(drifted, st)
             posvar_c = position_variance(lowband_energy_positions(corrected, hc))

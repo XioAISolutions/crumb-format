@@ -217,18 +217,32 @@ def estimate_lowband_shift(Xlo: torch.Tensor, anchor: torch.Tensor,
 
 
 def apply_lowband_shift(Xlo: torch.Tensor, dy: float, dx: float,
-                        H: int, W: int) -> torch.Tensor:
+                        H: int, W: int,
+                        taper: Optional[torch.Tensor] = None) -> torch.Tensor:
     """Translate the low-band content by (dy, dx) pixels via the shift theorem.
 
     Multiplies each cell by exp(-i 2π (ky·dy + kx·dx)); an exact whole-image
     translation with no interpolation and no touch to magnitude — so detail
     (high band) and per-cell energy are preserved, only position moves.
+
+    `taper` (M0.4, optional [kh,kw] in [0,1]): a per-cell fraction of the shift
+    to apply. It scales the *phase* (`exp(-i 2π·taper·(...))`), NOT the amplitude,
+    so every cell stays unit-modulus — the shift is still exactly unitary and
+    magnitude-preserving. With `taper=1` at low k and `->0` at the band edge, the
+    position-carrying (bump) cells are fully re-centered while the detail-carrying
+    edge cells the SSIM high-pass overlaps are left as an exact identity. This is
+    the fix for M0.3's hf_ssim collapse: a rigid full-band ramp rotates those edge
+    cells at full strength (largest phase at highest k); a graded ramp does not.
+    `taper=None` reproduces the exact rigid translation (M0.3 behaviour).
     """
     if dy == 0.0 and dx == 0.0:
         return Xlo
     kh, kw = Xlo.shape[-2], Xlo.shape[-1]
     ky, kx = _box_freqs(kh, kw, H, W, device=Xlo.device)
-    ramp = torch.exp(-2j * torch.pi * (ky * dy + kx * dx)).to(Xlo.dtype)  # [kh,kw]
+    phase = ky * dy + kx * dx                             # [kh,kw], cycles
+    if taper is not None:
+        phase = phase * taper                            # graded, still |ramp|=1
+    ramp = torch.exp(-2j * torch.pi * phase).to(Xlo.dtype)  # [kh,kw]
     return Xlo * ramp
 
 
@@ -307,7 +321,9 @@ class SpectralCoherenceEngine:
                  reset_on_cut: bool = True,
                  cut_thresh: float = 0.35,
                  phase_anchor: float = 0.0,
-                 mc_strength: float = 0.0):
+                 mc_strength: float = 0.0,
+                 mc_taper: bool = True,
+                 mc_deadband: float = 1e-2):
         if anchor_mode not in ("magnitude", "dc_only", "complex", "complex_mc"):
             raise ValueError(f"unknown anchor_mode {anchor_mode!r}")
         if color_space not in ("ycbcr", "rgb"):
@@ -316,6 +332,8 @@ class SpectralCoherenceEngine:
             raise ValueError(f"phase_anchor must be >= 0, got {phase_anchor}")
         if mc_strength < 0.0:
             raise ValueError(f"mc_strength must be >= 0, got {mc_strength}")
+        if mc_deadband < 0.0:
+            raise ValueError(f"mc_deadband must be >= 0, got {mc_deadband}")
         self.cutoff_frac = cutoff_frac
         self.sigma_k_frac = sigma_k_frac
         self.alpha = alpha
@@ -335,6 +353,18 @@ class SpectralCoherenceEngine:
         # a no-op invariant). 1.0 => the wandering bump is fully re-centered onto
         # the anchor's position each frame. Ignored by every other mode.
         self.mc_strength = mc_strength
+        # mc_taper (M0.4): apply the re-centering ramp as a GRADED, unit-modulus
+        # shift weighted by the Gaussian band weight — full translation on the
+        # low-k cells the bump lives in, fading to an exact identity on the
+        # detail-carrying band edge the SSIM high-pass overlaps. False => the M0.3
+        # rigid full-band ramp (which rotated those edge cells at full strength and
+        # collapsed hf_ssim). complex_mc only.
+        self.mc_taper = mc_taper
+        # mc_deadband (M0.4): a shift below this many pixels (after the mc_strength
+        # scale) is snapped to an EXACT no-op, so estimator noise at ~zero wander
+        # (e.g. gain_field) yields output byte-identical to the non-mc `complex`
+        # path. This is the explicit zero-shift-identity invariant. complex_mc only.
+        self.mc_deadband = mc_deadband
         self._wcache: dict = {}     # (kh,kw) -> gaussian weight
         self._pcache: dict = {}     # (kh,kw) -> flat phase weight
 
@@ -440,17 +470,22 @@ class SpectralCoherenceEngine:
         w = self._blend_weight(kh, kw, device)      # [kh,kw] real, <=1
         aw = (self.alpha * w).clamp(max=1.0)
 
-        # Motion-compensated pre-shift (complex_mc, M0.3): measure how far the
-        # current low band has wandered from the anchor and undo mc_strength of it
-        # BEFORE the blend, so the bump is re-centered rather than pulled toward a
-        # lagging target. Only the low band moves (exact frequency-domain shift),
-        # so detail and motion (high band) are untouched.
+        # Motion-compensated pre-shift (complex_mc, M0.3 + M0.4): measure how far
+        # the current low band has wandered from the anchor and undo mc_strength of
+        # it BEFORE the blend, so the bump is re-centered rather than pulled toward
+        # a lagging target. M0.4 makes the shift a GRADED, unit-modulus k-space
+        # phase ramp (mc_taper) so only the position-carrying low-k cells move and
+        # the detail-carrying band edge the SSIM high-pass overlaps is left exact,
+        # and snaps sub-deadband shifts to an exact no-op (zero-shift identity).
         src = Xlo
         if (self.anchor_mode == "complex_mc" and self.mc_strength > 0.0
                 and state.n_seen > 1):
             dy, dx = estimate_lowband_shift(Xlo, state.anchor, state.H, state.W)
-            src = apply_lowband_shift(Xlo, -self.mc_strength * dy,
-                                      -self.mc_strength * dx, state.H, state.W)
+            sdy, sdx = -self.mc_strength * dy, -self.mc_strength * dx
+            if max(abs(sdy), abs(sdx)) >= self.mc_deadband:
+                taper = self._weight(kh, kw, device) if self.mc_taper else None
+                src = apply_lowband_shift(Xlo, sdy, sdx, state.H, state.W,
+                                          taper=taper)
         Xlo_new = (1.0 - aw) * src + aw * target
 
         X_new = put_low_band(X, Xlo_new)
