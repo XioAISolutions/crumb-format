@@ -11,3 +11,11 @@ Owner feedback on renders/m1_before_after.mp4: "not sure if that video is good o
 4. Execution stays owner-run; list the exact commands.
 
 Constraints: CPU only; no new deps beyond matplotlib-or-PIL fallback (both likely present; check first, prefer what exists); runtime < 8 min total; artifacts must be >= 30 fps?? no — keep readable: three-panel 12 fps fine.
+
+## ADDENDUM (applied before refire — Astra demo guidance from DEEP_DIVE_M1_assess.md)
+
+Make the FAILURE visible, not the algorithm:
+1. Long-horizon demo: raw vs plugin where drift accumulates over time (identical for the first ~10s; raw visibly wanders by ~30s; obvious by ~60s). Reference overlay (fixed crosshair on an anchored object) + a small live "scene drift" trace strip below both panels.
+2. Lead with plain language ("Long videos drift. Crumb remembers."); no FFT/rho/spectral terms on the surface.
+3. Keep the three-panel synthetic + trajectory graph as the follow-up "mechanism" view, not the opener.
+4. Numbers only after the trap test (M2) supports the claim.
