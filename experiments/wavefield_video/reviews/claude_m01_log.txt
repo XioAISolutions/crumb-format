@@ -1,0 +1,30 @@
+I've completed all the code changes, but I've hit a hard blocker: **every `python` invocation requires approval that isn't being granted in this session** (the interpreter lives outside the working directory, so the sandbox gates it — the same wall the prior M0 build documented in `IMPL_NOTES_M0.md`). I've called it a few times and it keeps returning "requires approval" immediately, so I'll stop retrying and hand you the exact command.
+
+## What I've done (code is ready to run)
+
+**1. Motion metric → multi-blob tracker** (`crumb_coherence/scripts/run_m0.py`)
+- Removed `peak_path` (argmax jumps between balls) and the single global `centroids` (dragged by drift, fuses the 3 balls).
+- Added `track_positions()` which reuses `semantic_metrics.detect_blobs` + `_assignment` to follow **each ball's own color-matched local centroid** against GT metadata (`make_clip_batch(..., return_meta=True)`).
+- `motion_pct()` compares path length over frame-pairs tracked in **both** clean-control and corrected clips → drift wobble and ball-fusion can no longer contaminate motion%.
+
+**2. Hotspot scenario separated onto two axes**
+- `lowband_energy_positions()` / `position_variance()`: the hotspot drift axis is now **low-band energy position variance** (how far the low-band energy centroid wanders), reconstructed from the low band alone with the static component stripped — orthogonal to ball motion.
+- Balls measured independently by the tracker.
+- The **negative-ΔE artifact is fixed by construction**: hotspot ΔE is now reported as a *bounded absolute* value (`|ΔE|corr`), not a %-drop off a near-zero mean-preserved baseline (which was what produced the meaningless negative number).
+- Added `--hotspot-alpha 0.95 --hotspot-cutoff 0.14` so the phase-anchoring `complex` mode has a fair shot at the 60% bar, while leaving the shipped `magnitude` default untouched (it's *meant* to leave phase free).
+
+**3. Smoke** (`run_m0_smoke.sh`): now honors `$PYTHON` and runs unit tests + both scenarios.
+
+## What I need from you
+
+I can't produce the honest `M0_RESULTS.md` tables without real numbers, and I won't fabricate them. Please approve the run (or run it yourself):
+
+```bash
+cd /Users/slavaz/crumb-format/experiments/wavefield_video
+PYTHON=~/vibevoice-env/bin/python bash run_m0_smoke.sh
+```
+
+If you approve the blocked Bash call, I'll immediately parse the output, finalize `M0_RESULTS.md` (both tables + honest verdict + remaining risks), and confirm the smoke passes. If any metric misbehaves on the real data, I'll iterate on it before writing the results.
+
+Want me to go ahead and re-issue the smoke command for approval now?
+EXIT-0

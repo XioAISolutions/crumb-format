@@ -10,7 +10,7 @@ v2 fairness + architecture suite:
   * multi-step rollout loss                                            (--rollout-loss)
   * divergence-horizon rollout eval with color-matched centroids       (--eval-rollout)
 """
-import argparse, json, sys, time, pathlib
+import argparse, json, math, sys, time, pathlib
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -41,6 +41,63 @@ def make_clip_batch(bs, T, H, W, **kw):
         kw.pop("kicks", None)        # occlusion balls just bounce; no stochastic kicks
         return _occ.make_clip_batch(bs, T, H, W, **kw)
     return _balls_make(bs, T, H, W, **kw)
+
+# --------------------------------------------------------------------------- #
+# Anti-collapse context augmentations (RESEARCH_SWEEP_20260926 sec 2-4).
+# Both act on CONTEXT frames ONLY -- targets stay clean/continuous -- and are
+# gated by their flags so the default (off) numeric path is byte-identical: no
+# tensors allocated, and (crucially) no draws from the global RNG stream that
+# seeds clip generation. drift-pert uses a private torch.Generator for exactly
+# that reason.
+# --------------------------------------------------------------------------- #
+HIST_DISC_LEVELS = 16        # "bits" mode: uniform quantization levels in [0,1]
+
+
+def apply_drift_pert(frames, magnitude, seed):
+    """Drift-perturbed augmentation (SurgVista-style; RESEARCH_SWEEP sec 3).
+
+    Overlays a per-sample smooth low-frequency gain + bias + color field on the
+    context frames, wandering slowly across the T frames. This is the SAME
+    family as crumb_coherence run_m0.inject_drift (exposure ramp + brightness
+    lift + low-freq spatial color cast) but (a) randomized per batch sample,
+    (b) amplitude-scaled by `magnitude`, (c) drawn from a private generator so
+    the global RNG stream is untouched. Anti-collapse rationale: a drifted
+    history no longer maps onto the clean future under copy-last, so the model
+    must infer real dynamics instead of echoing pixels.
+
+    frames [B,T,C,H,W] -> same shape, clamped to [0,1]."""
+    B, T, C, H, W = frames.shape
+    dev = frames.device
+    g = torch.Generator(device=dev).manual_seed(int(seed))
+    def rnd(*shape):
+        return torch.rand(*shape, generator=g, device=dev, dtype=frames.dtype)
+    t  = torch.linspace(0, 1, T, device=dev, dtype=frames.dtype).view(1, T, 1, 1, 1)
+    ys = torch.linspace(0, 1, H, device=dev, dtype=frames.dtype).view(1, 1, 1, H, 1)
+    xs = torch.linspace(0, 1, W, device=dev, dtype=frames.dtype).view(1, 1, 1, 1, W)
+    gslope = 2 * rnd(B, 1, 1, 1, 1) - 1                    # exposure ramp sign U(-1,1)
+    bslope = 2 * rnd(B, 1, 1, 1, 1) - 1                    # brightness-lift sign
+    gain = 1.0 + magnitude * gslope * t                   # 1 -> 1 +/- magnitude
+    bias = magnitude * bslope * t                         # 0 -> +/- magnitude
+    amp  = magnitude * rnd(B, 1, C, 1, 1)                 # per-channel color cast
+    kx   = 1.0 + rnd(B, 1, 1, 1, 1)                        # low spatial freq [1,2] cycles
+    ky   = 1.0 + rnd(B, 1, 1, 1, 1)
+    ph0  = 2 * math.pi * rnd(B, 1, 1, 1, 1)               # random spatial phase
+    phase = 2 * math.pi * 0.5 * t + ph0                   # slow temporal wander
+    field = (amp
+             * (0.5 + 0.5 * torch.sin(2 * math.pi * kx * xs + phase))
+             * (0.5 + 0.5 * torch.cos(2 * math.pi * ky * ys + 0.7 * phase)))
+    return (frames * gain + bias + field).clamp(0, 1)
+
+
+def quantize_frames(frames, levels):
+    """Discrete history representation (FramePack v1 History Discretization;
+    RESEARCH_SWEEP sec 2/4). Round context frames to `levels` uniform bins in
+    [0,1]; targets stay continuous. No grad path needed -- context is model
+    input, not a loss term -- so plain rounding is fine. Anti-collapse
+    rationale: coarsening the history removes the sub-bin precision the model
+    would otherwise reuse to copy the last frame pixel-exactly."""
+    return torch.round(frames.clamp(0, 1) * (levels - 1)) / (levels - 1)
+
 
 # Fixed-before-running eval constants (item 10) -- do NOT move after seeing results.
 DIV_THRESH = RADIUS          # 1.6 px: divergence when median centroid error exceeds this
@@ -551,6 +608,21 @@ def main():
     ap.add_argument("--const-lr", action="store_true", help="constant LR (LambdaLR==1) instead of OneCycle")
     ap.add_argument("--fp32", action="store_true", help="disable bf16 autocast (fp32 train+eval)")
     ap.add_argument("--no-decay-norm-head", action="store_true", help="exclude norm/bias/head from AdamW weight decay")
+    # ---- anti-collapse arms (RESEARCH_SWEEP_20260926 sec 2-4) ---------------
+    ap.add_argument("--var-reg", type=float, default=0.0,
+                    help="VICReg-style variance-matching on per-step frame deltas: add "
+                         "var_reg * relu(std(gt_delta) - std(pred_delta)) to the loss "
+                         "(hinge fires when the prediction UNDER-moves = collapse). "
+                         "0=off. Contribution logged in each step row as var_reg.")
+    ap.add_argument("--drift-pert", type=float, default=0.0,
+                    help="drift-perturbed training augmentation: smooth low-frequency "
+                         "gain/bias/color field (magnitude=this) applied to CONTEXT "
+                         "frames only (targets clean); same family as crumb_coherence "
+                         "run_m0.inject_drift. 0=off.")
+    ap.add_argument("--hist-disc", choices=["off", "bits"], default="off",
+                    help=f"discrete history representation: 'bits' quantizes context "
+                         f"frames to {HIST_DISC_LEVELS} uniform levels before feeding "
+                         f"the model (targets stay continuous). off=continuous (default).")
     ap.add_argument("--telemetry-every", type=int, default=25, help="log head grad-norm + batch copy_ratio every N steps (0=off)")
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--ffn-mult", type=float, default=4.0)
@@ -605,10 +677,14 @@ def main():
     ap.add_argument("--data-source", choices=["balls", "waves", "occlusion"], default="balls",
                     help="balls = data.py; waves = data_waves.py PDE fields; "
                          "occlusion = data_occlusion.py long-memory probe (R14)")
-    ap.add_argument("--fuse", choices=["none", "local_ssm", "local_wave"], default="none",
-                    help="gated local+global fusion arm (R14): local causal attention "
-                         "fused with a generic SSM (local_ssm, needs --kind ssm) or the "
-                         "structured wave state (local_wave, needs --kind wave)")
+    ap.add_argument("--fuse", "--fusion", dest="fuse",
+                    choices=["none", "local_wave", "local_ssm"], default="none",
+                    help="gated local+global fusion arm (R14 / DEEP_DIVE_3 Rank 1): "
+                         "h = g*h_local + (1-g)*h_global, g = sigmoid(Linear([h_local;h_global])). "
+                         "local causal attention fused with the structured wave state "
+                         "(local_wave, needs --kind wave --kernel-version dispersion) or a "
+                         "generic diagonal SSM (local_ssm, needs --kind ssm). --fusion is an "
+                         "alias for --fuse (DEEP_DIVE_3 names the flag --fusion).")
     ap.add_argument("--occ-start", type=int, default=_occ.OCC_START,
                     help="first frame the occlusion probe hides the target (data-source occlusion)")
     ap.add_argument("--occ-end", type=int, default=_occ.OCC_END,
@@ -663,6 +739,12 @@ def main():
                          "which is not threaded through the AE latent path")
     if a.latent and a.grid % DOWNSAMPLE != 0:
         raise SystemExit(f"--latent needs --grid divisible by {DOWNSAMPLE} (got {a.grid})")
+    if a.latent and (a.drift_pert > 0 or a.hist_disc != "off"):
+        raise SystemExit("--drift-pert / --hist-disc are pixel-space context "
+                         "augmentations; they are not wired through the --latent path "
+                         "(--var-reg works in latent space and is allowed)")
+    if a.var_reg < 0 or a.drift_pert < 0:
+        ap.error("--var-reg and --drift-pert must be >= 0")
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     torch.manual_seed(a.seed)
     seed_off = a.seed * 1_000_000            # decorrelates training-clip seeds per run
@@ -769,6 +851,7 @@ def main():
     ckpt_path = base / f"ckpt_{a.kind}{a.tag}.pt"
     cur_batch = a.batch                       # item (3): auto-batch shrinks this on OOM
     log = []
+    var_reg_val = 0.0                         # last var-reg loss contribution (for step-row logging)
     t0 = time.time()
     for step in range(start_step + 1, a.steps + 1):
         K = k_at(step)                       # constant, or ramped 3->8 in the 2nd half
@@ -780,6 +863,15 @@ def main():
                                       return_moving=a.motion_loss, move_thresh=a.move_thresh)
                 clips, moving = (gen if a.motion_loss else (gen, None))
                 ctx = clips[:, :a.frames].clone()
+                # Anti-collapse CONTEXT augmentations (train only; eval stays clean
+                # so cross-arm metrics remain comparable). Both are gated so the
+                # default path is byte-identical -- see helper docstrings. drift is
+                # applied first (continuous field), then discretized: the model sees
+                # the drifted-then-coarsened history a real streaming decoder would.
+                if a.drift_pert > 0:
+                    ctx = apply_drift_pert(ctx, a.drift_pert, seed=2_000_000 + step + seed_off)
+                if a.hist_disc == "bits":
+                    ctx = quantize_frames(ctx, HIST_DISC_LEVELS)
                 with torch.autocast(device_type=dev, dtype=torch.bfloat16, enabled=(dev == "cuda" and not a.fp32)):
                     if a.latent:
                         # Encode the whole clip once with the frozen AE (no grad),
@@ -791,15 +883,24 @@ def main():
                             z = m.encode_clip(clips).float()           # [B, gen+1, cz, h, w]
                         zwin = z[:, :a.frames]
                         loss = 0.0
+                        var_term = 0.0
                         for k in range(K):
                             zpred = core(zwin).float()
                             lk = F.mse_loss(zpred, z[:, a.frames + k])
                             loss = loss + (1.0 if k == 0 else 0.25) * lk
+                            if a.var_reg > 0:  # variance-match in latent space (sec 2)
+                                pd = zpred - zwin[:, -1]
+                                gd = z[:, a.frames + k] - z[:, a.frames + k - 1]
+                                var_term = var_term + (1.0 if k == 0 else 0.25) * torch.relu(gd.std() - pd.std())
                             if k < K - 1:
                                 zwin = torch.cat([zwin[:, 1:], zpred.detach().unsqueeze(1)], 1)
+                        if a.var_reg > 0:
+                            loss = loss + a.var_reg * var_term
+                            var_reg_val = float((a.var_reg * var_term).detach())
                     else:
                         win = ctx
                         loss = 0.0
+                        var_term = 0.0
                         for k in range(K):
                             pred = m(win).float()
                             tgt_k = clips[:, a.frames + k]
@@ -813,8 +914,19 @@ def main():
                             else:
                                 lk = F.mse_loss(pred, tgt_k)
                             loss = loss + (1.0 if k == 0 else 0.25) * lk
+                            if a.var_reg > 0:
+                                # Per-step delta = motion the model produced (pred vs
+                                # its own last input frame) vs GT motion (clean next vs
+                                # clean prev). SIGN: relu(std(gt)-std(pred)) fires when
+                                # the model UNDER-moves = the freeze/collapse we fight.
+                                pd = pred - win[:, -1].float()
+                                gd = (tgt_k - clips[:, a.frames + k - 1]).float()
+                                var_term = var_term + (1.0 if k == 0 else 0.25) * torch.relu(gd.std() - pd.std())
                             if k < K - 1:  # feed own prediction, detached (own-forward gradients only)
                                 win = torch.cat([win[:, 1:], pred.detach().unsqueeze(1)], 1)
+                        if a.var_reg > 0:
+                            loss = loss + a.var_reg * var_term
+                            var_reg_val = float((a.var_reg * var_term).detach())
                 opt.zero_grad(set_to_none=True)
                 loss.backward()
                 if a.telemetry_every and step % a.telemetry_every == 0:
@@ -848,6 +960,8 @@ def main():
         if step % 25 == 0 or step == start_step + 1:
             row = {"step": step, "K": K, "loss": round(float(loss), 5),
                    "st_s": round((step - start_step) / (time.time() - t0), 2)}
+            if a.var_reg > 0:                # anti-collapse hinge contribution this step
+                row["var_reg"] = round(var_reg_val, 6)
             log.append(row)
             print(json.dumps(row), flush=True)
     if a.save_every > 0:                      # final checkpoint at the end of training
@@ -928,6 +1042,7 @@ def main():
            "persistent_state_bytes": psb, "window_bytes": window_bytes,
            "state_bytes_total": psb + window_bytes,
            "rollout_loss_K": Kmax, "rollout_ramp": a.rollout_ramp,
+           "var_reg": a.var_reg, "drift_pert": a.drift_pert, "hist_disc": a.hist_disc,
            "motion_loss": a.motion_loss, "move_thresh": a.move_thresh,
            "resid_balanced": a.resid_balanced, "motion_weighted": a.motion_weighted,
            "motion_w_max": a.motion_w_max if a.motion_weighted else None,

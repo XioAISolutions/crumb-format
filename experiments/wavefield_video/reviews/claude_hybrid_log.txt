@@ -1,2 +1,35 @@
-You've hit your session limit · resets 12:40am (America/Toronto)
-EXIT-1
+All `a.fuse` references are dict-based (order-independent), and both `--fuse`/`--fusion` write the same `dest`. The edit is clean.
+
+`★ Insight ─────────────────────────────────────`
+- Because every consumer of the flag does `{"local_ssm":"ssm","local_wave":"wave"}[a.fuse]` rather than indexing `choices` by position, reordering the choices list to match the spec spelling is provably safe — a good example of why dict-dispatch beats positional/ordinal coupling.
+- The equal-params guarantee is subtle: `match_ffn_mult` bisects over the **whole** `build()` param count, which includes `FusedMix`'s *two* mixers + the gate `Linear(2·dim,dim)`. So the hybrid doesn't get "extra" parameters — it pays for the second mixer with a smaller FFN, keeping the local+wave vs wave-only comparison honest.
+`─────────────────────────────────────────────────`
+
+I've completed the build. Here's the summary.
+
+## What I found
+
+The hybrid gated fusion DEEP_DIVE_3 ranks #1 was **already implemented end-to-end in R14** and matches the spec verbatim — I verified rather than rebuilt it:
+
+- **`FusedMix._fuse` (`wfvideo.py:401-408`)** computes exactly `h = g·h_local + (1−g)·h_global`, `g = sigmoid(Linear([h_local; h_global]))` — the spec's exact form. Local = causal `AttnMix` (window=T); global = `WaveMix3D(dispersion)` (`local_wave`) or `SSMLite` (`local_ssm`).
+- Wired through `train_compare.py`: `build()` (`:688`), `--target-params` matching (`:692-698`), shared eval, streaming (`stream_step`), and state-byte accounting in the result JSON.
+- Parity already tested (`test_fusion_r14.py`: `step()==forward()` for both globals; hybrid persistent-bytes == its global path's).
+
+## What I changed (additive, non-breaking)
+
+1. **`--fusion {none,local_wave,local_ssm}` alias** — `train_compare.py:608`: `ap.add_argument("--fuse", "--fusion", dest="fuse", …)`. DEEP_DIVE_3 names the flag `--fusion`; the existing scripts use `--fuse`. Both now write the same `a.fuse`, so nothing breaks. Choices reordered to the spec spelling (cosmetic — all lookups are dict-based).
+2. **`run_smoke_hybrid.sh`** — CPU smoke that asserts: (1) wrapper + streaming parity + state bytes (via `test_fusion_r14.py`); (2) **default path byte-identical** (`--fuse none` vs `--fusion none`, same seed, must agree on every deterministic field); (2b) mixer regression; (3) **both hybrid arms train end-to-end at g16 AND g32**, matched to a shared `--target-params` within 10%.
+3. **`IMPL_NOTES_HYBRID.md`** — the boxed decisive run set at g32 for `{local-only, wave-only, local+wave, local+ssm}` at 4M matched budget, the FREEZE-FIX flags to append (per Part 1), what to read (`copy_ratio`, `gate_g`, `div_horizon/KB_state` + kill criteria), and the occlusion-harness wiring note (`run_occlusion.sh` already runs these as arms A/C/D/E).
+
+No commits made.
+
+## One thing I could not do
+
+**I could not execute the smoke in this session** — Bash execution of `python3`/scripts is gated behind an approval prompt here (read-only `grep` works; running programs does not). The smoke logic is verified by reading (deterministic CPU fp32 runs, reachable param target, real JSON keys), but it has **not been run**. To verify it live:
+
+```
+bash run_smoke_hybrid.sh
+```
+
+If you approve execution, I'll run it now and confirm all arms pass at g16 and g32.
+EXIT-0
