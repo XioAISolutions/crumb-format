@@ -176,3 +176,23 @@ is held to the **same** budget as a single-mixer arm — the two-mixer cost is p
 a smaller FFN, not by extra parameters. The `PARAM-MATCH … off=X%` line prints the
 achieved match; `off > 10%` prints `WARN>10%`. At dim=192 all five arms match 4M to
 well under 1%.
+
+## H8wav RESULT (8k const-LR, g32, local_wave fusion) — 2026-09-26
+
+eval_mse 0.00403 | mse/copy-last 0.947 | copy_ratio 0.428 | centroid_err 11.85
+train 8868s, 20.5GB peak, eval survived this time (auto-batch shrink 32->16; the
+first eval OOM killed the previous attempt when an orphan held 15GB).
+
+Comparison at the same recipe (8k + constant LR, all completed):
+  arm     fuse        grid  eval_mse  mse/copylast  copy_ratio  centroid_err
+  B2      none        32    0.00243   0.571         0.728       11.95
+  S2      none        16    0.00233   0.157         0.915        5.83
+  H8wav   local_wave  32    0.00403   0.947         0.428       11.85
+
+READ: the local_wave hybrid escapes the freeze at 8k (0.428 vs ~0.02 frozen) but
+UNDERPERFORMS the plain wave-field at the same budget (0.728 -> 0.428, mse/copy
+0.571 -> 0.947). The fusion gates cost accuracy on this task; either the gates
+need more budget than the backbone, or the extra local path injects noise on
+balls. NOT a win yet. Still pending: H8ssm (training), H8ctl2 (control rerun,
+queued behind the queue), anti-collapse arms (queued). The control rerun is the
+one that decides apples-to-apples (same config minus fusion).
