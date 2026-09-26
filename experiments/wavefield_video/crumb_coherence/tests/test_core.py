@@ -14,7 +14,9 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(
 from crumb_coherence import (          # noqa: E402
     SpectralCoherenceEngine, StatsEMAEngine, target_lowband, low_band_box,
     phase_band_weight, estimate_lowband_shift, apply_lowband_shift,
+    radial_band_mask, estimate_lowband_shift_phaseplane,
 )
+from crumb_coherence.core import _box_freqs   # noqa: E402
 
 torch.manual_seed(0)
 
@@ -348,6 +350,197 @@ def test_mc_deadband_snaps_to_identity():
         pass
     else:
         raise AssertionError("negative mc_deadband should raise")
+
+
+# --- invariant (M0.6): radial band mask is unity inside, zero outside, radially
+#     symmetric, and unit-modulus-safe (it multiplies phase, not amplitude) ---- #
+def test_radial_band_mask_hard_inside_outside_and_symmetry():
+    # A hard mask must be exactly 1.0 on every box cell with radial freq
+    # r < r_inner and exactly 0.0 elsewhere, and depend ONLY on r (radial
+    # symmetry: cells at +/- the same ky, same kx are equal).
+    H = W = 64
+    kh, kw = 12, 7
+    r_inner = 0.06
+    m = radial_band_mask(kh, kw, H, W, r_inner, edge="hard")
+    assert m.shape == (kh, kw)
+    ky, kx = _box_freqs(kh, kw, H, W)
+    r = torch.sqrt(ky * ky + kx * kx)                    # [kh,kw]
+    assert torch.all(m[r < r_inner] == 1.0), "hard mask not unity inside"
+    assert torch.all(m[r >= r_inner] == 0.0), "hard mask not zero outside"
+    # every value is a clean 0 or 1 (a mask, no partial cells for a hard cut)
+    assert torch.all((m == 0.0) | (m == 1.0)), "hard mask has partial cells"
+    # radial symmetry across the DC row (box row kh//2): +j and -j rows match.
+    dc = kh // 2
+    for j in range(1, min(dc, kh - dc - 1) + 1):
+        assert torch.equal(m[dc + j], m[dc - j]), f"row {j} not radially symmetric"
+    # DC cell (r=0) is always inside; the far corner is always outside.
+    assert m[dc, 0].item() == 1.0
+    assert m[0, kw - 1].item() == 0.0 or r[0, kw - 1].item() < r_inner
+
+
+def test_radial_band_mask_flat_top_grades_and_bounds():
+    # The flat-top edge is unity in the interior, 0 well outside, and takes
+    # intermediate values only in the raised-cosine transition centered on
+    # r_inner. Everything stays within [0,1].
+    H = W = 64
+    kh, kw = 16, 9
+    r_inner = 0.08
+    m = radial_band_mask(kh, kw, H, W, r_inner, edge="flat_top", width_frac=0.3)
+    assert torch.all((m >= 0.0) & (m <= 1.0)), "flat_top mask out of [0,1]"
+    ky, kx = _box_freqs(kh, kw, H, W)
+    r = torch.sqrt(ky * ky + kx * kx)
+    w = 0.3 * r_inner
+    r1, r2 = r_inner - 0.5 * w, r_inner + 0.5 * w
+    assert torch.all(m[r < r1] == 1.0), "flat_top not unity below transition"
+    assert torch.all(m[r >= r2] == 0.0), "flat_top not zero above transition"
+    dc = kh // 2
+    assert m[dc, 0].item() == 1.0, "flat_top DC not unity"
+    # radial symmetry holds for the smooth edge too.
+    for j in range(1, min(dc, kh - dc - 1) + 1):
+        assert torch.allclose(m[dc + j], m[dc - j]), f"row {j} not symmetric"
+    # unknown edge is rejected.
+    try:
+        radial_band_mask(kh, kw, H, W, r_inner, edge="bogus")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("unknown edge should raise")
+
+
+# --- invariant (M0.6): each new complex_mc kwarg defaults to a byte-identical
+#     no-op, and only ever affects complex_mc ---------------------------------- #
+def test_mc_band_default_is_noop_and_only_complex_mc():
+    # mc_band defaults to 0.0 => identical output to explicitly passing 0.0 in
+    # every mode, and a non-zero mc_band never leaks into a non-complex_mc mode.
+    x = _clip()
+    for mode in ("magnitude", "dc_only", "complex", "complex_mc"):
+        kw = {"mc_strength": 0.8} if mode == "complex_mc" else {}
+        base = SpectralCoherenceEngine(alpha=0.9, anchor_mode=mode, **kw)
+        expl = SpectralCoherenceEngine(alpha=0.9, anchor_mode=mode,
+                                       mc_band=0.0, **kw)
+        yb, _ = base.process_segment(x, base.init_state(32, 32))
+        ye, _ = expl.process_segment(x, expl.init_state(32, 32))
+        assert torch.equal(yb, ye), f"mc_band=0 not a no-op for {mode}"
+    for mode in ("magnitude", "dc_only", "complex"):
+        off = SpectralCoherenceEngine(alpha=0.9, anchor_mode=mode, mc_band=0.0)
+        on = SpectralCoherenceEngine(alpha=0.9, anchor_mode=mode, mc_band=0.05)
+        yoff, _ = off.process_segment(x, off.init_state(32, 32))
+        yon, _ = on.process_segment(x, on.init_state(32, 32))
+        assert torch.equal(yoff, yon), f"mc_band leaked into {mode}"
+    # In complex_mc with a real shift it MUST change the result vs the full-band
+    # (mc_band=0) path — it is restricting the correction to the inner band.
+    off = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                  mc_strength=1.0, mc_taper=False, mc_band=0.0,
+                                  mc_deadband=0.0)
+    on = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                 mc_strength=1.0, mc_taper=False, mc_band=0.05,
+                                 mc_deadband=0.0)
+    yoff, _ = off.process_segment(x, off.init_state(32, 32))
+    yon, _ = on.process_segment(x, on.init_state(32, 32))
+    assert not torch.equal(yoff, yon), "mc_band had no effect in complex_mc"
+    # negative mc_band is rejected at construction.
+    try:
+        SpectralCoherenceEngine(mc_band=-0.1)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("negative mc_band should raise")
+
+
+def test_mc_est_default_is_noop():
+    # mc_est defaults to "corr" => identical to explicitly passing it; and the
+    # "phase_plane" alternative changes complex_mc (a different estimator) while
+    # never touching the other modes (which ignore mc_est entirely).
+    x = _clip()
+    base = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                   mc_strength=0.8, mc_deadband=0.0)
+    expl = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                   mc_strength=0.8, mc_est="corr", mc_deadband=0.0)
+    yb, _ = base.process_segment(x, base.init_state(32, 32))
+    ye, _ = expl.process_segment(x, expl.init_state(32, 32))
+    assert torch.equal(yb, ye), "mc_est='corr' is not the default behaviour"
+    pp = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                 mc_strength=0.8, mc_est="phase_plane",
+                                 mc_deadband=0.0)
+    yp, _ = pp.process_segment(x, pp.init_state(32, 32))
+    assert not torch.equal(yb, yp), "phase_plane estimator had no effect"
+    try:
+        SpectralCoherenceEngine(mc_est="bogus")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("unknown mc_est should raise")
+
+
+def test_mc_smooth_default_is_noop():
+    # mc_smooth defaults to False => byte-identical to explicitly passing False;
+    # turning it on runs the alpha-beta filter and changes complex_mc output.
+    x = _clip()
+    base = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                   mc_strength=0.8, mc_deadband=0.0)
+    expl = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                   mc_strength=0.8, mc_smooth=False,
+                                   mc_deadband=0.0)
+    yb, _ = base.process_segment(x, base.init_state(32, 32))
+    ye, _ = expl.process_segment(x, expl.init_state(32, 32))
+    assert torch.equal(yb, ye), "mc_smooth=False is not the default behaviour"
+    sm = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                 mc_strength=0.8, mc_smooth=True, mc_deadband=0.0)
+    ys, _ = sm.process_segment(x, sm.init_state(32, 32))
+    assert not torch.equal(yb, ys), "mc_smooth had no effect"
+
+
+def test_mc_edge_default_is_noop_given_band():
+    # mc_edge only matters when mc_band>0; "hard" is the default and "flat_top"
+    # changes the correction. With mc_band==0 the edge is irrelevant (no-op).
+    x = _clip()
+    hard = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                   mc_strength=1.0, mc_band=0.06, mc_deadband=0.0)
+    hard2 = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                    mc_strength=1.0, mc_band=0.06, mc_edge="hard",
+                                    mc_deadband=0.0)
+    yh, _ = hard.process_segment(x, hard.init_state(32, 32))
+    yh2, _ = hard2.process_segment(x, hard2.init_state(32, 32))
+    assert torch.equal(yh, yh2), "mc_edge='hard' is not the default"
+    ft = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                 mc_strength=1.0, mc_band=0.06, mc_edge="flat_top",
+                                 mc_deadband=0.0)
+    yf, _ = ft.process_segment(x, ft.init_state(32, 32))
+    assert not torch.equal(yh, yf), "flat_top edge had no effect"
+    # mc_edge is irrelevant when mc_band==0 (no band mask is built).
+    e0h = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                  mc_strength=1.0, mc_band=0.0, mc_edge="hard")
+    e0f = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                  mc_strength=1.0, mc_band=0.0, mc_edge="flat_top")
+    y0h, _ = e0h.process_segment(x, e0h.init_state(32, 32))
+    y0f, _ = e0f.process_segment(x, e0f.init_state(32, 32))
+    assert torch.equal(y0h, y0f), "mc_edge leaked with mc_band==0"
+    try:
+        SpectralCoherenceEngine(mc_edge="bogus")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("unknown mc_edge should raise")
+
+
+def test_phaseplane_recovers_known_shift():
+    # The weighted phase-plane fit must recover a known small circular-roll
+    # translation to sub-pixel accuracy, matching estimate_lowband_shift's sign.
+    H = W = 64
+    ys = torch.arange(H).view(H, 1).float()
+    xs = torch.arange(W).view(1, W).float()
+    blob = torch.exp(-(((ys - 32) ** 2 + (xs - 30) ** 2) / (2 * 9.0 ** 2)))
+    base = blob.unsqueeze(0).expand(3, H, W).contiguous()
+    sy, sx = 2, -1
+    shifted = torch.roll(base, shifts=(sy, sx), dims=(-2, -1))
+    a_lo = low_band_box(torch.fft.rfft2(base), 0.25)
+    x_lo = low_band_box(torch.fft.rfft2(shifted), 0.25)
+    dy, dx = estimate_lowband_shift_phaseplane(x_lo, a_lo, H, W)
+    assert abs(dy - sy) < 0.5, f"phase-plane dy={dy} != {sy}"
+    assert abs(dx - sx) < 0.5, f"phase-plane dx={dx} != {sx}"
+    # empty anchor -> no shift (cold-start guard).
+    assert estimate_lowband_shift_phaseplane(
+        x_lo, torch.zeros_like(a_lo), H, W) == (0.0, 0.0)
 
 
 def _run_all():

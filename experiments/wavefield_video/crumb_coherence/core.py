@@ -29,6 +29,12 @@ import torch
 EPS = 1e-8
 CUT_COOLDOWN_N = 5      # frames of fast (rho=0.5) adaptation after a soft cut
 CUT_RHO = 0.5
+# Causal alpha-beta trajectory filter gains (M0.6, mc_smooth). beta = a^2/(2-a)
+# is the standard critically-damped pairing for a=0.5. Both are gated by a
+# per-frame phase-coherence confidence in [0,1], so a low-confidence (noisy)
+# measurement moves the filtered path less.
+MC_ALPHA_AB = 0.5
+MC_BETA_AB = MC_ALPHA_AB * MC_ALPHA_AB / (2.0 - MC_ALPHA_AB)   # = 1/6
 
 
 # --------------------------------------------------------------------------- #
@@ -247,6 +253,120 @@ def apply_lowband_shift(Xlo: torch.Tensor, dy: float, dx: float,
 
 
 # --------------------------------------------------------------------------- #
+# Radial band mask (§3.2, M0.6). The M0.5 E3 experiment showed the decisive win:
+# restrict the re-centering shift to the bump's dominant INNERMOST radial band
+# (r < mc_band cyc/px), leaving the SSIM-overlapping mid/high band an exact
+# identity. The injected bump is a wide Gaussian (energy < ~0.02 cyc/px); the
+# SSIM high-pass ramps in past ~0.06 cyc/px. A hard inner mask at r~0.03 moves the
+# bump while touching NO cell the fidelity gate watches -> drift removed AND
+# hf_ref preserved, the frontier neither the M0.3 rigid ramp (hf dies) nor the
+# M0.4 gaussian taper (drift dies) could reach. The mask multiplies the shift's
+# PHASE only, so every cell stays unit-modulus (magnitude / energy exact).
+#
+# edge="hard"     : 1.0 where r < mc_band, else 0.0  (the E3 mask, verbatim).
+# edge="flat_top" : unity in the interior with a raised-cosine transition of
+#                   width width_frac*mc_band CENTERED on mc_band (Astra's flat-top,
+#                   M0.6) — a smooth band edge that avoids the hard-cut seam while
+#                   still covering the bump's support.
+# --------------------------------------------------------------------------- #
+def radial_band_mask(kh: int, kw: int, H: int, W: int, r_inner: float,
+                     device="cpu", edge: str = "hard",
+                     width_frac: float = 0.3) -> torch.Tensor:
+    """Per-cell weight in [0,1] over the low-band box restricting an mc shift to
+    the innermost radial frequencies r < r_inner (cycles/pixel). See the block
+    comment above for the M0.5 E3 rationale. Returns a real [kh,kw] tensor."""
+    if edge not in ("hard", "flat_top"):
+        raise ValueError(f"unknown edge {edge!r}")
+    ky, kx = _box_freqs(kh, kw, H, W, device=device)     # [kh,1],[1,kw] cyc/px
+    r = torch.sqrt(ky * ky + kx * kx)                     # [kh,kw] broadcast
+    if edge == "hard":
+        return (r < r_inner).to(torch.float32)
+    # flat_top: unity below r1, cosine 1->0 across [r1,r2), zero at/above r2.
+    w = max(EPS, width_frac * r_inner)
+    r1 = r_inner - 0.5 * w
+    r2 = r_inner + 0.5 * w
+    mask = torch.ones_like(r)
+    trans = (r >= r1) & (r < r2)
+    cos_t = 0.5 * (1.0 + torch.cos(torch.pi * (r - r1) / (r2 - r1)))
+    mask = torch.where(trans, cos_t, mask)
+    mask = torch.where(r >= r2, torch.zeros_like(r), mask)
+    return mask.to(torch.float32)
+
+
+# --------------------------------------------------------------------------- #
+# Weighted phase-plane displacement estimate (§3.2, M0.6, Astra). An alternative
+# to the correlation-peak estimator above. By the shift theorem the cross-power
+# phase between the current low band and the (near-static) anchor is LINEAR in
+# frequency: phi_k = angle( sum_c Xlo_c conj(anchor_c) ) ~= -2π(ky·dy + kx·dx).
+# Rather than build a correlation surface and pick its peak, fit the plane
+# (dy, dx) directly by magnitude-weighted Gauss-Newton over the lowest non-DC
+# cells (r < r_fit, where the phase has not wrapped), Huber-reweighted to reject
+# outlier cells. At 32-64px grids there are very few meaningful low-k bins, so a
+# weighted slope fit uses them more efficiently than peak-picking. Sign
+# convention matches estimate_lowband_shift exactly (a +d displacement reads back
+# as +d), so it is a drop-in alternative.
+# --------------------------------------------------------------------------- #
+def _wrap_phase(x: torch.Tensor) -> torch.Tensor:
+    """Wrap radians into (-π, π]."""
+    return x - 2.0 * torch.pi * torch.round(x / (2.0 * torch.pi))
+
+
+def estimate_lowband_shift_phaseplane(Xlo: torch.Tensor, anchor: torch.Tensor,
+                                      H: int, W: int, r_fit: float = 0.06,
+                                      iters: int = 4, exclude_dc: bool = True):
+    """Sub-pixel (dy, dx) px translation of `Xlo` vs `anchor` by weighted
+    phase-plane fitting. See the block comment above. Returns (0.0, 0.0) if the
+    anchor is empty or too few cells are usable.
+
+    The fit is Gauss-Newton on the WRAPPED residual r_k = wrap(phi_k + 2π k·d):
+    starting from d=0 (residual = wrap(phi)), each step solves a 2x2 weighted
+    normal system for the increment and accumulates it. Cells whose true phase
+    exceeded π (large displacement, higher k) wrap and are down-weighted by the
+    Huber term, so the low-k cells (which do not wrap) anchor the estimate.
+    """
+    kh, kw = Xlo.shape[-2], Xlo.shape[-1]
+    device = Xlo.device
+    if anchor.abs().sum().item() <= EPS:
+        return 0.0, 0.0
+    cross = (Xlo * anchor.conj()).sum(dim=0)             # [kh,kw] collapse channels
+    phi = torch.angle(cross)                              # [kh,kw]
+    mag = cross.abs()
+    ky, kx = _box_freqs(kh, kw, H, W, device=device)      # [kh,1],[1,kw]
+    KY = ky.expand(kh, kw)
+    KX = kx.expand(kh, kw)
+    r = torch.sqrt(KY * KY + KX * KX)
+    sel = r < r_fit
+    if exclude_dc:
+        sel = sel & (r > EPS)
+    if int(sel.sum().item()) < 2:
+        return 0.0, 0.0
+    ay = (2.0 * torch.pi * KY[sel])                       # d(phase)/d(dy)
+    ax = (2.0 * torch.pi * KX[sel])
+    ph = phi[sel]
+    mg = mag[sel]
+    dy = dx = 0.0
+    for _ in range(max(1, iters)):
+        resid = _wrap_phase(ph + ay * dy + ax * dx)      # current wrapped residual
+        s = 1.345 * (resid.abs().median() + EPS)         # Huber scale (MAD-ish)
+        ar = resid.abs()
+        hub = torch.where(ar <= s, torch.ones_like(ar), s / (ar + EPS))
+        w = mg * hub
+        Syy = torch.sum(w * ay * ay)
+        Sxx = torch.sum(w * ax * ax)
+        Sxy = torch.sum(w * ay * ax)
+        by = -torch.sum(w * ay * resid)                  # solve for the increment
+        bx = -torch.sum(w * ax * resid)
+        det = Syy * Sxx - Sxy * Sxy
+        if abs(float(det)) < EPS:
+            break
+        ddy = float((by * Sxx - bx * Sxy) / det)
+        ddx = float((Syy * bx - Sxy * by) / det)
+        dy += ddy
+        dx += ddx
+    return dy, dx
+
+
+# --------------------------------------------------------------------------- #
 # EMA anchor update (§2 step 3). First-value initialization (anchor := Xlo on
 # frame 1) removes the warmup bias that a from-zero EMA would need correcting,
 # so this is a plain leaky integrator; n_seen is kept for interface parity.
@@ -305,6 +425,16 @@ class CoherenceState:
     cut_cooldown: int = 0           # frames of fast adaptation left after a cut
     H: int = 0
     W: int = 0
+    # M0.6 mc_smooth: causal alpha-beta trajectory-filter state (used only by
+    # complex_mc + mc_smooth). Position is the estimated (dy, dx) offset of the
+    # wandering bump from the anchor; velocity is its per-frame change. Left at
+    # defaults (and never touched) for every other configuration.
+    mc_pdy: float = 0.0
+    mc_pdx: float = 0.0
+    mc_vdy: float = 0.0
+    mc_vdx: float = 0.0
+    mc_conf: float = 0.0
+    mc_filt_init: bool = False
 
 
 # --------------------------------------------------------------------------- #
@@ -323,7 +453,11 @@ class SpectralCoherenceEngine:
                  phase_anchor: float = 0.0,
                  mc_strength: float = 0.0,
                  mc_taper: bool = True,
-                 mc_deadband: float = 1e-2):
+                 mc_deadband: float = 1e-2,
+                 mc_band: float = 0.0,
+                 mc_est: str = "corr",
+                 mc_smooth: bool = False,
+                 mc_edge: str = "hard"):
         if anchor_mode not in ("magnitude", "dc_only", "complex", "complex_mc"):
             raise ValueError(f"unknown anchor_mode {anchor_mode!r}")
         if color_space not in ("ycbcr", "rgb"):
@@ -334,6 +468,12 @@ class SpectralCoherenceEngine:
             raise ValueError(f"mc_strength must be >= 0, got {mc_strength}")
         if mc_deadband < 0.0:
             raise ValueError(f"mc_deadband must be >= 0, got {mc_deadband}")
+        if mc_band < 0.0:
+            raise ValueError(f"mc_band must be >= 0, got {mc_band}")
+        if mc_est not in ("corr", "phase_plane"):
+            raise ValueError(f"unknown mc_est {mc_est!r}")
+        if mc_edge not in ("hard", "flat_top"):
+            raise ValueError(f"unknown mc_edge {mc_edge!r}")
         self.cutoff_frac = cutoff_frac
         self.sigma_k_frac = sigma_k_frac
         self.alpha = alpha
@@ -365,8 +505,29 @@ class SpectralCoherenceEngine:
         # (e.g. gain_field) yields output byte-identical to the non-mc `complex`
         # path. This is the explicit zero-shift-identity invariant. complex_mc only.
         self.mc_deadband = mc_deadband
+        # mc_band (M0.6): if > 0, restrict the re-centering shift to the innermost
+        # radial band r < mc_band (cyc/px) via a hard/flat-top phase mask, leaving
+        # the SSIM-overlapping mid/high band an exact identity. This is the M0.5 E3
+        # mechanism (the first setting to clear D+S+M on the hotspot). 0.0 => the
+        # M0.4 behaviour exactly (gaussian mc_taper or a rigid ramp). When >0 it
+        # REPLACES the gaussian mc_taper as the shift's phase weighting. complex_mc.
+        self.mc_band = mc_band
+        # mc_est (M0.6): "corr" (default) = the M0.3 correlation-peak estimator;
+        # "phase_plane" = a magnitude-weighted, Huber-robust phase-slope fit over
+        # the lowest non-DC cells. Alternative estimator only; complex_mc.
+        self.mc_est = mc_est
+        # mc_smooth (M0.6): if True, pass the per-frame displacement estimate
+        # through a causal alpha-beta trajectory filter (state on CoherenceState)
+        # before applying the correction, denoising the path. Default off (the raw
+        # per-frame estimate, byte-identical to M0.4). complex_mc.
+        self.mc_smooth = mc_smooth
+        # mc_edge (M0.6): band-mask edge shape when mc_band>0. "hard" = a step cut
+        # (E3 verbatim); "flat_top" = a raised-cosine transition centered on
+        # mc_band. Ignored when mc_band==0. complex_mc.
+        self.mc_edge = mc_edge
         self._wcache: dict = {}     # (kh,kw) -> gaussian weight
         self._pcache: dict = {}     # (kh,kw) -> flat phase weight
+        self._bcache: dict = {}     # (kh,kw,H,W,edge) -> radial band mask
 
     # -- box geometry ------------------------------------------------------ #
     def _dims(self, H: int, W: int) -> tuple[int, int]:
@@ -399,6 +560,66 @@ class SpectralCoherenceEngine:
             self._pcache[key] = wp
         return torch.clamp(w + self.phase_anchor * wp, max=1.0)
 
+    # -- M0.6 motion-compensation helpers ---------------------------------- #
+    def _mc_taper_weight(self, kh: int, kw: int, H: int, W: int, device):
+        """The per-cell PHASE taper applied to the mc shift. mc_band>0 (M0.5 E3)
+        takes precedence: use the radial band mask (hard / flat_top) and leave the
+        SSIM-overlapping band an exact identity. Else fall back to the M0.4 path:
+        the gaussian band weight when mc_taper, or None (rigid ramp)."""
+        if self.mc_band > 0.0:
+            key = (kh, kw, H, W, self.mc_edge, str(device))
+            m = self._bcache.get(key)
+            if m is None:
+                m = radial_band_mask(kh, kw, H, W, self.mc_band, device=device,
+                                     edge=self.mc_edge)
+                self._bcache[key] = m
+            return m
+        return self._weight(kh, kw, device) if self.mc_taper else None
+
+    def _mc_confidence(self, Xlo: torch.Tensor, anchor: torch.Tensor) -> float:
+        """Phase-coherence of the current low band vs the anchor, in [0,1]: the
+        magnitude of the summed cross-power over the summed |cross-power|, with DC
+        excluded. ~1 when a clean rigid shift explains the band (phases align),
+        ~0 when the low band is incoherent (noise) — used to gate the alpha-beta
+        filter so noisy frames move the trajectory less."""
+        if anchor.abs().sum().item() <= EPS:
+            return 0.0
+        cross = (Xlo * anchor.conj()).sum(dim=0).clone()   # [kh,kw]
+        cross[cross.shape[-2] // 2, 0] = 0.0               # exclude DC
+        denom = float(cross.abs().sum().item()) + EPS
+        return float(cross.sum().abs().item() / denom)
+
+    def _smooth_shift(self, dy: float, dx: float, conf: float,
+                      state: CoherenceState):
+        """Causal alpha-beta trajectory filter on the (dy, dx) estimate. Returns
+        the filtered offset; the correction downstream is -mc_strength*filtered
+        (the desired path is the near-static anchor at offset 0, so the stabilized
+        target p* = 0 and delta = p* - p_filtered)."""
+        if not state.mc_filt_init:
+            state.mc_pdy, state.mc_pdx = dy, dx
+            state.mc_vdy, state.mc_vdx = 0.0, 0.0
+            state.mc_conf = conf
+            state.mc_filt_init = True
+            return dy, dx
+        a = MC_ALPHA_AB * conf
+        b = MC_BETA_AB * conf
+        pdy = state.mc_pdy + state.mc_vdy                  # predict
+        pdx = state.mc_pdx + state.mc_vdx
+        ry, rx = dy - pdy, dx - pdx                        # innovation
+        pdy += a * ry
+        pdx += a * rx
+        state.mc_vdy += b * ry
+        state.mc_vdx += b * rx
+        state.mc_pdy, state.mc_pdx = pdy, pdx
+        state.mc_conf = conf
+        return pdy, pdx
+
+    def _reset_mc_filter(self, state: CoherenceState) -> None:
+        state.mc_pdy = state.mc_pdx = 0.0
+        state.mc_vdy = state.mc_vdx = 0.0
+        state.mc_conf = 0.0
+        state.mc_filt_init = False
+
     # -- public interface -------------------------------------------------- #
     def init_state(self, H: int, W: int, device="cpu") -> CoherenceState:
         kh, kw = self._dims(H, W)
@@ -416,6 +637,7 @@ class SpectralCoherenceEngine:
         state.n_seen = 0
         state.warm = False
         state.cut_cooldown = 0
+        self._reset_mc_filter(state)
         return state
 
     def process_frame(self, frame: torch.Tensor, state: CoherenceState):
@@ -440,6 +662,7 @@ class SpectralCoherenceEngine:
             state.n_seen = 1
             state.warm = True
             state.cut_cooldown = 0
+            self._reset_mc_filter(state)   # new scene: drop the stale trajectory
             return frame, state
 
         # rho: adapt fast for a few frames after a soft cut, else steady drift.
@@ -480,10 +703,20 @@ class SpectralCoherenceEngine:
         src = Xlo
         if (self.anchor_mode == "complex_mc" and self.mc_strength > 0.0
                 and state.n_seen > 1):
-            dy, dx = estimate_lowband_shift(Xlo, state.anchor, state.H, state.W)
+            if self.mc_est == "phase_plane":
+                dy, dx = estimate_lowband_shift_phaseplane(
+                    Xlo, state.anchor, state.H, state.W)
+            else:
+                dy, dx = estimate_lowband_shift(
+                    Xlo, state.anchor, state.H, state.W)
+            # M0.6 mc_smooth: denoise the trajectory before applying (default off
+            # -> byte-identical to M0.4, which uses the raw per-frame estimate).
+            if self.mc_smooth:
+                conf = self._mc_confidence(Xlo, state.anchor)
+                dy, dx = self._smooth_shift(dy, dx, conf, state)
             sdy, sdx = -self.mc_strength * dy, -self.mc_strength * dx
             if max(abs(sdy), abs(sdx)) >= self.mc_deadband:
-                taper = self._weight(kh, kw, device) if self.mc_taper else None
+                taper = self._mc_taper_weight(kh, kw, state.H, state.W, device)
                 src = apply_lowband_shift(Xlo, sdy, sdx, state.H, state.W,
                                           taper=taper)
         Xlo_new = (1.0 - aw) * src + aw * target

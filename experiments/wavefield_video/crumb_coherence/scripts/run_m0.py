@@ -228,7 +228,9 @@ def pct_drop(before: float, after: float) -> float:
 # --------------------------------------------------------------------------- #
 def _engines(alpha, rho, cutoff, hotspot_alpha, hotspot_cutoff, scenario,
              hotspot_phase_anchor=0.0, hotspot_mc_strength=0.0,
-             hotspot_mc_taper=True):
+             hotspot_mc_taper=True, hotspot_mc_band=0.0,
+             hotspot_mc_est="corr", hotspot_mc_smooth=False,
+             hotspot_mc_edge="hard"):
     """Engine list. For the hotspot (positional/phase drift) the spectral modes
     may use a slightly wider band / stronger blend so the phase-anchoring
     `complex` mode can actually clear the bar — the `magnitude` DEFAULT is left
@@ -267,7 +269,9 @@ def _engines(alpha, rho, cutoff, hotspot_alpha, hotspot_cutoff, scenario,
     if scenario == "hotspot":
         engines.append(("spectral complex_mc", SpectralCoherenceEngine(
             alpha=a, rho=rho, cutoff_frac=c, anchor_mode="complex_mc",
-            mc_strength=hotspot_mc_strength, mc_taper=hotspot_mc_taper)))
+            mc_strength=hotspot_mc_strength, mc_taper=hotspot_mc_taper,
+            mc_band=hotspot_mc_band, mc_est=hotspot_mc_est,
+            mc_smooth=hotspot_mc_smooth, mc_edge=hotspot_mc_edge)))
     return engines
 
 
@@ -288,6 +292,10 @@ def main():
     # M0.3 motion-compensation strength for the hotspot complex_mc engine
     # (0 = byte-identical to complex; 1 = fully re-center the wandering bump).
     ap.add_argument("--hotspot-mc-strength", type=float, default=0.5)
+    ap.add_argument("--hotspot-mc-band", type=float, default=0.03)
+    ap.add_argument("--hotspot-mc-est", choices=["corr", "phase_plane"], default="corr")
+    ap.add_argument("--hotspot-mc-smooth", action="store_true", default=False)
+    ap.add_argument("--hotspot-mc-edge", choices=["hard", "flat_top"], default="hard")
     # M0.4 graded (edge-tapered), unit-modulus k-space shift on the hotspot
     # complex_mc engine (default on). --no-hotspot-mc-taper reverts to the M0.3
     # rigid full-band ramp, for the hf_ssim before/after comparison.
@@ -420,7 +428,11 @@ def _run_hotspot(control, drifted, control_traj, gt_pos, gt_col, cutoff, args):
                               hc, "hotspot",
                               hotspot_phase_anchor=args.hotspot_phase_anchor,
                               hotspot_mc_strength=args.hotspot_mc_strength,
-                              hotspot_mc_taper=args.hotspot_mc_taper):
+                              hotspot_mc_taper=args.hotspot_mc_taper,
+                              hotspot_mc_band=args.hotspot_mc_band,
+                              hotspot_mc_est=args.hotspot_mc_est,
+                              hotspot_mc_smooth=args.hotspot_mc_smooth,
+                              hotspot_mc_edge=args.hotspot_mc_edge):
         st = eng.init_state(args.grid, args.grid)
         corrected, _ = eng.process_segment(drifted, st)
         posvar_c = position_variance(lowband_energy_positions(corrected, hc))
