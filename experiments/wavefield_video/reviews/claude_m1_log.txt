@@ -1,0 +1,20 @@
+M1 integration rung is built and documented. Here's the summary.
+
+## What I found (the load-bearing reality check)
+`runs_dd3/model_wave_S2.pt` **doesn't exist locally** — it was a planned training run, never executed here. The best local wave checkpoint is `demo_ckpts/model_wave_w1r4.pt` at **grid 16**, and there's no 64×64 wave model at all. But real rollouts already exist: `demo_out/seed_170001_wave/prediction/` is 256 frames of genuine autoregressive wave-model output (content = moving balls — the same domain M0 was tuned on).
+
+The grid-16 fact drives everything: `mc_band=0.03` cyc/px sits **below the fundamental** (1/16 = 0.0625), so the r<0.03 inner band collapses to DC and `complex_mc` degenerates to plain `complex`. The positional correction that won at grid 64 is mathematically inexpressible at grid 16. So the **luminance/`magnitude`** axis (grid-agnostic) is the meaningful lever, and I feature it — while still running and reporting `complex_mc` honestly.
+
+## Deliverables
+- **`crumb_coherence/scripts/m1_integration.py`** — reuses the existing rollout (recovers native 16×16 float frames losslessly from the NEAREST-upscaled display PNGs), runs the frozen engine in both configs, computes self-referential metrics, writes the artifact. Also takes `--ckpt` to render + integrate S2@64 the instant it exists. Zero changes under `crumb_coherence/`.
+- **Self-referential metrics** (no clean reference, stated as such): low-band magnitude variance + energy-centroid drift; band-split flicker (low should drop, **high must stay ~1** or motion froze); `hf_ssim(raw,plugin)` detail preservation + a **stillness guard**.
+- **Artifact**: `renders/m1_before_after.mp4` (raw | plugin, **labels baked via PIL** since local ffmpeg has no drawtext), `renders/m1_pairs/`, `renders/m1_metrics.json`.
+- **`IMPL_NOTES_M1.md`** — commands, the S2/grid-16 caveats, pre-registered expectations, and the explicit falsification criteria.
+
+## The honest gap
+Execution is owner-run/gated (same as M0.2–M0.7 — I retried, denied), so the results table is **PENDING** with no invented numbers; the certain grid-16 band diagnosis is pre-filled. The script is audited end-to-end (frame I/O via the repo's own PIL+ffmpeg, dims forced even for yuv420p, robust to scale=1).
+
+**To finish:** run `~/vibevoice-env/bin/python crumb_coherence/scripts/m1_integration.py` (and the `--frames 256` variant — late frames are where accumulated drift, and thus the plugin's leverage, actually shows), then watch `renders/m1_before_after.mp4`. Paste the two metric blocks and I'll fill the table and give the verdict on whether the luminance axis genuinely transfers to real model output.
+
+One thing worth your call: I defaulted to 64 frames per the task, but I suspect the first 64 frames of a fresh rollout drift too little to be convincing — the 256-frame run is likely the real test. Want me to flip the default to 256?
+EXIT-0

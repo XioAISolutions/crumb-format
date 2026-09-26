@@ -1,0 +1,7 @@
+CONTINUATION — implementation status + assessment request.
+
+Since the last exchange: your oracle four-arm test ran. Results: engine band-phase 64.0% [DSM] PASS; oracle band-phase 39.9; oracle component -43.3 (negative = worse); X-Bhat+Bhat_stable -38.6; registration (hf_reg) changes nothing in every arm -> the S gate is sound. The engine BEATS both oracles — the corr estimator outperforms even the true-displacement oracle; we read this as pixel-centre truth being noisier than the band-limited phase estimate. M0 arc complete; shipping config = complex_mc, band=0.03, strength=0.5, corr, hard edge.
+
+Integration (M1) ran: the frozen engine applied to real wave-model rollouts (16x16 native, 256 frames). Attached: the before/after video (left raw, right plugin) + metrics json. Self-referential metrics: low-band var -36.9%, centroid drift -25.6%, hf_ssim 0.9902, high-band flicker ratio 0.973, stillness guard passed. Trivial baselines (temporal EMA a=0.2 / temporal median k=5) achieve ~0% (-0.5 / -0.4) on the drift metrics and only 'stabilize' by damping motion (hf_ratio 0.84 / 0.87). Caveat: at 16x16 the hotspot band is DC-degenerate, so this run exercises the luminance axis.
+
+ASK (critical, no flattery needed): (1) Is this evidence convincing that the mechanism works, and where is it still weak? (2) What is the strongest single falsification test we have NOT run? (3) The video is candidate material for a product page — what would make the improvement self-evident to a lay viewer? (4) Any red flags in the design or metrics as described?
