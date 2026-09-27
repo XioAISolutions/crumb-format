@@ -1,0 +1,35 @@
+{
+  "config": {
+    "frames": 96,
+    "grid": 64,
+    "seed": 0,
+    "ship": {
+      "alpha": 0.95,
+      "rho": 0.995,
+      "cutoff_frac": 0.14,
+      "anchor_mode": "complex_mc",
+      "mc_strength": 0.5,
+      "mc_band": 0.03,
+      "mc_est": "corr",
+      "mc_edge": "hard"
+    },
+    "obj_velocity": 0.15,
+    "obj_sigma": 10.0
+  },
+  "retention": 54.740489605813444,
+  "distortion": 64.05140489209458,
+  "distortion_mean": 34.850627229412424,
+  "hf_ssim": 0.9911060929298401,
+  "lowband_var_raw": 67.55403900146484,
+  "lowband_var_plugin": 35.818153381347656,
+  "var_ratio": 0.5302148310520535,
+  "est_x_range": 14.280288696289062,
+  "true_x_range": 14.25,
+  "passes": {
+    "retention": false,
+    "distortion": false,
+    "hf": true,
+    "var_ratio": false
+  },
+  "all_pass": false
+}
