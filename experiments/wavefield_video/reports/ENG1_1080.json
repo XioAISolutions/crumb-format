@@ -1,0 +1,136 @@
+{
+  "config": {
+    "alpha": 0.95,
+    "rho": 0.995,
+    "cutoff_frac": 0.14,
+    "anchor_mode": "complex_mc",
+    "mc_strength": 0.5,
+    "mc_band": 0.03,
+    "phase_anchor": 0.0
+  },
+  "sanity": {
+    "drift_pct": 63.98399897815149,
+    "passes": true
+  },
+  "clips": {
+    "e_curve": {
+      "1080": {
+        "metrics": {
+          "frames": 682,
+          "W": 1080,
+          "H": 1920,
+          "low_band_var_ratio": 0.27484708018926135,
+          "low_band_var_raw": 279045.5690169561,
+          "low_band_var_cor": 76694.85988406415,
+          "centroid_stability_ratio": 0.7435947025353218,
+          "centroid_var_raw": 56311.7265625,
+          "centroid_var_cor": 41873.1015625,
+          "detail_retention_median": 0.9820308089256287,
+          "detail_retention_min": 0.0,
+          "motion_ratio": 0.6987825275882744,
+          "jitter_cor_max_over_p95": 2.9079127311706543,
+          "jitter_raw_max_over_p95": 1.6928595304489136,
+          "runtime_s": 91.9459159579128,
+          "per_frame_ms": 134.81805858931497
+        },
+        "passes": {
+          "detail": true,
+          "motion": false,
+          "jitter": false,
+          "runtime": true,
+          "all": false
+        }
+      },
+      "720": {
+        "metrics": {
+          "frames": 682,
+          "W": 720,
+          "H": 1280,
+          "low_band_var_ratio": 0.2818017520710306,
+          "low_band_var_raw": 119135.88428934889,
+          "low_band_var_cor": 33572.700927272905,
+          "centroid_stability_ratio": 0.7139616984842442,
+          "centroid_var_raw": 25826.837890625,
+          "centroid_var_cor": 18439.373046875,
+          "detail_retention_median": 0.9871974587440491,
+          "detail_retention_min": 0.0,
+          "motion_ratio": 0.7474651657875512,
+          "jitter_cor_max_over_p95": 2.9735970497131348,
+          "jitter_raw_max_over_p95": 1.6984344720840454,
+          "runtime_s": 35.55154312495142,
+          "per_frame_ms": 52.128362353301206
+        },
+        "passes": {
+          "detail": true,
+          "motion": false,
+          "jitter": false,
+          "runtime": true,
+          "all": false
+        }
+      }
+    },
+    "fib_spiral": {
+      "1080": {
+        "metrics": {
+          "frames": 641,
+          "W": 1080,
+          "H": 1920,
+          "low_band_var_ratio": 0.15911717160207942,
+          "low_band_var_raw": 529761.3131341544,
+          "low_band_var_cor": 84294.12177011177,
+          "centroid_stability_ratio": 0.6531676675170313,
+          "centroid_var_raw": 43288.703125,
+          "centroid_var_cor": 28274.78125,
+          "detail_retention_median": 0.9573764801025391,
+          "detail_retention_min": 0.0,
+          "motion_ratio": 0.5359812883881705,
+          "jitter_cor_max_over_p95": 1.2718355655670166,
+          "jitter_raw_max_over_p95": 2.0460870265960693,
+          "runtime_s": 88.53034183289856,
+          "per_frame_ms": 138.1128577736327
+        },
+        "passes": {
+          "detail": false,
+          "motion": false,
+          "jitter": true,
+          "runtime": true,
+          "all": false
+        }
+      },
+      "720": {
+        "metrics": {
+          "frames": 641,
+          "W": 720,
+          "H": 1280,
+          "low_band_var_ratio": 0.18677905955812768,
+          "low_band_var_raw": 224056.36816407417,
+          "low_band_var_cor": 41849.03773369726,
+          "centroid_stability_ratio": 0.684550371280904,
+          "centroid_var_raw": 19196.08984375,
+          "centroid_var_cor": 13140.6904296875,
+          "detail_retention_median": 0.9632198810577393,
+          "detail_retention_min": 0.0,
+          "motion_ratio": 0.6231621830230163,
+          "jitter_cor_max_over_p95": 1.3183727264404297,
+          "jitter_raw_max_over_p95": 2.0463593006134033,
+          "runtime_s": 36.79660566709936,
+          "per_frame_ms": 57.40500104071663
+        },
+        "passes": {
+          "detail": false,
+          "motion": false,
+          "jitter": true,
+          "runtime": true,
+          "all": false
+        }
+      }
+    }
+  },
+  "verdict": {
+    "status": "FAIL",
+    "failures": [
+      "e_curve:motion,jitter",
+      "fib_spiral:detail,motion"
+    ]
+  }
+}

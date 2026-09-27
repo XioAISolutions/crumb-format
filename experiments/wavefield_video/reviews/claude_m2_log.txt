@@ -1,0 +1,23 @@
+Both M2 and the owed M1b notes are done. Summary:
+
+## M2 — legitimate-motion trap (the current task)
+
+**`crumb_coherence/scripts/run_trap.py` + `IMPL_NOTES_M2.md`.** A 64×64 scene with **no injected wander** — so the scene *is* its own clean truth — containing a large soft Gaussian translating at 0.15 px/frame (σ=10, energy at r≈0.016 cyc/px, sitting *inside* the r<0.03 band `complex_mc` corrects), a slow illumination sinusoid, and 3 independently-moving balls. The frozen shipping config runs untouched; four measures check the four kill criteria (retention >95%, distortion <5%, HF >0.98, low-band var ratio ∈ [0.9,1.1]).
+
+**The honest pre-registration** (in the notes, stated before the run): I expect this trap to **FAIL** — confirming Astra's dangerous hypothesis `H_suppress`. The reasoning is mechanical: the engine's core is an EMA anchor blended in at ~0.95 near the object's frequencies, and *reducing low-band temporal variance is exactly what that anchor does* — but here that variance is legitimate motion + illumination. Measure (4) is the most robust failure indicator; retention/distortion likely fail too (the EMA is mid-transient at T=96 vs its ~200-frame time constant, so the anchor lags the object); HF-SSIM likely passes but is insufficient (it never saw the low-freq motion — that's the whole point of the trap).
+
+**If it fails**, the hypothesis that dies is the strong product claim — *"shipping complex_mc distinguishes drift from intended evolution and is a do-no-harm sidecar."* What survives is "frequency-selective low-band stabilizer, safe only when the low-band change is real drift." The consequence is concrete: `complex_mc` needs **velocity-aware gating** (don't correct a self-consistent persistent velocity) or the shipped default reverts to `magnitude` mode (leaves phase/motion free); and the DSM objective needs a motion-preservation metric beside HF-SSIM. **If it passes**, `H_suppress` is falsified and the claim genuinely strengthens.
+
+I want to be direct: I'm predicting the current shipping config likely *loses* this test. That's the valuable outcome Astra is hunting for — a cheap, decisive falsification — not a defect in the deliverable.
+
+## Also closed: `IMPL_NOTES_M1b.md`
+The M1b demo script (`m1_demo_v2.py`, three legibility artifacts) landed last round but I was interrupted before its notes — now written, with the watch order (three-panel → blink → trajectory) and a cross-reference flagging that the real-rollout centroid tightening is *not* proof of correctness until M2's trap disambiguates it.
+
+## To run (owner, gated as always)
+```
+PY=~/vibevoice-env/bin/python
+$PY crumb_coherence/scripts/run_trap.py --json crumb_coherence/out/trap.json
+$PY crumb_coherence/scripts/run_trap.py --frames 192 --seed 1   # longer-horizon robustness
+```
+Paste the results block and I'll fill the table and state the verdict. The `--frames 192` run matters: a longer horizon lets the EMA approach the object's velocity, so if retention *rises* there, that itself tells us the failure is a transient-tracking artifact rather than a fundamental one.
+EXIT-0

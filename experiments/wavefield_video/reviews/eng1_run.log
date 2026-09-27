@@ -1,0 +1,31 @@
+========================================================================================
+ENG-1  1080p real-footage gate   frozen: complex_mc band=0.03 str=0.5 alpha=0.95 rho=0.995 cut=0.14
+========================================================================================
+[sanity] synthetic drifted fixture: drift removal 64.0%  [PASS  >=60%]
+
+[e_curve] source 1080x1920 @ 30.00fps  -> /Users/slavaz/crumb-format/experiments/wavefield_video/data_real/e_curve.mp4
+  [1080p native] 1080x1920 682f  detail_med=0.9820  motion_ratio=0.699  lowband_var_ratio=0.275  centroid_stab=0.744
+           jitter cor_max/p95=2.91 (raw 1.69)  runtime=91.9s (134.8 ms/f)
+           NATIVE GATE: FAIL -> motion,jitter
+  [720p downscale] 720x1280 682f  detail_med=0.9872  motion_ratio=0.747  lowband_var_ratio=0.282  centroid_stab=0.714
+           jitter cor_max/p95=2.97 (raw 1.70)  runtime=35.6s (52.1 ms/f)
+
+[fib_spiral] source 1080x1920 @ 30.00fps  -> /Users/slavaz/crumb-format/experiments/wavefield_video/data_real/fib_spiral.mp4
+  [1080p native] 1080x1920 641f  detail_med=0.9574  motion_ratio=0.536  lowband_var_ratio=0.159  centroid_stab=0.653
+           jitter cor_max/p95=1.27 (raw 2.05)  runtime=88.5s (138.1 ms/f)
+           NATIVE GATE: FAIL -> detail,motion
+  [720p downscale] 720x1280 641f  detail_med=0.9632  motion_ratio=0.623  lowband_var_ratio=0.187  centroid_stab=0.685
+           jitter cor_max/p95=1.32 (raw 2.05)  runtime=36.8s (57.4 ms/f)
+
+----------------------------------------------------------------------------------------
+cost/quality (per clip x resolution)
+clip             res  ms/frame  runtime_s  detail_med   motion   lbvar
+e_curve        1080p     134.8       91.9      0.9820    0.699   0.275
+e_curve         720p      52.1       35.6      0.9872    0.747   0.282
+fib_spiral     1080p     138.1       88.5      0.9574    0.536   0.159
+fib_spiral      720p      57.4       36.8      0.9632    0.623   0.187
+----------------------------------------------------------------------------------------
+VERDICT: FAIL  (e_curve:motion,jitter; fib_spiral:detail,motion)
+========================================================================================
+[out] reports/ENG1_1080.json  reports/ENG1_1080.md  renders/eng1_*_sidebyside.mp4
+EXIT-0
