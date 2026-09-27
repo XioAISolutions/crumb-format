@@ -56,12 +56,14 @@ The measured core, from the primary sources:
   initialization + quaternion batch normalization; "improved convergence compared to real-valued
   and complex-valued networks, especially on the segmentation task, while having fewer parameters"
   (CIFAR-10/100, KITTI road).
-- **Lightweight NLP with quaternion networks** (Tay et al., 2019, arXiv:1906.04393): "up to **75%
-  reduction** in parameter size without significant loss in performance"; introduces Quaternion
+- **Lightweight NLP with quaternion networks** (Tay et al., 2019, arXiv:1906.04393): "up to 75%
+  reduction in parameter size without significant loss in performance" (verbatim — "lesser
+  degrees of freedom in the Hamilton product" is their stated reason); introduces Quaternion
   attention/Transformer — the 4× number usually quoted as "quaternion = 4× cheaper".
 - **QUAN** (Grant & Wang, 2025, arXiv:2509.05512): quaternion approximation via Hamilton-product
   decomposition with real-valued ops + CUDA kernels; "higher accuracy with fewer parameters and
-  faster convergence" on CIFAR/ImageNet/COCO/DOTA; rotation handling improved for detection.
+  faster convergence" than existing convolution and quaternion-based models (their wording), on
+  image-classification and oriented-object-detection benchmarks.
 - **Rotational equivariance**: the sharpest statement is REQNN (Shen et al., 2019,
   arXiv:1911.09040): "when a neural network uses quaternion features under certain conditions, the
   network feature naturally has the rotation-equivariance property" — for **3D point-cloud**
@@ -129,7 +131,8 @@ Search receipts (Appendix A): `abs:"quaternion" AND (abs:"mamba" OR abs:"selecti
 results**; `abs:"hypercomplex" AND abs:"state space"` → **2 results**, both classical time-series
 statistics (quaternion irregular autoregressive, arXiv:2609.06866; octonion AR, arXiv:2609.18794);
 no ML sequence-model work found. Meanwhile complex-diagonal states are standard in the SSM field
-(S4/S4D, HiPPO, Mamba, Liquid-S4 are all in our ENGINE_RESEARCH_SWEEP_2026 source list; our own
+(S4/S4D and Mamba appear in our ENGINE_RESEARCH_SWEEP_2026 §1.3; Liquid-S4, arXiv:2209.12951,
+is the canonical complex-diagonal-dynamics reference; our own
 `ssm_lite.py` already uses complex poles A = exp(−softplus(a) + i·a_im)). So a quaternion-state
 SSM is a *genuine open question*, not a known win. Treat it as research with a kill criterion —
 and note the prior: complex eigenvalues already give rotation in one plane; the quaternion upgrade
@@ -139,8 +142,8 @@ rotational. Nothing in our ball/occlusion data says it is; that is exactly what 
 ### 1.5 Dual numbers, dual quaternions, split-complex
 
 - **Dual numbers** are the algebraic vehicle of forward-mode AD (Baydin et al., 2015 survey,
-  arXiv:1502.05767; hyper-dual for higher order arXiv:1801.03614; dual-number reverse AD
-  arXiv:2205.11368 / arXiv:2507.12640). Forward mode is efficient when inputs ≪ outputs:
+  arXiv:1502.05767; Neuenhofen's hyper-dual review, arXiv:1801.03614; dual-number reverse AD
+  arXiv:2205.11368 / arXiv:2507.12640; arbitrary-order AD arXiv:2501.04159). Forward mode is efficient when inputs ≪ outputs:
   Jacobian-vector products, small parameter blocks — e.g., pose/geometry Jacobians.
 - **Dual quaternions** own the rigid-transform composition space in robotics: dual-quaternion
   network layers predict rigid-body dynamics (arXiv:2011.08734), hand-eye calibration/SLAM
@@ -172,10 +175,10 @@ complex transfer `G[nh, L, Hp, Wp]` (`_transfer`, dtype `torch.cfloat`), (ii) co
 poles `lam` (`_dispersion_lam`), and (iii) a complex streaming state
 `[B, n_modes, nh, Hp, Wp, dh]` (`init_state`), updated `state = lam_b * state + Bg * x_hat` and
 read out `out_hat = (Cg * state).sum(1)` (`step`). Per head/mode the kernel is a damped complex
-exponential e^(−αt)·e^(iΩt) — **one rotation plane per mode** — and the modes are mixed by learned
-gains. So when the card says "complex64 spectral params", the exact facts are: the *coordinates*
-are real, the *operators and state* are complex64, and the kernel's expressivity per mode is a
-planar (2-real-parameter) rotation.
+exponential e^(−αt)·e^(iΩt), i.e. a scalar damped *phase* per mode (one rotation plane, one angle
+field Ω(k)), and the modes are mixed by learned gains. So when the card says "complex64 spectral
+params", the exact facts are: the *coordinates* are real, the *operators and state* are
+complex64, and the kernel's temporal operator per mode is a single complex exponential.
 
 **What a quaternion upgrade would change, concretely.**
 
@@ -520,23 +523,23 @@ Quaternions — networks / layers:
 - Zhu et al., *Quaternion Convolutional Neural Networks*, arXiv:1903.00658 (2019) — color-image QCNN. [~196 cites]
 - Gaudet & Maida, *Deep Quaternion Networks*, arXiv:1712.04604 (2017) — init, batch-norm; CIFAR/KITTI. [~200 cites]
 - Trabelsi et al., *Deep Complex Networks*, arXiv:1705.09792 (2017) — complex building blocks (the immediate predecessor). [~167 cites]
-- Tay et al., *Lightweight and Efficient NLP with Quaternion Networks*, arXiv:1906.04393 (2019) — up to 75% param reduction.
-- Grant & Wang, *QUAN: Quaternion Approximation Networks*, arXiv:2509.05512 (2025) — rotation-aware classification/detection, fewer params.
+- Tay et al., *Lightweight and Efficient Neural Natural Language Processing with Quaternion Networks*, arXiv:1906.04393 (2019) — "up to 75% reduction in parameter size"; Quaternion Transformer/attention.
+- Grant & Wang, *Quaternion Approximation Networks for Enhanced Image Classification and Oriented Object Detection*, arXiv:2509.05512 (2025) — higher accuracy with fewer params (their claim).
 - Shen et al., *3D-Rotation-Equivariant Quaternion Neural Networks*, arXiv:1911.09040 (2019).
 - Mandic et al., *The HR-Calculus: Enabling Information Processing with Quaternion Algebra*, arXiv:2311.16771 (2023).
 - Pöppelbaum & Schwung, *Quaternion Backpropagation*, arXiv:2212.13082 (2022); *Quaternionic Activation Functions*, arXiv:2406.16481 (2024).
 - *Quaternion Self-Attention with Shared Scores*, arXiv:2605.24920 (2026) — component-wise attention mostly re-parameterizes.
-- Valle & Lobo, *Quaternion-Valued Recurrent Projection Neural Networks*, arXiv:1909.09227 / 2001.11846 (2019-2020); Granero et al., *QCNN for ALL diagnosis*, arXiv:2112.06685 (2021); Miao, Kou et al., *Quaternion Matrix Completion for Color Inpainting*, arXiv:2305.00416 (2023); Nguyen et al., *Quaternion Graph Neural Networks*, arXiv:2008.05089 (2020); Qiu et al., *QNN for multi-channel distant speech*, arXiv:2005.08566 (2020); survey: *Quaternion CNNs: Current Advances and Future Directions*, arXiv:2307.08663 (2023).
+- Valle & Lobo, *Quaternion-Valued Recurrent Projection Neural Networks*, arXiv:1909.09227 / 2001.11846 (2019-2020); Granero et al., *QCNN for ALL diagnosis*, arXiv:2112.06685 (2021); Miao, Kou et al., *Quaternion Matrix Completion for Color Inpainting*, arXiv:2305.00416 (2023); Nguyen et al., *Quaternion Graph Neural Networks*, arXiv:2008.05089 (2020); Qiu et al., *QNN for multi-channel distant speech*, arXiv:2005.08566 (2020); survey: Altamirano-Gómez & Gershenson, *Quaternion Convolutional Neural Networks: Current Advances and Future Directions*, arXiv:2307.08663 (2023).
 
 Quaternion color-video processing:
-- Miao et al., *Quaternion-based DMD for background modeling in color videos*, arXiv:2112.13982 — Q-DMD outperforms exact DMD.
-- *Quaternion-Based Robust PCA for Moving Target Detection and Background Recovery*, arXiv:2507.19730 — uQRPCA+ SOTA.
+- Han, Kou, Miao et al., *Quaternion-based dynamic mode decomposition for background modeling in color videos*, arXiv:2112.13982 — "Q-DMD outperforms the exact DMD method" (their wording), comparable to SOTA.
+- Wang, Wu, Fang, *Quaternion-Based Robust PCA for Efficient Moving Target Detection and Background Recovery in Color Videos*, arXiv:2507.19730 — "uQRPCA+ achieves State Of The Art (SOTA) performance on moving target detection and background recovery tasks" (verbatim).
 
 Clifford / geometric algebra:
 - Brandstetter et al., *Clifford Neural Layers for PDE Modeling*, arXiv:2209.04934 (2022) — consistently improves at similar params. [~22 cites]
 - Ruhe et al., *Clifford Group Equivariant Neural Networks*, arXiv:2305.11141 (2023).
 - Brehmer et al., *Geometric Algebra Transformer*, arXiv:2305.18415 (2023) — rotors, E(3) equivariance.
-- Zhdanov et al., *Clifford-Steerable CNNs* (implicit steerable kernels), arXiv:2212.06096 / 2402.14730; *Fast Clifford Neural Layers*, arXiv:2507.01040 (2025); Ruhe et al., *Clifford Group Equivariant Diffusion Models*, arXiv:2504.15773 (2025).
+- Zhdanov et al., *Implicit Convolutional Kernels for Steerable CNNs*, arXiv:2212.06096 (2022); *Clifford-Steerable Convolutional Neural Networks*, arXiv:2402.14730 (2024); *Fast Clifford Neural Layers*, arXiv:2507.01040 (2025); Liu et al., *Clifford Group Equivariant Diffusion Models for 3D Molecular Generation*, arXiv:2504.15773 (2025).
 
 Hypercomplex FFTs:
 - Sangwine & Ell, *Complex and Hypercomplex DFTs Based on Matrix Exponential Form of Euler's Formula*, arXiv:1001.4379 (2010).
@@ -544,15 +547,15 @@ Hypercomplex FFTs:
 - Said, Le Bihan, Sangwine, *Fast complexified quaternion Fourier transform*, math/0603578 (2006).
 - Sfikas & Retsinas, *On the Matrix Form of the QFT and Quaternion Convolution*, arXiv:2307.01836 (2023).
 - Pan & Ng, *Block Diagonalization of Quaternion Circulant Matrices*, arXiv:2302.04086 (2023).
-- Hitzer & Sangwine, *Steerable Quaternion Fourier Transformations*, arXiv:1306.2157 (2013); Kenwright, *Dual-Quaternion Fourier Transform*, arXiv:2305.02802 (2023); Grigoryan & Agaian, *Octonion Fourier Transform*, arXiv:1905.12631 (2019).
+- Hitzer & Sangwine, *The Orthogonal 2D Planes Split of Quaternions and Steerable Quaternion Fourier Transformations*, arXiv:1306.2157 (2013); Kenwright, *Dual-Quaternion Fourier Transform*, arXiv:2305.02802 (2023); Błaszczyk, *A Generalization of the Octonion Fourier Transform to 3-D Octonion-Valued Signals*, arXiv:1905.12631 (2019).
 
 SSMs (the per-byte bar, already in our sweep doc — anchor citations):
 - Gu et al.: HiPPO arXiv:2008.07669; S4 arXiv:2111.00396; S4D arXiv:2206.11893; Mamba (Gu & Dao) arXiv:2312.00752; Hasani et al., Liquid-S4 arXiv:2209.12951.
 
 Dual numbers / dual quaternions:
 - Baydin et al., *Automatic differentiation in machine learning: a survey*, arXiv:1502.05767 (2015).
-- Fike & Alonso, hyper-dual numbers, arXiv:1801.03614; *Dual Numbers for Arbitrary Order AD*, arXiv:2501.04159; dual-numbers reverse AD arXiv:2205.11368, arXiv:2507.12640.
-- *Dual Quaternion Recurrent NN for rigid-body dynamics*, arXiv:2011.08734 (2020); dual-quaternion SLAM, arXiv:2206.14406 (2022); DQ survey arXiv:2303.14765 (2023).
+- Neuenhofen, *Review of theory and implementation of hyper-dual numbers for first and second order automatic differentiation*, arXiv:1801.03614 (2018); Peñuñuri et al., *Dual Numbers for Arbitrary Order AD*, arXiv:2501.04159 (2025); dual-numbers reverse AD arXiv:2205.11368 / arXiv:2507.12640.
+- Pöppelbaum & Schwung, *Predicting Rigid Body Dynamics using Dual Quaternion Recurrent Neural Networks with Quaternion Attention*, arXiv:2011.08734 (2020); *Standard Dual Quaternion Optimization* (hand-eye calibration & SLAM), arXiv:2206.14406 (2022); *Dual Quaternion SE(3) Synchronization with Recovery Guarantees*, arXiv:2602.00324 (2026); Kenwright, *A Survey on Dual-Quaternions*, arXiv:2303.14765 (2023).
 
 Octonions:
 - Wu et al., *Deep Octonion Networks*, arXiv:1903.08478 (2019).
