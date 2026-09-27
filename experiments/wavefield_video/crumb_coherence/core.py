@@ -36,6 +36,57 @@ CUT_RHO = 0.5
 MC_ALPHA_AB = 0.5
 MC_BETA_AB = MC_ALPHA_AB * MC_ALPHA_AB / (2.0 - MC_ALPHA_AB)   # = 1/6
 
+# --------------------------------------------------------------------------- #
+# Velocity-coherence gate (M3). complex_mc measures the current low band's
+# offset p(t)=(dy,dx) from the (slow) anchor every frame; the frame-to-frame
+# change v(t)=p(t)-p(t-1) is the low-band VELOCITY (the anchor's slow drift
+# cancels in the difference). The M2 trap proved the frozen engine cannot tell a
+# translating subject from wander, because it only ever looks at displacement
+# MAGNITUDE, never at whether that displacement is DIRECTIONALLY PERSISTENT.
+#
+# The gate adds that missing signal. Two leaky integrators over the velocity —
+# one on the VECTOR, one on the SPEED —
+#   s(t)  = mu*s(t-1)  + (1-mu)*v(t)        # net velocity direction (a vector)
+#   sp(t) = mu*sp(t-1) + (1-mu)*||v(t)||    # mean speed (a scalar)
+# give a directional-persistence ratio
+#   C(t)  = ||s(t)|| / (sp(t) + eps)   in [0,1].
+# C -> 1 when every step points the same way (a pan / translation / an
+# accelerating subject — the vector and scalar EMAs agree); C -> 0 when steps
+# cancel because the structure oscillates and RETURNS (wander — what complex_mc
+# exists to kill; its net displacement stays bounded while its path length keeps
+# growing). Using EMAs (not a fixed window) keeps the memory bounded and matches
+# the anchor's own philosophy.
+#
+# Noise: v is differenced from a LIGHTLY SMOOTHED offset p_bar (EMA with decay
+# mc_gate_pos_decay, time-constant ~1-2 frames) rather than the raw estimate.
+# The ratio's numerator ||s|| is a vector mean (per-frame estimator noise
+# cancels), but the denominator sp is a mean of MAGNITUDES (noise biases it up),
+# so a slow-but-straight crawl near the sub-pixel noise floor would otherwise
+# read as incoherent. Smoothing the POSITION kills that 1-frame noise while
+# leaving wander's tens-of-frames oscillation period untouched — so a crawl reads
+# coherent (C->1) yet a fast Lissajous still reverses and reads incoherent (C->0).
+# pos_decay=0 recovers the raw per-frame velocity exactly.
+#
+# The correction is then scaled by g = 1 - smoothstep(lo, hi, C): FULL where the
+# motion is incoherent (C<=lo => g=1), an exact IDENTITY where it is coherent
+# (C>=hi => g=0). g multiplies BOTH the mc pre-shift AND the anchor-blend weight,
+# so a coherent frame is a provable pass-through (g==0 => Xlo_new == Xlo, the
+# whole low band untouched — position, magnitude and any legitimate illumination
+# all preserved). Default OFF (mc_gate=False) => byte-identical to the frozen
+# engine, so every prior invariant and the "old behaviour reachable via a flag"
+# requirement both hold.
+GATE_SPEED_FLOOR = 5e-3     # px/frame; below this there is no motion to protect
+
+
+def _smoothstep(lo: float, hi: float, x: float) -> float:
+    """Hermite smoothstep: 0 for x<=lo, 1 for x>=hi, smooth cubic in between.
+    Degenerate (hi<=lo) becomes a hard step at hi."""
+    if hi <= lo:
+        return 0.0 if x < hi else 1.0
+    t = (x - lo) / (hi - lo)
+    t = 0.0 if t < 0.0 else (1.0 if t > 1.0 else t)
+    return t * t * (3.0 - 2.0 * t)
+
 
 # --------------------------------------------------------------------------- #
 # Color space (§3.1) — decorrelate exposure (Y) from color (Cb,Cr).
@@ -435,6 +486,21 @@ class CoherenceState:
     mc_vdx: float = 0.0
     mc_conf: float = 0.0
     mc_filt_init: bool = False
+    # M3 velocity-coherence gate. gate_p{dy,dx} is the lightly-smoothed low-band
+    # offset p_bar (an EMA of the raw (dy,dx), decay mc_gate_pos_decay); its
+    # frame-to-frame increment is the denoised velocity v. Two leaky integrators
+    # over v (vector gate_s{y,x} + speed gate_sp) yield a directional-persistence
+    # ratio gate_C in [0,1]; the applied correction gate is
+    # gate_g = 1 - smoothstep(lo, hi, gate_C). All inert unless mc_gate is on
+    # (complex_mc); gate_C / gate_g are exposed purely for introspection/diag.
+    gate_pdy: float = 0.0
+    gate_pdx: float = 0.0
+    gate_sy: float = 0.0
+    gate_sx: float = 0.0
+    gate_sp: float = 0.0
+    gate_init: bool = False
+    gate_C: float = 0.0
+    gate_g: float = 1.0
 
 
 # --------------------------------------------------------------------------- #
@@ -457,7 +523,12 @@ class SpectralCoherenceEngine:
                  mc_band: float = 0.0,
                  mc_est: str = "corr",
                  mc_smooth: bool = False,
-                 mc_edge: str = "hard"):
+                 mc_edge: str = "hard",
+                 mc_gate: bool = False,
+                 mc_gate_lo: float = 0.35,
+                 mc_gate_hi: float = 0.75,
+                 mc_gate_decay: float = 0.9,
+                 mc_gate_pos_decay: float = 0.5):
         if anchor_mode not in ("magnitude", "dc_only", "complex", "complex_mc"):
             raise ValueError(f"unknown anchor_mode {anchor_mode!r}")
         if color_space not in ("ycbcr", "rgb"):
@@ -474,6 +545,14 @@ class SpectralCoherenceEngine:
             raise ValueError(f"unknown mc_est {mc_est!r}")
         if mc_edge not in ("hard", "flat_top"):
             raise ValueError(f"unknown mc_edge {mc_edge!r}")
+        if not 0.0 <= mc_gate_decay < 1.0:
+            raise ValueError(f"mc_gate_decay must be in [0,1), got {mc_gate_decay}")
+        if not 0.0 <= mc_gate_pos_decay < 1.0:
+            raise ValueError(f"mc_gate_pos_decay must be in [0,1), got "
+                             f"{mc_gate_pos_decay}")
+        if mc_gate_lo < 0.0 or mc_gate_hi < mc_gate_lo:
+            raise ValueError(f"require 0 <= mc_gate_lo <= mc_gate_hi, got "
+                             f"lo={mc_gate_lo}, hi={mc_gate_hi}")
         self.cutoff_frac = cutoff_frac
         self.sigma_k_frac = sigma_k_frac
         self.alpha = alpha
@@ -525,6 +604,18 @@ class SpectralCoherenceEngine:
         # (E3 verbatim); "flat_top" = a raised-cosine transition centered on
         # mc_band. Ignored when mc_band==0. complex_mc.
         self.mc_edge = mc_edge
+        # mc_gate (M3): the velocity-coherence GATE (see the GATE block comment).
+        # When True (complex_mc only), the per-frame correction is scaled by
+        # g=1-smoothstep(mc_gate_lo, mc_gate_hi, C), where C is the directional
+        # persistence of the low-band motion: FULL correction on incoherent
+        # wander (C<=lo), an EXACT pass-through on coherent motion (C>=hi). This
+        # is the M2-trap fix. False (default) => byte-identical to the frozen
+        # engine (g==1 always), so the pre-M3 behaviour stays reachable by a flag.
+        self.mc_gate = mc_gate
+        self.mc_gate_lo = mc_gate_lo    # C below this => full correction (g=1)
+        self.mc_gate_hi = mc_gate_hi    # C above this => identity      (g=0)
+        self.mc_gate_decay = mc_gate_decay   # mu of the velocity EMAs (memory)
+        self.mc_gate_pos_decay = mc_gate_pos_decay   # offset pre-smoother (denoise)
         self._wcache: dict = {}     # (kh,kw) -> gaussian weight
         self._pcache: dict = {}     # (kh,kw) -> flat phase weight
         self._bcache: dict = {}     # (kh,kw,H,W,edge) -> radial band mask
@@ -614,11 +705,59 @@ class SpectralCoherenceEngine:
         state.mc_conf = conf
         return pdy, pdx
 
+    def _velocity_gate(self, dy: float, dx: float, state: CoherenceState) -> float:
+        """Update the velocity-coherence integrators from the current low-band
+        offset (dy,dx) vs the anchor and return the correction gate g in [0,1].
+        See the GATE block comment at the top of the module. g=1 => full
+        correction (incoherent wander), g=0 => exact pass-through (coherent
+        motion). Also stores gate_C / gate_g on `state` for introspection.
+
+        First measured frame seeds the offset and returns g=1: a single frame
+        carries no velocity, so it cannot yet look coherent and defaults to
+        correction. Frames with negligible accumulated speed (a static scene,
+        nothing positional to protect) also return g=1 (C:=0), so magnitude/DC
+        drift on a still scene is still fully corrected."""
+        if not state.gate_init:
+            state.gate_pdy, state.gate_pdx = dy, dx     # seed smoothed offset p_bar
+            state.gate_sy = state.gate_sx = state.gate_sp = 0.0
+            state.gate_init = True
+            state.gate_C, state.gate_g = 0.0, 1.0
+            return 1.0
+        # Advance the smoothed offset p_bar; v is its increment (denoised velocity).
+        k = self.mc_gate_pos_decay
+        new_py = k * state.gate_pdy + (1.0 - k) * dy
+        new_px = k * state.gate_pdx + (1.0 - k) * dx
+        vy = new_py - state.gate_pdy
+        vx = new_px - state.gate_pdx
+        state.gate_pdy, state.gate_pdx = new_py, new_px
+        mu = self.mc_gate_decay
+        state.gate_sy = mu * state.gate_sy + (1.0 - mu) * vy
+        state.gate_sx = mu * state.gate_sx + (1.0 - mu) * vx
+        speed = (vy * vy + vx * vx) ** 0.5
+        state.gate_sp = mu * state.gate_sp + (1.0 - mu) * speed
+        if state.gate_sp <= GATE_SPEED_FLOOR:
+            state.gate_C, state.gate_g = 0.0, 1.0
+            return 1.0
+        net = (state.gate_sy * state.gate_sy + state.gate_sx * state.gate_sx) ** 0.5
+        C = net / (state.gate_sp + EPS)
+        C = 0.0 if C < 0.0 else (1.0 if C > 1.0 else C)
+        g = 1.0 - _smoothstep(self.mc_gate_lo, self.mc_gate_hi, C)
+        state.gate_C, state.gate_g = C, g
+        return g
+
     def _reset_mc_filter(self, state: CoherenceState) -> None:
         state.mc_pdy = state.mc_pdx = 0.0
         state.mc_vdy = state.mc_vdx = 0.0
         state.mc_conf = 0.0
         state.mc_filt_init = False
+        # M3: a scene cut invalidates the velocity history too — drop the gate's
+        # integrators so the new scene starts from correction (g=1) and re-learns
+        # its coherence from scratch (never carries the old scene's verdict over).
+        state.gate_pdy = state.gate_pdx = 0.0
+        state.gate_sy = state.gate_sx = state.gate_sp = 0.0
+        state.gate_init = False
+        state.gate_C = 0.0
+        state.gate_g = 1.0
 
     # -- public interface -------------------------------------------------- #
     def init_state(self, H: int, W: int, device="cpu") -> CoherenceState:
@@ -701,6 +840,7 @@ class SpectralCoherenceEngine:
         # the detail-carrying band edge the SSIM high-pass overlaps is left exact,
         # and snaps sub-deadband shifts to an exact no-op (zero-shift identity).
         src = Xlo
+        gate_g = 1.0
         if (self.anchor_mode == "complex_mc" and self.mc_strength > 0.0
                 and state.n_seen > 1):
             if self.mc_est == "phase_plane":
@@ -714,12 +854,27 @@ class SpectralCoherenceEngine:
             if self.mc_smooth:
                 conf = self._mc_confidence(Xlo, state.anchor)
                 dy, dx = self._smooth_shift(dy, dx, conf, state)
-            sdy, sdx = -self.mc_strength * dy, -self.mc_strength * dx
+            # M3 velocity-coherence gate: scale the correction toward an exact
+            # identity where the low-band motion is directionally coherent (a
+            # pan / translation / accelerating subject), leaving it full where it
+            # is incoherent wander (what complex_mc exists to remove). g gates
+            # BOTH the pre-shift AND the anchor-blend weight below, so a coherent
+            # frame is a provable pass-through. Off (default) => g stays 1.0 and
+            # every downstream value is byte-identical to the frozen engine.
+            if self.mc_gate:
+                gate_g = self._velocity_gate(dy, dx, state)
+            sdy = -self.mc_strength * gate_g * dy
+            sdx = -self.mc_strength * gate_g * dx
             if max(abs(sdy), abs(sdx)) >= self.mc_deadband:
                 taper = self._mc_taper_weight(kh, kw, state.H, state.W, device)
                 src = apply_lowband_shift(Xlo, sdy, sdx, state.H, state.W,
                                           taper=taper)
-        Xlo_new = (1.0 - aw) * src + aw * target
+        # g scales the blend too: at g=0 (coherent) aw_eff=0 => Xlo_new==src==Xlo,
+        # the whole low band untouched (position, magnitude AND any legitimate
+        # illumination all preserved). g==1.0 when the gate is off => bitwise the
+        # frozen blend (x*1.0 is exact for finite float32).
+        aw_eff = aw * gate_g
+        Xlo_new = (1.0 - aw_eff) * src + aw_eff * target
 
         X_new = put_low_band(X, Xlo_new)
         xc_out = torch.fft.irfft2(X_new, s=(state.H, state.W))

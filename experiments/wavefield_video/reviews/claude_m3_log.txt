@@ -1,0 +1,389 @@
+PY=/Users/slavaz/vibevoice-env/bin/python
+Python 3.14.7
+
+############ 0. GATE SEPARATION — coherence C: legit(want HIGH) vs wander(want LOW)
+   pick hi BELOW the translate C and ABOVE the settled wander C; lo a bit under that.
+==== velocity-EMA decay=0.80  (pos-smoother fixed at 0.5) ====
+-- translate (coherent: settled C should be HIGH, g->0) --
+  gate diagnostic (per-frame coherence C, applied gate g):
+    C(t): mean 0.946  min 0.399  max 1.000
+    g(t): mean 0.023  min 0.000  max 0.958   (g->0 = correction OFF, motion preserved; g->1 = full correction)
+    t   :    0    8   16   24   32   40   48   56   64   72   80   88
+    C   : 0.00 0.40 0.79 0.93 0.98 0.99 1.00 1.00 1.00 1.00 0.99 1.00
+    g   : 1.00 0.96 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00
+====================================================================================
+-- wander (incoherent: settled C should be LOW, g->1) --
+  gate diagnostic (per-frame coherence C, applied gate g):
+    C(t): mean 0.944  min 0.452  max 1.000
+    g(t): mean 0.023  min 0.000  max 0.837   (g->0 = correction OFF, motion preserved; g->1 = full correction)
+    t   :    0    8   16   24   32   40   48   56   64   72   80   88
+    C   : 0.00 0.92 0.77 0.92 0.98 0.99 1.00 0.99 1.00 0.99 1.00 1.00
+    g   : 1.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00
+====================================================================================
+==== velocity-EMA decay=0.90  (pos-smoother fixed at 0.5) ====
+-- translate (coherent: settled C should be HIGH, g->0) --
+  gate diagnostic (per-frame coherence C, applied gate g):
+    C(t): mean 0.910  min 0.383  max 1.000
+    g(t): mean 0.040  min 0.000  max 0.981   (g->0 = correction OFF, motion preserved; g->1 = full correction)
+    t   :    0    8   16   24   32   40   48   56   64   72   80   88
+    C   : 0.00 0.38 0.70 0.83 0.92 0.96 0.98 0.99 0.99 0.99 0.99 1.00
+    g   : 1.00 0.98 0.04 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00
+====================================================================================
+-- wander (incoherent: settled C should be LOW, g->1) --
+  gate diagnostic (per-frame coherence C, applied gate g):
+    C(t): mean 0.908  min 0.410  max 1.000
+    g(t): mean 0.040  min 0.000  max 0.940   (g->0 = correction OFF, motion preserved; g->1 = full correction)
+    t   :    0    8   16   24   32   40   48   56   64   72   80   88
+    C   : 0.00 0.93 0.69 0.82 0.91 0.95 0.98 0.99 0.99 0.99 0.99 1.00
+    g   : 1.00 0.00 0.06 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00
+====================================================================================
+==== velocity-EMA decay=0.95  (pos-smoother fixed at 0.5) ====
+-- translate (coherent: settled C should be HIGH, g->0) --
+  gate diagnostic (per-frame coherence C, applied gate g):
+    C(t): mean 0.868  min 0.394  max 1.000
+    g(t): mean 0.056  min 0.000  max 0.966   (g->0 = correction OFF, motion preserved; g->1 = full correction)
+    t   :    0    8   16   24   32   40   48   56   64   72   80   88
+    C   : 0.00 0.40 0.65 0.77 0.85 0.90 0.93 0.95 0.97 0.98 0.98 0.99
+    g   : 1.00 0.96 0.15 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00
+====================================================================================
+-- wander (incoherent: settled C should be LOW, g->1) --
+  gate diagnostic (per-frame coherence C, applied gate g):
+    C(t): mean 0.866  min 0.386  max 1.000
+    g(t): mean 0.054  min 0.000  max 0.977   (g->0 = correction OFF, motion preserved; g->1 = full correction)
+    t   :    0    8   16   24   32   40   48   56   64   72   80   88
+    C   : 0.00 0.94 0.65 0.76 0.84 0.89 0.92 0.95 0.96 0.97 0.98 0.98
+    g   : 1.00 0.00 0.15 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00
+====================================================================================
+==== velocity-EMA decay=0.97  (pos-smoother fixed at 0.5) ====
+-- translate (coherent: settled C should be HIGH, g->0) --
+  gate diagnostic (per-frame coherence C, applied gate g):
+    C(t): mean 0.836  min 0.380  max 1.000
+    g(t): mean 0.074  min 0.000  max 0.984   (g->0 = correction OFF, motion preserved; g->1 = full correction)
+    t   :    0    8   16   24   32   40   48   56   64   72   80   88
+    C   : 0.00 0.40 0.63 0.74 0.82 0.86 0.90 0.92 0.94 0.95 0.96 0.97
+    g   : 1.00 0.95 0.20 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00
+====================================================================================
+-- wander (incoherent: settled C should be LOW, g->1) --
+  gate diagnostic (per-frame coherence C, applied gate g):
+    C(t): mean 0.835  min 0.378  max 1.000
+    g(t): mean 0.070  min 0.000  max 0.986   (g->0 = correction OFF, motion preserved; g->1 = full correction)
+    t   :    0    8   16   24   32   40   48   56   64   72   80   88
+    C   : 0.00 0.94 0.63 0.74 0.81 0.85 0.89 0.92 0.93 0.94 0.96 0.96
+    g   : 1.00 0.00 0.20 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00
+====================================================================================
+
+############ 1. TRAP — LEGACY (pre-M3, no gate): should still FAIL (record)
+====================================================================================
+TRAP  scene=translate  LEGACY (no gate)   grid=64x64  frames=96  seed=0
+  object: legit low-band path (sigma=10.0) + illum sinusoid + 3 balls;  NO injected wander
+  config: complex_mc band=0.03 strength=0.5 corr hard  alpha=0.95 rho=0.995 cutoff=0.14
+====================================================================================
+  estimator validity: clean centroid x-range 14.28px vs true object x-range 14.25px  (should be close)
+------------------------------------------------------------------------------------
+  (1) centroid-motion retention :   54.7%   (clean path 14.32px, plugin 7.84px)   [FAIL  >95%]
+  (2) trajectory distortion     :  64.05%   (mean 34.85%; max dev 9.152px / range 14.29px)   [FAIL  <5%]
+  (3) HF-SSIM vs clean          : 0.9911   [PASS  >0.98]
+  (4) low-band var ratio p/raw  :  0.530   (raw 6.7554e+01 -> plugin 3.5818e+01)   [FAIL  in [0.90,1.10]]
+------------------------------------------------------------------------------------
+  VERDICT: FAIL
+====================================================================================
+====================================================================================
+TRAP  scene=translate  LEGACY (no gate)   grid=64x64  frames=192  seed=0
+  object: legit low-band path (sigma=10.0) + illum sinusoid + 3 balls;  NO injected wander
+  config: complex_mc band=0.03 strength=0.5 corr hard  alpha=0.95 rho=0.995 cutoff=0.14
+====================================================================================
+  estimator validity: clean centroid x-range 26.54px vs true object x-range 28.65px  (should be close)
+------------------------------------------------------------------------------------
+  (1) centroid-motion retention :   70.8%   (clean path 27.05px, plugin 19.16px)   [FAIL  >95%]
+  (2) trajectory distortion     :  58.88%   (mean 33.94%; max dev 15.642px / range 26.57px)   [FAIL  <5%]
+  (3) HF-SSIM vs clean          : 0.9849   [PASS  >0.98]
+  (4) low-band var ratio p/raw  :  0.546   (raw 1.1229e+02 -> plugin 6.1309e+01)   [FAIL  in [0.90,1.10]]
+------------------------------------------------------------------------------------
+  VERDICT: FAIL
+====================================================================================
+
+############ 2. TRAP — M3 GATED, translate, BOTH horizons (acceptance 1)
+====================================================================================
+TRAP  scene=translate  M3 gated   grid=64x64  frames=96  seed=0
+  object: legit low-band path (sigma=10.0) + illum sinusoid + 3 balls;  NO injected wander
+  config: complex_mc band=0.03 strength=0.5 corr hard  alpha=0.95 rho=0.995 cutoff=0.14
+          gate ON  lo=0.35 hi=0.75 decay=0.9
+====================================================================================
+  estimator validity: clean centroid x-range 14.28px vs true object x-range 14.25px  (should be close)
+------------------------------------------------------------------------------------
+  (1) centroid-motion retention :  118.6%   (clean path 14.32px, plugin 16.98px)   [PASS  >95%]
+  (2) trajectory distortion     :   6.33%   (mean 0.30%; max dev 0.905px / range 14.29px)   [FAIL  <5%]
+  (3) HF-SSIM vs clean          : 1.0000   [PASS  >0.98]
+  (4) low-band var ratio p/raw  :  0.987   (raw 6.7554e+01 -> plugin 6.6667e+01)   [PASS  in [0.90,1.10]]
+------------------------------------------------------------------------------------
+  VERDICT: FAIL
+====================================================================================
+  gate diagnostic (per-frame coherence C, applied gate g):
+    C(t): mean 0.910  min 0.383  max 1.000
+    g(t): mean 0.040  min 0.000  max 0.981   (g->0 = correction OFF, motion preserved; g->1 = full correction)
+    t   :    0    8   16   24   32   40   48   56   64   72   80   88
+    C   : 0.00 0.38 0.70 0.83 0.92 0.96 0.98 0.99 0.99 0.99 0.99 1.00
+    g   : 1.00 0.98 0.04 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00
+====================================================================================
+[json] wrote crumb_coherence/out/trap_translate_96.json
+====================================================================================
+TRAP  scene=translate  M3 gated   grid=64x64  frames=192  seed=0
+  object: legit low-band path (sigma=10.0) + illum sinusoid + 3 balls;  NO injected wander
+  config: complex_mc band=0.03 strength=0.5 corr hard  alpha=0.95 rho=0.995 cutoff=0.14
+          gate ON  lo=0.35 hi=0.75 decay=0.9
+====================================================================================
+  estimator validity: clean centroid x-range 26.54px vs true object x-range 28.65px  (should be close)
+------------------------------------------------------------------------------------
+  (1) centroid-motion retention :  306.9%   (clean path 27.05px, plugin 83.04px)   [PASS  >95%]
+  (2) trajectory distortion     :  57.62%   (mean 8.17%; max dev 15.308px / range 26.57px)   [FAIL  <5%]
+  (3) HF-SSIM vs clean          : 0.9967   [PASS  >0.98]
+  (4) low-band var ratio p/raw  :  1.238   (raw 1.1229e+02 -> plugin 1.3901e+02)   [FAIL  in [0.90,1.10]]
+------------------------------------------------------------------------------------
+  VERDICT: FAIL
+====================================================================================
+  gate diagnostic (per-frame coherence C, applied gate g):
+    C(t): mean 0.752  min 0.091  max 1.000
+    g(t): mean 0.213  min 0.000  max 1.000   (g->0 = correction OFF, motion preserved; g->1 = full correction)
+    t   :    0   16   32   48   64   80   96  112  128  144  160  176
+    C   : 0.00 0.60 0.88 0.97 0.99 0.99 0.90 0.44 0.55 0.94 0.75 0.59
+    g   : 1.00 0.31 0.00 0.00 0.00 0.00 0.00 0.87 0.49 0.00 0.00 0.37
+====================================================================================
+[json] wrote crumb_coherence/out/trap_translate_192.json
+
+############ 3. TRAP — M3 GATED, accelerate, BOTH horizons (acceptance 2)
+====================================================================================
+TRAP  scene=accelerate  M3 gated   grid=64x64  frames=96  seed=0
+  object: legit low-band path (sigma=10.0) + illum sinusoid + 3 balls;  NO injected wander
+  config: complex_mc band=0.03 strength=0.5 corr hard  alpha=0.95 rho=0.995 cutoff=0.14
+          gate ON  lo=0.35 hi=0.75 decay=0.9
+====================================================================================
+  estimator validity: clean centroid x-range 23.94px vs true object x-range 25.60px  (should be close)
+------------------------------------------------------------------------------------
+  (1) centroid-motion retention :  103.3%   (clean path 24.00px, plugin 24.79px)   [PASS  >95%]
+  (2) trajectory distortion     :   2.13%   (mean 0.15%; max dev 0.510px / range 23.94px)   [PASS  <5%]
+  (3) HF-SSIM vs clean          : 1.0000   [PASS  >0.98]
+  (4) low-band var ratio p/raw  :  0.972   (raw 6.7070e+01 -> plugin 6.5205e+01)   [PASS  in [0.90,1.10]]
+------------------------------------------------------------------------------------
+  VERDICT: PASS — plugin leaves legitimate motion alone
+====================================================================================
+  gate diagnostic (per-frame coherence C, applied gate g):
+    C(t): mean 0.890  min 0.303  max 1.000
+    g(t): mean 0.057  min 0.000  max 1.000   (g->0 = correction OFF, motion preserved; g->1 = full correction)
+    t   :    0    8   16   24   32   40   48   56   64   72   80   88
+    C   : 0.00 0.37 0.60 0.76 0.87 0.94 0.97 0.98 0.99 0.99 0.99 1.00
+    g   : 1.00 0.99 0.33 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00
+====================================================================================
+[json] wrote crumb_coherence/out/trap_accel_96.json
+====================================================================================
+TRAP  scene=accelerate  M3 gated   grid=64x64  frames=192  seed=0
+  object: legit low-band path (sigma=10.0) + illum sinusoid + 3 balls;  NO injected wander
+  config: complex_mc band=0.03 strength=0.5 corr hard  alpha=0.95 rho=0.995 cutoff=0.14
+          gate ON  lo=0.35 hi=0.75 decay=0.9
+====================================================================================
+  estimator validity: clean centroid x-range 23.27px vs true object x-range 25.60px  (should be close)
+------------------------------------------------------------------------------------
+  (1) centroid-motion retention :  265.8%   (clean path 23.77px, plugin 63.19px)   [PASS  >95%]
+  (2) trajectory distortion     :  71.64%   (mean 7.15%; max dev 16.694px / range 23.30px)   [FAIL  <5%]
+  (3) HF-SSIM vs clean          : 0.9976   [PASS  >0.98]
+  (4) low-band var ratio p/raw  :  1.118   (raw 1.0490e+02 -> plugin 1.1729e+02)   [FAIL  in [0.90,1.10]]
+------------------------------------------------------------------------------------
+  VERDICT: FAIL
+====================================================================================
+  gate diagnostic (per-frame coherence C, applied gate g):
+    C(t): mean 0.760  min 0.120  max 1.000
+    g(t): mean 0.206  min 0.000  max 1.000   (g->0 = correction OFF, motion preserved; g->1 = full correction)
+    t   :    0   16   32   48   64   80   96  112  128  144  160  176
+    C   : 0.00 0.60 0.87 0.97 0.99 0.99 0.91 0.47 0.52 0.94 0.67 0.63
+    g   : 1.00 0.32 0.00 0.00 0.00 0.00 0.00 0.78 0.62 0.00 0.11 0.22
+====================================================================================
+[json] wrote crumb_coherence/out/trap_accel_192.json
+
+############ 4. TRAP — M3 GATED, curve (STRESS, reported — turning-arc limit)
+====================================================================================
+TRAP  scene=curve  M3 gated   grid=64x64  frames=96  seed=0
+  object: legit low-band path (sigma=10.0) + illum sinusoid + 3 balls;  NO injected wander
+  config: complex_mc band=0.03 strength=0.5 corr hard  alpha=0.95 rho=0.995 cutoff=0.14
+          gate ON  lo=0.35 hi=0.75 decay=0.9
+====================================================================================
+  estimator validity: clean centroid x-range 23.88px vs true object x-range 25.60px  (should be close)
+------------------------------------------------------------------------------------
+  (1) centroid-motion retention :  119.4%   (clean path 26.75px, plugin 31.94px)   [PASS  >95%]
+  (2) trajectory distortion     :   7.83%   (mean 0.25%; max dev 2.037px / range 26.01px)   [FAIL  <5%]
+  (3) HF-SSIM vs clean          : 0.9999   [PASS  >0.98]
+  (4) low-band var ratio p/raw  :  0.984   (raw 6.7638e+01 -> plugin 6.6578e+01)   [PASS  in [0.90,1.10]]
+------------------------------------------------------------------------------------
+  VERDICT: FAIL
+====================================================================================
+  gate diagnostic (per-frame coherence C, applied gate g):
+    C(t): mean 0.917  min 0.378  max 0.999
+    g(t): mean 0.032  min 0.000  max 0.986   (g->0 = correction OFF, motion preserved; g->1 = full correction)
+    t   :    0    8   16   24   32   40   48   56   64   72   80   88
+    C   : 0.00 0.99 0.69 0.83 0.92 0.96 0.98 0.99 0.99 0.99 1.00 1.00
+    g   : 1.00 0.00 0.06 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00 0.00
+====================================================================================
+[json] wrote crumb_coherence/out/trap_curve_96.json
+
+############ 5. REGRESSION — M0 hotspot: gated (SHIP) then ungated (removal>=60%)
+==================================================================================
+M0 drift test  scenario=hotspot  grid=64x64  frames=48  seed=1234  balls=3
+  alpha=0.95  rho=0.995  cutoff_frac=0.14  phase_anchor=0.0  mc_strength=0.5  mc_taper=True  mc_gate=True  (hotspot overrides)
+==================================================================================
+injected drift  : lowband_pos_var=44.051px^2  (bump wanders)  |ΔE|drifted=0.018  flicker=2.53e-04
+clean control   : lowband_pos_var=63.294px^2  (noise floor: ball motion leaks a little low-band energy)
+  NOTE: hotspot is mean-preserving, so ΔE is ~0 by construction — it is a
+        BOUNDED-ARTIFACT check (corrected |ΔE| must stay small), NOT the drift axis.
+----------------------------------------------------------------------------------
+engine                 drift%(pos)  |ΔE|corr   hf_ref   hf_chg  motion%  segs    state  verdict
+----------------------------------------------------------------------------------
+stats-EMA baseline           -0.5%     0.008   0.9942   0.9999  99.8%   141      24B  fail [.SME]
+spectral dc_only              0.3%     0.012   0.9941   1.0000  99.8%   141      24B  fail [.SME]
+spectral magnitude          -18.0%     0.124   0.9943   0.9994  99.7%   141    1944B  fail [.SME]
+spectral complex             50.2%     0.121   0.9946   0.9957  99.7%   141    1944B  fail [.SME]
+spectral complex_mc          -0.2%     0.018   0.9941   1.0000  99.8%   141    1944B  fail [.SME]
+----------------------------------------------------------------------------------
+flags: D=drift(pos)>=60%  S=hf_ssim(vs CLEAN ref)>=0.98  M=motion within 5%  E=|ΔE| bounded  (hf_chg = vs input, diagnostic only)
+----------------------------------------------------------------------------------
+complex_mc mc_strength sweep (drift bar >=60%, motion >=97, ssim >=0.98)  mc_taper=True:
+mc_strength    drift%(pos)  |ΔE|corr  hf_ssim  motion%  segs  verdict
+0.000                50.2%     0.121   0.9957  99.7%   141  fail
+0.500                41.6%     0.139   0.9932  99.1%   141  fail
+0.850                34.7%     0.176   0.9893  99.0%   141  fail
+1.000                31.7%     0.193   0.9875  99.0%   141  fail
+state bytes @512x512 (spec headline):
+    stats-EMA baseline          24 B
+    spectral dc_only            24 B
+    spectral magnitude      124416 B
+    spectral complex        124416 B
+    spectral complex_mc     124416 B
+==================================================================================
+Reading: the hotspot WANDERS -> its drift is low-band *phase*. 'magnitude'
+         keeps phase free (by design) so it barely moves drift%(pos) but keeps
+         motion. 'complex' anchors phase -> removes the wander; watch motion% for
+         whether it also freezes ball motion (the §3.2 cost of phase-anchoring).
+         stats-EMA is blind (mean-preserving bump). The negative %-ΔE artifact
+         is gone: |ΔE|corr is reported absolute and bounded.
+==================================================================================
+M0 drift test  scenario=hotspot  grid=64x64  frames=48  seed=1234  balls=3
+  alpha=0.95  rho=0.995  cutoff_frac=0.14  phase_anchor=0.0  mc_strength=0.5  mc_taper=True  mc_gate=False  (hotspot overrides)
+==================================================================================
+injected drift  : lowband_pos_var=44.051px^2  (bump wanders)  |ΔE|drifted=0.018  flicker=2.53e-04
+clean control   : lowband_pos_var=63.294px^2  (noise floor: ball motion leaks a little low-band energy)
+  NOTE: hotspot is mean-preserving, so ΔE is ~0 by construction — it is a
+        BOUNDED-ARTIFACT check (corrected |ΔE| must stay small), NOT the drift axis.
+----------------------------------------------------------------------------------
+engine                 drift%(pos)  |ΔE|corr   hf_ref   hf_chg  motion%  segs    state  verdict
+----------------------------------------------------------------------------------
+stats-EMA baseline           -0.5%     0.008   0.9942   0.9999  99.8%   141      24B  fail [.SME]
+spectral dc_only              0.3%     0.012   0.9941   1.0000  99.8%   141      24B  fail [.SME]
+spectral magnitude          -18.0%     0.124   0.9943   0.9994  99.7%   141    1944B  fail [.SME]
+spectral complex             50.2%     0.121   0.9946   0.9957  99.7%   141    1944B  fail [.SME]
+spectral complex_mc          64.0%     0.119   0.9946   0.9955  99.7%   141    1944B  PASS [DSME]
+----------------------------------------------------------------------------------
+flags: D=drift(pos)>=60%  S=hf_ssim(vs CLEAN ref)>=0.98  M=motion within 5%  E=|ΔE| bounded  (hf_chg = vs input, diagnostic only)
+----------------------------------------------------------------------------------
+complex_mc mc_strength sweep (drift bar >=60%, motion >=97, ssim >=0.98)  mc_taper=True:
+mc_strength    drift%(pos)  |ΔE|corr  hf_ssim  motion%  segs  verdict
+0.000                50.2%     0.121   0.9957  99.7%   141  fail
+0.500                41.6%     0.139   0.9932  99.1%   141  fail
+0.850                34.7%     0.176   0.9893  99.0%   141  fail
+1.000                31.7%     0.193   0.9875  99.0%   141  fail
+state bytes @512x512 (spec headline):
+    stats-EMA baseline          24 B
+    spectral dc_only            24 B
+    spectral magnitude      124416 B
+    spectral complex        124416 B
+    spectral complex_mc     124416 B
+==================================================================================
+Reading: the hotspot WANDERS -> its drift is low-band *phase*. 'magnitude'
+         keeps phase free (by design) so it barely moves drift%(pos) but keeps
+         motion. 'complex' anchors phase -> removes the wander; watch motion% for
+         whether it also freezes ball motion (the §3.2 cost of phase-anchoring).
+         stats-EMA is blind (mean-preserving bump). The negative %-ΔE artifact
+         is gone: |ΔE|corr is reported absolute and bounded.
+
+############ 6. REGRESSION — M0 gain_field (magnitude default; gate not involved)
+==================================================================================
+M0 drift test  scenario=gain_field  grid=64x64  frames=48  seed=1234  balls=3
+  alpha=0.9  rho=0.995  cutoff_frac=0.1
+==================================================================================
+injected drift  : lowband_mag_var=2.8749e+02  meanΔE=2.267  flicker=2.98e-04
+clean control   : lowband_mag_var=7.9477e+00  (noise floor; drift adds on top)
+----------------------------------------------------------------------------------
+engine                 drift%(var)  drift%(ΔE)  hf_ssim  motion%  segs    state  verdict
+----------------------------------------------------------------------------------
+stats-EMA baseline           89.5%       87.4%   0.9995 101.0%   141      24B  PASS [DSM]
+spectral dc_only             88.3%       87.4%   1.0000 101.0%   141      24B  PASS [DSM]
+spectral magnitude           91.7%       87.0%   0.9998 100.6%   141     864B  PASS [DSM]
+spectral complex             89.8%       86.8%   0.9987 100.0%   141     864B  PASS [DSM]
+----------------------------------------------------------------------------------
+flags: D=drift(var)>=60%  S=ssim>=0.98  M=tracker motion within 5%
+state bytes @512x512 (spec headline):
+    stats-EMA baseline          24 B
+    spectral dc_only            24 B
+    spectral magnitude       62424 B
+    spectral complex         62424 B
+==================================================================================
+Reading: 'magnitude' should clear D+S+M (magnitude drift is exactly what it
+         anchors). 'complex' may also remove drift but can drop motion% (it
+         freezes low-band phase). dc_only/stats miss the spatial color field.
+
+############ 7. UNIT TESTS — core invariants incl. the gate
+  ok  test_alpha0_byte_identical_spectral
+  ok  test_alpha0_byte_identical_stats
+  ok  test_apply_lowband_shift_is_exact_and_magnitude_preserving
+  ok  test_apply_lowband_shift_taper_is_unit_modulus_and_grades
+  ok  test_complex_mc_zero_shift_is_complex_identity
+  ok  test_cut_guard_hard_reset
+  ok  test_estimate_lowband_shift_recovers_known_shift
+Traceback (most recent call last):
+  File "/Users/slavaz/crumb-format/experiments/wavefield_video/crumb_coherence/tests/test_core.py", line 693, in <module>
+    _run_all()
+    ~~~~~~~~^^
+  File "/Users/slavaz/crumb-format/experiments/wavefield_video/crumb_coherence/tests/test_core.py", line 687, in _run_all
+    fn()
+    ~~^^
+  File "/Users/slavaz/crumb-format/experiments/wavefield_video/crumb_coherence/tests/test_core.py", line 643, in test_gate_preserves_coherent_translation
+    assert su.gate_g < 0.5, f"gate did not open on coherent motion (g={su.gate_g})"
+           ^^^^^^^^^^^^^^^
+AssertionError: gate did not open on coherent motion (g=0.7601011471248479)
+
+############ 8. M1 integration (self-referential; low-band drop + detail)
+====================================================================================
+M1  integration — crumb_coherence on a REAL wave-model rollout
+  source: demo_out/seed_170001_wave/prediction  frames=64  native grid=16x16  (display PNG 128px)
+  NO clean reference exists for model output -> all numbers are
+  SELF-REFERENTIAL (raw rollout vs plugin, or the clip's own stats).
+====================================================================================
+
+[A] luminance/energy axis  anchor_mode=magnitude  cutoff=0.1  alpha=0.9  rho=0.995
+    low-band mag var : 2.7106e+01 -> 3.8136e+00  (+85.9% )
+    centroid var(px2): 26.5579 -> 11.7541  (+55.7% )
+    low-band flicker : 3.2977e-05 -> 3.0434e-05  (+7.7% )
+    high-band flicker: 8.5249e-05 -> 8.5010e-05  (ratio 0.997; ~1 = motion kept)
+    detail hf_ssim(raw,plugin): 0.9879  (~1 = detail preserved)
+    stillness guard  : plugin flicker 1.1726e-04 vs raw 1.2039e-04  (must be >> 0)
+
+[B] recommended hotspot cfg  anchor_mode=complex_mc  mc_band=0.03  strength=0.5  corr  hard  cutoff=0.14  alpha=0.95
+    band diagnosis: low-band box 2x2; cells with r<0.03 = 1 (fundamental 1/16=0.0625 cyc/px). DEGENERATE (DC-only) -> complex_mc == complex at this grid.
+    low-band mag var : 2.7106e+01 -> 3.4187e+00  (+87.4% )
+    centroid var(px2): 26.5579 -> 11.1869  (+57.9% )
+    low-band flicker : 3.2977e-05 -> 2.5002e-05  (+24.2% )
+    high-band flicker: 8.5249e-05 -> 8.3354e-05  (ratio 0.978; ~1 = motion kept)
+    detail hf_ssim(raw,plugin): 0.9868  (~1 = detail preserved)
+    stillness guard  : plugin flicker 1.1027e-04 vs raw 1.2039e-04  (must be >> 0)
+
+[artifact] wrote renders/m1_before_after.mp4  (left=raw, right=plugin[magnitude]; labels baked via PIL, ffmpeg drawtext N/A)
+[artifact] wrote 6 pairs under renders/m1_pairs/
+[artifact] ffmpeg: ffmpeg -y -f rawvideo -pix_fmt rgb24 -s 516x256 -r 12 -i - -an -c:v libx264 -pix_fmt yuv420p -crf 18 /Users/slavaz/crumb-format/experiments/wavefield_video/renders/m1_before_after.mp4
+
+Falsifies 'the plugin helps' if, on this real rollout:
+  - low-band drift energy / centroid var / low-band flicker do NOT drop
+    (plugin does not stabilize the low band), OR
+  - detail hf_ssim(raw,plugin) collapses (< ~0.95: detail damaged), OR
+  - high-band flicker ratio -> 0 or plugin flicker -> 0 (plugin froze
+    the scene into stillness — the anti-collapse guard).
+
+[json] wrote renders/m1_metrics.json
+====================================================================================
+
+############ DONE. JSONs in crumb_coherence/out/ ; interpret against the acceptance bars above.

@@ -16,7 +16,7 @@ from crumb_coherence import (          # noqa: E402
     phase_band_weight, estimate_lowband_shift, apply_lowband_shift,
     radial_band_mask, estimate_lowband_shift_phaseplane,
 )
-from crumb_coherence.core import _box_freqs   # noqa: E402
+from crumb_coherence.core import _box_freqs, _smoothstep   # noqa: E402
 
 torch.manual_seed(0)
 
@@ -541,6 +541,144 @@ def test_phaseplane_recovers_known_shift():
     # empty anchor -> no shift (cold-start guard).
     assert estimate_lowband_shift_phaseplane(
         x_lo, torch.zeros_like(a_lo), H, W) == (0.0, 0.0)
+
+
+# --- invariant (M3): the velocity-coherence gate. ------------------------- #
+def test_smoothstep_bounds_and_monotone():
+    # 0 below lo, 1 above hi, monotone non-decreasing in between, all in [0,1].
+    assert _smoothstep(0.3, 0.7, 0.2) == 0.0
+    assert _smoothstep(0.3, 0.7, 0.8) == 1.0
+    assert _smoothstep(0.3, 0.7, 0.5) == 0.5           # symmetric midpoint
+    prev = -1.0
+    for i in range(21):
+        x = i / 20.0
+        v = _smoothstep(0.3, 0.7, x)
+        assert 0.0 <= v <= 1.0
+        assert v >= prev - 1e-9, "smoothstep not monotone"
+        prev = v
+    # degenerate hi<=lo is a hard step at hi
+    assert _smoothstep(0.5, 0.5, 0.49) == 0.0
+    assert _smoothstep(0.5, 0.5, 0.5) == 1.0
+
+
+def test_mc_gate_default_is_noop_and_only_complex_mc():
+    # mc_gate defaults False => byte-identical to explicitly passing False in
+    # every mode; and a True gate never leaks into a non-complex_mc mode.
+    x = _clip(T=10)
+    for mode in ("magnitude", "dc_only", "complex", "complex_mc"):
+        kw = {"mc_strength": 0.8} if mode == "complex_mc" else {}
+        base = SpectralCoherenceEngine(alpha=0.9, anchor_mode=mode, **kw)
+        expl = SpectralCoherenceEngine(alpha=0.9, anchor_mode=mode,
+                                       mc_gate=False, **kw)
+        yb, _ = base.process_segment(x, base.init_state(32, 32))
+        ye, _ = expl.process_segment(x, expl.init_state(32, 32))
+        assert torch.equal(yb, ye), f"mc_gate=False not a no-op for {mode}"
+    for mode in ("magnitude", "dc_only", "complex"):
+        off = SpectralCoherenceEngine(alpha=0.9, anchor_mode=mode, mc_gate=False)
+        on = SpectralCoherenceEngine(alpha=0.9, anchor_mode=mode, mc_gate=True)
+        yoff, _ = off.process_segment(x, off.init_state(32, 32))
+        yon, _ = on.process_segment(x, on.init_state(32, 32))
+        assert torch.equal(yoff, yon), f"mc_gate leaked into {mode}"
+    # bad gate params are rejected at construction.
+    for bad in (dict(mc_gate_decay=1.0), dict(mc_gate_decay=-0.1),
+                dict(mc_gate_lo=-0.1), dict(mc_gate_lo=0.8, mc_gate_hi=0.5)):
+        try:
+            SpectralCoherenceEngine(**bad)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError(f"bad gate params {bad} should raise")
+
+
+def _translating_blob_clip(T, H=64, W=64, vx=0.6, vy=0.0, sigma=8.0, x0=None):
+    """A single soft Gaussian on a straight constant-velocity path -> a purely
+    COHERENT low-band motion (the thing the gate must leave alone)."""
+    ys = torch.arange(H).view(1, H, 1).float()
+    xs = torch.arange(W).view(1, 1, W).float()
+    t = torch.arange(T).float()
+    cx = (0.30 * W if x0 is None else x0) + vx * t
+    cy = 0.5 * H + vy * t
+    blob = torch.exp(-(((xs - cx.view(T, 1, 1)) ** 2)
+                       + ((ys - cy.view(T, 1, 1)) ** 2)) / (2 * sigma ** 2))
+    return (0.08 + 0.7 * blob).unsqueeze(1).expand(T, 3, H, W).contiguous().clamp(0, 1)
+
+
+def _oscillating_blob_clip(T, H=64, W=64, amp=10.0, cycles=2.0, sigma=8.0):
+    """A single soft Gaussian oscillating about a center -> INCOHERENT wander
+    (net displacement stays bounded while path length grows: what the gate must
+    keep correcting)."""
+    import math
+    ys = torch.arange(H).view(1, H, 1).float()
+    xs = torch.arange(W).view(1, 1, W).float()
+    t = torch.arange(T).float()
+    cx = 0.5 * W + amp * torch.sin(2 * math.pi * cycles * t / T)
+    cy = torch.full((T,), 0.5 * H)
+    blob = torch.exp(-(((xs - cx.view(T, 1, 1)) ** 2)
+                       + ((ys - cy.view(T, 1, 1)) ** 2)) / (2 * sigma ** 2))
+    return (0.08 + 0.7 * blob).unsqueeze(1).expand(T, 3, H, W).contiguous().clamp(0, 1)
+
+
+def _dev(a, b):
+    return float((a - b).abs().mean().item())
+
+
+def test_gate_preserves_coherent_translation():
+    # On a purely translating blob the gate must recognise coherent motion
+    # (g->0) and leave it far closer to the input than the ungated engine does.
+    T = 48
+    clip = _translating_blob_clip(T)
+    cfg = dict(alpha=0.95, rho=0.995, cutoff_frac=0.14, anchor_mode="complex_mc",
+               mc_strength=0.5, mc_band=0.03)
+    ungated = SpectralCoherenceEngine(**cfg, mc_gate=False)
+    gated = SpectralCoherenceEngine(**cfg, mc_gate=True)
+    yu, _ = ungated.process_segment(clip, ungated.init_state(64, 64))
+    yg, su = gated.process_segment(clip, gated.init_state(64, 64))
+    dev_ungated = _dev(clip, yu)
+    dev_gated = _dev(clip, yg)
+    # the gate must cut the damage to coherent motion by a large margin.
+    assert dev_gated < 0.5 * dev_ungated, (
+        f"gate did not spare coherent motion: dev_gated={dev_gated:.5f} "
+        f"vs dev_ungated={dev_ungated:.5f}")
+    # and it must have actually detected coherence (settled gate near 0).
+    assert su.gate_g < 0.5, f"gate did not open on coherent motion (g={su.gate_g})"
+
+
+def test_gate_still_corrects_wander():
+    # On an oscillating (returning) blob the gate must STAY engaged (g->1) so the
+    # drift is still removed: gated output should track the ungated one, and both
+    # should differ clearly from the raw input.
+    T = 64
+    clip = _oscillating_blob_clip(T)
+    cfg = dict(alpha=0.95, rho=0.995, cutoff_frac=0.14, anchor_mode="complex_mc",
+               mc_strength=0.5, mc_band=0.03)
+    ungated = SpectralCoherenceEngine(**cfg, mc_gate=False)
+    gated = SpectralCoherenceEngine(**cfg, mc_gate=True)
+    yu, _ = ungated.process_segment(clip, ungated.init_state(64, 64))
+    yg, sg = gated.process_segment(clip, gated.init_state(64, 64))
+    dev_input = _dev(clip, yg)          # gate still changed the wander
+    dev_vs_ungated = _dev(yg, yu)       # and stayed close to the ungated result
+    assert dev_input > 1e-3, "gate wrongly passed wander through untouched"
+    assert dev_vs_ungated < dev_input, (
+        "gated wander drifted away from the ungated correction "
+        f"(vs_ungated={dev_vs_ungated:.5f}, vs_input={dev_input:.5f})")
+    assert sg.gate_g > 0.5, f"gate opened on wander (g={sg.gate_g}); should stay engaged"
+
+
+def test_gate_reset_on_cut_clears_velocity_history():
+    # A hard cut must drop the gate's velocity integrators so the new scene
+    # starts from correction (g=1) and re-learns coherence from scratch.
+    eng = SpectralCoherenceEngine(alpha=0.9, anchor_mode="complex_mc",
+                                  mc_strength=0.5, mc_band=0.03, mc_gate=True,
+                                  reset_on_cut=True, cut_thresh=0.35)
+    st = eng.init_state(64, 64)
+    clip = _translating_blob_clip(20)
+    for t in range(clip.shape[0]):
+        _, st = eng.process_frame(clip[t], st)
+    assert st.gate_init, "gate never warmed on the moving scene"
+    sceneB = torch.full((3, 64, 64), 0.9)                # hard cut -> reset
+    _, st = eng.process_frame(sceneB, st)
+    assert st.gate_init is False, "cut did not reset the gate history"
+    assert st.gate_g == 1.0 and st.gate_sp == 0.0, "gate not cleared on cut"
 
 
 def _run_all():

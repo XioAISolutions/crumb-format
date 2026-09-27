@@ -230,7 +230,9 @@ def _engines(alpha, rho, cutoff, hotspot_alpha, hotspot_cutoff, scenario,
              hotspot_phase_anchor=0.0, hotspot_mc_strength=0.0,
              hotspot_mc_taper=True, hotspot_mc_band=0.0,
              hotspot_mc_est="corr", hotspot_mc_smooth=False,
-             hotspot_mc_edge="hard"):
+             hotspot_mc_edge="hard", hotspot_mc_gate=False,
+             hotspot_mc_gate_lo=0.35, hotspot_mc_gate_hi=0.75,
+             hotspot_mc_gate_decay=0.9):
     """Engine list. For the hotspot (positional/phase drift) the spectral modes
     may use a slightly wider band / stronger blend so the phase-anchoring
     `complex` mode can actually clear the bar — the `magnitude` DEFAULT is left
@@ -267,11 +269,18 @@ def _engines(alpha, rho, cutoff, hotspot_alpha, hotspot_cutoff, scenario,
             phase_anchor=pa)),
     ]
     if scenario == "hotspot":
+        # M3: the SHIP config now carries the velocity-coherence gate. The
+        # hotspot WANDERS (its low-band centroid oscillates/returns), so the gate
+        # should read it as incoherent (g->1) and leave the drift removal intact
+        # -- this row is the regression that proves the gate did not gut the
+        # engine's reason for existing. mc_gate defaults on here to match ship.
         engines.append(("spectral complex_mc", SpectralCoherenceEngine(
             alpha=a, rho=rho, cutoff_frac=c, anchor_mode="complex_mc",
             mc_strength=hotspot_mc_strength, mc_taper=hotspot_mc_taper,
             mc_band=hotspot_mc_band, mc_est=hotspot_mc_est,
-            mc_smooth=hotspot_mc_smooth, mc_edge=hotspot_mc_edge)))
+            mc_smooth=hotspot_mc_smooth, mc_edge=hotspot_mc_edge,
+            mc_gate=hotspot_mc_gate, mc_gate_lo=hotspot_mc_gate_lo,
+            mc_gate_hi=hotspot_mc_gate_hi, mc_gate_decay=hotspot_mc_gate_decay)))
     return engines
 
 
@@ -296,6 +305,13 @@ def main():
     ap.add_argument("--hotspot-mc-est", choices=["corr", "phase_plane"], default="corr")
     ap.add_argument("--hotspot-mc-smooth", action="store_true", default=False)
     ap.add_argument("--hotspot-mc-edge", choices=["hard", "flat_top"], default="hard")
+    # M3 velocity-coherence gate on the hotspot complex_mc engine. Defaults ON to
+    # match the M3 ship config; --no-hotspot-mc-gate reproduces the pre-M3 row.
+    ap.add_argument("--hotspot-mc-gate", action=argparse.BooleanOptionalAction,
+                    default=True)
+    ap.add_argument("--hotspot-mc-gate-lo", type=float, default=0.35)
+    ap.add_argument("--hotspot-mc-gate-hi", type=float, default=0.75)
+    ap.add_argument("--hotspot-mc-gate-decay", type=float, default=0.9)
     # M0.4 graded (edge-tapered), unit-modulus k-space shift on the hotspot
     # complex_mc engine (default on). --no-hotspot-mc-taper reverts to the M0.3
     # rigid full-band ramp, for the hf_ssim before/after comparison.
@@ -334,7 +350,8 @@ def main():
               f"cutoff_frac={args.hotspot_cutoff}  "
               f"phase_anchor={args.hotspot_phase_anchor}  "
               f"mc_strength={args.hotspot_mc_strength}  "
-              f"mc_taper={args.hotspot_mc_taper}  (hotspot overrides)")
+              f"mc_taper={args.hotspot_mc_taper}  mc_gate={args.hotspot_mc_gate}"
+              f"  (hotspot overrides)")
     else:
         print(f"  alpha={args.alpha}  rho={args.rho}  cutoff_frac={cutoff}")
     print("=" * 82)
@@ -432,7 +449,11 @@ def _run_hotspot(control, drifted, control_traj, gt_pos, gt_col, cutoff, args):
                               hotspot_mc_band=args.hotspot_mc_band,
                               hotspot_mc_est=args.hotspot_mc_est,
                               hotspot_mc_smooth=args.hotspot_mc_smooth,
-                              hotspot_mc_edge=args.hotspot_mc_edge):
+                              hotspot_mc_edge=args.hotspot_mc_edge,
+                              hotspot_mc_gate=args.hotspot_mc_gate,
+                              hotspot_mc_gate_lo=args.hotspot_mc_gate_lo,
+                              hotspot_mc_gate_hi=args.hotspot_mc_gate_hi,
+                              hotspot_mc_gate_decay=args.hotspot_mc_gate_decay):
         st = eng.init_state(args.grid, args.grid)
         corrected, _ = eng.process_segment(drifted, st)
         posvar_c = position_variance(lowband_energy_positions(corrected, hc))
