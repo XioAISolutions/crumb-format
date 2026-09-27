@@ -66,7 +66,7 @@ Constraints honored throughout: nothing public without an owner watch-gate on th
 From the market's own length survey (invideo.io/blog/ai-video-length-limits/, Aug 7, 2026):
 
 - **Native single generations: 8–30 s.** Seedance 2.5 = 30 s record; FLUX 3 = 20 s; Veo 3.1 = 8 s.
-- **Extension chains:** Sora API 120 s (API sunsets Sep 24, 2026); Veo 148 s (720p-only, Veo-source-only, 2-day storage timer); Kling ~3 min (paid; "reviewers report drift past ~2 minutes"); PixVerse practical consensus ~60 s before coherence decays.
+- **Extension chains:** Sora API 120 s (its API was scheduled to shut down Sep 24, 2026); Veo 148 s (720p-only, Veo-source-only, 2-day storage timer); Kling ~3 min (paid; "reviewers report drift past ~2 minutes"); PixVerse practical consensus ~60 s before coherence decays.
 - The tell: *"Extension is a splice, not a memory; characters and lighting drift a little at every seam, which is why no model advertises unlimited chaining even when its docs set no cap."*
 
 So: at 2 minutes, the market's options are (a) spliced extensions with documented drift, (b) resolution penalties, or (c) don't offer it. **Nobody's promise survives 2 minutes.** That is the regime our wedge lives in.
