@@ -1062,6 +1062,8 @@ def main():
            "grid": a.grid, "frames": a.frames, "batch": a.batch,
            "causal": a.causal, "residual": a.residual, "kernel_version": a.kernel_version,
            "q_mix": a.q_mix, "quat_color": a.quat_color,
+           "const_lr": a.const_lr, "seed": a.seed, "fp32": a.fp32,
+           "no_decay_norm_head": a.no_decay_norm_head, "telemetry_every": a.telemetry_every,
            "gate": a.gate, "local_fuse": a.local_fuse, "linear_pad": a.linear_pad,
            "occ_start": a.occ_start, "occ_end": a.occ_end,
            "persistent_state_bytes": psb, "window_bytes": window_bytes,
