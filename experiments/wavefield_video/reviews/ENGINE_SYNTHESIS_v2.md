@@ -93,3 +93,24 @@ proof) runs on pre-registered kill criteria.
 3. **Leads**: outreach approval for v1 (channel + tone), or hold?
 4. **Mac reboot** once for hygiene (swap clear) — pick a moment.
 5. **Landing hero swap** to the authored-motion demo (after watch-gate) — yes/no.
+
+## D1 OUTCOME (t_3e1d4c9f, IMPL_NOTES_M4.md)
+
+**KILL — pre-registered outcome triggered, round 1 = decisive wipeout.** 120-config sweep
+(window×strength×cutoff on trap96/192 + hotspot48): **0/120 co-pass.** Trap distortion floor
+= 61.2% (bar 5%); hotspot removal max = 51.2% (bar 60). The no-op floor sits at 61.7% ⇒
+corrections at every usable strength only ADD damage; no grid refinement crosses a structural floor.
+
+**Mechanism finding (the valuable part): the premise inverts the useful correction.** On these
+traces the drift IS the predictable slow component (illumination sinusoid / anchor-lag ramp), and
+the innovation is estimator noise. The legacy anchor-pull's 64% removal lived precisely in the
+predictable term that residual anchoring refuses to touch. Additionally: the fixed blend's
+*magnitude* alone contributes ≈50% removal — i.e. the **safe magnitude mode carries half the
+benefit with none of the risk.**
+
+**Consequence:** the middleware correction research = **CLOSED** (M2 fail → M3 RED → M4 kill:
+three mechanisms, three honest negatives, one structural explanation). No rounds 2–3
+(structural floor, per pre-registration). Code stays in-tree, default OFF.
+Coherence must come from **authorship** (3D-control lane: proven) or the **model itself**
+(wave-field / qssm lane); product = triage + authored-motion + magnitude envelope.
+The 4090 keeps cooking the model lane.
