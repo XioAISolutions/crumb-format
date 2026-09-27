@@ -593,7 +593,17 @@ class LatentWrapper(nn.Module):
 # ----------------------------------------------------------------------------- main
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--kind", choices=["wave", "attn", "ssm"], required=True)
+    ap.add_argument("--kind", choices=["wave", "attn", "ssm", "qssm"], required=True)
+    # ---- R15 hypercomplex arms (HYPERCOMPLEX_STUDY.md sec 4-E2/E3) -----------
+    ap.add_argument("--q-mix", action=argparse.BooleanOptionalAction, default=False,
+                    help="[kind wave] E2 qwave: quaternion-structured pi/po (WaveQuatMix) "
+                         "-- Hamilton maps at dh/4 slots per head; pair with "
+                         "--target-params so the param saving is reinvested and the "
+                         "arm stays at the same budget")
+    ap.add_argument("--quat-color", action="store_true",
+                    help="[kind wave] E3 qcolor: quaternion color stem (QuatEmbed) -- "
+                         "pixels as (0,r,g,b), 3x3 Hamilton kernels, dim/4 quaternion "
+                         "channels; ~9*dim vs 27*dim stem params")
     ap.add_argument("--seed", type=int, default=0,
                     help="training seed: seeds weight init AND offsets the per-step "
                          "training-clip seeds, so a multi-seed sweep gets independent "
@@ -719,6 +729,19 @@ def main():
             ap.error("--fuse local_wave requires --kernel-version dispersion (streamable state)")
         if a.latent:
             ap.error("--fuse hybrids are not wired through the latent path")
+    if (a.q_mix or a.quat_color) and a.kind != "wave":
+        ap.error("--q-mix / --quat-color apply to --kind wave "
+                 "(HYPERCOMPLEX_STUDY.md sec 4-E2/E3)")
+    if a.q_mix and a.fuse != "none":
+        ap.error("--q-mix is not supported together with --fuse hybrids")
+    if a.q_mix and a.dim % (4 * a.heads):
+        ap.error("--q-mix needs --dim divisible by 4*--heads (quaternion pi/po slots)")
+    if a.quat_color and a.dim % 4:
+        ap.error("--quat-color needs --dim divisible by 4 (quaternion channels)")
+    if a.quat_color and a.latent:
+        ap.error("--quat-color is not wired through the latent path")
+    if a.kind == "qssm" and a.dim % (2 * a.heads):
+        ap.error("--kind qssm needs --dim divisible by 2*--heads (dhq = dh // 2)")
     if a.data_source == "occlusion":
         # Wire the (seedable, overridable) occlusion window into data_occlusion so
         # every generated clip -- train and eval -- shares one window definition.
@@ -767,7 +790,8 @@ def main():
         vp = VideoPredictor(a.dim, a.layers, a.heads, a.frames, lat_grid, lat_grid, a.kind,
                             causal=a.causal, residual=a.residual, ffn_mult=ffn_mult,
                             kernel_version=a.kernel_version, linear_pad=a.linear_pad,
-                            gate=a.gate, local_fuse=a.local_fuse, fuse=a.fuse)
+                            gate=a.gate, local_fuse=a.local_fuse, fuse=a.fuse,
+                            q_mix=a.q_mix, quat_color=a.quat_color)
         return LatentCore(vp, a.dim, cz) if a.latent else vp
 
     ffn_mult = a.ffn_mult
@@ -1037,6 +1061,7 @@ def main():
            "steps": a.steps, "dim": a.dim, "layers": a.layers, "heads": a.heads,
            "grid": a.grid, "frames": a.frames, "batch": a.batch,
            "causal": a.causal, "residual": a.residual, "kernel_version": a.kernel_version,
+           "q_mix": a.q_mix, "quat_color": a.quat_color,
            "gate": a.gate, "local_fuse": a.local_fuse, "linear_pad": a.linear_pad,
            "occ_start": a.occ_start, "occ_end": a.occ_end,
            "persistent_state_bytes": psb, "window_bytes": window_bytes,

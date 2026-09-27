@@ -450,18 +450,36 @@ class VideoPredictor(nn.Module):
               tokens) with the head's final linear zero-initialized, so training
               starts exactly at the copy-last baseline instead of learning RGB
               reconstruction from scratch. (default ON for v2; off reproduces v1.)
-    kind: "wave" | "attn" | "ssm"."""
+    kind: "wave" | "attn" | "ssm" | "qssm" (quaternion-state SSM, R15).
+    q_mix / quat_color: R15 hypercomplex arms on --kind wave (wfvideo_quat.py);
+              both default off and the flag-off paths are byte-identical."""
 
     def __init__(self, dim, n_layers, n_heads, T, H, W, kind,
                  causal=False, residual=True, ffn_mult=4.0,
                  kernel_version="separable", linear_pad=False,
-                 gate=False, local_fuse=False, fuse="none"):
+                 gate=False, local_fuse=False, fuse="none",
+                 q_mix=False, quat_color=False):
         super().__init__()
         self.T, self.H, self.W = T, H, W
         self.kind = kind
         self.fuse = fuse
         self.residual = residual
-        self.embed = nn.Conv2d(3, dim, 3, padding=1)
+        # R15 hypercomplex arms (HYPERCOMPLEX_STUDY.md sec 4-E2/E3): wave-scope,
+        # default-off. Flag-off paths below construct the existing classes in the
+        # same order, so default init is byte-identical (asserted r15 test).
+        if q_mix and kind != "wave":
+            raise ValueError(f"--q-mix applies to kind 'wave' (got {kind!r})")
+        if q_mix and fuse != "none":
+            raise ValueError("--q-mix is not supported together with --fuse hybrids")
+        if quat_color and kind != "wave":
+            raise ValueError(f"--quat-color applies to kind 'wave' (got {kind!r})")
+        if quat_color and dim % 4:
+            raise ValueError(f"--quat-color needs dim divisible by 4 (got {dim})")
+        if quat_color:
+            from wfvideo_quat import QuatEmbed
+            self.embed = QuatEmbed(dim)
+        else:
+            self.embed = nn.Conv2d(3, dim, 3, padding=1)
         self.posemb = FactorizedPosEmb(dim, T, H, W)   # shared, all arms, always on
         if fuse != "none":
             # Hybrid arm: the global memory kind must agree with --kind so config,
@@ -477,14 +495,23 @@ class VideoPredictor(nn.Module):
                 mix = FusedMix(dim, n_heads, T, H, W, fuse,
                                causal=causal, linear_pad=linear_pad)
             elif kind == "wave":
-                mix = WaveMix3D(dim, n_heads, T, H, W, kernel_version=kernel_version,
-                                causal_time=causal, linear_pad=linear_pad,
-                                gate=gate, local_fuse=local_fuse)
+                if q_mix:
+                    from wfvideo_quat import WaveQuatMix
+                    mix = WaveQuatMix(dim, n_heads, T, H, W, kernel_version=kernel_version,
+                                      causal_time=causal, linear_pad=linear_pad,
+                                      gate=gate, local_fuse=local_fuse)
+                else:
+                    mix = WaveMix3D(dim, n_heads, T, H, W, kernel_version=kernel_version,
+                                    causal_time=causal, linear_pad=linear_pad,
+                                    gate=gate, local_fuse=local_fuse)
             elif kind == "attn":
                 mix = AttnMix(dim, n_heads, T, H, W, causal=causal)
             elif kind == "ssm":
                 from ssm_lite import SSMLite
                 mix = SSMLite(dim, n_heads, T, H, W, causal=causal)
+            elif kind == "qssm":
+                from ssm_quat import QuatSSM
+                mix = QuatSSM(dim, n_heads, T, H, W, causal=causal)
             else:
                 raise ValueError(f"unknown kind {kind!r}")
             blocks.append(Block(mix, dim, ffn_mult=ffn_mult))
@@ -515,12 +542,13 @@ class VideoPredictor(nn.Module):
 
     # ---- O(1)-in-T streaming rollout (wave / ssm / local+global hybrids) -----
     def _streamable(self):
-        return self.fuse != "none" or self.kind in ("wave", "ssm")
+        return self.fuse != "none" or self.kind in ("wave", "ssm", "qssm")
 
     def stream_init(self, B, device):
         """Per-layer streaming state (list, one entry per block). Supported for the
-        recurrent arms: wave (dispersion), ssm, and the local+ssm / local+wave
-        hybrids. Attention has no recurrence and must roll out windowed instead."""
+        recurrent arms: wave (dispersion), ssm, qssm, and the local+ssm /
+        local+wave hybrids. Attention has no recurrence and must roll out
+        windowed instead."""
         assert self._streamable(), "stream_step needs a recurrent arm (wave/ssm/fused)"
         return [blk.mix.init_state(B, device) for blk in self.blocks]
 
