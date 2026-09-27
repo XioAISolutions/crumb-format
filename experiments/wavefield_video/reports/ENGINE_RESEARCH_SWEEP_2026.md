@@ -68,7 +68,7 @@ where the campaign already builds on them. No claim below has been replicated by
   in-loop; their drift instrumentation.
 - **Sparse Forcing** (Apr 2026) — https://arxiv.org/abs/2604.21221
   *Mechanism:* attention concentrates on a *persistent subset of salient blocks* (implicit spatiotemporal
-  memory); trainable sparse attention cuts latency massively. *Steal:* block-salience memory — we already
+  memory); trainable sparse attention reduces decoding latency (as-reported). *Steal:* block-salience memory — we already
   compute low-band energy per cell; a salience channel could drive cut/revisit logic cheaply.
 - **Reward Forcing** (CVPR'26 Highlight) — https://github.com/JaydenLyh/Reward-Forcing
   *Mechanism:* reward-weighted distillation (vs vanilla DMD) into a 4-step AR student, 23.1 FPS. *Steal:*
