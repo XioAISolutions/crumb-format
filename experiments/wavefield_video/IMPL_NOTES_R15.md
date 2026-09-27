@@ -98,6 +98,9 @@ run. Recorded here per §5.2 ("record the choice and the probe numbers").
 
 ## Results (append as they land)
 
+- Commit: `0c87976` (branch `crumb-llm-standalone`, pushed 2026-09-27).
+- Deployment: file set md5-verified on the box; jobs queued 2026-09-27 (pending band
+  `gpuq_job_200..461`, ordered after the pre-existing P4 jobs 13–19).
 - Box smoke (job 200): _pending_
 - Pre-flight probe copy_ratio: _pending_ -> recipe: _pending_
 - Suite: _pending_ (status file + result JSONs on the box)
