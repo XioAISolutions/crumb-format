@@ -1,0 +1,103 @@
+{
+  "config": {
+    "grid": 64,
+    "frames": 48,
+    "seed": 1234
+  },
+  "posvar_drift": 44.05097961425781,
+  "posvar_ctrl": 63.294368743896484,
+  "rows": [
+    {
+      "name": "stats-EMA baseline",
+      "drift_pct_pos": -0.503390285511407,
+      "de_corr": 0.008413269184529781,
+      "hf_ssim_clean": 0.9941813349723816,
+      "hf_ssim_chg": 0.999893844127655,
+      "motion_pct": 99.7526115176861,
+      "n_seg": 141,
+      "state_bytes": 24,
+      "verdict": "fail",
+      "flags": ".SME",
+      "ok_drift": false,
+      "ok_ssim": true,
+      "ok_motion": true,
+      "ok_de": true
+    },
+    {
+      "name": "spectral dc_only",
+      "drift_pct_pos": 0.30647661439074936,
+      "de_corr": 0.012316517531871796,
+      "hf_ssim_clean": 0.9940952658653259,
+      "hf_ssim_chg": 0.9999993443489075,
+      "motion_pct": 99.75598475291073,
+      "n_seg": 141,
+      "state_bytes": 24,
+      "verdict": "fail",
+      "flags": ".SME",
+      "ok_drift": false,
+      "ok_ssim": true,
+      "ok_motion": true,
+      "ok_de": true
+    },
+    {
+      "name": "spectral magnitude",
+      "drift_pct_pos": -17.957047723789145,
+      "de_corr": 0.12357673794031143,
+      "hf_ssim_clean": 0.9942919611930847,
+      "hf_ssim_chg": 0.9994404315948486,
+      "motion_pct": 99.67375710127023,
+      "n_seg": 141,
+      "state_bytes": 1944,
+      "verdict": "fail",
+      "flags": ".SME",
+      "ok_drift": false,
+      "ok_ssim": true,
+      "ok_motion": true,
+      "ok_de": true
+    },
+    {
+      "name": "spectral complex",
+      "drift_pct_pos": 50.213137681096676,
+      "de_corr": 0.12119708210229874,
+      "hf_ssim_clean": 0.9945866465568542,
+      "hf_ssim_chg": 0.9956691861152649,
+      "motion_pct": 99.66622885636014,
+      "n_seg": 141,
+      "state_bytes": 1944,
+      "verdict": "fail",
+      "flags": ".SME",
+      "ok_drift": false,
+      "ok_ssim": true,
+      "ok_motion": true,
+      "ok_de": true
+    },
+    {
+      "name": "spectral complex_mc",
+      "drift_pct_pos": -0.17462351810317855,
+      "de_corr": 0.017748171463608742,
+      "hf_ssim_clean": 0.9941070079803467,
+      "hf_ssim_chg": 0.9999975562095642,
+      "motion_pct": 99.75727577123517,
+      "n_seg": 141,
+      "state_bytes": 1944,
+      "verdict": "fail",
+      "flags": ".SME",
+      "ok_drift": false,
+      "ok_ssim": true,
+      "ok_motion": true,
+      "ok_de": true
+    }
+  ],
+  "args": {
+    "grid": 64,
+    "frames": 48,
+    "seed": 1234,
+    "hotspot_mc_residual": false,
+    "hotspot_res_strength": 0.5,
+    "hotspot_res_window": 8.0,
+    "hotspot_res_cutoff": 0.25,
+    "hotspot_mc_strength": 0.5,
+    "hotspot_mc_band": 0.03,
+    "hotspot_mc_gate": true
+  }
+}

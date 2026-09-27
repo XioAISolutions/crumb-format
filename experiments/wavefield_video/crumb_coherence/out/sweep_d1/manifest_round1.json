@@ -1,0 +1,14 @@
+{
+  "round": 1,
+  "tag": "r1",
+  "git_rev": "1b99415",
+  "tsp": 1790514181.5883179,
+  "n_runs": 360,
+  "n_new": 360,
+  "md5": {
+    "core": "0d48d08d651bb6cc81b13bee2c256e08",
+    "run_trap": "df04c70bd74e2dff038e82914a910817",
+    "run_m0": "b8a0e6a4d8a20e12288a3eb4d023440e"
+  },
+  "copass_configs": []
+}

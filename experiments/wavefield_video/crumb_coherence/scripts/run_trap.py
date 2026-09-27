@@ -207,6 +207,12 @@ def main():
     ap.add_argument("--gate-hi", type=float, default=None)
     ap.add_argument("--gate-decay", type=float, default=None)
     ap.add_argument("--gate-pos-decay", type=float, default=None)
+    # D1 residual anchoring (M4): predict-then-correct-the-residual mode.
+    ap.add_argument("--residual", action="store_true",
+                    help="enable D1 residual anchoring (mc_residual)")
+    ap.add_argument("--res-window", type=float, default=None)
+    ap.add_argument("--res-strength", type=float, default=None)
+    ap.add_argument("--res-cutoff", type=float, default=None)
     ap.add_argument("--json", type=str, default="")
     args = ap.parse_args()
 
@@ -225,6 +231,15 @@ def main():
         cfg["mc_gate_decay"] = args.gate_decay
     if args.gate_pos_decay is not None:
         cfg["mc_gate_pos_decay"] = args.gate_pos_decay
+    if args.residual:
+        cfg["mc_gate"] = False
+        cfg["mc_residual"] = True
+        if args.res_window is not None:
+            cfg["mc_res_window"] = args.res_window
+        if args.res_strength is not None:
+            cfg["mc_res_strength"] = args.res_strength
+        if args.res_cutoff is not None:
+            cfg["mc_res_cutoff"] = args.res_cutoff
 
     scene, obj_true = make_trap_scene(args.scene, T, G, G)   # raw == clean
 
@@ -261,14 +276,18 @@ def main():
                   hf=hf > 0.98, var_ratio=0.90 <= var_ratio <= 1.10)
     all_pass = all(passes.values())
 
-    mode = "LEGACY (no gate)" if args.legacy else "M3 gated"
+    mode = ("D1 residual" if cfg.get("mc_residual") else
+            ("LEGACY (no gate)" if args.legacy else "M3 gated"))
     print("=" * 84)
     print(f"TRAP  scene={args.scene}  {mode}   grid={G}x{G}  frames={T}  seed={args.seed}")
     print(f"  object: legit low-band path (sigma={OBJ_SIGMA}) + illum sinusoid + 3 balls;"
           f"  NO injected wander")
     print(f"  config: complex_mc band={cfg['mc_band']} strength={cfg['mc_strength']} "
           f"corr hard  alpha={cfg['alpha']} rho={cfg['rho']} cutoff={CUT}")
-    if not args.legacy:
+    if cfg.get("mc_residual"):
+        print(f"          residual ON  window={cfg.get('mc_res_window', 8.0)} "
+              f"strength={cfg.get('mc_res_strength', 0.5)} cutoff={cfg.get('mc_res_cutoff', 0.25)}")
+    elif not args.legacy:
         print(f"          gate ON  lo={cfg['mc_gate_lo']} hi={cfg['mc_gate_hi']} "
               f"decay={cfg['mc_gate_decay']}")
     print("=" * 84)

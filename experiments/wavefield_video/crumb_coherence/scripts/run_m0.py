@@ -42,6 +42,7 @@ Usage:  python crumb_coherence/scripts/run_m0.py [--frames 48] [--grid 64]
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import os
 import sys
@@ -232,7 +233,10 @@ def _engines(alpha, rho, cutoff, hotspot_alpha, hotspot_cutoff, scenario,
              hotspot_mc_est="corr", hotspot_mc_smooth=False,
              hotspot_mc_edge="hard", hotspot_mc_gate=False,
              hotspot_mc_gate_lo=0.35, hotspot_mc_gate_hi=0.75,
-             hotspot_mc_gate_decay=0.9):
+             hotspot_mc_gate_decay=0.9,
+             hotspot_mc_residual=False, hotspot_res_strength=0.5,
+             hotspot_res_window=8.0, hotspot_res_cutoff=0.25,
+             hotspot_only_residual=False):
     """Engine list. For the hotspot (positional/phase drift) the spectral modes
     may use a slightly wider band / stronger blend so the phase-anchoring
     `complex` mode can actually clear the bar — the `magnitude` DEFAULT is left
@@ -281,6 +285,16 @@ def _engines(alpha, rho, cutoff, hotspot_alpha, hotspot_cutoff, scenario,
             mc_smooth=hotspot_mc_smooth, mc_edge=hotspot_mc_edge,
             mc_gate=hotspot_mc_gate, mc_gate_lo=hotspot_mc_gate_lo,
             mc_gate_hi=hotspot_mc_gate_hi, mc_gate_decay=hotspot_mc_gate_decay)))
+        if hotspot_mc_residual:
+            # D1 residual anchoring (M4): gate-free predict-then-correct.
+            engines.append(("spectral complex_mc residual",
+                            SpectralCoherenceEngine(
+                alpha=a, rho=rho, cutoff_frac=c, anchor_mode="complex_mc",
+                mc_residual=True, mc_res_strength=hotspot_res_strength,
+                mc_res_window=hotspot_res_window,
+                mc_res_cutoff=hotspot_res_cutoff)))
+            if hotspot_only_residual:
+                return [engines[-1]]
     return engines
 
 
@@ -320,6 +334,14 @@ def main():
     # Comma-separated sweep over mc_strength for the hotspot complex_mc engine,
     # printed as an extra block (shape of the new knob). Empty = no sweep.
     ap.add_argument("--hotspot-mc-sweep", type=str, default="0,0.5,0.85,1.0")
+    # D1 residual anchoring (M4) on the hotspot engine.
+    ap.add_argument("--hotspot-mc-residual", action="store_true", default=False)
+    ap.add_argument("--hotspot-res-strength", type=float, default=0.5)
+    ap.add_argument("--hotspot-res-window", type=float, default=8.0)
+    ap.add_argument("--hotspot-res-cutoff", type=float, default=0.25)
+    ap.add_argument("--hotspot-only-residual", action="store_true",
+                    help="run ONLY the residual row (fast sweep batches)")
+    ap.add_argument("--json", type=str, default="")
     ap.add_argument("--scenario", choices=["gain_field", "hotspot"], default="gain_field")
     ap.add_argument("--outdir", type=str, default=os.path.join(_ROOT, "crumb_coherence", "out"))
     ap.add_argument("--no-video", action="store_true")
@@ -441,6 +463,7 @@ def _run_hotspot(control, drifted, control_traj, gt_pos, gt_col, cutoff, args):
     print("-" * 82)
 
     results = {}
+    rows = []
     for name, eng in _engines(args.alpha, args.rho, cutoff, args.hotspot_alpha,
                               hc, "hotspot",
                               hotspot_phase_anchor=args.hotspot_phase_anchor,
@@ -453,7 +476,12 @@ def _run_hotspot(control, drifted, control_traj, gt_pos, gt_col, cutoff, args):
                               hotspot_mc_gate=args.hotspot_mc_gate,
                               hotspot_mc_gate_lo=args.hotspot_mc_gate_lo,
                               hotspot_mc_gate_hi=args.hotspot_mc_gate_hi,
-                              hotspot_mc_gate_decay=args.hotspot_mc_gate_decay):
+                              hotspot_mc_gate_decay=args.hotspot_mc_gate_decay,
+                              hotspot_mc_residual=args.hotspot_mc_residual,
+                              hotspot_res_strength=args.hotspot_res_strength,
+                              hotspot_res_window=args.hotspot_res_window,
+                              hotspot_res_cutoff=args.hotspot_res_cutoff,
+                              hotspot_only_residual=args.hotspot_only_residual):
         st = eng.init_state(args.grid, args.grid)
         corrected, _ = eng.process_segment(drifted, st)
         posvar_c = position_variance(lowband_energy_positions(corrected, hc))
@@ -476,6 +504,12 @@ def _run_hotspot(control, drifted, control_traj, gt_pos, gt_col, cutoff, args):
         results[name] = corrected
         print(f"{name:<22}{d_pos:>11.1f}%{de_c:>10.3f}{ssim:>9.4f}{ssim_chg:>9.4f}"
               f"{_fmt_motion(pct, n_seg)}{n_seg:>6}{sb:>8}B  {verdict} [{flags}]")
+        rows.append(dict(name=name, drift_pct_pos=d_pos, de_corr=de_c,
+                         hf_ssim_clean=ssim, hf_ssim_chg=ssim_chg,
+                         motion_pct=pct, n_seg=n_seg, state_bytes=sb,
+                         verdict=verdict, flags=flags,
+                         ok_drift=ok_drift, ok_ssim=ok_ssim,
+                         ok_motion=ok_motion, ok_de=ok_de))
 
     print("-" * 82)
     print("flags: D=drift(pos)>=60%  S=hf_ssim(vs CLEAN ref)>=0.98  M=motion within 5%  "
@@ -483,7 +517,25 @@ def _run_hotspot(control, drifted, control_traj, gt_pos, gt_col, cutoff, args):
 
     # M0.3 sweep: shape of the mc_strength knob on the complex_mc engine.
     sweep = [s.strip() for s in args.hotspot_mc_sweep.split(",") if s.strip()]
-    if sweep:
+    if args.json:
+        rec = dict(config=dict(grid=args.grid, frames=args.frames,
+                               seed=args.seed),
+                   posvar_drift=posvar_drift, posvar_ctrl=posvar_ctrl,
+                   rows=rows, args=dict(
+                       grid=args.grid, frames=args.frames, seed=args.seed,
+                       hotspot_mc_residual=args.hotspot_mc_residual,
+                       hotspot_res_strength=args.hotspot_res_strength,
+                       hotspot_res_window=args.hotspot_res_window,
+                       hotspot_res_cutoff=args.hotspot_res_cutoff,
+                       hotspot_mc_strength=args.hotspot_mc_strength,
+                       hotspot_mc_band=args.hotspot_mc_band,
+                       hotspot_mc_gate=args.hotspot_mc_gate))
+        d = os.path.dirname(os.path.abspath(args.json))
+        os.makedirs(d, exist_ok=True)
+        with open(args.json, "w") as fh:
+            json.dump(rec, fh, indent=2)
+        print(f"[json] wrote {args.json}")
+    if sweep and not args.hotspot_only_residual:
         print("-" * 82)
         print(f"complex_mc mc_strength sweep (drift bar >=60%, motion >=97, "
               f"ssim >=0.98)  mc_taper={args.hotspot_mc_taper}:")
@@ -519,7 +571,9 @@ def _run_hotspot(control, drifted, control_traj, gt_pos, gt_col, cutoff, args):
           "gone: |ΔE|corr is reported absolute and bounded.")
 
     if not args.no_video:
-        _save_video(control, drifted, results.get("spectral complex_mc"),
+        _save_video(control, drifted,
+                    results.get("spectral complex_mc")
+                    or results.get("spectral complex_mc residual"),
                     args.outdir, "m0_hotspot.mp4")
 
 

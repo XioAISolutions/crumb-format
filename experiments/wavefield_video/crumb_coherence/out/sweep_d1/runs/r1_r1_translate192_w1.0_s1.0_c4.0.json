@@ -1,0 +1,44 @@
+{
+  "config": {
+    "frames": 192,
+    "grid": 64,
+    "seed": 0,
+    "scene": "translate",
+    "legacy": false,
+    "cfg": {
+      "alpha": 0.95,
+      "rho": 0.995,
+      "cutoff_frac": 0.14,
+      "anchor_mode": "complex_mc",
+      "mc_strength": 0.5,
+      "mc_band": 0.03,
+      "mc_est": "corr",
+      "mc_edge": "hard",
+      "mc_gate": false,
+      "mc_gate_lo": 0.35,
+      "mc_gate_hi": 0.75,
+      "mc_gate_decay": 0.9,
+      "mc_gate_pos_decay": 0.5,
+      "mc_residual": true,
+      "mc_res_window": 1.0,
+      "mc_res_strength": 1.0,
+      "mc_res_cutoff": 4.0
+    }
+  },
+  "retention": 449.94389203676786,
+  "distortion": 68.5666054073222,
+  "distortion_mean": 1.831345707820154,
+  "hf_ssim": 0.999325692653656,
+  "lowband_var_raw": 112.28591918945312,
+  "lowband_var_plugin": 113.46197509765625,
+  "var_ratio": 1.0104737611499988,
+  "est_x_range": 26.53509521484375,
+  "true_x_range": 28.650001525878906,
+  "passes": {
+    "retention": true,
+    "distortion": false,
+    "hf": true,
+    "var_ratio": true
+  },
+  "all_pass": false
+}

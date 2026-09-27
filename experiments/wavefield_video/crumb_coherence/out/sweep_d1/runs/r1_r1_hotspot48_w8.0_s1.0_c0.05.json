@@ -1,0 +1,39 @@
+{
+  "config": {
+    "grid": 64,
+    "frames": 48,
+    "seed": 1234
+  },
+  "posvar_drift": 44.05097961425781,
+  "posvar_ctrl": 63.294368743896484,
+  "rows": [
+    {
+      "name": "spectral complex_mc residual",
+      "drift_pct_pos": 47.08722949158707,
+      "de_corr": 0.12416142970323563,
+      "hf_ssim_clean": 0.9945041537284851,
+      "hf_ssim_chg": 0.9955717921257019,
+      "motion_pct": 99.65239730217361,
+      "n_seg": 141,
+      "state_bytes": 1944,
+      "verdict": "fail",
+      "flags": ".SME",
+      "ok_drift": false,
+      "ok_ssim": true,
+      "ok_motion": true,
+      "ok_de": true
+    }
+  ],
+  "args": {
+    "grid": 64,
+    "frames": 48,
+    "seed": 1234,
+    "hotspot_mc_residual": true,
+    "hotspot_res_strength": 1.0,
+    "hotspot_res_window": 8.0,
+    "hotspot_res_cutoff": 0.05,
+    "hotspot_mc_strength": 0.5,
+    "hotspot_mc_band": 0.03,
+    "hotspot_mc_gate": true
+  }
+}

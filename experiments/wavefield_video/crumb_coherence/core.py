@@ -501,6 +501,19 @@ class CoherenceState:
     gate_init: bool = False
     gate_C: float = 0.0
     gate_g: float = 1.0
+    # M4/D1 residual anchoring: alpha-beta (constant-velocity) predictor state
+    # for the PREDICT-THEN-CORRECT-THE-RESIDUAL path. res_p* is the filtered
+    # offset, res_v* its per-frame velocity, res_r* the last innovation
+    # (measured minus prediction) and res_f its significance scale in [0,1].
+    # All inert unless mc_residual is on (complex_mc only).
+    res_pdy: float = 0.0
+    res_pdx: float = 0.0
+    res_vdy: float = 0.0
+    res_vdx: float = 0.0
+    res_filt_init: bool = False
+    res_ry: float = 0.0
+    res_rx: float = 0.0
+    res_f: float = 0.0
 
 
 # --------------------------------------------------------------------------- #
@@ -528,7 +541,11 @@ class SpectralCoherenceEngine:
                  mc_gate_lo: float = 0.35,
                  mc_gate_hi: float = 0.75,
                  mc_gate_decay: float = 0.9,
-                 mc_gate_pos_decay: float = 0.5):
+                 mc_gate_pos_decay: float = 0.5,
+                 mc_residual: bool = False,
+                 mc_res_strength: float = 0.5,
+                 mc_res_window: float = 8.0,
+                 mc_res_cutoff: float = 0.25):
         if anchor_mode not in ("magnitude", "dc_only", "complex", "complex_mc"):
             raise ValueError(f"unknown anchor_mode {anchor_mode!r}")
         if color_space not in ("ycbcr", "rgb"):
@@ -553,6 +570,22 @@ class SpectralCoherenceEngine:
         if mc_gate_lo < 0.0 or mc_gate_hi < mc_gate_lo:
             raise ValueError(f"require 0 <= mc_gate_lo <= mc_gate_hi, got "
                              f"lo={mc_gate_lo}, hi={mc_gate_hi}")
+        if mc_residual and anchor_mode != "complex_mc":
+            raise ValueError("mc_residual requires anchor_mode='complex_mc'")
+        if mc_residual and mc_gate:
+            raise ValueError("mc_residual and mc_gate are mutually exclusive "
+                             "(D1 is gate-free by construction)")
+        if mc_residual and mc_smooth:
+            raise ValueError("mc_residual and mc_smooth are mutually exclusive")
+        if mc_res_strength < 0.0:
+            raise ValueError(f"mc_res_strength must be >= 0, got "
+                             f"{mc_res_strength}")
+        if mc_res_window < 1.0:
+            raise ValueError(f"mc_res_window must be >= 1, got "
+                             f"{mc_res_window}")
+        if mc_res_cutoff < 0.0:
+            raise ValueError(f"mc_res_cutoff must be >= 0, got "
+                             f"{mc_res_cutoff}")
         self.cutoff_frac = cutoff_frac
         self.sigma_k_frac = sigma_k_frac
         self.alpha = alpha
@@ -616,6 +649,19 @@ class SpectralCoherenceEngine:
         self.mc_gate_hi = mc_gate_hi    # C above this => identity      (g=0)
         self.mc_gate_decay = mc_gate_decay   # mu of the velocity EMAs (memory)
         self.mc_gate_pos_decay = mc_gate_pos_decay   # offset pre-smoother (denoise)
+        # mc_residual (M4/D1): PREDICT-THEN-CORRECT-THE-RESIDUAL anchoring. The
+        # measured current-vs-anchor offset is predicted one frame ahead by an
+        # alpha-beta (constant-velocity) filter; only the unpredicted residual
+        # r = measured - prediction is corrected, scaled by its significance f
+        # = smoothstep(0, mc_res_cutoff, |r|) (f=1.0 when cutoff<=0). f gates
+        # the shift AND the anchor-blend below, so an exactly predictable
+        # trajectory (constant velocity -> r->0 -> f->0) is a provable no-op.
+        # Replaces the velocity GATE with a continuous prior; mutually
+        # exclusive with mc_gate/mc_smooth. complex_mc only.
+        self.mc_residual = mc_residual
+        self.mc_res_strength = mc_res_strength   # residual correction gain
+        self.mc_res_window = mc_res_window       # alpha-beta window (frames)
+        self.mc_res_cutoff = mc_res_cutoff       # residual significance (px)
         self._wcache: dict = {}     # (kh,kw) -> gaussian weight
         self._pcache: dict = {}     # (kh,kw) -> flat phase weight
         self._bcache: dict = {}     # (kh,kw,H,W,edge) -> radial band mask
@@ -745,6 +791,46 @@ class SpectralCoherenceEngine:
         state.gate_C, state.gate_g = C, g
         return g
 
+    def _res_gains(self):
+        """D1 alpha-beta gains from the configured window (frames): alpha =
+        2/(W+1) (the EMA-equivalent of a W-frame window) with the standard
+        critically-damped pairing beta = alpha^2/(2-alpha)."""
+        a = 2.0 / (self.mc_res_window + 1.0)
+        b = a * a / (2.0 - a)
+        return a, b
+
+    def _residual_shift(self, dy: float, dx: float, state: CoherenceState):
+        """D1 residual anchoring: advance the alpha-beta (constant-velocity)
+        predictor over the measured offset and return (ry, rx, f) — the
+        UNPREDICTED residual and its significance scale f in [0,1].
+
+        The first measured frame seeds the filter and returns (0, 0, 0): no
+        prediction exists yet, so nothing is corrected. After that the
+        innovation r = measured - prediction decays to zero on exactly
+        constant-velocity motion (the downstream correction is then a no-op)
+        while wander the constant-velocity prior cannot track stays in r."""
+        a, b = self._res_gains()
+        if not state.res_filt_init:
+            state.res_pdy, state.res_pdx = dy, dx
+            state.res_vdy = state.res_vdx = 0.0
+            state.res_filt_init = True
+            state.res_ry = state.res_rx = 0.0
+            state.res_f = 0.0
+            return 0.0, 0.0, 0.0
+        pdy = state.res_pdy + state.res_vdy
+        pdx = state.res_pdx + state.res_vdx
+        ry, rx = dy - pdy, dx - pdx
+        state.res_pdy = pdy + a * ry
+        state.res_pdx = pdx + a * rx
+        state.res_vdy += b * ry
+        state.res_vdx += b * rx
+        if self.mc_res_cutoff <= 0.0:
+            f = 1.0
+        else:
+            f = _smoothstep(0.0, self.mc_res_cutoff, max(abs(ry), abs(rx)))
+        state.res_ry, state.res_rx, state.res_f = ry, rx, f
+        return ry, rx, f
+
     def _reset_mc_filter(self, state: CoherenceState) -> None:
         state.mc_pdy = state.mc_pdx = 0.0
         state.mc_vdy = state.mc_vdx = 0.0
@@ -758,6 +844,12 @@ class SpectralCoherenceEngine:
         state.gate_init = False
         state.gate_C = 0.0
         state.gate_g = 1.0
+        # M4/D1: a cut also invalidates the constant-velocity hypothesis.
+        state.res_pdy = state.res_pdx = 0.0
+        state.res_vdy = state.res_vdx = 0.0
+        state.res_filt_init = False
+        state.res_ry = state.res_rx = 0.0
+        state.res_f = 0.0
 
     # -- public interface -------------------------------------------------- #
     def init_state(self, H: int, W: int, device="cpu") -> CoherenceState:
@@ -841,7 +933,27 @@ class SpectralCoherenceEngine:
         # and snaps sub-deadband shifts to an exact no-op (zero-shift identity).
         src = Xlo
         gate_g = 1.0
-        if (self.anchor_mode == "complex_mc" and self.mc_strength > 0.0
+        if (self.mc_residual and self.mc_res_strength > 0.0
+                and state.n_seen > 1):
+            # M4/D1 residual anchoring: anchor to the alpha-beta PREDICTION of
+            # the measured offset and correct only the unpredicted residual
+            # (see _residual_shift). gate_g carries the residual significance f
+            # and scales the shift AND the blend below, so a constant-velocity
+            # trajectory is a no-op by construction.
+            if self.mc_est == "phase_plane":
+                dy, dx = estimate_lowband_shift_phaseplane(
+                    Xlo, state.anchor, state.H, state.W)
+            else:
+                dy, dx = estimate_lowband_shift(
+                    Xlo, state.anchor, state.H, state.W)
+            ry, rx, gate_g = self._residual_shift(dy, dx, state)
+            sdy = -self.mc_res_strength * gate_g * ry
+            sdx = -self.mc_res_strength * gate_g * rx
+            if max(abs(sdy), abs(sdx)) >= self.mc_deadband:
+                taper = self._mc_taper_weight(kh, kw, state.H, state.W, device)
+                src = apply_lowband_shift(Xlo, sdy, sdx, state.H, state.W,
+                                          taper=taper)
+        elif (self.anchor_mode == "complex_mc" and self.mc_strength > 0.0
                 and state.n_seen > 1):
             if self.mc_est == "phase_plane":
                 dy, dx = estimate_lowband_shift_phaseplane(
