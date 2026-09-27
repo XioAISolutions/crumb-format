@@ -74,7 +74,7 @@ So: at 2 minutes, the market's options are (a) spliced extensions with documente
 ### b.2 What we've already proven (and the claim boundary)
 
 Proven (receipts in §Receipts index):
-- **2-minute chain (P4):** 20 chunks x 121 frames, 832x480 @16 fps, stitched to exactly 120.0 s (1920 f). Drift slope **3.1e-5/frame** (raw and crumb), geometry-tracking recall mean 0.679, seam ratios with no boundary pops; controlled vs uncontrolled ~3–5x tracking, and the uncontrolled baseline is a *pixel-identical fixed point* (no state = repeats the same ~6 s dream — this is itself a demo).
+- **2-minute chain (P4):** 20 chunks x 121 frames, 832x480 @16 fps, stitched to exactly 120.0 s (1920 f). Drift slope **3.1e-5/frame** (raw and crumb), geometry-tracking recall mean 0.679; seam audit shows no boundary pops (the clip's max frame-to-frame diff is NOT on a seam; one elevated seam at f1152 sits inside a camera turn). Controlled vs uncontrolled: recall 0.679 vs **0.138** (~4.9x), and the uncontrolled chain is a *pixel-identical fixed point* — u1-vs-u0 and u10-vs-u0 full-res diffs are 0.0000 across independent box runs (no state = it repeats one ~7.6 s chunk; this is itself a demo).
 - **60-second chain (P3):** zero cumulative drift over 960 frames, byte-identical re-stitch from the same chunk files (md5), occlusion held (doorway crossed twice).
 - **Crumb (our spectral pass) on top:** −51.3% low-band trajectory variance, −49.8% luma flicker on the 2-min, texture/detail preserved (retention 0.996–1.005) — with a disclosed tone trade (broad contrast 0.829 at alpha 0.5; alpha 0.25 halves both sides of the trade). Raw stays the default presentation until the owner rules on the veil trade-off.
 - **Mechanism sentence (the important one):** every chunk is generated *anchored to an authored scene* (dense-depth control from a Blender render with fixed clip bounds) — the scene remembers geometry, so drift cannot accumulate across the chain. Their splices condition on the last clip; ours condition on the world.
@@ -269,7 +269,7 @@ Weekly cadence proposal (post-gate only): Tue = one clip (30–60 s excerpt of b
 
 Local (all paths relative to `~/.hermes/workspaces/brainsnn/` unless noted):
 - Generator audit: `generator_audit/GENERATOR_AUDIT_v0.1.md` + addenda; `generator_audit/arm_results/crumb_battery/CRUMB_KILL_BATTERY.md`; `generator_audit/judge_moves/REF_CHUNK.md`, `R2A_VERIFY.md`.
-- P4 2-min: `3d_first_pilot/p4/qa120/p4_summary.json` (drift slope 3.1e-5, seams), `p4/` video assets, `p4/wait_pull.log`.
+- P4 2-min: `3d_first_pilot/p4/qa120/p4_summary.json` (drift slope 3.1e-5, seams), `p4/qa120_u/u_identity_receipt.txt` + `recheck_log.txt` (uncontrolled fixed-point: u1/u10 vs u0 = 0.0000 diff; recall 0.138), `p4/` video assets, `p4/wait_pull.log`.
 - P3 60 s: `3d_first_pilot/NOTES.md` (P0–P3), `3d_first_pilot/p3/`.
 - Method ladder: `method_ladder/METHOD_LADDER_RUN1.md`; engine synthesis: `ENGINE_SYNTHESIS_v2.md`; repo mirrors in `~/crumb-format/experiments/wavefield_video/` (PRODUCT_SPEC_brainsnn.md, THE_POSITION.md, METHODS_SPACE_2026.md, IMPL_NOTES_M3/M4.md).
 - Box/compute: `remote-gpu-runtime-operations` skill `references/compute-economics.md`; box probe 2026-09-27 ~11:00 EDT (gpuq pending/done lists; P4-RESULT walls 170 s; GPU idle between jobs, 21 GB resident).
