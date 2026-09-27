@@ -42,17 +42,35 @@ can cross a structural floor. **Pre-registered outcome executed: residual mode s
 (code in-tree behind `mc_residual`), no further estimator/gate refinements on this axis; product =
 triage concierge + authored-motion lane, magnitude-mode envelope as the claim boundary.**
 
-## Box (24/7 engine-lab)
+## Box (24/7 engine-lab) — family deployed + verified in place (2026-09-27)
 
 - `crumb_coherence/` shipped to `/workspace/slava/exp/wavefield_video/`; md5 parity verified
-  (core.py `0d48d08d651bb6cc81b13bee2c256e08` both ends; run_trap/run_m0/run_sweep_d1 match after
-  the print-fix re-ship).
-- Remote smoke (translate:96, w8 s0.5 c0.25): **identical** to local — 736.2% / 70.81% / 0.9940 /
+  (core.py `0d48d08d651bb6cc81b13bee2c256e08` both ends; run_trap/run_m0 match).
+- Remote smoke (translate:96, w8 s0.5 c0.25): identical to local — 736.2% / 70.81% / 0.9940 /
   0.508, max dev 10.117px (box python: `/workspace/slava/comfy-house/venv/bin/python`, torch 2.6.0+cu124).
-- Filler family wired: `gpu_queue/generators/{engine_lab_sweep,engine_lab_eval,engine_lab_corpus}.sh`
-  + entries in `gpu_queue/generators.json` (specs under `engine_lab/specs/*.args`, outputs under
-  `engine_lab/sweeps|evals|corpus`). Verification job queued via `gpu_queue/pending/` (manual
-  injection — the daily filler cap was already saturated when wiring landed).
+- Engine-lab filler family deployed as first-class gpuq v2 generators (not a one-off injection):
+  `gpuq/generators/engine_lab_{sweep,eval,corpus}.sh` + registry entries in `gpuq/generators.json`
+  (order appended after the two content fillers; enabled, bounded caps). Mac source of truth
+  `~/.hermes/scripts/box_gpuq/` — supervisor FILES, status.sh md5 list and box_push manifest all
+  carry the family, so drift is auto-repaired every 10 min and it survives box rebuilds
+  (registry md5 `6a4e4b69aead7387a05056df40c0860a`).
+- Verified in place on the box (2026-09-27 13:16–13:19Z; receipts in
+  `/workspace/slava/exp/wavefield_video/engine_lab/verify/`): every generator emits a job file
+  (bash -n clean) and every payload ran rc=0 — sweep 6 runs → `sweeps/sweep_d1_rounds.csv` (spec
+  archived to `specs/done/`), eval 5 runs → `evals/20260927_131632/`, corpus 8 runs →
+  `corpus/20260927_131833/` (4 motion classes × {96,192}). Back-off paths return rc=3 ("no sweep
+  spec queued" / "no eval.args staged"), matching the conductor contract checked in gpuq2.py.
+- Corpus design fix (found by the in-place run): `--seed` is numerically inert for the tracked
+  object (6 seed repeats give identical metrics; only the background balls vary), so the corpus
+  diversity axis is motion class × horizon; the seed-based draft is superseded.
+- No verification job was left in `pending/`: the queue is saturated for hours and fillers exist
+  for idle gaps — the family fires naturally when the queue empties with the other fillers
+  unavailable (the earlier "wired + queued" wording in this section was an interim overclaim,
+  corrected here after the on-box verification).
+- Also fixed while deploying: `run_sweep_d1.py`'s final CSV rewrite wrote only the current round's
+  rows, silently dropping prior rounds on multi-round appends (demonstrated: run tA then tB → CSV
+  kept tB only). Fix writes the merged set; before/after test green; box copy md5-matched
+  (`4da51957a89901fea8b5a00d2d8d8e9c` both ends).
 
 ## Files
 
@@ -60,3 +78,6 @@ triage concierge + authored-motion lane, magnitude-mode envelope as the claim bo
   `out/sweep_d1/manifest_round1.json`, `out/sweep_d1/controls/*.json`
 - Analyzer (scratch): `~/.hermes/workspaces/engine_lab/analyze_sweep.py`
 - Full writeup: `IMPL_NOTES_M4.md`
+- Box family sources: `~/.hermes/scripts/box_gpuq/generators/engine_lab_{sweep,eval,corpus}.sh`
+  + `generators.json`; receipts on the box: `exp/wavefield_video/engine_lab/verify/`
+- Verification harnesses (scratch): `~/.hermes/workspaces/engine_lab/box_verify/`

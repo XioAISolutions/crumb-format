@@ -217,12 +217,15 @@ def main():
         if copass:
             winners.append(key)
 
-    # rewrite csv with copass filled (small file: rewrite atomically)
+    # rewrite csv with copass filled (small file: rewrite atomically).
+    # NOTE: must write the MERGED row set — writing only this round's rows
+    # silently dropped every prior round on multi-round appends (fixed
+    # 2026-09-27, t_3e1d4c9f).
     with open(csv_path, "w", newline="") as fh:
         wtr = csv.DictWriter(fh, fieldnames=CSV_FIELDS)
         wtr.writeheader()
-        for r in rows:
-            wtr.writerow(r)
+        for r in merged_rows:
+            wtr.writerow({k: r.get(k, "") for k in CSV_FIELDS})
 
     # markdown summary
     lines = [f"# D1 sweep round {args.round} ({tag})", "",

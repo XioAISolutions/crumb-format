@@ -37,7 +37,7 @@ pre-existing on pristine HEAD (float-equality nit etc., not D1).
 
 Harness bugs found and fixed en route: (1) `cfg['mc_res_*']` print KeyError for partial flag sets —
 fixed with `.get(..., default)`; (2) earlier over-eager sed fixed with an assertion-guarded rewrite.
-Both were display-path only; round-1 numbers were computed with all flags present and are valid.
+Both were display-path only; round-1 numbers were computed with all flags present and are valid. (3) post-deploy: the driver's final CSV rewrite dropped prior rounds on multi-round appends — fixed + before/after tested (round-1 evidence untouched: single-round file).
 
 ## Sweep (round 1, 120 configs × 3 scenes = 360 runs, 302s local)
 
@@ -88,14 +88,21 @@ magnitude-mode envelope is the claim boundary.
 ## Box (24/7 engine-lab)
 
 - Code parity verified: `crumb_coherence` shipped to `/workspace/slava/exp/wavefield_video/`,
-  md5s identical both ends (core.py `0d48d08d…`), remote smoke run = **identical numbers** to local
-  (736.2% / 70.81% / 0.9940 / 0.508; box python = `/workspace/slava/comfy-house/venv/bin/python`,
-  torch 2.6.0+cu124).
-- Engine-lab filler family: generator scripts + `generators.json` entry as of this note (see
-  `ENGINE_D1_SWEEP.md` §Box for the wiring state and the queued verification job).
+  md5s identical both ends (core.py `0d48d08d…`; run_trap/run_m0 match), remote smoke run =
+  **identical numbers** to local (736.2% / 70.81% / 0.9940 / 0.508; box python =
+  `/workspace/slava/comfy-house/venv/bin/python`, torch 2.6.0+cu124).
+- Engine-lab filler family deployed + **verified in place** on the box (2026-09-27): all three
+  generators emit valid jobs; all three payloads ran rc=0 (receipts under `engine_lab/verify/`);
+  registered as first-class gpuq generators with supervisor drift-repair (Mac source
+  `~/.hermes/scripts/box_gpuq/`). No job left pending (queue saturated; fillers fire on idle
+  gaps). The earlier "wired + queued" wording in this section was corrected after the on-box
+  verification — see `reviews/ENGINE_D1_SWEEP.md` §Box for the full record.
 
 ## Files
 
 - `crumb_coherence/core.py` (D1, default OFF) • `scripts/run_trap.py`, `scripts/run_m0.py` (wiring + print fix)
 - `scripts/run_sweep_d1.py` (driver) • `out/sweep_d1/{sweep_d1_rounds.csv,manifest_round1.json,controls/*}`
-- Scratch (not shipped): `~/.hermes/workspaces/engine_lab/` (smoke_d1.py, repro_m0.py, probes, fixer scripts)
+- Scratch (not shipped): `~/.hermes/workspaces/engine_lab/` (smoke_d1.py, repro_m0.py, probes, fixer scripts;
+  box-verify harnesses under `box_verify/`)
+- Box: `~/.hermes/scripts/box_gpuq/` (engine-lab generator family + registry; supervisor-wired) •
+  box receipts: `exp/wavefield_video/engine_lab/verify/SUMMARY.md`
