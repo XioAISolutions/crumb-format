@@ -70,6 +70,11 @@ class VideoVAETests(unittest.TestCase):
         self.assertEqual(a.fingerprint, b.fingerprint)
         b.std, b._fp = b.std * 2, None                   # latents_std changed, weights identical
         self.assertNotEqual(a.fingerprint, b.fingerprint)
+        from diffusers.configuration_utils import FrozenDict
+        c = VideoVAE("wan-tiny")                         # config-only forward option changed
+        c.model._internal_dict = FrozenDict({**dict(c.model.config), "scale_factor_temporal": 2})
+        c._fp = None
+        self.assertNotEqual(a.fingerprint, c.fingerprint)
 
     def test_bad_inputs(self):
         with self.assertRaises(ValueError):
@@ -89,6 +94,7 @@ class VideoVAETests(unittest.TestCase):
                                       "--out", str(d / "lat"), "--device", "cpu"])
             self.assertEqual(len(idx), 6)                         # 65 frames -> 33 + 25
             self.assertEqual([m["latent_steps"] for m in idx[:2]], [5, 4])
+            self.assertEqual(len({m["sha256"] for m in idx}), len(idx))   # content digests
             # held-out split is by source video and independent of the window
             self.assertEqual(LatentShards(d / "lat", window=2).eval_srcs,
                              LatentShards(d / "lat", window=4).eval_srcs)

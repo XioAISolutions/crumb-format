@@ -16,6 +16,7 @@ train_long.py --latents OUT samples windows from these shards.
     python encode_videos.py --synthetic 4 --videos /tmp/syn --vae ltx-tiny --out /tmp/lat   # smoke
 """
 import argparse
+import hashlib
 import json
 import os
 import pathlib
@@ -154,10 +155,15 @@ def main(argv=None):
                 log({"src": str(v), "seg": j, "shard": None})
                 continue
             z = vae.encode(frames[None, :n])[0].cpu()          # shards load on any host
+            zh = z.half()
             meta = {"src": str(v), "start_frame": s0, "n_frames": n, "fps": fps,
+                    # content digest: the dataset fingerprint (index.json) changes when
+                    # latents do, even at the same paths and lengths
+                    "sha256": hashlib.sha256(zh.contiguous().view(torch.uint8).numpy()
+                                             .tobytes()).hexdigest()[:16],
                     "latent_steps": z.shape[0], "latent_shape": list(z.shape[1:]),
                     "vae": vae.describe(), "file": f"shard_{k:05d}.pt"}
-            torch.save({"latents": z.half(), **meta}, out / (meta["file"] + ".tmp"))
+            torch.save({"latents": zh, **meta}, out / (meta["file"] + ".tmp"))
             os.replace(out / (meta["file"] + ".tmp"), out / meta["file"])
             log({"src": str(v), "seg": j, "shard": meta})
             index.append(meta)

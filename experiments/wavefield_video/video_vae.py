@@ -166,7 +166,7 @@ class VideoVAE(nn.Module):
 
     @property
     def fingerprint(self):
-        """sha256 over the encoder/decoder weights and the latent normalization: shards,
+        """sha256 over the weights, the latent normalization and the model config: shards,
         resumed encodes and the stream's decoder must all use the same latent space,
         and backend + shape alone cannot tell two checkpoints apart."""
         if getattr(self, "_fp", None) is None:
@@ -178,6 +178,10 @@ class VideoVAE(nn.Module):
             for k, v in items:
                 h.update(f"{k}{tuple(v.shape)}{v.dtype}".encode())
                 h.update(v.detach().cpu().contiguous().view(-1).view(torch.uint8).numpy().tobytes())
+            # config-only forward options (e.g. LTX encoder_causal) change the latents too
+            cfg = getattr(self.model, "config", None)
+            if cfg is not None:
+                h.update(json.dumps(dict(cfg), sort_keys=True, default=str).encode())
             self._fp = h.hexdigest()[:16]
         return self._fp
 
