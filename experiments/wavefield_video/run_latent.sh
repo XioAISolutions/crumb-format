@@ -71,7 +71,7 @@ if ! { [ -f "$OUT/result_wave${tag}.json" ] && [ -f "$OUT/model_wave${tag}.pt" ]
     run train "$PY" train_long.py --latents "$LATENTS" --kind wave --pole-param halflife \
         --seq-frames "$SEQ" --chunk "$CHUNK" --tbptt-chunks "$TBPTT" --dense --dim "$DIM" \
         --layers "$LAYERS" --heads "$HEADS" --batch "$BATCH" --steps "$STEPS" --seed "$SEED" \
-        --eval-rollout 256 --save-every 500 ${resume[@]+"${resume[@]}"} --out "$OUT" --tag "$tag"
+        --eval-rollout 256 --save-every 500 --save-every-sec 600 ${resume[@]+"${resume[@]}"} --out "$OUT" --tag "$tag"
 fi
 
 # 3. decoded long stream
@@ -86,4 +86,13 @@ if [ ! -f "$js" ]; then
     mv "$js.tmp" "$js"
 fi
 echo DONE > "$OUT/status.txt"
-"$PY" -c 'import json,sys; d=json.load(open(sys.argv[1])); print("collapse (latent steps; KILL if < 256):", d.get("collapse_latent_step") or "none", "| decoded frames:", d["log"][-1]["decoded_frames"])' "$js"
+"$PY" -c '
+import json, sys
+d = json.load(open(sys.argv[1]))
+c = d.get("collapse_latent_step") or {}
+kill = {k: v for k, v in c.items() if k in ("fade", "flatten")}
+print("pre-registered (fade/flatten, KILL if < 256):", kill or "none",
+      "->", "KILL" if any(v < 256 for v in kill.values()) else "not killed")
+print("other health flags (not part of the rule):",
+      {k: v for k, v in c.items() if k not in kill} or "none",
+      "| decoded frames:", d["log"][-1]["decoded_frames"])' "$js"

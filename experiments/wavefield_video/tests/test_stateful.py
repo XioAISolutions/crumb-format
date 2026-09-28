@@ -214,6 +214,32 @@ class StatefulTests(unittest.TestCase):
             __import__("render_rollout").render(args)                 # auto mode
             meta = json.loads(Path(f"{d}/r/metrics.json").read_text())
             self.assertEqual(meta["rollout"]["mode"], "recurrent")    # SSM through its state
+    def test_sigterm_checkpoints_and_resume_finishes(self):
+        import os
+        import signal
+        import subprocess
+        import tempfile
+        here = Path(__file__).resolve().parents[1]
+        args = [sys.executable, str(here / "train_long.py"), "--seq-frames", "8", "--chunk", "4",
+                "--dim", "16", "--layers", "1", "--heads", "2", "--grid", "16", "--batch", "2",
+                "--eval-rollout", "4", "--steps", "200", "--save-every-sec", "3600"]
+        with tempfile.TemporaryDirectory() as d:
+            p = subprocess.Popen(args + ["--out", d], cwd=here, stdout=subprocess.PIPE, text=True)
+            for line in p.stdout:                        # wait until training is under way
+                if line.startswith("STEP"):
+                    break
+            p.send_signal(signal.SIGTERM)
+            out, _ = p.communicate(timeout=120)
+            self.assertEqual(p.returncode, 143)
+            self.assertIn("SIGTERM: saved step", out)
+            ck = torch.load(Path(d) / "ckpt_wave.pt", weights_only=True)
+            self.assertGreater(ck["step"], 0)
+            self.assertFalse(any(n.endswith(".tmp") for n in os.listdir(d)))
+            done = subprocess.run(args[:-4] + ["--steps", str(ck["step"] + 1), "--save-every-sec",
+                                               "3600", "--resume", str(Path(d) / "ckpt_wave.pt"),
+                                               "--out", d], cwd=here, capture_output=True, text=True)
+            self.assertEqual(done.returncode, 0, done.stderr[-2000:])
+            self.assertTrue((Path(d) / "model_wave.pt").exists())
 
 if __name__ == "__main__":
     unittest.main()

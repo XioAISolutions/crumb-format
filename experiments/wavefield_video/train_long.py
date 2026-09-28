@@ -25,7 +25,9 @@ context. Result JSON keeps train_compare's field names.
 """
 import argparse
 import json
+import os
 import pathlib
+import signal
 import time
 
 import torch
@@ -36,6 +38,12 @@ import train_compare as tc
 from data import MOVE_THRESH, N_BALLS, RADIUS, SPEED
 from video_vae import LatentShards
 from wfvideo import VideoPredictor
+
+
+def _save_atomic(obj, path):
+    tmp = pathlib.Path(str(path) + ".tmp")
+    torch.save(obj, tmp)
+    os.replace(tmp, path)
 
 
 def arch_kwargs(a, in_ch=3):
@@ -254,6 +262,9 @@ def main(argv=None):
     ap.add_argument("--eval-batch", type=int, default=8,
                     help="single-step eval batch (8 x 8 batches); keep small on the GPU box")
     ap.add_argument("--save-every", type=int, default=0)
+    ap.add_argument("--save-every-sec", type=float, default=0,
+                    help="also checkpoint when this many seconds passed since the last save "
+                         "(sliced jobs: keep it well under the slice budget)")
     ap.add_argument("--resume", default="")
     ap.add_argument("--out", default="runs_long")
     ap.add_argument("--tag", default="")
@@ -325,8 +336,19 @@ def main(argv=None):
     def resume_meta():          # latent runs: sampler position + what it samples from
         return {"dgen": dgen.get_state(), "vae": data.vae, "data_fp": data.fingerprint}
 
+    def save_ckpt(step):        # atomic: a kill mid-write leaves the previous file intact
+        _save_atomic({"state": m.state_dict(), "opt": opt.state_dict(), "step": step,
+                      "train_sec": prior_sec + time.time() - t0,
+                      **(resume_meta() if data is not None else {})}, ckpt_path)
+
+    # A slice budget ends with SIGTERM (GNU timeout): finish the current step, save,
+    # exit 143 so the runner reports SLICED and the next slice resumes from here.
+    stop = []
+    if a.save_every or a.save_every_sec:
+        signal.signal(signal.SIGTERM, lambda *_: stop.append(1))
     m.train()
     log, t0 = [], time.time()
+    last_save = t0
     for step in range(start + 1, a.steps + 1):
         if data is not None:
             clips, moving = data.batch(a.batch, a.seq_frames + 1, dgen), None
@@ -349,15 +371,18 @@ def main(argv=None):
                    "st_s": round((step - start) / max(time.time() - t0, 1e-9), 3)}
             log.append(row)
             print("STEP", json.dumps(row), flush=True)
-        if a.save_every and step % a.save_every == 0:
-            torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": step,
-                        "train_sec": prior_sec + time.time() - t0,
-                        **(resume_meta() if data is not None else {})}, ckpt_path)
+        due = (a.save_every and step % a.save_every == 0) or \
+              (a.save_every_sec and time.time() - last_save >= a.save_every_sec)
+        if due or stop:
+            save_ckpt(step)
+            last_save = time.time()
+        if stop:
+            print(f"SIGTERM: saved step {step} to {ckpt_path}; exiting to resume", flush=True)
+            raise SystemExit(143)
     train_sec = prior_sec + time.time() - t0              # cumulative across resumed slices
-    if a.save_every:
-        torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": a.steps,
-                    "train_sec": train_sec,
-                    **(resume_meta() if data is not None else {})}, ckpt_path)
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)         # evaluation: plain termination
+    if a.save_every or a.save_every_sec:
+        save_ckpt(a.steps)
 
     m.eval()
     a.frames = a.chunk                                   # eval context = one chunk
@@ -379,8 +404,12 @@ def main(argv=None):
            "train_occ_end": a.train_occ_end, "occ_start": a.occ_start, "occ_end": a.occ_end,
            "persistent_state_bytes": m.persistent_state_bytes(), "train_sec": round(train_sec, 1),
            "log_tail": log[-3:], **single, **roll}
-    (base / f"result_{a.kind}{a.tag}.json").write_text(json.dumps(res, indent=1))
-    torch.save({"state": m.state_dict(), "config": cfg}, base / f"model_{a.kind}{a.tag}.pt")
+    # model before result, both atomic: "both files exist" (the runners' done test)
+    # then always means both are complete
+    _save_atomic({"state": m.state_dict(), "config": cfg}, base / f"model_{a.kind}{a.tag}.pt")
+    tmp = base / f"result_{a.kind}{a.tag}.json.tmp"
+    tmp.write_text(json.dumps(res, indent=1))
+    os.replace(tmp, base / f"result_{a.kind}{a.tag}.json")
     keys = ("eval_mse_over_copylast", "copy_ratio", "divergence_horizon", "exit_direction_accuracy",
             "position_error_at_emergence")
     print("RESULT", json.dumps({k: res.get(k) for k in keys}), flush=True)
