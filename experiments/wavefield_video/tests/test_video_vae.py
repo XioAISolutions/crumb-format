@@ -255,6 +255,9 @@ class VideoVAETests(unittest.TestCase):
             done = stream(d / "lat", d / "vae", "--stream-frames", "8", "--checkpoint", ck)
             self.assertEqual(done["steps_generated"], 8)                        # done: no-op
             self.assertTrue(done["state_bytes_constant"])                       # from saved log
+            self.assertNotIn("log", torch.load(ck, weights_only=True)["extra"])  # sidecar only
+            self.assertEqual(len(open(ck + ".log.jsonl").read().splitlines()),
+                             len(whole["log"]))
             self.assertEqual(done["grid"], [2, 2])                              # latent h, w
             with self.assertRaisesRegex(SystemExit, "different context"):     # other stream
                 stream(d / "lat", d / "vae", "--stream-frames", "8", "--checkpoint", ck,

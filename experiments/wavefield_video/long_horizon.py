@@ -432,7 +432,16 @@ def cmd_stream(a):
     ex = sess.extra or {}
     prev = ex.get("prev_latent", ctx[:, -1] if vae is not None and not a.resume else None)
     gen = int(ex.get("generated", 0))                # steps generated so far
-    log = list(ex.get("log", [])) if a.checkpoint else []
+    # --checkpoint: per-chunk log rows go to a sidecar JSONL (append-only), so the
+    # checkpoint itself stays constant-size; it records only how many rows count.
+    log_path = a.checkpoint + ".log.jsonl" if a.checkpoint else None
+    log = []
+    if log_path and a.resume and os.path.exists(log_path):
+        rows = open(log_path).read().splitlines()[:int(ex.get("log_rows", 0))]
+        log = [json.loads(r) for r in rows]
+    if log_path:                     # drop rows written after the last checkpoint
+        with open(log_path, "w") as fh:
+            fh.writelines(json.dumps(r) + "\n" for r in log)
     # Decoded frame d -> generated latent step, in closed form (O(1) state): with an
     # overlap latent before the first chunk every latent gives `stride` frames
     # (d // stride); without one, latent 0 gives a single frame first.
@@ -447,7 +456,7 @@ def cmd_stream(a):
         if vae is not None:
             extra.update(prev_latent=prev, lead_frame=lead)
         if a.checkpoint:
-            extra["log"] = log                       # one row per chunk
+            extra["log_rows"] = len(log)
         return extra
 
     todo = max(0, a.stream_frames - gen) if a.checkpoint else a.stream_frames
@@ -472,6 +481,9 @@ def cmd_stream(a):
         if vae is not None:
             row["flags_latent_step"] = {k: latent_step(v) for k, v in mon.first.items()}
         log.append(row)
+        if log_path:                 # row first, then the checkpoint that counts it
+            with open(log_path, "a") as fh:
+                fh.write(json.dumps(row) + "\n")
         print(f"STREAM t={row['frame']:6d} state={_fmt_bytes(row['state_bytes'])} "
               f"fps={row['fps']} mean={st['mean']:.4f} std={st['std']:.4f} "
               f"motion={st['motion']:.5f} flags={row['flags']}", flush=True)

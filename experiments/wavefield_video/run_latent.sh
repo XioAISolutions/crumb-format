@@ -55,13 +55,13 @@ fi
 echo "$cfg" > "$OUT/run_config.txt"
 echo RUNNING > "$OUT/status.txt"
 
-# 1. encode (skipped once index.json exists; a sliced encode resumes at the next
-#    unencoded segment via LATENTS/progress.jsonl; delete LATENTS to re-encode)
-if [ ! -f "$LATENTS/index.json" ]; then
-    echo "== encode $(date -u +%FT%TZ)" | tee -a "$OUT/progress.txt"
-    run encode "$PY" encode_videos.py --videos "$VIDEOS" "${vae_args[@]}" --height "$HEIGHT" \
-        --width "$WIDTH" --fps "$FPS" --max-frames "$MAX_FRAMES" --out "$LATENTS"
-fi
+# 1. encode -- always invoked: it is resumable and idempotent (finished segments are
+#    journaled in LATENTS/progress.jsonl), and it refuses a LATENTS written for
+#    another corpus / size / fps / segmentation / VAE. A complete LATENTS costs one
+#    VAE load plus that identity check. Delete LATENTS to re-encode.
+echo "== encode $(date -u +%FT%TZ)" | tee -a "$OUT/progress.txt"
+run encode "$PY" encode_videos.py --videos "$VIDEOS" "${vae_args[@]}" --height "$HEIGHT" \
+    --width "$WIDTH" --fps "$FPS" --max-frames "$MAX_FRAMES" --out "$LATENTS"
 
 # 2. train (result + model both present = done; else resume from ckpt)
 tag="_latent_s${SEED}"

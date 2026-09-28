@@ -125,7 +125,9 @@ def main(argv=None):
     if cfg_path.exists() and json.loads(cfg_path.read_text()) != cfg:
         raise SystemExit(f"{out} holds a partial encode with different settings; delete it or "
                          "use another --out")
-    cfg_path.write_text(json.dumps(cfg))
+    if not cfg_path.exists():                        # atomic, and never rewritten
+        cfg_path.with_suffix(".tmp").write_text(json.dumps(cfg))
+        os.replace(cfg_path.with_suffix(".tmp"), cfg_path)
     lines = []
     if journal.exists():
         for x in journal.read_text().splitlines():
