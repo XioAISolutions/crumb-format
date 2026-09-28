@@ -9,8 +9,9 @@
 #               by chunk; HealthMonitor judges the DECODED pixels
 #
 # Pre-registered read (fixed before any result):
-#   KILL   fade or flatten fires before latent step 256 (~34 s of LTX video) on
-#          the held-out stream -> the latent line is not ready for minutes.
+#   KILL   fade or flatten fires before latent step 256 (256 x 8 frames / 24 fps
+#          ~= 85 s of LTX video) on the held-out stream -> the latent line is not
+#          ready for minutes.
 #   PASS   no fade/flatten through STREAM_STEPS (default 900 = 5 min through LTX);
 #          then judge the decoded frames by eye before any claim.
 # Resumable like run_long_horizon.sh: re-run until $OUT/status.txt reads DONE.

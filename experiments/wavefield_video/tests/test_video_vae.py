@@ -170,6 +170,27 @@ class VideoVAETests(unittest.TestCase):
             self.assertEqual(resumed, full)
             with self.assertRaises(SystemExit):                  # settings changed mid-encode
                 encode_videos.main(args[:-6] + ["--height", "32", "--width", "32"] + args[-4:])
+            # different weights, same backend and shapes: a resumed encode and a stream
+            # decoder must both refuse them
+            other = VideoVAE("ltx-tiny")
+            with torch.no_grad():
+                next(other.model.parameters()).add_(1e-3)
+            other.save(d / "vae2")
+            self.assertNotEqual(VideoVAE("ltx-tiny", path=d / "vae2").fingerprint,
+                                VideoVAE("ltx-tiny", path=d / "vae").fingerprint)
+            (d / "lat" / "index.json").unlink()
+            with self.assertRaises(SystemExit):
+                encode_videos.main([x if x != str(d / "vae") else str(d / "vae2") for x in args])
+            encode_videos.main(args)                             # restore a complete index
+            train_long.main(["--latents", str(d / "lat"), "--seq-frames", "4", "--chunk", "2",
+                             "--dim", "16", "--layers", "1", "--heads", "2", "--steps", "1",
+                             "--batch", "2", "--eval-rollout", "2", "--out", str(d / "run")])
+            with self.assertRaises(SystemExit):
+                lh.main(["stream", "--pole-param", "halflife", "--time-pos", "none",
+                         "--ckpt", str(d / "run" / "model_wave.pt"), "--latents", str(d / "lat"),
+                         "--vae", "ltx-tiny", "--vae-path", str(d / "vae2"), "--frames", "2",
+                         "--dim", "16", "--layers", "1", "--heads", "2", "--stream-frames", "4",
+                         "--chunk", "2", "--batch", "1", "--device", "cpu"])
 
 if __name__ == "__main__":
     unittest.main()

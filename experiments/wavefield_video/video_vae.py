@@ -162,7 +162,21 @@ class VideoVAE(nn.Module):
 
     def describe(self):
         return {"backend": self.backend, "t_stride": self.t_stride, "s_stride": self.s_stride,
-                "channels": self.channels}
+                "channels": self.channels, "fingerprint": self.fingerprint}
+
+    @property
+    def fingerprint(self):
+        """sha256 over the encoder/decoder weights (names, shapes, values): shards,
+        resumed encodes and the stream's decoder must all use the same latent space,
+        and backend + shape alone cannot tell two checkpoints apart."""
+        if getattr(self, "_fp", None) is None:
+            import hashlib
+            h = hashlib.sha256()
+            for k, v in sorted(self.model.state_dict().items()):
+                h.update(f"{k}{tuple(v.shape)}{v.dtype}".encode())
+                h.update(v.detach().cpu().contiguous().view(-1).view(torch.uint8).numpy().tobytes())
+            self._fp = h.hexdigest()[:16]
+        return self._fp
 
 
 class LatentShards:

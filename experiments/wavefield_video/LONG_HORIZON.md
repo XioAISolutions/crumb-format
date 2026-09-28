@@ -323,9 +323,11 @@ for hours of 256×448 latents (≈0.1 MB per latent step at fp16) but not for
 datasets far larger than that.
 
 Pre-registered box read (`run_latent.sh`): **KILL** if fade or flatten fires
-before latent step 256 (~34 s of LTX video) on the held-out stream. **PASS**
-if nothing fires through 900 steps (5 minutes); then judge the decoded frames
-by eye before any claim.
+before latent step 256 on the held-out stream. That is 256 × 8 frames ÷ 24 fps
+≈ 85 s of LTX video; an earlier draft said ~34 s, which was an arithmetic error,
+and the threshold itself (step 256) is unchanged. **PASS** if nothing fires
+through 900 steps (5 minutes); then judge the decoded frames by eye before any
+claim.
 
 ## Pitch corrections
 

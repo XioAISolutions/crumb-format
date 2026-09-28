@@ -367,6 +367,10 @@ def cmd_stream(a):
             raise SystemExit("--latents needs --vae (and --vae-path for real weights)")
         shards = LatentShards(a.latents, a.frames, device="cpu")
         vae = VideoVAE(a.vae, path=a.vae_path, device=dev)
+        enc = shards.vae.get("fingerprint")
+        if enc is not None and enc != vae.fingerprint:
+            raise SystemExit(f"--vae weights ({vae.fingerprint}) differ from the encoder that "
+                             f"wrote {a.latents} ({enc}): decoded frames would be meaningless")
         ctx = shards.batch(a.batch, a.frames, torch.Generator().manual_seed(70000), "eval")
         m = build_model(a, a.pole_param[0], write_gate=wg, clean_write=cw, in_ch=shards.C, H=shards.h, W=shards.w).to(dev)
     else:
