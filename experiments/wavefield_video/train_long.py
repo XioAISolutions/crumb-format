@@ -306,6 +306,12 @@ def main(argv=None):
     if a.resume:
         ck = torch.load(a.resume, map_location=dev, weights_only=True)
         m.load_state_dict(ck["state"])
+        if data is not None:                             # same latent space, or refuse
+            fp_ck = (ck.get("vae") or {}).get("fingerprint")
+            fp_now = (data.vae or {}).get("fingerprint")
+            if fp_ck is not None and fp_now is not None and fp_ck != fp_now:
+                ap.error(f"--resume {a.resume} was trained on VAE {fp_ck}; --latents {a.latents} "
+                         f"was encoded with {fp_now}")
         if data is not None and "dgen" in ck:            # continue the latent sample stream
             dgen.set_state(ck["dgen"].cpu())
         opt.load_state_dict(ck["opt"])
@@ -340,12 +346,12 @@ def main(argv=None):
         if a.save_every and step % a.save_every == 0:
             torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": step,
                         "train_sec": prior_sec + time.time() - t0,
-                        **({"dgen": dgen.get_state()} if data is not None else {})}, ckpt_path)
+                        **({"dgen": dgen.get_state(), "vae": data.vae} if data is not None else {})}, ckpt_path)
     train_sec = prior_sec + time.time() - t0              # cumulative across resumed slices
     if a.save_every:
         torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": a.steps,
                     "train_sec": train_sec,
-                    **({"dgen": dgen.get_state()} if data is not None else {})}, ckpt_path)
+                    **({"dgen": dgen.get_state(), "vae": data.vae} if data is not None else {})}, ckpt_path)
 
     m.eval()
     a.frames = a.chunk                                   # eval context = one chunk

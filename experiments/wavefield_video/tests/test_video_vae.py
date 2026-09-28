@@ -4,7 +4,9 @@ LONG_HORIZON.md phase 2 on CPU with tiny random VAEs: shapes, strides,
 save/load, mp4 -> shards -> latent training -> decoded 5-minute-style stream.
 Skips when the optional video deps (requirements-video.txt) are missing."""
 
+import contextlib
 import importlib.util
+import io
 import json
 import sys
 import tempfile
@@ -214,8 +216,20 @@ class VideoVAETests(unittest.TestCase):
             self.assertEqual(sliced["log"][-1]["decoded_frames"], whole["log"][-1]["decoded_frames"])
             self.assertEqual(sliced["log"][-1]["last"], whole["log"][-1]["last"])
             self.assertEqual(len(sliced["log"]), len(whole["log"]))
-            self.assertEqual(stream(d / "lat", d / "vae", "--stream-frames", "8",
-                                    "--checkpoint", ck)["steps_generated"], 8)   # done: no-op
+            done = stream(d / "lat", d / "vae", "--stream-frames", "8", "--checkpoint", ck)
+            self.assertEqual(done["steps_generated"], 8)                        # done: no-op
+            self.assertTrue(done["state_bytes_constant"])                       # from saved log
+            # a training resume onto shards from another VAE is refused
+            common = ["--seq-frames", "4", "--chunk", "2", "--dim", "16", "--layers", "1",
+                      "--heads", "2", "--batch", "2", "--eval-rollout", "2"]
+            train_long.main(common + ["--latents", str(d / "lat"), "--steps", "1",
+                                      "--save-every", "1", "--out", str(d / "tr")])
+            err = io.StringIO()
+            with self.assertRaises(SystemExit), contextlib.redirect_stderr(err):
+                train_long.main(common + ["--latents", str(d / "lat2"), "--steps", "2",
+                                          "--resume", str(d / "tr" / "ckpt_wave.pt"),
+                                          "--out", str(d / "tr")])
+            self.assertIn("was trained on VAE", err.getvalue())
 
 if __name__ == "__main__":
     unittest.main()

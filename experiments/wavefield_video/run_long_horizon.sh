@@ -22,7 +22,7 @@
 #           carries memory past a gap longer than any it trained on.
 #
 # Pre-registered read (fixed before any result):
-#   SEQ=1 adds W_half_seq / S_ssm_seq (train_long.py): SEQ_FRAMES=512 sequences
+#   SEQ=1 adds W_half_seq[_cw|_wg] / S_ssm_seq (train_long.py): SEQ_FRAMES=512 sequences
 #           in T_LONG chunks with carried state and a SEQ_GAP=256 gap mid-sequence.
 #           PROVE (seq): W_half_seq exit-direction accuracy >= 0.8 on >= 2/3 seeds
 #           with TBPTT=1 -> constant-memory training bridges gaps > one chunk.
@@ -93,7 +93,12 @@ if [ "$EVAL_ROLLOUT" -lt "$need" ]; then
 fi
 if [ "${SEQ:-0}" = "only" ]; then ARMS=(); SEQ=1; fi    # SEQ=only: carried-state arms alone
 if [ "${SEQ:-0}" = "1" ]; then
-    ARMS+=("W_half_seq|wave|$T_LONG|--pole-param halflife $WRITE|long"
+    # The write path changes the architecture, so it is part of the arm's identity:
+    # W_half_seq_cw (clean write), _wg (gate); plain W_half_seq = as built. An OUT
+    # from an older as-built run is never resumed into / mistaken for another.
+    wtag=""; case " $WRITE " in *" --clean-write "*) wtag+="_cw";; esac
+    case " $WRITE " in *" --write-gate "*) wtag+="_wg";; esac
+    ARMS+=("W_half_seq${wtag}|wave|$T_LONG|--pole-param halflife $WRITE|long"
            "S_ssm_seq|ssm|$T_LONG||long")
 fi
 

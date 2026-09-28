@@ -312,7 +312,8 @@ halflife):** arms clean G=4, clean G=1, gate G=4, gate G=1.
   clean write cannot remove it. Nothing here yet handles real static content.
 - **Runner default.** The ball scenes are effectively blank-background (median
   pixel ≈ 7e-7), so `run_long_horizon.sh` now defaults the wave SEQ arm to
-  `WRITE=--clean-write`. `WRITE=` restores the as-built write.
+  `WRITE=--clean-write`, tagged `W_half_seq_cw` so it never resumes or skips
+  on an as-built `W_half_seq` run. `WRITE=` restores the as-built write.
 - **Next (not run; to be pre-registered as 8.5 before any result):** write
   temporal differences (x_t − x_{t−1}) into the wave state. A static
   background then writes exactly zero on real video too, and events still

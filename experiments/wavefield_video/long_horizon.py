@@ -466,7 +466,9 @@ def cmd_stream(a):
            "frames": a.stream_frames, "grid": a.grid,
            "context_ref": {k: v.tolist() for k, v in mon.ref.items()},
            "collapse_sample": dict(mon.first_sample),
-           "state_bytes_constant": len(sizes) == 1, "collapse": dict(mon.first), "log": log}
+           # over every chunk of the stream, including slices restored from --checkpoint
+           "state_bytes_constant": len(sizes | {r["state_bytes"] for r in log}) == 1,
+           "collapse": dict(mon.first), "log": log}
     if vae is not None:     # collapse above is in decoded frames; the KILL rule reads latent steps
         res["collapse_latent_step"] = {k: latent_step(v) for k, v in mon.first.items()}
         res["latent_steps_generated"] = gen
