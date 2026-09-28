@@ -6,6 +6,7 @@
 LOG=/workspace/slava/logs/gpuq_job_600_long_horizon_smoke.log
 mkdir -p /workspace/slava/logs
 exec > "$LOG" 2>&1
+set -o pipefail                 # a failing test must not hide behind `| tail`
 echo "=== job600 long-horizon boxsmoke start $(date -u +%FT%TZ)"
 nvidia-smi --query-gpu=name,utilization.gpu,memory.used --format=csv,noheader
 cd /workspace/slava/exp/wavefield_video || exit 1

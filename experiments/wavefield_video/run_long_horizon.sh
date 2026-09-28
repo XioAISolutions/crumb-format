@@ -103,14 +103,15 @@ for seed in $SEEDS; do
 done
 
 # 5-minute health stream on each trained wave arm (constant state, collapse flags).
-for f in "$OUT"/model_wave_W_*_s0.pt; do
+for f in "$OUT"/model_wave_W_*_s0.pt "$OUT"/model_wave_E_*_s0.pt; do
     [ -f "$f" ] || continue
     [ -f "${f%.pt}_stream7200.json" ] && continue
-    pp=softplus; [[ "$f" == *W_half* ]] && pp=halflife
+    pp=softplus; [[ "$f" == *_half_* ]] && pp=halflife
+    fuse=none; [[ "$(basename "$f")" == model_wave_E_* ]] && fuse=local_wave
     res="$OUT/result_$(basename "${f#*model_}")"; res="${res%.pt}.json"
     ffn=$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["ffn_mult"])' "$res")
     "$PY" long_horizon.py stream --pole-param "$pp" --ckpt "$f" --grid "$GRID" --frames "$T_LONG" \
-        --dim "$DIM" --layers "$LAYERS" --heads "$HEADS" --ffn-mult "$ffn" \
+        --dim "$DIM" --layers "$LAYERS" --heads "$HEADS" --ffn-mult "$ffn" --fuse "$fuse" \
         --stream-frames "$STREAM_FRAMES" --chunk 600 \
         --out "${f%.pt}_stream7200.json" > "${f%.pt}_stream7200.log" 2>&1 || { echo "STREAM FAIL $f" | tee -a "$OUT/progress.txt"
              echo "FAILED stream $(basename "$f")" > "$OUT/status.txt"; exit 1; }

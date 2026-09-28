@@ -11,5 +11,7 @@ cd /workspace/slava/exp/wavefield_video || exit 1
 grep -qs DONE runs_long_horizon/status.txt && { echo "suite DONE -- no-op"; exit 0; }
 export PY=/workspace/slava/comfy-house/venv/bin/python
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
-OUT=runs_long_horizon STEPS=4000 SEEDS="0 1 2" SLICE_S=4800 bash run_long_horizon.sh
+rc=0
+OUT=runs_long_horizon STEPS=4000 SEEDS="0 1 2" SLICE_S=4800 bash run_long_horizon.sh || rc=$?
 tail -5 runs_long_horizon/progress.txt
+exit "$rc"                      # FAILED suites must fail the queue job
