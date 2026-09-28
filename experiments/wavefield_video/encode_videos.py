@@ -27,11 +27,13 @@ from video_vae import VideoVAE, valid_frames
 EXTS = (".mp4", ".mov", ".mkv", ".webm", ".avi")
 
 
-def iter_segments(path, fps, height, width, seg):
+def iter_segments(path, fps, height, width, seg, skip=0):
     """Stream a video: decode one frame at a time, drop frames to ~fps, resize +
     crop each frame immediately, and yield (start_frame, [n,3,H,W] float) segments
     of up to ``seg`` frames. Memory is one segment at the target size, however long
-    or high-resolution the source is (a full 5-min 1080p decode would be ~180 GB)."""
+    or high-resolution the source is (a full 5-min 1080p decode would be ~180 GB).
+    ``skip``: segments already encoded (resume); their frames are decoded and
+    counted but not resized or yielded."""
     import imageio.v2 as iio
     rd = iio.get_reader(str(path), "ffmpeg")
     try:
@@ -43,11 +45,13 @@ def iter_segments(path, fps, height, width, seg):
         for i, f in enumerate(rd):
             if i / src_fps < kept / out_fps - 1e-6 * (1 / src_fps):
                 continue
-            x = torch.from_numpy(f).permute(2, 0, 1)[None].float() / 255.0
-            buf.append(fit(x, height, width)[0])
+            if kept >= skip * seg:
+                x = torch.from_numpy(f).permute(2, 0, 1)[None].float() / 255.0
+                buf.append(fit(x, height, width)[0])
             kept += 1
-            if len(buf) == seg:
-                yield start, torch.stack(buf), out_fps
+            if kept % seg == 0:
+                if buf:
+                    yield start, torch.stack(buf), out_fps
                 start, buf = kept, []
         if buf:
             yield start, torch.stack(buf), out_fps
@@ -105,39 +109,50 @@ def main(argv=None):
     vids = sorted(p for p in pathlib.Path(a.videos).rglob("*") if p.suffix.lower() in EXTS)
     if not vids:
         raise SystemExit(f"no videos under {a.videos}")
-    # Resumable: every finished video is journaled (progress.jsonl) with its shards,
-    # so a run killed by a slice budget continues at the next unfinished video.
-    # A partly encoded video is redone (its shard numbers are reused).
+    # Resumable: every encoded segment is journaled (progress.jsonl) with its shard,
+    # and every finished video gets a "done" line, so a run killed by a slice
+    # budget continues at the next unencoded segment -- inside a long video too.
+    # A segment killed mid-encode is redone (its shard number is reused).
     cfg = {"vae": vae.describe(), "height": a.height, "width": a.width, "fps": a.fps, "seg": seg}
     cfg_path, journal = out / "progress_config.json", out / "progress.jsonl"
     if cfg_path.exists() and json.loads(cfg_path.read_text()) != cfg:
         raise SystemExit(f"{out} holds a partial encode with different settings; delete it or "
                          "use another --out")
     cfg_path.write_text(json.dumps(cfg))
-    done = [json.loads(line) for line in journal.read_text().splitlines()] if journal.exists() else []
-    finished = {d["src"] for d in done}
-    index = [m for d in done for m in d["shards"]]
+    lines = [json.loads(x) for x in journal.read_text().splitlines()] if journal.exists() else []
+    finished = {d["src"] for d in lines if d.get("done")}
+    segs_done = {}
+    for d in lines:
+        if "seg" in d:
+            segs_done[d["src"]] = segs_done.get(d["src"], 0) + 1
+    index = [d["shard"] for d in lines if d.get("shard")]
     k = len(index)
-    if finished:
-        print(f"RESUME {len(finished)} videos / {k} shards already encoded", flush=True)
+    if lines:
+        print(f"RESUME {len(finished)} videos done, {k} shards already encoded", flush=True)
+
+    def log(entry):
+        with journal.open("a") as fh:
+            fh.write(json.dumps(entry) + "\n")
+
     for v in vids:
         if str(v) in finished:
             continue
-        mine = []
-        for s0, frames, fps in iter_segments(v, a.fps, a.height, a.width, seg):
+        skip = segs_done.get(str(v), 0)
+        for j, (s0, frames, fps) in enumerate(iter_segments(v, a.fps, a.height, a.width, seg,
+                                                            skip=skip), start=skip):
             n = valid_frames(frames.shape[0], vae.t_stride)
             if n < 1 + vae.t_stride:                 # too short to give 2 latent steps
+                log({"src": str(v), "seg": j, "shard": None})
                 continue
             z = vae.encode(frames[None, :n])[0].cpu()          # shards load on any host
             meta = {"src": str(v), "start_frame": s0, "n_frames": n, "fps": fps,
                     "latent_steps": z.shape[0], "latent_shape": list(z.shape[1:]),
                     "vae": vae.describe(), "file": f"shard_{k:05d}.pt"}
             torch.save({"latents": z.half(), **meta}, out / meta["file"])
-            mine.append(meta)
+            log({"src": str(v), "seg": j, "shard": meta})
+            index.append(meta)
             k += 1
-        index += mine
-        with journal.open("a") as fh:
-            fh.write(json.dumps({"src": str(v), "shards": mine}) + "\n")
+        log({"src": str(v), "done": True})
         print(f"ENCODED {v} -> {k} shards so far", flush=True)
     (out / "index.json").write_text(json.dumps(index, indent=1))
     print(f"DONE {len(index)} shards, {sum(m['latent_steps'] for m in index)} latent steps", flush=True)

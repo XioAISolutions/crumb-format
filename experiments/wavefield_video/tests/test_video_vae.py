@@ -167,14 +167,18 @@ class VideoVAETests(unittest.TestCase):
                     "--height", "64", "--width", "64", "--max-frames", "33", "--out", str(d / "lat"),
                     "--device", "cpu"]
             full = encode_videos.main(["--synthetic", "3"] + args)
-            # simulate a slice killed while encoding video 2: only video 1 journaled
+            # simulate a slice killed inside video 2, after its first segment
             journal = d / "lat" / "progress.jsonl"
-            journal.write_text(journal.read_text().splitlines()[0] + "\n")
+            rows = journal.read_text().splitlines()
+            v2 = sorted({json.loads(r)["src"] for r in rows})[1]
+            cut = next(i for i, r in enumerate(rows) if json.loads(r)["src"] == v2) + 1
+            journal.write_text("\n".join(rows[:cut]) + "\n")
             (d / "lat" / "index.json").unlink()
-            with unittest.mock.patch.object(encode_videos, "iter_segments",
-                                            wraps=encode_videos.iter_segments) as seg:
+            with unittest.mock.patch.object(VideoVAE, "encode", autospec=True,
+                                            side_effect=VideoVAE.encode) as enc:
                 resumed = encode_videos.main(args)
-            self.assertEqual(seg.call_count, 2)                  # video 1 not re-encoded
+            self.assertEqual(len(full), 6)                      # 3 videos x 2 segments
+            self.assertEqual(enc.call_count, 3)                 # v2's 2nd segment + v3's two
             self.assertEqual(resumed, full)
             with self.assertRaises(SystemExit):                  # settings changed mid-encode
                 encode_videos.main(args[:-6] + ["--height", "32", "--width", "32"] + args[-4:])
