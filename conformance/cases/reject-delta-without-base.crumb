@@ -1,0 +1,8 @@
+BEGIN CRUMB
+v=1.4
+kind=delta
+source=test
+---
+[changes]
+- +[notes] added a note
+END CRUMB

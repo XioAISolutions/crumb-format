@@ -14,6 +14,8 @@ const REQUIRED_SECTIONS = {
 };
 const SUPPORTED_VERSIONS = new Set(["1.1", "1.2", "1.3", "1.4"]);
 const FOLD_SECTION_RE = /^fold:([^/]+)\/(summary|full)$/;
+const CONTENT_REF_RE = /^sha256:[0-9a-f]{16,64}$/;
+const DELTA_CHANGE_RE = /^\s*-\s*([+\-~])\[(@?[a-z0-9_:/-]+)\]\s*(.*)$/i;
 const HANDOFF_ID_RE = /^[a-zA-Z0-9_-]+$/;
 const WORKFLOW_LINE_RE = /^\s*-?\s*(\d+)[.)]\s*(.+)$/;
 const KV_RE = /([a-zA-Z_][a-zA-Z0-9_]*)=([^\s]+)/g;
@@ -94,6 +96,12 @@ function validateV12Additive(headers, sections) {
       throw new Error("refs header must not be empty when present");
     for (const ref of refsValue.split(",").map((r) => r.trim())) {
       if (!ref) throw new Error("refs header contains an empty entry");
+      // The reference parser enforces the digest shape (SPEC §13). This
+      // validator did not, so a malformed content ref passed here and failed
+      // there — caught by the conformance suite the first time both
+      // implementations ran the same cases.
+      if (ref.startsWith("sha256:") && !CONTENT_REF_RE.test(ref))
+        throw new Error(`refs entry '${ref}' has a malformed sha256: digest`);
     }
   }
   if ("refs" in sections && !sections.refs.some((line) => line.trim()))
@@ -114,6 +122,28 @@ function validateV12Additive(headers, sections) {
       throw new Error(
         `fold:${foldName} declares /full without a paired /summary`,
       );
+  }
+
+  // Delta crumbs (SPEC §15). This validator had no delta rules at all, so a
+  // delta with no base — which cannot be applied to anything — validated
+  // clean here and failed in the reference parser.
+  if (headers.kind === "delta") {
+    if (!("base" in headers) || !headers.base.trim())
+      throw new Error(
+        "kind=delta requires a 'base' header identifying the parent crumb",
+      );
+    const changes = (sections.changes || []).filter((line) => line.trim());
+    if (!changes.length)
+      throw new Error("kind=delta requires at least one entry in [changes]");
+    for (const line of changes) {
+      const stripped = line.trim();
+      if (stripped.startsWith("@")) continue;
+      if (!DELTA_CHANGE_RE.test(line))
+        throw new Error(
+          `malformed [changes] entry: '${stripped}' (expected '- +[section] text', ` +
+            `'- -[section] text', or '- ~[section] text')`,
+        );
+    }
   }
 
   for (const [name, body] of Object.entries(sections)) {

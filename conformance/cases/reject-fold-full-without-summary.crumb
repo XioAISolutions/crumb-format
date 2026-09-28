@@ -1,0 +1,11 @@
+BEGIN CRUMB
+v=1.4
+kind=mem
+source=test
+---
+[consolidated]
+- x
+
+[fold:notes/full]
+Long.
+END CRUMB

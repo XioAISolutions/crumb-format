@@ -1,22 +1,24 @@
---- task: wavefield video: half-life poles + long-horizon tooling toward 2–5 min, and two correctness fixes
-source: github.pr
-pr: #58
-generated: 2026-09-28T00:54:50Z
+BEGIN CRUMB
+v=1.4
+kind=task
+title=Stop publishing invented numbers, and stop committing invalid CRUMB
+source=github.pr
+x-github.pr=42
+x-github.generated=2026-08-13T14:05:58Z
 ---
-
 [goal]
 ## What changed
 
 [context]
 Changed files in this PR:
-- experiments/wavefield_video/bench_scaling_honest.py
-- experiments/wavefield_video/long_horizon.py
-- experiments/wavefield_video/recall_probe.py
-- experiments/wavefield_video/run_long_horizon.sh
-- experiments/wavefield_video/test_fusion_r14.py
-- experiments/wavefield_video/tests/test_long_horizon.py
-- experiments/wavefield_video/train_compare.py
-- experiments/wavefield_video/wfvideo.py
+- .crumb/latest.crumb
+- .github/workflows/auto-crumb-pr.yml
+- .github/workflows/bench-pr.yml
+- CHANGELOG.md
+- cli/crumb.py
+- tests/test_repo_crumbs_valid.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
+
+END CRUMB

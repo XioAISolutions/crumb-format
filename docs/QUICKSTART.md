@@ -98,14 +98,14 @@ crumb todo dream sprint.crumb   # archive completed tasks
 
 ```bash
 # Two-stage compression (dedup + signal pruning)
-crumb compress auth-fix.crumb
+crumb optimize auth-fix.crumb --mode signal
 
 # MeTalk caveman compression for AI-to-AI messages
 crumb metalk auth-fix.crumb              # level 2 (default, ~40% savings)
 crumb metalk auth-fix.crumb --level 3    # aggressive (~50-60% savings)
 
 # Combine both
-crumb compress auth-fix.crumb --metalk
+crumb optimize auth-fix.crumb --mode signal --metalk
 ```
 
 ## 8. Benchmark your crumbs

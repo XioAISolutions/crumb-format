@@ -163,51 +163,53 @@ Crumb LLM is *not* just a reproduction. These are original:
 ## Quick Start
 
 ```bash
-# Install
-pip install crumb-llm
+# Install (from a checkout until the standalone wheel is published)
+pip install torch numpy
+python -m crumb_wavelm.setup_standalone --output ./crumb-wavelm-pkg
+pip install ./crumb-wavelm-pkg
 
 # See pretrained checkpoints in the registry
-crumb-llm models
+crumb-wavelm models
 
 # Download a registered checkpoint
-crumb-llm download crumb-llm-tiny-local
+crumb-wavelm download crumb-llm-tiny-local
 
 # Generate from the downloaded checkpoint
-crumb-llm generate --ckpt ~/.cache/crumb-llm/models/crumb-llm-tiny-local --prompt "BEGIN CRUMB"
+crumb-wavelm generate --ckpt ~/.cache/crumb-wavelm/models/crumb-llm-tiny-local --prompt "BEGIN CRUMB"
 
 # Train a model (CPU, ~2 min)
-crumb-llm train --config tiny --steps 500 --out /tmp/crumb_model
+crumb-wavelm train --config tiny --steps 500 --out /tmp/crumb_model
 
 # Generate text
-crumb-llm generate --ckpt /tmp/crumb_model --prompt "BEGIN CRUMB"
+crumb-wavelm generate --ckpt /tmp/crumb_model --prompt "BEGIN CRUMB"
 
 # Index your crumb library for context pulling
-crumb-llm index examples/ -o my_index.json
+crumb-wavelm index examples/ -o my_index.json
 
 # Pull relevant context for a query
-crumb-llm pull "How do I fix auth?" --index-file my_index.json
+crumb-wavelm pull "How do I fix auth?" --index-file my_index.json
 
 # Serve over HTTP with context pulling
-crumb-llm serve --ckpt /tmp/crumb_model --index examples/
+crumb-wavelm serve --ckpt /tmp/crumb_model --index examples/
 
 # Compare against a transformer baseline
-crumb-llm compare --config tiny --steps 1000 --data examples/
+crumb-wavelm compare --config tiny --steps 1000 --data examples/
 
 # Export for HuggingFace Hub
-crumb-llm export --ckpt /tmp/crumb_model --name my-crumb-llm
+crumb-wavelm export --ckpt /tmp/crumb_model --name my-crumb-llm
 
 # Register your own local checkpoint
-crumb-llm register my-crumb-model --path /tmp/crumb_model --alias mine
+crumb-wavelm register my-crumb-model --path /tmp/crumb_model --alias mine
 
 # Prepare the bundled tiny checkpoint for HuggingFace publication
 python scripts/publish_crumb_llm_model.py
 ```
 
-`crumb-format` is optional. Install `pip install 'crumb-llm[crumb]'`
+`crumb-format` is optional. Install `pip install 'crumb-wavelm[crumb]'`
 only when you want CRUMB parser priors or direct `.crumb` adapters.
 The model, tokenizer, trainer, sampler, chat REPL, server, quantizer,
 model registry, downloader, and hub export live in the standalone
-`crumb_llm` package.
+`crumb_wavelm` package.
 
 ---
 
@@ -215,7 +217,7 @@ model registry, downloader, and hub export live in the standalone
 
 | Method | Cost | Latency | Setup |
 |--------|------|---------|-------|
-| Local CLI | Free | ~15ms/tok | `pip install crumb-llm` |
+| Local CLI | Free | ~15ms/tok | build from a checkout |
 | Docker (CPU) | ~$5/mo | ~20ms/tok | `docker build -f Dockerfile.crumb-llm .` |
 | Fly.io | ~$7/mo | ~25ms/tok | `fly launch` |
 | HF Spaces | Free tier | ~30ms/tok | Push hub export |

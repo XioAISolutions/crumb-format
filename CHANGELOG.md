@@ -1,6 +1,253 @@
 # Changelog
 
-## Unreleased
+## v1.3.0
+
+Everything below shipped after `v1.2.0` was tagged. It is a separate version
+because the tag already exists and carries different content — continuing to
+call this 1.2.0 would mean two different trees answering to one version, which
+is the drift the release checks exist to prevent. `scripts/release_check.py`
+now fails when the working tree's version is already tagged at another commit.
+
+### The handoff loop closes itself
+
+- **`crumb resume`** injects the last session's handoff at `SessionStart`, the
+  other half of `crumb capture`. Previously the README's next step was "paste
+  it into whatever you open next", and the step people forget is the one that
+  decides whether a tool gets used twice. It injects on a fresh `startup` only
+  — never on `clear`, which is the user asking for a clean slate, and never on
+  `compact`, which fires mid-session when the newest crumb belongs to a
+  *different* session. Injects at most once per session even when the hook is
+  registered twice (plugin *and* `install.sh`).
+- **A SessionStart hook's stdout is model context**, so every diagnostic goes
+  to stderr; the tests assert each skip path leaves stdout byte-for-byte empty.
+
+### Crumbs carry their own numbers
+
+- **`measured=`** records what the compression cost, in the artifact:
+  `measured=3705->565 tokens, 84.8% saved, 30.5% retention, tiktoken:o200k_base`.
+  Written to a fixed point, so `crumb measure` on the finished file reproduces
+  the header exactly. Excluded from fact matching, because retention is a
+  substring test over digit-heavy patterns and a receipt reading `->3502` would
+  otherwise make a source `502` count as retained.
+- **`captured=`** records when the handoff was made. A crumb's mtime is not its
+  age: `git checkout` stamps every file with the checkout time, so a handoff
+  committed months ago arrived on a fresh clone looking newly written, and the
+  staleness gate was blind to exactly the crumbs most likely to be stale.
+- Both headers are optional and ignorable, so the wire format stays at **v1.4**.
+
+### Distribution that does not depend on PyPI
+
+- **A Claude Code plugin** (`.claude-plugin/`). Plugins install from GitHub, so
+  this channel would have delivered a working CRUMB throughout the four months
+  PyPI served a stale wheel. `/plugin marketplace add XioAISolutions/crumb-format`
+  then `/plugin install crumb-format` wires up both hooks, the MCP tools and the
+  slash commands. The CLI is stdlib-only and runs from the plugin checkout, and
+  a test fails if that ever stops being true.
+- **The release became reachable.** Tag pushes are rejected from this org's
+  automation and the Actions dispatch API answers 403 for the same identity, so
+  a merge to `main` carrying an untagged version now releases itself; a `gate`
+  job stops the run when the tag already exists. The PyPI trusted-publisher
+  prerequisite — undocumented, and the reason the first attempt failed — is now
+  in `docs/RELEASING.md`.
+
+### Measuring other tools, not just other strategies
+
+- **`benchmarks/external/`** takes real output from competing tools, measured
+  through the same code as every built-in row and carrying no `-style` suffix.
+  Cases nobody has supplied print as `—` rather than being skipped, so the
+  table cannot imply coverage it does not have.
+
+### Known limitation
+
+- The plugin's hooks invoke `python3`, which on native Windows is usually
+  `python` or `py -3`. No Windows machine was available to verify a fallback,
+  so the gap is documented in `.claude-plugin/README.md` rather than papered
+  over with an untested launcher.
+
+## v1.2.0
+
+### Phase 6 — stop publishing invented numbers
+
+- **`crumb bench` no longer emits a score or a grade.** It reduced a crumb to a
+  number out of 100 built from axes it invented for itself — keyword density
+  and "conciseness" — plus a compression ratio measured against a squeezed copy
+  of the same file. That ratio was misleading in the expensive direction: it
+  graded the transcript handoff at **"74/100, 1.3x"** when the same crumb
+  measures **9.0x** against the conversation it was actually compressed from. A
+  self-comparison cannot report what compression cost, because it never sees
+  the source. The command now prints structure, a token count from a named
+  tokenizer, required-section completeness, and clearly-labelled redundancy
+  headroom, and points at `crumb measure`. It emits a deprecation notice on
+  stderr.
+- **The PR comment reports facts instead of judgements.** `bench-pr.yml`
+  published that Score/Grade/Compression table on every pull request. It now
+  lists file, kind, wire version, token count, and validity — and names the
+  tokenizer. Rejected files say *why* they were rejected rather than showing
+  `N/A`. Deliberately-invalid fixtures are excluded so they don't read as
+  failures.
+
+**The reference implementation was committing files its own validator rejects.**
+`auto-crumb-pr.yml` generated `.crumb/latest.crumb` on every pull request using
+YAML front matter — `--- task: ...`, a `source:` line, a closing `---` — with no
+`BEGIN CRUMB`, no `v=`, no `kind=`, and no `END CRUMB`. Nothing validated it, so
+an invalid file sat in the repository and was regenerated on every PR. The
+generator now emits v1.4 (carrying PR metadata as namespaced `x-github.*`
+headers per SPEC §3.3), the workflow validates before committing, and
+`tests/test_repo_crumbs_valid.py` asserts every `.crumb` in the repository
+parses — with the deliberately-invalid fixtures enumerated explicitly, and
+separately asserted to still be invalid so the exclusion list cannot hide a
+regression.
+
+**Two copy-paste templates were running as live workflows.**
+`.github/workflows/bench-template.yml` and `auto-crumb-template.yml` are
+documents meant to be copied into *other* repositories, but sitting in
+`.github/workflows/` meant GitHub executed them here too. The effects were
+visible on every pull request: two identical bench comments (the template's
+copy called `bench-pr.yml@main`, so it always ran main's logic rather than the
+version under review), and two workflows writing the same
+`.crumb/latest.crumb` — both emitting the invalid YAML front matter. Both are
+now in `docs/integrations/`, and the auto-crumb template's generator is fixed
+and gains the same pre-commit validation, so nobody copies a workflow that
+produces files the validator rejects.
+
+1.2.0 was never published — PyPI still serves 0.2.0 — so the parser extraction
+lands in the same release rather than a later one. This matters for the
+dependency contract: CrumbContext and CrumbLLM both require
+`crumb-format>=1.2.0` for `crumb_core`, and a 1.2.0 without it would satisfy
+that constraint while failing on import.
+
+### Phase 5 — one parser, one spec version
+
+CRUMB called itself a standard while carrying three independent parsers across
+three repositories, with no shared code and no test comparing them:
+`crumb-format` emitted `v=1.4`, `CrumbContext` hand-wrote `v=1.3` as a string
+literal, `CrumbLLM` forked a 334-line copy of the validation logic and ran a CI
+job asserting it could *not* import `crumb-format`, and `CrumbLLM`'s EJA
+schemas required `crumb_version: "1.5"` — a version no spec defines. Nothing
+detected the drift, because nothing compared them.
+
+- **`crumb_core`** is now the single normative parser: `parse_crumb`,
+  `render_crumb`, the additive v1.2/v1.3 validators, and the shared constants
+  and regexes. Stdlib-only and dependency-free, so a consumer can depend on the
+  format without inheriting the ~46-command CLI, the MCP servers, or a PyTorch
+  language model. `cli.crumb` re-exports every name, so existing
+  `from cli.crumb import parse_crumb` callers are unaffected — 757 tests passed
+  unchanged across the extraction.
+- **`WIRE_VERSION`** is exported so emitters stop hardcoding a version string.
+  Hardcoding is exactly how CrumbContext came to emit v1.3 against a v1.4 spec.
+- **`conformance/`** — 31 executable cases (12 accept, 19 reject) with a
+  machine-readable `manifest.json`, each citing the SPEC section it derives
+  from. Only the accept/reject decision is normative; rejection messages stay
+  free. Covers structure, the version and kind whitelists, additive
+  forward-compatibility, required and empty sections, fold pairs, refs and
+  content-ref digests, and deltas — plus a `render(parse(x))` round-trip check.
+
+**The suite found a real interop bug the first time both implementations ran
+the same cases.** `validators/validate.js` accepted a malformed `sha256:`
+content ref, and accepted a `kind=delta` crumb with no `base` header — a delta
+that cannot be applied to anything. The reference parser rejects both. The JS
+validator now enforces both rules, and both are permanent cases.
+
+**First PyPI release since 0.2.0 (April 2026).** Everything between 0.3.0 and
+1.1.0 shipped to the repository but never to the index, so this release carries
+four months of accumulated work to anyone installing from PyPI.
+
+### Phase 4 — release pipeline repair
+
+The publish path was broken in three compounding ways, all fixed here.
+
+- **`publish-pypi.yml` is now tag-triggered.** It previously fired on
+  `release: published`, which required a hand-created GitHub Release. Between
+  the workflow landing (2026-05-28) and 2026-08-12 nobody created one, so it
+  never ran a single time. Pushing `vX.Y.Z` is now sufficient, and the workflow
+  creates the GitHub Release itself.
+- **Publishing uses Trusted Publishing** (OIDC) instead of a `PYPI_API_TOKEN`
+  secret. The old workflow declared `id-token: write` and then passed an API
+  token anyway; if the secret was unset the publish step simply failed.
+- **The release now has to run its own documentation.** Before publishing, the
+  built wheel is installed into a clean venv outside the source tree and the
+  README quickstart is executed against it — `crumb doctor`, `from-messages`,
+  `validate`, `measure`. A wheel that cannot run its own README cannot ship.
+- **`scripts/release_check.py`** enforces three invariants, and runs on every
+  PR via `tests.yml` rather than only at release time:
+  1. `pyproject.toml`, `cli.crumb.CLI_VERSION`, the `CHANGELOG.md` heading and
+     the git tag all agree.
+  2. Every `crumb <subcommand>` shown in a code block in README, QUICKSTART,
+     SPEC, PROTOCOL or PACKS is a subcommand the CLI actually registers.
+  3. The publish workflow is still tag-triggered.
+- **`verify-pypi.yml`** reinstalls from the public index on 3.10/3.11/3.12
+  after a release and re-runs the quickstart, and separately runs a weekly
+  `detect-drift` job comparing the published version against the working tree.
+  That job is what turns a silently stale index into a red build.
+
+**Documentation drift caught by the new check on its first run** — three
+commands were documented but had been folded into `crumb optimize` and no
+longer existed:
+- `crumb compress` in `README.md` and `docs/QUICKSTART.md` → `crumb optimize --mode signal`
+- `crumb squeeze` in `SPEC.md` → `crumb optimize --mode budget`
+
+Also corrected: `README.md` linked `crumb_llm/`, renamed to `crumb_wavelm/` in
+`8c38846`; the test count claim (291 → 757); and `TRANSPORTS.md` listed
+CrumbBeam as an `experimental` optical transport when the repository contains
+no implementation — now marked `specified, unimplemented`.
+
+`docs/RELEASING.md` previously listed the tag push as **"(Optional)"**, noting
+that tag pushes "have historically 403'd" and naming the merge commit the
+"canonical release marker." Nothing downstream reads merge commits. The tag is
+now documented as the release mechanism.
+
+### Phase 3 — real conversation ingest + honest measurement
+
+No wire-format change. Two commands that close the gap between what CRUMB
+claims (compress and hand off conversation context) and what it could
+previously demonstrate.
+
+- **`crumb from-messages`** — reads the shapes conversations are actually
+  stored in, rather than the ad-hoc `User:` / `AI:` text `from-chat`
+  expects:
+  - OpenAI Chat Completions — `{"messages": [...]}`, a bare array, or a
+    response envelope with `choices`. `tool_calls` and `role=tool` turns
+    are understood.
+  - Anthropic Messages API — content-block arrays with `text`,
+    `tool_use`, `tool_result`, and `thinking`.
+  - ChatGPT data export — `conversations.json`, the mapping-tree form,
+    replayed in creation order.
+  - Claude.ai data export — `chat_messages` arrays.
+  - JSONL of any of the above.
+
+  Output is a v1.4 `kind=task` handoff: derived goal, decisions reached,
+  files and tools touched, constraints stated along the way, and open
+  threads as `[handoff]` items. `thinking` blocks are dropped — the most
+  expensive and least reusable part of a transcript. Extraction is
+  deterministic and model-free, so the same transcript always yields the
+  same crumb and the output can be diffed in CI.
+
+- **`crumb measure`** — compares a crumb against the source it was
+  compressed from and reports two numbers:
+  - **Token savings**, counted with `tiktoken` when available and with an
+    explicitly labelled `chars/4` heuristic when not. The report always
+    names which one produced the number; a ratio computed from
+    `len(text) // 4` is presented as approximate, never as a measurement.
+  - **Fact retention**, the share of load-bearing tokens (paths, URLs,
+    identifiers, error codes, numbers with units, quoted strings) that
+    survive into the compressed form — broken down by category so you can
+    see *what kind* of information the packer drops. Documented as a
+    lexical proxy for fidelity, not a task-success measure.
+
+  `--json` emits a machine-readable report; `--min-saved` and
+  `--min-retention` turn it into a CI gate that exits non-zero.
+
+  Install exact counting with `pip install crumb-format[measure]`.
+
+- **Sentence splitting no longer truncates dotted identifiers.** The
+  extractors split on `[.!?]` followed by whitespace *and* a capitalised
+  opener, so `tests/checkout_refresh.spec.ts` and `v1.4` stay intact —
+  previously a naive split cut exactly the filenames a handoff needs most.
+
+- **`tests/test_transcripts.py`** (23 cases) and **`tests/test_measure.py`**
+  (14 cases). Every provider shape is asserted to yield identical extracted
+  signal; the tokenizer tests stub `tiktoken` both ways so they pass with or
+  without it installed.
 
 ### Phase 2 — trust + capability
 

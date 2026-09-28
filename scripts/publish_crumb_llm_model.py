@@ -51,8 +51,8 @@ def load_metrics(ckpt_dir: Path) -> dict:
 
 
 def export_hub(ckpt_dir: Path, out_dir: Path, model_id: str) -> None:
-    from crumb_llm.hub import save_for_hub
-    from crumb_llm.sample import load_checkpoint
+    from crumb_wavelm.hub import save_for_hub
+    from crumb_wavelm.sample import load_checkpoint
 
     metrics = load_metrics(ckpt_dir)
     training_info = (

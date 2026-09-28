@@ -14,10 +14,11 @@ import base64
 import shutil
 import subprocess
 import sys
+import time
 from collections import Counter
 from pathlib import Path
 from textwrap import dedent
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 # When run as a script (python3 cli/crumb.py ...), sibling submodules like
 # `cli.linting` can't be imported unless the repo root is on sys.path. Adding
@@ -30,27 +31,34 @@ if __name__ == "__main__":
         sys.path.insert(0, _repo_root)
 
 
-REQUIRED_HEADERS = ["v", "kind", "source"]
-REQUIRED_SECTIONS = {
-    "task": ["goal", "context", "constraints"],
-    "mem": ["consolidated"],
-    "map": ["project", "modules"],
-    "log": ["entries"],
-    "todo": ["tasks"],
-    "passport": ["identity", "permissions"],
-    "audit": ["goal", "actions", "verdict"],
-    "wake": ["identity"],
-    "delta": ["changes"],
-    "agent": ["identity"],
-}
-CLI_VERSION = "1.1.0"
-SUPPORTED_VERSIONS = {"1.1", "1.2", "1.3", "1.4"}
+# The wire-format parser lives in `crumb_core`, the single normative
+# implementation that CrumbContext and CrumbLLM also depend on. It is
+# re-exported here so the many `from cli.crumb import parse_crumb` callers keep
+# working; do not reintroduce a local copy.
+from crumb_core import (  # noqa: F401  (re-exported for backwards compatibility)
+    CONTENT_REF_RE,
+    DELTA_CHANGE_RE,
+    DELTA_HEADERS_SECTION,
+    FOLD_SECTION_RE,
+    HANDOFF_ID_RE,
+    REQUIRED_HEADERS,
+    REQUIRED_SECTIONS,
+    SUPPORTED_VERSIONS,
+    WIRE_VERSION,
+    WORKFLOW_LINE_RE,
+    parse_crumb,
+    render_crumb,
+)
+
+CLI_VERSION = "1.3.0"
+# Mirrors cli.transcripts.FORMATS. Duplicated as a literal so building the
+# argument parser doesn't pull in the transcript readers on every CLI start;
+# tests assert the two stay in sync.
+_TRANSCRIPT_FORMATS = (
+    "openai-messages", "anthropic-messages", "chatgpt-export", "claude-export",
+    "claude-code-transcript",
+)
 FOLD_SECTION_RE = re.compile(r"^fold:([^/]+)/(summary|full)$")
-CONTENT_REF_RE = re.compile(r"^sha256:[0-9a-f]{16,64}$")
-DELTA_CHANGE_RE = re.compile(r"^\s*-\s*([+\-~])\[(@?[a-z0-9_:/-]+)\]\s*(.*)$", re.IGNORECASE)
-DELTA_HEADERS_SECTION = "@headers"
-HANDOFF_ID_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
-WORKFLOW_LINE_RE = re.compile(r"^\s*-?\s*(\d+)[.)]\s*(.+)$")
 
 
 def read_text(path: str | None) -> str:
@@ -65,309 +73,6 @@ def write_text(path: str | None, content: str) -> None:
         return
     Path(path).write_text(content, encoding='utf-8')
 
-
-def parse_crumb(text: str) -> Dict[str, object]:
-    """Parse a .crumb file and return headers and sections.
-
-    Raises ValueError on any structural problem.
-    """
-    lines = [line.rstrip("\n") for line in text.splitlines()]
-    while lines and not lines[0].strip():
-        lines.pop(0)
-    while lines and not lines[-1].strip():
-        lines.pop()
-    if not lines or lines[0] != "BEGIN CRUMB":
-        raise ValueError("missing BEGIN CRUMB marker")
-    if lines[-1] != "END CRUMB":
-        raise ValueError("missing END CRUMB marker")
-    try:
-        sep_index = lines.index("---")
-    except ValueError:
-        raise ValueError("missing header separator ---")
-    headers: Dict[str, str] = {}
-    for line in lines[1:sep_index]:
-        if not line.strip():
-            continue
-        if "=" not in line:
-            raise ValueError(f"invalid header line: {line!r}")
-        key, value = line.split("=", 1)
-        headers[key.strip()] = value.strip()
-    for key in REQUIRED_HEADERS:
-        if key not in headers:
-            raise ValueError(f"missing required header: {key}")
-    if headers["v"] not in SUPPORTED_VERSIONS:
-        raise ValueError(f"unsupported version: {headers['v']}")
-    kind = headers["kind"]
-    if kind not in REQUIRED_SECTIONS:
-        valid = ", ".join(sorted(REQUIRED_SECTIONS.keys()))
-        raise ValueError(f"unknown kind: {kind!r}. valid: {valid}")
-    sections: Dict[str, List[str]] = {}
-    current_section: str | None = None
-    for line in lines[sep_index + 1 : -1]:
-        stripped = line.strip()
-        if stripped.startswith("[") and stripped.endswith("]"):
-            current_section = stripped[1:-1].strip().lower()
-            sections.setdefault(current_section, [])
-            continue
-        if current_section is None:
-            if stripped:
-                raise ValueError("body content found before first section")
-            continue
-        sections[current_section].append(line)
-    for section in REQUIRED_SECTIONS[kind]:
-        fold_summary = f"fold:{section}/summary"
-        fold_full = f"fold:{section}/full"
-        if section in sections:
-            if not any(item.strip() for item in sections[section]):
-                raise ValueError(f"section [{section}] is empty")
-        elif fold_summary in sections or fold_full in sections:
-            for variant_name in (fold_summary, fold_full):
-                if variant_name in sections and not any(
-                    item.strip() for item in sections[variant_name]
-                ):
-                    raise ValueError(f"section [{variant_name}] is empty")
-        else:
-            raise ValueError(
-                f"missing required section for kind={kind}: [{section}]"
-            )
-
-    _validate_v12_additive(headers, sections)
-    _validate_v13_additive(headers, sections)
-
-    return {"headers": headers, "sections": sections}
-
-
-def _validate_v12_additive(
-    headers: Dict[str, str], sections: Dict[str, List[str]]
-) -> None:
-    """Additive v1.2 validation. Does not reject v1.1 files."""
-
-    if "refs" in headers:
-        refs_value = headers["refs"].strip()
-        if not refs_value:
-            raise ValueError("refs header must not be empty when present")
-        for ref in (r.strip() for r in refs_value.split(",")):
-            if not ref:
-                raise ValueError("refs header contains an empty entry")
-            if ref.startswith("sha256:") and not CONTENT_REF_RE.match(ref):
-                raise ValueError(
-                    f"refs entry {ref!r} has a malformed sha256: digest"
-                )
-
-    if "refs" in sections and not any(line.strip() for line in sections["refs"]):
-        raise ValueError("[refs] section is empty; omit it instead")
-
-    if "handoff" in sections and not any(
-        line.strip() for line in sections["handoff"]
-    ):
-        raise ValueError("[handoff] section is empty; omit it instead")
-
-    fold_pairs: Dict[str, set] = {}
-    for section_name in sections:
-        match = FOLD_SECTION_RE.match(section_name)
-        if not match:
-            continue
-        fold_name, variant = match.group(1), match.group(2)
-        fold_pairs.setdefault(fold_name, set()).add(variant)
-
-    for fold_name, variants in fold_pairs.items():
-        if "full" in variants and "summary" not in variants:
-            raise ValueError(
-                f"fold:{fold_name} declares /full without a paired /summary"
-            )
-
-    for section_name, body in sections.items():
-        meaningful = [line for line in body if line.strip()]
-        for idx, line in enumerate(meaningful[:2]):
-            stripped = line.strip()
-            if stripped.startswith("@type:") and idx == 0:
-                content_type = stripped.split(":", 1)[1].strip()
-                if not content_type:
-                    raise ValueError(
-                        f"@type annotation has empty value in [{section_name}]"
-                    )
-            if stripped.startswith("@priority:"):
-                raw = stripped.split(":", 1)[1].strip()
-                if not raw:
-                    raise ValueError(
-                        f"@priority annotation has empty value in [{section_name}]"
-                    )
-                try:
-                    score = int(raw)
-                except ValueError:
-                    raise ValueError(
-                        f"@priority value in [{section_name}] must be an integer 1-10"
-                    )
-                if not 1 <= score <= 10:
-                    raise ValueError(
-                        f"@priority value in [{section_name}] must be between 1 and 10"
-                    )
-
-    if headers.get("kind") == "delta":
-        if "base" not in headers or not headers["base"].strip():
-            raise ValueError("kind=delta requires a 'base' header identifying the parent crumb")
-        changes = [line for line in sections.get("changes", []) if line.strip()]
-        if not changes:
-            raise ValueError("kind=delta requires at least one entry in [changes]")
-        for line in changes:
-            stripped = line.strip()
-            if stripped.startswith("@"):
-                continue
-            if not DELTA_CHANGE_RE.match(line):
-                raise ValueError(
-                    f"malformed [changes] entry: {stripped!r} "
-                    "(expected '- +[section] text', '- -[section] text', or '- ~[section] text')"
-                )
-
-
-def _parse_kv_line(line: str) -> Dict[str, str]:
-    """Parse 'key=value  key=value' style trailing annotations on a bullet line."""
-    tokens: Dict[str, str] = {}
-    body = line.strip()
-    if body.startswith("- "):
-        body = body[2:]
-    elif body.startswith("-"):
-        body = body[1:]
-    for match in re.finditer(r"([a-zA-Z_][a-zA-Z0-9_]*)=([^\s]+)", body):
-        tokens[match.group(1)] = match.group(2)
-    return tokens
-
-
-def _validate_v13_additive(
-    headers: Dict[str, str], sections: Dict[str, List[str]]
-) -> None:
-    """Additive v1.3 validation. Does not reject v1.1 or v1.2 files."""
-    if "fold_priority" in headers:
-        value = headers["fold_priority"].strip()
-        if not value:
-            raise ValueError("fold_priority header must not be empty when present")
-        for name in (n.strip() for n in value.split(",")):
-            if not name:
-                raise ValueError("fold_priority contains an empty entry")
-            if not re.match(r"^[a-zA-Z0-9_-]+$", name):
-                raise ValueError(f"fold_priority entry {name!r} has invalid characters")
-
-    if "handoff" in sections:
-        step_ids: Dict[str, int] = {}
-        deps: Dict[str, List[str]] = {}
-        position = 0
-        for line in sections["handoff"]:
-            stripped = line.strip()
-            if not stripped or stripped.startswith("- [x]"):
-                continue
-            if not stripped.startswith("-"):
-                continue
-            position += 1
-            tokens = _parse_kv_line(stripped)
-            step_id = tokens.get("id", str(position))
-            if not HANDOFF_ID_RE.match(step_id):
-                raise ValueError(
-                    f"[handoff] id={step_id!r} must match [a-zA-Z0-9_-]+"
-                )
-            if step_id in step_ids:
-                raise ValueError(f"[handoff] duplicate id={step_id!r}")
-            step_ids[step_id] = position
-            after = tokens.get("after", "")
-            if after:
-                deps[step_id] = [
-                    d.strip() for d in after.split(",") if d.strip()
-                ]
-        for step_id, refs in deps.items():
-            for ref in refs:
-                if ref not in step_ids:
-                    raise ValueError(
-                        f"[handoff] id={step_id!r} has unknown after= dependency {ref!r}"
-                    )
-        _detect_dep_cycle(deps, label="[handoff]")
-
-    if "workflow" in sections:
-        step_ids: Dict[str, int] = {}
-        deps: Dict[str, List[str]] = {}
-        for line in sections["workflow"]:
-            stripped = line.strip()
-            if not stripped:
-                continue
-            match = WORKFLOW_LINE_RE.match(stripped)
-            if not match:
-                if stripped.startswith("-"):
-                    continue
-                raise ValueError(
-                    f"[workflow] line must be numbered (e.g. '1. reproduce_bug'): {stripped!r}"
-                )
-            num, rest = match.group(1), match.group(2)
-            tokens = _parse_kv_line("- " + rest)
-            step_id = tokens.get("id", num)
-            if not HANDOFF_ID_RE.match(step_id):
-                raise ValueError(
-                    f"[workflow] id={step_id!r} must match [a-zA-Z0-9_-]+"
-                )
-            if step_id in step_ids:
-                raise ValueError(f"[workflow] duplicate id={step_id!r}")
-            step_ids[step_id] = int(num)
-            depends = tokens.get("depends_on", "")
-            if depends:
-                deps[step_id] = [
-                    d.strip() for d in depends.split(",") if d.strip()
-                ]
-        for step_id, refs in deps.items():
-            for ref in refs:
-                if ref not in step_ids:
-                    raise ValueError(
-                        f"[workflow] id={step_id!r} has unknown depends_on {ref!r}"
-                    )
-        _detect_dep_cycle(deps, label="[workflow]")
-
-    if "script" in sections:
-        meaningful = [line for line in sections["script"] if line.strip()]
-        if meaningful and not meaningful[0].strip().startswith("@type:"):
-            raise ValueError("[script] section must begin with @type: <lang>")
-
-    if "checks" in sections:
-        for line in sections["checks"]:
-            stripped = line.strip()
-            if not stripped or not stripped.startswith("-"):
-                continue
-            body = stripped[1:].strip()
-            if "::" not in body:
-                raise ValueError(
-                    f"[checks] line must use 'name :: status' format: {stripped!r}"
-                )
-
-
-def _detect_dep_cycle(deps: Dict[str, List[str]], label: str) -> None:
-    """Raise if deps contains a cycle. Uses DFS coloring."""
-    WHITE, GRAY, BLACK = 0, 1, 2
-    color: Dict[str, int] = {k: WHITE for k in deps}
-
-    def visit(node: str) -> None:
-        if color.get(node, WHITE) == GRAY:
-            raise ValueError(f"{label} dependency cycle through {node!r}")
-        if color.get(node, WHITE) == BLACK:
-            return
-        color[node] = GRAY
-        for child in deps.get(node, []):
-            if child in deps:
-                visit(child)
-        color[node] = BLACK
-
-    for node in list(deps):
-        if color[node] == WHITE:
-            visit(node)
-
-
-def render_crumb(headers: Dict[str, str], sections: Dict[str, List[str]]) -> str:
-    """Render headers and sections back into a .crumb file string."""
-    lines = ["BEGIN CRUMB"]
-    for key, value in headers.items():
-        lines.append(f"{key}={value}")
-    lines.append("---")
-    for name, body in sections.items():
-        lines.append(f"[{name}]")
-        lines.extend(body)
-        if body and body[-1].strip():
-            lines.append("")
-    lines.append("END CRUMB")
-    return "\n".join(lines) + "\n"
 
 
 def normalize_entry(text: str) -> str:
@@ -739,6 +444,433 @@ source={source}
         crumb_text += '\n'.join(constraints) + '\nEND CRUMB\n'
 
     write_text(args.output, crumb_text)
+
+
+# ── from-messages ────────────────────────────────────────────────────
+# Real conversation ingest. `from-chat` reads ad-hoc "User:/AI:" text;
+# `from-messages` reads the shapes conversations are actually stored in
+# (OpenAI/Anthropic messages arrays, ChatGPT and Claude.ai exports).
+
+def cmd_from_messages(args: argparse.Namespace) -> None:
+    from cli import measure as measure_mod
+    from cli import transcripts
+
+    raw = read_text(args.input)
+    try:
+        fmt, messages = transcripts.load_messages(raw, fmt=args.format)
+    except transcripts.TranscriptError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    crumb_text = transcripts.to_crumb(
+        messages,
+        fmt=fmt,
+        title=args.title,
+        source=args.source,
+        goal=args.goal,
+        project=args.project,
+        extra_constraints=args.constraints or [],
+    )
+    write_text(args.output, crumb_text)
+
+    if args.stats and args.output != '-':
+        result = measure_mod.measure(transcripts.transcript_text(messages), crumb_text)
+        print(f"Read {len(messages)} messages as {fmt}.")
+        print(f"  {result.source_tokens:,} → {result.crumb_tokens:,} tokens "
+              f"({result.saved_pct:.0f}% smaller, {result.ratio:.1f}x) via {result.tokenizer}")
+        print(f"  Fact retention: {result.retention * 100:.0f}% "
+              f"({result.facts_retained}/{result.facts_total} load-bearing tokens kept)")
+
+
+# ── locating a recent agent session ──────────────────────────────────
+
+# Where agents keep session transcripts. Ordered by how likely a user is to
+# have one; the first existing directory with a transcript in it wins.
+TRANSCRIPT_SEARCH_DIRS = (
+    Path.home() / ".claude" / "projects",
+    Path.home() / ".codex" / "sessions",
+    Path.home() / ".cursor" / "sessions",
+)
+
+
+def find_recent_transcripts(limit: int = 5) -> List[Path]:
+    """Return the most recently modified agent transcripts on this machine.
+
+    Zero-argument discovery matters more than it looks. The difference between
+    "read the docs, find your transcript path, pass it in" and "run one command
+    against your own last session" is the difference between a tool someone
+    reads about and one they try.
+
+    Sidechain and subagent files are skipped: a handoff describes the main
+    thread, and those directories can hold far more subagent files than
+    sessions.
+    """
+    found: List[Path] = []
+    for root in TRANSCRIPT_SEARCH_DIRS:
+        if not root.is_dir():
+            continue
+        for path in root.rglob("*.jsonl"):
+            if "subagents" in path.parts or path.name.startswith("agent-"):
+                continue
+            try:
+                if path.stat().st_size > 0:
+                    found.append(path)
+            except OSError:
+                continue
+    found.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    return found[:limit]
+
+
+# ── capture ──────────────────────────────────────────────────────────
+# Zero-friction auto-capture. `crumb it` requires the user to remember; a
+# session-end hook does not. Reads an agent hook payload on stdin, finds the
+# session transcript, and writes a handoff crumb.
+
+# The header recording when a handoff was captured. Optional, like
+# `measured=`, so the spec stays frozen at 1.4 — unknown headers are ignored.
+CAPTURED_KEY = "captured"
+CAPTURED_RE = re.compile(rf"^{CAPTURED_KEY}=(\S+)\s*$", re.MULTILINE)
+
+
+def _utc_now_iso() -> str:
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _insert_header(crumb_text: str, key: str, value: str) -> str:
+    """Add a header just above the `---` divider, replacing any existing one."""
+    existing = re.compile(rf"^{re.escape(key)}=.*$\n?", re.MULTILINE)
+    body = existing.sub("", crumb_text)
+    lines = body.splitlines()
+    for index, line in enumerate(lines):
+        if line.strip() == "---":
+            lines.insert(index, f"{key}={value}")
+            break
+    else:
+        return crumb_text  # no divider: not a crumb we should be editing
+    return "\n".join(lines) + ("\n" if body.endswith("\n") else "")
+
+
+def _crumb_age_seconds(path: Path) -> Tuple[float, str]:
+    """How old a handoff is, and how that was determined.
+
+    Prefers the `captured=` header over the filesystem. mtime is not age: a
+    crumb committed to a repository months ago gets the checkout time, which
+    made the staleness gate blind to exactly the handoffs most likely to be
+    stale.
+    """
+    try:
+        match = CAPTURED_RE.search(path.read_text(encoding="utf-8"))
+    except OSError:
+        match = None
+    if match:
+        try:
+            stamp = datetime.datetime.strptime(
+                match.group(1), "%Y-%m-%dT%H:%M:%SZ"
+            ).replace(tzinfo=datetime.timezone.utc)
+            age = (datetime.datetime.now(datetime.timezone.utc) - stamp).total_seconds()
+            return max(0.0, age), "captured header"
+        except ValueError:
+            pass  # unparseable stamp: fall back rather than refuse to resume
+    return max(0.0, time.time() - path.stat().st_mtime), "file mtime"
+
+
+def cmd_capture(args: argparse.Namespace) -> None:
+    """Capture an agent session as a crumb, driven by a lifecycle hook.
+
+    Claude Code's SessionEnd hook delivers a JSON payload on stdin containing
+    ``transcript_path`` (a JSONL of the session), ``session_id`` and ``cwd``.
+    Other agents can drive this the same way, or pass ``--transcript``
+    directly.
+    """
+    from cli import measure as measure_mod
+    from cli import transcripts
+
+    transcript_path = args.transcript
+    session_id = ""
+
+    if not transcript_path and getattr(args, "last", False):
+        recent = find_recent_transcripts(limit=1)
+        if not recent:
+            searched = "\n".join(f"         {d}" for d in TRANSCRIPT_SEARCH_DIRS)
+            print(
+                "error: no agent session transcripts found. Looked in:\n" + searched
+                + "\n       Pass --transcript <file> if yours lives elsewhere.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        transcript_path = str(recent[0])
+        print(f"crumb capture: using {transcript_path}", file=sys.stderr)
+
+    if not transcript_path:
+        raw = sys.stdin.read().strip()
+        if not raw:
+            print(
+                "error: no hook payload on stdin and no transcript given.\n"
+                "       Try `crumb capture --last` to use your most recent session,\n"
+                "       pass --transcript <file>, or pipe a SessionEnd hook payload.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            print(f"error: hook payload is not JSON: {exc}", file=sys.stderr)
+            sys.exit(2)
+        transcript_path = payload.get("transcript_path") or ""
+        session_id = str(payload.get("session_id") or "")
+        if not transcript_path:
+            print(
+                "error: hook payload has no 'transcript_path'. Keys present: "
+                f"{sorted(payload)}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+
+    source_file = Path(transcript_path)
+    if not source_file.is_file():
+        print(f"error: transcript not found: {source_file}", file=sys.stderr)
+        sys.exit(2)
+
+    try:
+        fmt, messages = transcripts.load_messages(source_file.read_text(encoding="utf-8"))
+    except transcripts.TranscriptError as exc:
+        # A hook must never fail the thing it is attached to. Report and exit 0
+        # unless the caller explicitly asked for strictness.
+        print(f"crumb capture: skipped ({exc})", file=sys.stderr)
+        sys.exit(1 if args.strict else 0)
+
+    crumb_text = transcripts.to_crumb(
+        messages, fmt=fmt, title=args.title, goal=args.goal,
+        project=args.project, source=args.source,
+    )
+
+    # When this handoff was made, carried in the file rather than inferred
+    # from it. A crumb's mtime is not its age: `git checkout` stamps every
+    # file with the checkout time, so a handoff committed months ago looks
+    # newly written, and a rebase can refresh one that never changed. Anything
+    # deciding whether a handoff is still relevant needs the date the content
+    # was captured, which only the content can carry.
+    crumb_text = _insert_header(crumb_text, CAPTURED_KEY, _utc_now_iso())
+
+    # Carry the compression cost in the artifact. Printed to stderr it dies
+    # with the shell that ran the command; in the header it travels with the
+    # crumb, so whoever receives it can see what was dropped without holding
+    # the original transcript. Embedded last, so the receipt counts every
+    # header above it.
+    source_text = transcripts.transcript_text(messages)
+    if not getattr(args, "no_receipt", False):
+        crumb_text = measure_mod.embed_receipt(source_text, crumb_text)
+
+    output = args.output
+    if not output:
+        stem = session_id[:12] or source_file.stem[:12] or "session"
+        out_dir = Path(args.dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        output = str(out_dir / f"session-{stem}.crumb")
+
+    write_text(output, crumb_text)
+    if output != '-':
+        result = measure_mod.measure(source_text, crumb_text)
+        print(
+            f"crumb capture: {output} — {result.source_tokens:,} → "
+            f"{result.crumb_tokens:,} tokens ({result.saved_pct:.0f}% smaller), "
+            f"{result.retention * 100:.0f}% fact retention",
+            file=sys.stderr,
+        )
+
+
+# ── resume ───────────────────────────────────────────────────────────
+
+# Which SessionStart sources should receive a handoff.
+#
+# `startup` is the case this exists for: a fresh session with no history, which
+# is exactly when the previous session's handoff is worth having.
+#
+# Everything else is deliberately excluded by default, each for its own reason:
+#
+# - `resume`: the conversation history is restored, so injecting a summary of
+#   it duplicates what is already there.
+# - `clear`: the user explicitly asked for a clean slate. Quietly putting the
+#   old context back is not a feature — it is the tool overriding an
+#   instruction it was given.
+# - `compact`: this one looks attractive and is a trap. Compaction fires
+#   *mid-session*, but the newest file in `.crumb/` at that moment is from the
+#   last session that **ended** — the current session has not ended and has no
+#   crumb. "Compaction discarded detail, the crumb restores it" is wrong on
+#   the timeline: it would restore a *different session's* detail, injected at
+#   the exact moment the model is most disoriented. `--on startup,compact`
+#   remains available for workflows where the latest crumb genuinely is the
+#   current task (e.g. a single long-running project handoff), but it is not a
+#   safe default.
+DEFAULT_RESUME_SOURCES = ('startup',)
+
+RESUME_PREAMBLE = (
+    "Handoff from a previous session in this project, captured {age} ago by "
+    "crumb-format ({path}). It records the goal, what was decided, the files "
+    "touched, the constraints, and what was still open.\n\n"
+    "Treat it as background, not as current truth: verify anything "
+    "load-bearing against the repository as it stands now, because the working "
+    "tree may have moved since it was written."
+)
+
+
+def _humanize_age(seconds: float) -> str:
+    if seconds < 90:
+        return "less than a minute"
+    minutes = seconds / 60
+    if minutes < 90:
+        return f"{round(minutes)} minutes"
+    hours = minutes / 60
+    if hours < 36:
+        return f"{round(hours)} hours"
+    return f"{round(hours / 24)} days"
+
+
+def cmd_resume(args: argparse.Namespace) -> None:
+    """Inject the last session's crumb into a new one, from a SessionStart hook.
+
+    This is the other half of ``crumb capture``. Capture writes the handoff when
+    a session ends; without this, picking it up is a manual copy-paste, which is
+    the step people forget.
+
+    Claude Code delivers a JSON payload on stdin containing ``source``
+    (``startup`` / ``resume`` / ``clear`` / ``compact`` / ``fork``), and adds a
+    SessionStart hook's stdout to the model's context. **Everything diagnostic
+    therefore goes to stderr** — a stray print here would be silently injected
+    into the conversation as though the user had written it.
+    """
+    def note(message: str) -> None:
+        print(f"crumb resume: {message}", file=sys.stderr)
+
+    payload: dict = {}
+    if not sys.stdin.isatty():
+        raw = sys.stdin.read().strip()
+        if raw:
+            try:
+                payload = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                note(f"skipped (hook payload is not JSON: {exc})")
+                sys.exit(1 if args.strict else 0)
+    if not isinstance(payload, dict):
+        note("skipped (hook payload is not a JSON object)")
+        sys.exit(1 if args.strict else 0)
+
+    source = str(payload.get('source') or 'startup')
+    wanted = {s.strip() for s in args.on.split(',') if s.strip()}
+    if source not in wanted:
+        note(f"nothing injected (source={source}; injecting on {sorted(wanted)})")
+        sys.exit(0)
+
+    # A session must receive the handoff at most once. This is not
+    # hypothetical: a user who ran install.sh *and* installed the Claude Code
+    # plugin has this hook registered twice — settings.json and the plugin
+    # manifest — and both fire on the same SessionStart. Double capture is
+    # harmless (same file, overwritten); double injection is the same context
+    # pasted into the conversation twice. The marker keys on session_id, so a
+    # genuinely new session always injects.
+    session_id = str(payload.get('session_id') or '')
+    state_path = Path(args.dir) / '.resume-state'
+    if session_id:
+        try:
+            already = state_path.read_text(encoding='utf-8').strip()
+        except OSError:
+            already = ''
+        if already == session_id:
+            note(f"already injected for session {session_id[:12]}; not injecting twice")
+            sys.exit(0)
+
+    if args.file:
+        candidate = Path(args.file)
+        if not candidate.is_file():
+            note(f"skipped (no such crumb: {candidate})")
+            sys.exit(1 if args.strict else 0)
+    else:
+        crumb_dir = Path(args.dir)
+        found = sorted(
+            (p for p in crumb_dir.glob('*.crumb') if p.is_file()),
+            key=lambda p: -_crumb_age_seconds(p)[0],
+        )
+        if not found:
+            note(f"nothing to inject (no .crumb files in {crumb_dir}/)")
+            sys.exit(0)
+        candidate = found[-1]
+
+    age_seconds, age_basis = _crumb_age_seconds(candidate)
+    if args.max_age_hours and age_seconds > args.max_age_hours * 3600:
+        note(
+            f"nothing injected ({candidate} is {_humanize_age(age_seconds)} old, "
+            f"past --max-age-hours {args.max_age_hours:g})"
+        )
+        sys.exit(0)
+
+    crumb_text = candidate.read_text(encoding='utf-8').strip()
+    if not crumb_text:
+        note(f"nothing injected ({candidate} is empty)")
+        sys.exit(0)
+
+    context = (
+        RESUME_PREAMBLE.format(age=_humanize_age(age_seconds), path=candidate)
+        + "\n\n" + crumb_text
+    )
+
+    if args.plain:
+        print(context)
+    else:
+        print(json.dumps({
+            'hookSpecificOutput': {
+                'hookEventName': 'SessionStart',
+                'additionalContext': context,
+            }
+        }))
+    if session_id:
+        try:
+            state_path.parent.mkdir(parents=True, exist_ok=True)
+            state_path.write_text(session_id + '\n', encoding='utf-8')
+        except OSError:
+            pass  # the marker is best-effort; failing to write it must not fail the hook
+    note(
+        f"injected {candidate} ({_humanize_age(age_seconds)} old "
+        f"by {age_basis}, source={source})"
+    )
+
+
+# ── measure ──────────────────────────────────────────────────────────
+
+def cmd_measure(args: argparse.Namespace) -> None:
+    """Measure a CRUMB against the source it was compressed from."""
+    from cli import measure as measure_mod
+    from cli import transcripts
+
+    crumb_text = read_text(args.crumb)
+    source_raw = read_text(args.source)
+    source_label = args.source if args.source != '-' else '<stdin>'
+
+    # A transcript source is compared on its flattened text, so tokens spent
+    # on JSON punctuation don't inflate the savings.
+    source_text = source_raw
+    try:
+        _, messages = transcripts.load_messages(source_raw)
+        source_text = transcripts.transcript_text(messages)
+    except transcripts.TranscriptError:
+        pass  # plain text or a .crumb source — measure it as-is
+
+    result = measure_mod.measure(source_text, crumb_text, encoding=args.encoding)
+
+    subject = getattr(args, "label", None) or "CRUMB"
+    if args.json:
+        print(measure_mod.format_json(
+            result, source_label=source_label, crumb_label=args.crumb, subject=subject))
+    else:
+        print(measure_mod.format_report(
+            result, source_label=source_label, crumb_label=args.crumb, subject=subject))
+
+    failures = measure_mod.check_thresholds(
+        result, min_saved_pct=args.min_saved, min_retention=args.min_retention
+    )
+    if failures:
+        for failure in failures:
+            print(f"FAIL: {failure}", file=sys.stderr)
+        sys.exit(1)
 
 
 # ── from-otel / from-halo ────────────────────────────────────────────
@@ -1696,7 +1828,18 @@ def cmd_compress(args: argparse.Namespace) -> None:
 # ── bench ───────────────────────────────────────────────────────────
 
 def cmd_bench(args: argparse.Namespace) -> None:
-    """Benchmark a crumb's compression efficiency and information density."""
+    """Report a crumb's structure and its self-comparison redundancy headroom.
+
+    Deprecated in favour of ``crumb measure``, which compares a crumb against
+    the source it was compressed from. See the note above the print block below
+    for why the old score was withdrawn.
+    """
+    print(
+        "note: `crumb bench` is deprecated. It compares a crumb against itself, "
+        "so it cannot tell you what compression cost. Use `crumb measure "
+        "<crumb> --source <transcript>` for token savings and fact retention.",
+        file=sys.stderr,
+    )
     text = read_text(args.file)
     parsed = parse_crumb(text)
     headers = parsed['headers']
@@ -1741,44 +1884,36 @@ def cmd_bench(args: argparse.Namespace) -> None:
     metalk_saved_pct = ((compressed_tokens - metalked_tokens) / max(compressed_tokens, 1)) * 100
     full_ratio = tokens / max(metalked_tokens, 1)
 
-    # Score components
-    density_score = min(keyword_density * 5, 25)  # max 25
-    compression_score = min(max_ratio * 5, 25)  # max 25
-    structure_score = 25 if not (set(REQUIRED_SECTIONS.get(kind, [])) - set(sections.keys())) else 10
-    conciseness_score = min(25, max(0, 25 - (tokens - 100) / 40))  # smaller = better, max 25
+    # No score, no grade. `crumb bench` used to reduce a crumb to a number out
+    # of 100 built from axes it invented for itself — keyword density and
+    # "conciseness" — and a compression ratio measured against a squeezed copy
+    # of the same file. That number was not just uninformative, it was
+    # misleading in the expensive direction: it graded a transcript handoff at
+    # "74/100, 1.3x" when the same crumb measured 9.0x against the conversation
+    # it was actually compressed from. A self-comparison cannot tell you what
+    # compression cost, because it never sees the source.
+    from cli.measure import count_tokens
 
-    total = density_score + compression_score + structure_score + conciseness_score
-
-    # Grade
-    if total >= 85:
-        grade = 'A'
-    elif total >= 70:
-        grade = 'B'
-    elif total >= 55:
-        grade = 'C'
-    elif total >= 40:
-        grade = 'D'
-    else:
-        grade = 'F'
+    real_tokens, tokenizer = count_tokens(text)
+    missing_required = set(REQUIRED_SECTIONS.get(kind, [])) - set(sections.keys())
 
     print(f"CRUMB Bench — {args.file}")
-    print(f"{'=' * 50}")
+    print(f"{'=' * 62}")
     print(f"  Kind:              {kind}")
-    print(f"  Token cost:        ~{tokens} tokens ({chars} chars)")
+    print(f"  Wire version:      {headers.get('v', '?')}")
+    print(f"  Token cost:        {real_tokens} tokens ({chars} chars) via {tokenizer}")
     print(f"  Content:           {total_lines} lines, {len(sections)} sections")
     print(f"  Unique keywords:   {len(keywords)}")
-    print(f"  Keyword density:   {keyword_density:.1f} per 100 tokens")
-    print(f"  Max compression:   {max_ratio:.1f}x ({tokens} → {compressed_tokens} tokens)")
-    print(f"  Dedup potential:   {original_entries} → {after_stage1} entries (stage 1)")
-    print(f"  Prune potential:   {after_stage1} → {after_stage2} entries (stage 2)")
-    print(f"  MeTalk potential:  {full_ratio:.1f}x ({tokens} → {metalked_tokens} tokens, +{metalk_saved_pct:.0f}% over stage 2)")
-    print(f"{'=' * 50}")
-    print(f"  Density:           {density_score:.0f}/25")
-    print(f"  Compressibility:   {compression_score:.0f}/25")
-    print(f"  Structure:         {structure_score:.0f}/25")
-    print(f"  Conciseness:       {conciseness_score:.0f}/25")
-    print(f"{'=' * 50}")
-    print(f"  SCORE: {total:.0f}/100  Grade: {grade}")
+    print(f"  Required sections: {'complete' if not missing_required else 'MISSING ' + ', '.join(sorted(missing_required))}")
+    print(f"{'-' * 62}")
+    print("  Redundancy headroom — this crumb compared against a squeezed copy")
+    print("  of ITSELF. Not a measurement of what compression cost you.")
+    print(f"    Dedup + prune:   {max_ratio:.1f}x ({tokens} → {compressed_tokens} est. tokens)")
+    print(f"    Entries:         {original_entries} → {after_stage2}")
+    print(f"    With MeTalk:     {full_ratio:.1f}x ({tokens} → {metalked_tokens} est. tokens)")
+    print(f"{'=' * 62}")
+    print("  For what compression actually cost, measure against the source:")
+    print(f"    crumb measure {args.file} --source <transcript>")
 
 
 # ── diff ─────────────────────────────────────────────────────────────
@@ -5349,20 +5484,29 @@ def cmd_wake(args: argparse.Namespace) -> None:
 
 
 _LLM_MISSING_DEPS = (
-    "crumb_llm requires PyTorch (and numpy). Install with:\n"
-    "    pip install 'crumb-format[llm]'"
+    "crumb_wavelm is not bundled with crumb-format.\n"
+    "\n"
+    "It is an experimental wave-field language model — research code, unrelated\n"
+    "to the CRUMB wire format — so it is no longer shipped inside this wheel.\n"
+    "The source lives in the crumb-format repository:\n"
+    "\n"
+    "    git clone https://github.com/XioAISolutions/crumb-format\n"
+    "    cd crumb-format && pip install torch numpy\n"
+    "    python -m crumb_wavelm.setup_standalone --output ./crumb-wavelm-pkg\n"
+    "\n"
+    "Nothing else in crumb-format depends on it."
 )
 
 
 def cmd_llm(args: argparse.Namespace) -> None:
     """Crumb LLM: train, generate, perplexity, bench, info.
 
-    All sub-actions live inside the ``crumb_llm`` subpackage. Importing
+    All sub-actions live inside the ``crumb_wavelm`` subpackage. Importing
     it raises ImportError if torch is not installed; we catch that and
     print a friendly install hint.
     """
     try:
-        import crumb_llm  # noqa: F401
+        import crumb_wavelm  # noqa: F401
     except ImportError as e:
         print(_LLM_MISSING_DEPS, file=sys.stderr)
         print(f"  (underlying error: {e})", file=sys.stderr)
@@ -5371,9 +5515,9 @@ def cmd_llm(args: argparse.Namespace) -> None:
     action = args.llm_action
 
     if action == 'info':
-        import crumb_llm
+        import crumb_wavelm
         import torch
-        print(f"Crumb LLM  v{crumb_llm.__version__}")
+        print(f"Crumb LLM  v{crumb_wavelm.__version__}")
         print(f"O(N log N) language modeling via physics-based wave equations")
         print()
         print(f"torch           {torch.__version__}")
@@ -5389,7 +5533,7 @@ def cmd_llm(args: argparse.Namespace) -> None:
         return
 
     if action == 'train':
-        from crumb_llm.train import load_config, train
+        from crumb_wavelm.train import load_config, train
         cfg = load_config(args.config)
         if args.arch:
             cfg["arch"] = args.arch
@@ -5406,10 +5550,10 @@ def cmd_llm(args: argparse.Namespace) -> None:
         return
 
     if action == 'generate':
-        from crumb_llm.sample import generate
+        from crumb_wavelm.sample import generate
         prompt = args.prompt
         if args.from_crumb:
-            from crumb_llm.crumb_adapter import CrumbPriorBuilder
+            from crumb_wavelm.crumb_adapter import CrumbPriorBuilder
             text = read_text(args.from_crumb)
             # Use the parsed body as the prompt; structural priors are
             # passed to forward() in the model.generate path automatically
@@ -5428,7 +5572,7 @@ def cmd_llm(args: argparse.Namespace) -> None:
         return
 
     if action == 'bench':
-        from crumb_llm.bench import benchmark, format_rows
+        from crumb_wavelm.bench import benchmark, format_rows
         lens = [int(x) for x in args.lens.split(",") if x.strip()]
         rows = benchmark(
             lens=lens, dim=args.dim, n_layers=args.n_layers, n_heads=args.n_heads,
@@ -5440,7 +5584,7 @@ def cmd_llm(args: argparse.Namespace) -> None:
     if action == 'perplexity':
         import math
         import torch
-        from crumb_llm.sample import load_checkpoint
+        from crumb_wavelm.sample import load_checkpoint
         model, tok = load_checkpoint(args.ckpt)
         text = read_text(args.file)
         ids = torch.tensor(tok.encode(text), dtype=torch.long).unsqueeze(0)
@@ -5461,7 +5605,7 @@ def cmd_llm(args: argparse.Namespace) -> None:
         return
 
     if action == 'demo':
-        from crumb_llm.demo import main as demo_main
+        from crumb_wavelm.demo import main as demo_main
         demo_argv = []
         if args.ckpt:
             demo_argv.extend(['--ckpt', args.ckpt])
@@ -5475,7 +5619,7 @@ def cmd_llm(args: argparse.Namespace) -> None:
         return
 
     if action == 'compare':
-        from crumb_llm.compare import compare
+        from crumb_wavelm.compare import compare
         compare(
             config_name=args.config,
             data_path=args.data,
@@ -5487,15 +5631,15 @@ def cmd_llm(args: argparse.Namespace) -> None:
         return
 
     if action == 'export':
-        from crumb_llm.hub import save_for_hub
-        from crumb_llm.sample import load_checkpoint
+        from crumb_wavelm.hub import save_for_hub
+        from crumb_wavelm.sample import load_checkpoint
         model, tok = load_checkpoint(args.ckpt)
         out_dir = args.output or str(Path(args.ckpt) / "hub")
         save_for_hub(model, tok, out_dir, model_name=args.name)
         return
 
     if action == 'serve':
-        from crumb_llm.serve import serve
+        from crumb_wavelm.serve import serve
         serve(
             ckpt_dir=args.ckpt, port=args.port, host=args.host,
             index_dir=args.index,
@@ -5505,14 +5649,14 @@ def cmd_llm(args: argparse.Namespace) -> None:
         return
 
     if action == 'index':
-        from crumb_llm.context_pull import build_index
+        from crumb_wavelm.context_pull import build_index
         idx = build_index(args.directory, field_size=args.field_size)
         idx.save(args.output)
         print(f"Indexed {len(idx.sections)} sections → {args.output}")
         return
 
     if action == 'pull':
-        from crumb_llm.context_pull import CrumbIndex, pull_context
+        from crumb_wavelm.context_pull import CrumbIndex, pull_context
         idx = CrumbIndex.load(args.index_file)
         pulled = pull_context(args.query, idx, max_tokens=args.max_tokens, top_k=args.top_k)
         if pulled:
@@ -5825,15 +5969,16 @@ def build_parser() -> argparse.ArgumentParser:
     full_help = dedent("""\
         Commands (use `crumb <cmd> --help` for details):
 
-          Create:    new   from-chat   from-git   from-otel   import   template
-          Inspect:   validate   inspect   diff   search   bench
-          Edit:      append   dream   merge   watch
+          Create:    new   capture   from-chat   from-messages   from-git   from-otel   import   template
+          Inspect:   validate   inspect   diff   search   bench   measure   verify
+          Edit:      append   log   dream   merge   watch
           Optimize:  optimize   lint   metalk
-          Handoff:   handoff   receive   export
+          Handoff:   handoff   receive   resume   export
           Memory:    palace   wake   reflect   classify
           Format:    bridge   resolve   hash   delta   apply   seen
           Governance:passport   policy   audit   scan   comply   webhook   guardrails
           Todo:      todo (add | done | list | dream)
+          Research:  llm  — experimental crumb_wavelm model; not part of the format
           Setup:     hello   doctor   init   hooks   context   pack
     """).strip()
 
@@ -5907,6 +6052,101 @@ def build_parser() -> argparse.ArgumentParser:
                            help='Output kind: task (default) or mem (extracts decisions).')
     from_chat.add_argument('--constraints', '-c', nargs='*', help='Constraints as separate arguments.')
     from_chat.set_defaults(func=cmd_from_chat)
+
+    # from-messages
+    from_messages = sub.add_parser(
+        'from-messages',
+        help='Convert a real conversation (OpenAI/Anthropic messages, ChatGPT or Claude export) into a task crumb.')
+    from_messages.add_argument('--input', '-i', default='-', help='JSON/JSONL transcript file, or - for stdin.')
+    from_messages.add_argument('--output', '-o', default='-', help='Output file or - for stdout.')
+    from_messages.add_argument('--format', '-f', choices=list(_TRANSCRIPT_FORMATS),
+                               help='Force an input format instead of auto-detecting.')
+    from_messages.add_argument('--title', help='Title for the crumb (default: derived from the first user turn).')
+    from_messages.add_argument('--source', help='Source label (default: transcript.<format>).')
+    from_messages.add_argument('--goal', help='Override the derived goal.')
+    from_messages.add_argument('--project', help='Optional project= header.')
+    from_messages.add_argument('--constraints', '-c', nargs='*', help='Extra constraints to append.')
+    from_messages.add_argument('--stats', action='store_true',
+                               help='Print token savings and fact retention after writing.')
+    from_messages.set_defaults(func=cmd_from_messages)
+
+    # capture
+    capture_cmd = sub.add_parser(
+        'capture',
+        help='Capture an agent session as a crumb (drive from a SessionEnd hook).')
+    capture_cmd.add_argument('--transcript', help='Transcript file. Default: read a hook payload on stdin.')
+    capture_cmd.add_argument('--last', action='store_true',
+                             help='Use your most recent agent session, found automatically.')
+    capture_cmd.add_argument('--output', '-o', help='Output file, or - for stdout. Default: <dir>/session-<id>.crumb')
+    capture_cmd.add_argument('--dir', default='.crumb', help='Directory for the default output path (default: .crumb).')
+    capture_cmd.add_argument('--title', help='Title for the crumb.')
+    capture_cmd.add_argument('--goal', help='Override the derived goal.')
+    capture_cmd.add_argument('--project', help='Optional project= header.')
+    capture_cmd.add_argument('--source', help='Source label (default: transcript.<format>).')
+    capture_cmd.add_argument('--strict', action='store_true',
+                             help='Exit non-zero if the transcript cannot be read (default: exit 0 so a hook never breaks the session).')
+    capture_cmd.add_argument('--no-receipt', action='store_true',
+                             help='Omit the measured= header recording what the compression cost.')
+    capture_cmd.set_defaults(func=cmd_capture)
+
+    # resume
+    resume_cmd = sub.add_parser(
+        'resume',
+        help='Inject the last session\'s crumb into a new one (drive from a SessionStart hook).')
+    resume_cmd.add_argument('--dir', default='.crumb',
+                            help='Directory to read crumbs from (default: .crumb).')
+    resume_cmd.add_argument('--file', help='Inject this crumb instead of the most recent one.')
+    resume_cmd.add_argument('--on', default=','.join(DEFAULT_RESUME_SOURCES),
+                            help='Comma-separated SessionStart sources to inject on '
+                                 f'(default: {",".join(DEFAULT_RESUME_SOURCES)}). '
+                                 'Excluding "clear" is deliberate: it means the user asked '
+                                 'for a clean slate.')
+    resume_cmd.add_argument('--max-age-hours', type=float, default=168.0,
+                            help='Skip crumbs older than this (default: 168, one week; 0 disables).')
+    resume_cmd.add_argument('--plain', action='store_true',
+                            help='Print the context as plain text instead of hook JSON.')
+    resume_cmd.add_argument('--strict', action='store_true',
+                            help='Exit non-zero on a malformed payload (default: exit 0 so a hook never breaks the session).')
+    resume_cmd.set_defaults(func=cmd_resume)
+
+    # measure
+    measure_cmd = sub.add_parser(
+        'measure',
+        help='Measure a crumb against its source: token savings + fact retention.')
+    measure_cmd.add_argument('crumb', help='The .crumb file to measure.')
+    measure_cmd.add_argument('--source', '-s', required=True,
+                             help='The transcript or text it was compressed from (- for stdin).')
+    measure_cmd.add_argument('--json', action='store_true', help='Emit machine-readable JSON.')
+    measure_cmd.add_argument('--encoding', default='o200k_base',
+                             help='tiktoken encoding name (default: o200k_base).')
+    measure_cmd.add_argument('--min-saved', type=float, dest='min_saved',
+                             help='Exit non-zero if token savings fall below this percentage.')
+    measure_cmd.add_argument('--min-retention', type=float, dest='min_retention',
+                             help='Exit non-zero if fact retention falls below this percentage.')
+    measure_cmd.add_argument('--label', help='Name what is being audited (default: CRUMB).')
+    measure_cmd.set_defaults(func=cmd_measure)
+
+    # verify — the same measurement, named for what it actually does. The
+    # compressed side is never parsed, so this audits any compaction output:
+    # a provider's compaction, an LLM summary, a truncated transcript. Useful
+    # to someone who never adopts the CRUMB format at all.
+    verify_cmd = sub.add_parser(
+        'verify',
+        help='Audit any compressed context against its source: what survived, what was dropped.')
+    verify_cmd.add_argument('crumb', metavar='FILE',
+                            help='The compressed artifact to audit (any text file).')
+    verify_cmd.add_argument('--source', '-s', required=True,
+                            help='The original it was compressed from (- for stdin).')
+    verify_cmd.add_argument('--label', default='compressed',
+                            help='Name what is being audited (default: compressed).')
+    verify_cmd.add_argument('--json', action='store_true', help='Emit machine-readable JSON.')
+    verify_cmd.add_argument('--encoding', default='o200k_base',
+                            help='tiktoken encoding name (default: o200k_base).')
+    verify_cmd.add_argument('--min-saved', type=float, dest='min_saved',
+                            help='Exit non-zero if token savings fall below this percentage.')
+    verify_cmd.add_argument('--min-retention', type=float, dest='min_retention',
+                            help='Exit non-zero if fact retention falls below this percentage.')
+    verify_cmd.set_defaults(func=cmd_measure)
 
     # from-otel
     from_otel = sub.add_parser('from-otel', help='Convert an OpenTelemetry trace JSONL into a kind=log crumb.')
@@ -6492,7 +6732,7 @@ def build_parser() -> argparse.ArgumentParser:
     wt.add_argument('--config', default='tiny', help='Built-in config or path to JSON.')
     wt.add_argument('--data', default=None, help='Text file or directory of *.txt/*.crumb/*.md.')
     wt.add_argument('--steps', type=int, default=500)
-    wt.add_argument('--out', default='crumb_llm/checkpoints/run')
+    wt.add_argument('--out', default='crumb_wavelm/checkpoints/run')
     wt.add_argument('--seed', type=int, default=0)
     wt.add_argument('--log-every', type=int, default=50)
     wt.add_argument('--eval-every', type=int, default=500)

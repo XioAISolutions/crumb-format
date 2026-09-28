@@ -11,7 +11,7 @@ torch = pytest.importorskip("torch")
 
 
 def test_baseline_forward_backward():
-    from crumb_llm.baseline import TinyTransformerLM, TransformerConfig
+    from crumb_wavelm.baseline import TinyTransformerLM, TransformerConfig
     cfg = TransformerConfig(vocab_size=32, dim=16, n_layers=2, n_heads=2, block_size=32)
     m = TinyTransformerLM(cfg)
     x = torch.randint(0, 32, (1, 8))
@@ -24,7 +24,7 @@ def test_baseline_forward_backward():
 
 
 def test_byte_tokenizer_roundtrip():
-    from crumb_llm.tokenizer import ByteTokenizer
+    from crumb_wavelm.tokenizer import ByteTokenizer
     tok = ByteTokenizer()
     text = "Hello, world! 🌍"
     ids = tok.encode(text)
@@ -34,7 +34,7 @@ def test_byte_tokenizer_roundtrip():
 
 
 def test_char_tokenizer_roundtrip():
-    from crumb_llm.tokenizer import CharTokenizer
+    from crumb_wavelm.tokenizer import CharTokenizer
     tok = CharTokenizer.fit("hello world test")
     ids = tok.encode("hello")
     decoded = tok.decode(ids)
@@ -43,7 +43,7 @@ def test_char_tokenizer_roundtrip():
 
 
 def test_char_tokenizer_save_load(tmp_path):
-    from crumb_llm.tokenizer import CharTokenizer
+    from crumb_wavelm.tokenizer import CharTokenizer
     tok = CharTokenizer.fit("abcdefg")
     tok.save(tmp_path / "tok.json")
     loaded = CharTokenizer.load(tmp_path / "tok.json")
@@ -55,14 +55,14 @@ def test_char_tokenizer_save_load(tmp_path):
 
 
 def test_load_text_corpus_synthetic():
-    from crumb_llm.data import load_text_corpus, SYNTHETIC_CORPUS
+    from crumb_wavelm.data import load_text_corpus, SYNTHETIC_CORPUS
     text = load_text_corpus(None)
     assert len(text) > 100
 
 
 def test_make_token_stream_batches():
-    from crumb_llm.data import make_token_stream
-    from crumb_llm.tokenizer import ByteTokenizer
+    from crumb_wavelm.data import make_token_stream
+    from crumb_wavelm.tokenizer import ByteTokenizer
     tok = ByteTokenizer()
     stream = make_token_stream("hello world " * 100, tok, block_size=16)
     x, y = stream.batch(4)
@@ -74,7 +74,7 @@ def test_make_token_stream_batches():
 
 
 def test_compare_runs_briefly():
-    from crumb_llm.compare import compare
+    from crumb_wavelm.compare import compare
     results = compare(config_name="tiny", steps=10, log_every=10)
     assert "wave_field" in results
     assert "transformer" in results
@@ -85,15 +85,15 @@ def test_compare_runs_briefly():
 
 
 def test_mcp_tools_without_model():
-    from crumb_llm.mcp_tools import handle_tool
+    from crumb_wavelm.mcp_tools import handle_tool
     result = handle_tool("crumb_llm_complete", {"prompt": "test"})
     assert "Error" in result or "no model" in result.lower()
 
 
 def test_mcp_tools_score_with_model():
-    from crumb_llm.mcp_tools import handle_tool
-    from crumb_llm.model import WaveFieldLM, WaveFieldConfig
-    from crumb_llm.tokenizer import ByteTokenizer
+    from crumb_wavelm.mcp_tools import handle_tool
+    from crumb_wavelm.model import WaveFieldLM, WaveFieldConfig
+    from crumb_wavelm.tokenizer import ByteTokenizer
     cfg = WaveFieldConfig(vocab_size=256, dim=16, n_layers=1, n_heads=2, field_size=32)
     m = WaveFieldLM(cfg)
     m.eval()
@@ -106,10 +106,10 @@ def test_mcp_tools_score_with_model():
 
 
 def test_setup_standalone_generates_files(tmp_path):
-    from crumb_llm.setup_standalone import generate_standalone
+    from crumb_wavelm.setup_standalone import generate_standalone
     generate_standalone(tmp_path / "pkg")
     assert (tmp_path / "pkg" / "pyproject.toml").exists()
-    assert (tmp_path / "pkg" / "crumb_llm").is_dir()
+    assert (tmp_path / "pkg" / "crumb_wavelm").is_dir()
     assert (tmp_path / "pkg" / "tests").is_dir()
 
 
@@ -117,7 +117,7 @@ def test_setup_standalone_generates_files(tmp_path):
 
 
 def test_serve_handler_dev_mode_no_auth():
-    from crumb_llm.serve import CrumbLLMHandler, TIERS
+    from crumb_wavelm.serve import CrumbLLMHandler, TIERS
     CrumbLLMHandler.production_mode = False
     # In dev mode, _auth should return without checking keys.
     # We can't easily call _auth without an HTTP request, but we can
@@ -129,7 +129,7 @@ def test_serve_handler_dev_mode_no_auth():
 
 
 def test_v2_model_trains():
-    from crumb_llm.model import WaveFieldLM, WaveFieldConfig
+    from crumb_wavelm.model import WaveFieldLM, WaveFieldConfig
     cfg = WaveFieldConfig(
         vocab_size=32, dim=16, n_layers=1, n_heads=2, field_size=32,
         use_v2_blocks=True,
@@ -148,8 +148,8 @@ def test_v2_model_trains():
 
 
 def test_cached_generation_beyond_field_size():
-    from crumb_llm.model import WaveFieldLM, WaveFieldConfig
-    from crumb_llm.cache import generate_cached
+    from crumb_wavelm.model import WaveFieldLM, WaveFieldConfig
+    from crumb_wavelm.cache import generate_cached
     cfg = WaveFieldConfig(vocab_size=32, dim=16, n_layers=1, n_heads=2, field_size=16)
     m = WaveFieldLM(cfg)
     m.eval()

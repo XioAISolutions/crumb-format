@@ -13,5 +13,5 @@ RUN pip install --no-cache-dir -e .
 # Override --ckpt and --index at runtime.
 EXPOSE 8090
 
-ENTRYPOINT ["python", "-m", "crumb_llm.serve"]
+ENTRYPOINT ["python", "-m", "crumb_wavelm.serve"]
 CMD ["--ckpt", "/ckpt", "--port", "8090", "--index", "/crumbs"]

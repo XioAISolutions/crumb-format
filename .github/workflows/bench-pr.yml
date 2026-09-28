@@ -1,4 +1,4 @@
-name: CRUMB Bench on PR
+name: CRUMB file inventory on PR
 
 on:
   # Reusable workflow — other repos can call this
@@ -25,7 +25,7 @@ permissions:
 
 jobs:
   bench:
-    name: Run crumb bench
+    name: Inventory .crumb files
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -53,56 +53,69 @@ jobs:
             pip install crumb-format
           fi
 
-      - name: Find and bench .crumb files
+      - name: Inventory and validate .crumb files
         id: bench
         shell: bash
         run: |
           SEARCH_PATH="${{ inputs.search-path || '.' }}"
-
-          # Find all .crumb files, excluding .git
-          mapfile -t CRUMB_FILES < <(find "$SEARCH_PATH" -name "*.crumb" -not -path "./.git/*" | sort)
+          # -type f because .crumb is also a directory name in this repo, and
+          # the deliberately-invalid fixtures are excluded: the conformance
+          # reject cases and fixtures/invalid exist precisely to be rejected,
+          # so listing them as failures would be noise, not signal.
+          mapfile -t CRUMB_FILES < <(
+            find "$SEARCH_PATH" -type f -name "*.crumb" \
+              -not -path "*/.git/*" \
+              -not -path "*/conformance/cases/reject-*" \
+              -not -path "*/fixtures/invalid/*" | sort
+          )
 
           if [ ${#CRUMB_FILES[@]} -eq 0 ]; then
             echo "No .crumb files found."
             echo "found=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-
           echo "found=true" >> "$GITHUB_OUTPUT"
 
-          # Build the markdown table
-          TABLE="| File | Score | Grade | Tokens | Compression |"
-          TABLE+=$'\n'"|------|-------|-------|--------|-------------|"
+          # Columns are facts, not judgements. This table used to publish a
+          # Score, a letter Grade, and a "Compression" ratio measured against a
+          # squeezed copy of the same file. All three were invented by the tool
+          # that reported them, and the ratio was misleading in the expensive
+          # direction -- it printed 1.3x for a crumb that measures 9.0x against
+          # the conversation it was actually compressed from. Token counts now
+          # come from a real tokenizer and the table says which one.
+          python -m pip install --quiet tiktoken || true
+
+          TABLE="| File | Kind | Wire | Tokens | Valid |"
+          TABLE+=$'\n'"|------|------|------|--------|-------|"
 
           for file in "${CRUMB_FILES[@]}"; do
-            echo "::group::Benching $file"
-            OUTPUT=$(crumb bench "$file" 2>&1) || true
-            echo "$OUTPUT"
+            echo "::group::$file"
+            ROW=$(python - "$file" <<'PY' || echo "| \`$file\` | - | - | - | parse error |"
+          import sys
+          from pathlib import Path
+          import crumb_core
+          from cli.measure import count_tokens
+
+          path = Path(sys.argv[1])
+          text = path.read_text(encoding="utf-8")
+          try:
+              parsed = crumb_core.parse_crumb(text)
+          except ValueError as exc:
+              print(f"| `{path}` | - | - | - | rejected: {exc} |")
+              raise SystemExit(0)
+          tokens, method = count_tokens(text)
+          headers = parsed["headers"]
+          print(f"| `{path}` | {headers['kind']} | {headers.get('v','?')} | {tokens} | ok |")
+          PY
+          )
+            echo "$ROW"
             echo "::endgroup::"
-
-            # Parse score (e.g. "Score: 83/100" or just "83/100")
-            SCORE=$(echo "$OUTPUT" | grep -oP '\d+/100' | head -1 || echo "N/A")
-
-            # Parse grade (e.g. "Grade: B" or standalone letter grade)
-            GRADE=$(echo "$OUTPUT" | grep -oP '(?<=Grade:\s)[A-F][+-]?' | head -1 || echo "-")
-            if [ "$GRADE" = "-" ]; then
-              GRADE=$(echo "$OUTPUT" | grep -oP '\b[A-F][+-]?\b' | head -1 || echo "-")
-            fi
-
-            # Parse token count (e.g. "Tokens: ~127" or "~127 tokens")
-            TOKENS=$(echo "$OUTPUT" | grep -oP '~?\d+(?=\s*tokens?)' | head -1 || echo "-")
-            if [ "$TOKENS" = "-" ]; then
-              TOKENS=$(echo "$OUTPUT" | grep -oP '(?<=Tokens:\s)~?\d+' | head -1 || echo "-")
-            fi
-
-            # Parse compression ratio (e.g. "Compression: 1.7x" or "1.7x")
-            COMPRESSION=$(echo "$OUTPUT" | grep -oP '\d+\.\d+x' | head -1 || echo "-")
-
-            TABLE+=$'\n'"| \`$file\` | $SCORE | $GRADE | $TOKENS | $COMPRESSION |"
+            TABLE+=$'\n'"$ROW"
           done
 
-          # Write table to file to avoid escaping issues
+          TOKENIZER=$(python -c "from cli.measure import count_tokens; print(count_tokens('x')[1])")
           echo "$TABLE" > /tmp/bench-table.md
+          echo "$TOKENIZER" > /tmp/bench-tokenizer.txt
 
       - name: Post PR comment
         if: steps.bench.outputs.found == 'true'
@@ -112,7 +125,13 @@ jobs:
             const fs = require('fs');
             const table = fs.readFileSync('/tmp/bench-table.md', 'utf8');
 
-            const body = `## CRUMB Bench Results\n\n${table}\n\n*Powered by [crumb-format](https://github.com/XioAISolutions/crumb-format) — two-stage context compression*`;
+            const tokenizer = fs.readFileSync('/tmp/bench-tokenizer.txt', 'utf8').trim();
+            const body = `## CRUMB files in this PR\n\n${table}\n\n`
+              + `Token counts via \`${tokenizer}\`. This table reports facts about each file — `
+              + `it deliberately does not score them. To measure what compression actually cost, `
+              + `compare a crumb against the source it came from:\n\n`
+              + '```bash\ncrumb measure handoff.crumb --source conversation.json\n```\n\n'
+              + `*[crumb-format](https://github.com/XioAISolutions/crumb-format)*`;
 
             // Determine the PR number. For workflow_call the context may differ.
             const prNumber = context.payload.pull_request?.number;
@@ -128,7 +147,7 @@ jobs:
               issue_number: prNumber,
             });
 
-            const marker = '## CRUMB Bench Results';
+            const marker = '## CRUMB files in this PR';
             const existing = comments.find(c => c.body.startsWith(marker));
 
             if (existing) {
@@ -160,5 +179,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
-              body: '## CRUMB Bench Results\n\nNo `.crumb` files found in this repository.',
+              body: '## CRUMB files in this PR\n\nNo `.crumb` files found in this repository.',
             });

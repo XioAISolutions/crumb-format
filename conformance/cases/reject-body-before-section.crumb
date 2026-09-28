@@ -1,0 +1,9 @@
+BEGIN CRUMB
+v=1.4
+kind=mem
+source=test
+---
+loose text
+[consolidated]
+- x
+END CRUMB

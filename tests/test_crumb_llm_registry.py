@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from crumb_llm.registry import (
+from crumb_wavelm.registry import (
     download_model,
     find_model,
     list_models,

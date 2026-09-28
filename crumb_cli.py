@@ -20,7 +20,7 @@ from pathlib import Path
 # Allow importing from cli/ without package restructuring.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "cli"))
 
-from crumb import main as crumb_main  # noqa: E402
+from crumb import CLI_VERSION, main as crumb_main  # noqa: E402
 
 PACKAGE_NAME = "crumb-format"
 PYPI_JSON_URL = f"https://pypi.org/pypi/{PACKAGE_NAME}/json"
@@ -39,7 +39,10 @@ def get_cli_version() -> str:
     try:
         return version(PACKAGE_NAME)
     except PackageNotFoundError:
-        return "dev"
+        # Not pip-installed (e.g. running from a source checkout in CI):
+        # fall back to the canonical version baked into the CLI rather than
+        # an opaque "dev" string, so `crumb version` and the banner are stable.
+        return CLI_VERSION
 
 
 def print_extra_commands() -> None:

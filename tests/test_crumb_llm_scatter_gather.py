@@ -4,7 +4,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from crumb_llm.scatter_gather import scatter_linear, gather_linear  # noqa: E402
+from crumb_wavelm.scatter_gather import scatter_linear, gather_linear  # noqa: E402
 
 
 def test_scatter_shape():

@@ -1,0 +1,17 @@
+BEGIN CRUMB
+v=1.4
+kind=task
+source=test
+---
+[goal]
+Do it.
+
+[fold:context/summary]
+Short.
+
+[fold:context/full]
+Long.
+
+[constraints]
+- c
+END CRUMB

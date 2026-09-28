@@ -1,0 +1,7 @@
+BEGIN CRUMB
+v=1.4
+source=test
+---
+[consolidated]
+- x
+END CRUMB

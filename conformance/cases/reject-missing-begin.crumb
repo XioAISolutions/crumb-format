@@ -1,0 +1,7 @@
+v=1.4
+kind=mem
+source=test
+---
+[consolidated]
+- x
+END CRUMB

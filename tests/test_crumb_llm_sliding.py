@@ -4,7 +4,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from crumb_llm.sliding import (  # noqa: E402
+from crumb_wavelm.sliding import (  # noqa: E402
     shift_field,
     SlidingFieldManager,
     sliding_scatter,

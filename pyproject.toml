@@ -4,8 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "crumb-format"
-version = "1.1.0"
-description = "The copy-paste AI handoff format — v1.4 wire format (stable). Native Claude Code and Cursor integrations, MCP servers (24 tools), validators (Python + JS), AgentAuth identity/governance/audit, palace memory, MeTalk compression, OTEL bridge, and ~46 CLI commands."
+version = "1.3.0"
+# The shadow-AI scanner substring-matches vendor names in this file and reports
+# them as SDK dependencies. Naming a model vendor here produced a permanent HIGH
+# finding on a package that has zero required dependencies. Naming the products
+# instead keeps the description accurate without the standing false positive.
+description = "Move AI session context between tools. Capture a Claude Code, ChatGPT, Claude or GPT transcript into a compact handoff — and measure what the compression cost."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -31,23 +35,32 @@ agentauth-mcp = "mcp.agentauth_server:main"
 [tool.setuptools]
 py-modules = ["crumb_cli"]
 packages = [
+    "crumb_core",
     "cli",
     "agentauth",
     "mcp",
     "api",
     "a2a",
-    "crumb_llm",
-    "crumb_llm.configs",
 ]
-
-[tool.setuptools.package-data]
-"crumb_llm" = ["models.json"]
-"crumb_llm.configs" = ["*.json"]
+# crumb_wavelm — the experimental wave-field language model — is deliberately
+# NOT packaged here. It is ~4,600 lines of PyTorch research code with nothing
+# to do with the wire format, and shipping it inside the format's wheel made
+# `pip install crumb-format` carry a homegrown LM. The source stays in this
+# repository and `python -m crumb_wavelm.setup_standalone` builds it as its own
+# distribution.
 
 [project.optional-dependencies]
+# Kept so `pip install 'crumb-format[llm]'` still resolves for anyone with it
+# pinned, but the model itself is no longer bundled — see the packages note
+# above and run crumb_wavelm.setup_standalone to build it separately.
 llm = [
     "torch>=2.2",
     "numpy>=1.26",
+]
+# Exact token counting for `crumb measure`. Without it the CLI falls back to
+# a chars/4 heuristic and labels every number it prints as approximate.
+measure = [
+    "tiktoken>=0.7",
 ]
 
 [tool.pytest.ini_options]
