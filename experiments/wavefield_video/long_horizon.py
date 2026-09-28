@@ -405,7 +405,12 @@ def cmd_stream(a):
     if a.resume:
         sess.load(a.resume)
         old_fp = (sess.extra or {}).get("context_fp")
-        if old_fp is not None and old_fp != ctx_fp:
+        if old_fp is None and (vae is not None or a.checkpoint):
+            raise SystemExit(f"{a.resume} records no warm-up context fingerprint (older state "
+                             "file); cannot verify it continues this stream -- start fresh")
+        if old_fp is None:          # legacy pixel --save-state file: allowed, but said so
+            print(f"WARNING: {a.resume} predates context fingerprints; not verified", flush=True)
+        elif old_fp != ctx_fp:
             raise SystemExit(f"{a.resume} continues a stream warmed on different context "
                              f"({old_fp} != {ctx_fp}: other --latents/--batch/--frames?)")
         if sess.extra and "health" in sess.extra:

@@ -115,7 +115,12 @@ def main(argv=None):
     # and every finished video gets a "done" line, so a run killed by a slice
     # budget continues at the next unencoded segment -- inside a long video too.
     # A segment killed mid-encode is redone (its shard number is reused).
-    cfg = {"vae": vae.describe(), "height": a.height, "width": a.width, "fps": a.fps, "seg": seg}
+    # the corpus is part of the encode's identity: a resume with another --videos root
+    # or changed files is refused instead of appending a second corpus
+    manifest = [[str(p.relative_to(pathlib.Path(a.videos))), p.stat().st_size,
+                 int(p.stat().st_mtime)] for p in vids]
+    cfg = {"vae": vae.describe(), "height": a.height, "width": a.width, "fps": a.fps, "seg": seg,
+           "videos": str(pathlib.Path(a.videos).resolve()), "manifest": manifest}
     cfg_path, journal = out / "progress_config.json", out / "progress.jsonl"
     if cfg_path.exists() and json.loads(cfg_path.read_text()) != cfg:
         raise SystemExit(f"{out} holds a partial encode with different settings; delete it or "

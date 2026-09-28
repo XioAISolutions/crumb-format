@@ -20,6 +20,7 @@ so the predictor sees roughly unit-scale inputs. Weights load from a local
 directory or a Hugging Face id (``from_pretrained``); ``save`` writes a directory
 that loads back identically, which is how tests pin the tiny random VAEs.
 """
+import hashlib
 import json
 import pathlib
 
@@ -170,7 +171,6 @@ class VideoVAE(nn.Module):
         resumed encodes and the stream's decoder must all use the same latent space,
         and backend + shape alone cannot tell two checkpoints apart."""
         if getattr(self, "_fp", None) is None:
-            import hashlib
             h = hashlib.sha256()
             # the effective normalization too: Wan keeps it in config, not in weights
             items = sorted(self.model.state_dict().items()) + [("_norm_mean", self.mean),
@@ -195,9 +195,9 @@ class LatentShards:
         root = pathlib.Path(root)
         raw = (root / "index.json").read_text()
         index = json.loads(raw)
-        # identifies the dataset (every shard's source, span and encoder), so a
-        # resumed run cannot silently continue on different videos
-        import hashlib
+        # identifies the dataset (every shard's source, span, encoder and content
+        # digest, each digest re-verified below), so a resumed run cannot silently
+        # continue on different videos
         self.fingerprint = hashlib.sha256(raw.encode()).hexdigest()[:16]
         if len(index) < 2:
             raise SystemExit(f"{root}: need >= 2 shards to hold one out (have {len(index)})")
@@ -213,7 +213,14 @@ class LatentShards:
         else:
             is_eval = [m["src"] in eval_srcs for m in index]
         self.eval_srcs = sorted({m["src"] for m, e in zip(index, is_eval) if e})
-        shards = [torch.load(root / m["file"], weights_only=True)["latents"] for m in index]
+        shards = []
+        for m in index:             # each shard must still be what the index recorded
+            z = torch.load(root / m["file"], weights_only=True)["latents"]
+            got = hashlib.sha256(z.contiguous().view(torch.uint8).numpy().tobytes()).hexdigest()[:16]
+            if m.get("sha256") != got:
+                raise SystemExit(f"{root / m['file']}: content does not match index.json "
+                                 f"({m.get('sha256')} != {got}); re-encode {root}")
+            shards.append(z)
         self.train = [z for z, e in zip(shards, is_eval) if not e and z.shape[0] >= window]
         self.eval = [z for z, e in zip(shards, is_eval) if e and z.shape[0] >= window]
         if not self.train or not self.eval:

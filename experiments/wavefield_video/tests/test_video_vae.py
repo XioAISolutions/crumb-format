@@ -188,6 +188,22 @@ class VideoVAETests(unittest.TestCase):
             self.assertEqual(resumed, full)
             with self.assertRaises(SystemExit):                  # settings changed mid-encode
                 encode_videos.main(args[:-6] + ["--height", "32", "--width", "32"] + args[-4:])
+            # another corpus into the same --out is refused (videos root is in the identity)
+            encode_videos.write_synthetic(d / "mp4b", 1, frames=65, size=64)
+            (d / "lat" / "index.json").unlink()
+            with self.assertRaises(SystemExit):
+                encode_videos.main([str(d / "mp4b") if x == str(d / "mp4") else x for x in args])
+            encode_videos.main(args)                             # original corpus: resumes
+            # a tampered shard no longer matches its recorded digest
+            shard = torch.load(d / "lat" / "shard_00000.pt", weights_only=True)
+            shard["latents"] = shard["latents"] + 1
+            torch.save(shard, d / "lat" / "shard_00000.pt")
+            with self.assertRaisesRegex(SystemExit, "does not match index.json"):
+                LatentShards(d / "lat", window=2)
+            (d / "lat" / "index.json").unlink()
+            (d / "lat" / "progress.jsonl").unlink()
+            (d / "lat" / "progress_config.json").unlink()
+            encode_videos.main(args)                             # clean re-encode
             # different weights, same backend and shapes: a resumed encode and a stream
             # decoder must both refuse them
             other = VideoVAE("ltx-tiny")
@@ -254,6 +270,16 @@ class VideoVAETests(unittest.TestCase):
                                           "--resume", str(d / "tr" / "ckpt_wave.pt"),
                                           "--out", str(d / "tr")])
             self.assertIn("was trained on VAE", err.getvalue())
+            # a latent checkpoint without identity metadata is refused, not trusted
+            legacy = torch.load(d / "tr" / "ckpt_wave.pt", weights_only=True)
+            legacy.pop("data_fp")
+            torch.save(legacy, d / "tr" / "ckpt_legacy.pt")
+            err = io.StringIO()
+            with self.assertRaises(SystemExit), contextlib.redirect_stderr(err):
+                train_long.main(common + ["--latents", str(d / "lat"), "--steps", "2",
+                                          "--resume", str(d / "tr" / "ckpt_legacy.pt"),
+                                          "--out", str(d / "tr")])
+            self.assertIn("missing VAE or dataset fingerprint", err.getvalue())
             # same VAE, different dataset (other segmentation of the same videos)
             encode_videos.main([x if x not in (str(d / "lat"), "33") else
                                 {str(d / "lat"): str(d / "lat3"), "33": "41"}[x] for x in args])

@@ -316,16 +316,19 @@ def main(argv=None):
     start, prior_sec = 0, 0.0
     if a.resume:
         ck = torch.load(a.resume, map_location=dev, weights_only=True)
-        m.load_state_dict(ck["state"])
-        if data is not None:                             # same latent space, or refuse
+        if data is not None:        # same latent space and dataset, or refuse (fail closed)
             fp_ck = (ck.get("vae") or {}).get("fingerprint")
             fp_now = (data.vae or {}).get("fingerprint")
-            if fp_ck is not None and fp_now is not None and fp_ck != fp_now:
+            if fp_ck is None or ck.get("data_fp") is None or fp_now is None:
+                ap.error(f"--resume {a.resume} / --latents {a.latents}: missing VAE or dataset "
+                         "fingerprint (written before fingerprints); cannot verify, start fresh")
+            if fp_ck != fp_now:
                 ap.error(f"--resume {a.resume} was trained on VAE {fp_ck}; --latents {a.latents} "
                          f"was encoded with {fp_now}")
-            if ck.get("data_fp") is not None and ck["data_fp"] != data.fingerprint:
+            if ck["data_fp"] != data.fingerprint:
                 ap.error(f"--resume {a.resume} was trained on a different latent dataset "
                          f"({ck['data_fp']} != {data.fingerprint} for --latents {a.latents})")
+        m.load_state_dict(ck["state"])
         if data is not None and "dgen" in ck:            # continue the latent sample stream
             dgen.set_state(ck["dgen"].cpu())
         opt.load_state_dict(ck["opt"])
