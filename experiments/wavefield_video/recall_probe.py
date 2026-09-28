@@ -71,7 +71,8 @@ def run_one(pole_param, D, seed, a):
     m = VideoPredictor(a.dim, a.layers, a.heads, T, a.grid, a.grid, "wave", causal=True,
                        kernel_version="dispersion", linear_pad=True,
                        pole_param=pole_param, hl_min=a.hl_min, hl_max=a.hl_max,
-                       time_pos="none" if a.chunk else "table")
+                       time_pos="none" if a.chunk else "table",
+                       write_gate=a.write_gate, clean_write=a.clean_write)
     opt = torch.optim.AdamW(m.parameters(), lr=a.lr, weight_decay=0.0)
     t0 = time.time()
     for _ in range(a.steps):
@@ -92,6 +93,7 @@ def run_one(pole_param, D, seed, a):
         hit = (pred.sum(1).flatten(1).argmax(1) == clip[:, D].sum(1).flatten(1).argmax(1)).float().mean().item()
     return {"pole_param": pole_param, "delay": D, "seed": seed, "steps": a.steps,
             "chunk": a.chunk, "tbptt_chunks": a.tbptt_chunks if a.chunk else None,
+            "write_gate": a.write_gate, "clean_write": a.clean_write,
             "recall": round(1 - mse / base, 4), "argmax_hit": round(hit, 4),
             "mse": round(mse, 6), "mse_forget": round(base, 6),
             "train_s": round(train_s, 1), "s_per_step": round(train_s / a.steps, 4)}
@@ -116,6 +118,10 @@ def main(argv=None):
                     help="0 = one D-frame window; >0 = carried-state chunks of this length")
     ap.add_argument("--tbptt-chunks", type=int, default=1,
                     help="with --chunk: chunks of gradient through the carried state")
+    ap.add_argument("--write-gate", action="store_true",
+                    help="learned per-token gate on what enters the wave (LONG_HORIZON.md 8.4)")
+    ap.add_argument("--clean-write", action="store_true",
+                    help="blank frames write nothing: no spatial table, no embed/pi bias")
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     rows = []

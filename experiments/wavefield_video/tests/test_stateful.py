@@ -91,6 +91,47 @@ class StatefulTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             VideoPredictor(DIM, 1, NH, TC, H, W, "wave", time_pos="sinusoid")
 
+    def test_clean_write_blank_frames_write_nothing(self):
+        """clean_write: no spatial table, no embed/pi bias -> a blank clip leaves
+        the first layer's state exactly zero (LONG_HORIZON.md 8.4)."""
+        torch.manual_seed(0)
+        m = VideoPredictor(DIM, 2, NH, TC, H, W, "wave", causal=True, kernel_version="dispersion",
+                           linear_pad=True, pole_param="halflife", time_pos="none",
+                           clean_write=True).eval()
+        self.assertIsNone(m.posemb.py)
+        with torch.no_grad():
+            _, st = m(torch.zeros(1, TC, 3, H, W), states=[None, None])
+        self.assertEqual(st[0].abs().max().item(), 0.0)
+
+    def test_write_gate_keeps_chunk_full_stream_equivalence(self):
+        for kw in (dict(write_gate=True), dict(write_gate=True, clean_write=True)):
+            with self.subTest(**kw):
+                long, ch = _pair("wave", dict(kernel_version="dispersion", linear_pad=True,
+                                              pole_param="halflife", hl_max=64.0, **kw))
+                for mm in (long, ch):                       # a non-trivial gate
+                    torch.manual_seed(5)
+                    for blk in mm.blocks:
+                        torch.nn.init.normal_(blk.mix.wg.weight, std=0.5)
+                fr = torch.rand(2, N, 3, H, W)
+                with torch.no_grad():
+                    full, _ = long(fr, states=[None, None], dense=True)
+                    sts, outs = [None, None], []
+                    for c in range(N // TC):
+                        p, sts = ch(fr[:, c * TC:(c + 1) * TC], states=sts, dense=True)
+                        outs.append(p)
+                    st, so = ch.stream_init(2, "cpu"), []
+                    for t in range(N):
+                        o, st = ch.stream_step(fr[:, t], st, t)
+                        so.append(o)
+                self.assertLess((torch.cat(outs, 1) - full).abs().max().item(), 1e-4)
+                self.assertLess((torch.stack(so, 1) - full).abs().max().item(), 1e-4)
+
+    def test_write_options_need_the_plain_wave_arm(self):
+        for kw in (dict(kind="ssm", write_gate=True), dict(kind="attn", clean_write=True)):
+            with self.subTest(**kw):
+                with self.assertRaises(ValueError):
+                    VideoPredictor(DIM, 1, NH, TC, H, W, **kw)
+
     def test_causal_gate_does_not_read_the_future(self):
         torch.manual_seed(0)
         # halflife -> exact truncated kernel, so any leak left is the gate's own.

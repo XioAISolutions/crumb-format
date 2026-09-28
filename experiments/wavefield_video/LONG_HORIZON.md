@@ -250,6 +250,44 @@ halflife G=1.
 
 RESULTS_8_3
 
+### 8.4 Diagnosis: the memory is there, but drowned (measured before 8.3 ran)
+
+Why does even full backprop fail at D=128? Blob signal vs background in the
+first layer's wave state at init (halflife, grid 6; RMS of the state difference
+blob-vs-blank, over the RMS of the blank-clip state):
+
+| D | signal/background, as built | no spatial table + no embed bias | + no `pi` bias ("clean write") |
+|---|---|---|---|
+| 16 | 2.6e-2 | 2.4e-1 | background **exactly 0** |
+| 128 | 7.5e-4 | 4.5e-3 | background **exactly 0** |
+
+Every frame, even a blank one, writes the same per-cell constant into the
+state: the spatial position embedding plus the embed and input-projection
+biases. A shared input projection cannot cancel a per-cell constant, and
+long poles integrate it. By D=128 the frame-0 memory is under a background
+about 1,000× larger. Real video has the same problem in a stronger form: a
+static background is a per-cell constant, and long ripples would integrate
+the still scene instead of the events.
+
+Two opt-in fixes (both keep chunk == full == stream exactly):
+- `clean_write=True`: no spatial table, no embed bias, no `pi` bias, so a blank
+  input writes zero. Structural, but it cannot help with real static content.
+- `write_gate=True`: a learned per-token, per-head sigmoid on the wave input.
+  The model can learn to write events and skip static content. It is applied
+  before the time-invariant recurrence, so the FFT path is unchanged. This is
+  the one that could transfer to video.
+
+**Pre-registered (same budget as 8.1: D=128, chunk 32, 1,000 steps, seed 0,
+halflife):** arms clean G=4, clean G=1, gate G=4, gate G=1.
+- **PROVE (the background was the blocker):** any arm reaches recall ≥ 0.5,
+  where 8.1's identical-budget arms sat at 0.118.
+- **Constant memory:** a G=1 arm ≥ 0.5 means carried-state training works
+  once the write is clean.
+- **KILL:** all four arms < 0.5, so the background was not the (only) blocker
+  at this budget.
+
+RESULTS_8_4
+
 ## Pitch corrections
 
 - "At 16k moments one step takes ~1.5 s": the *ratio* survives a fair re-measure
