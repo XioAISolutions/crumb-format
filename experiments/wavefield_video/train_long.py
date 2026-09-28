@@ -20,7 +20,8 @@ Evaluation reuses train_compare's rollout_eval (balls) and occlusion_rollout_eva
 context. Result JSON keeps train_compare's field names.
 
     python train_long.py --data-source occlusion --grid 16 --seq-frames 256 --chunk 64 \\
-        --tbptt-chunks 1 --train-occ-start 96 --train-occ-end 160 --occ-start 96 --occ-end 160
+        --tbptt-chunks 1 --dense --train-occ-start 96 --train-occ-end 160 \\
+        --occ-start 96 --occ-end 160 --eval-rollout 128     # emergence at 160-64 = 96 < 128
 """
 import argparse
 import json
@@ -83,6 +84,51 @@ def sequence_loss(m, clips, moving, a):
     return total
 
 
+def stream_rollout_eval(m, a, dev):
+    """Ball rollout through stream_step, so the carried state IS what is evaluated
+    (train_compare.rollout_eval re-runs m(window) from a zero state every frame,
+    which would score a chunk-window model, not the carried-state one). Warm on
+    a.frames real frames, then roll a.eval_rollout frames on the model's own output.
+    Same metric names/definitions as rollout_eval."""
+    S, R = a.eval_seeds, a.eval_rollout
+    clip, meta = tc.make_clip_batch(S, a.frames + R - 1, a.grid, a.grid, device=dev, seed=90000,
+                                    kicks=a.kicks, collisions=a.collisions, radius=a.radius,
+                                    speed=a.speed, nb=a.n_balls, return_meta=True)
+    cols = meta["col"]
+    mse, persist, cerrs = [0.0] * R, [0.0] * R, []
+    t0 = time.time()
+    with torch.no_grad():
+        for c0 in range(0, S, max(1, a.eval_chunk)):
+            c1 = min(S, c0 + max(1, a.eval_chunk))
+            cb = c1 - c0
+            st, f = m.stream_init(cb, dev), None
+            for t in range(a.frames):
+                f, st = m.stream_step(clip[c0:c1, t], st, t)
+            ce = []
+            for k in range(R):
+                f = f.float().clamp(0, 1)
+                gt = clip[c0:c1, a.frames + k]
+                mse[k] += F.mse_loss(f, gt).item() * cb
+                persist[k] += F.mse_loss(clip[c0:c1, a.frames + k - 1], gt).item() * cb
+                pc = tc.centroids_by_color(f, cols[c0:c1])
+                ce.append((pc - meta["pos"][c0:c1, a.frames + k]).norm(dim=-1))
+                f, st = m.stream_step(f, st, a.frames + k)
+            cerrs.append(torch.stack(ce, 0))                         # [R, cb, nb]
+    mse = [x / S for x in mse]
+    persist = [x / S for x in persist]
+    cerr = torch.cat(cerrs, 1)
+    med = cerr.reshape(R, -1).median(dim=1).values
+    return {"eval_rollout": R, "eval_seeds": S, "rollout_path": "stream_step (carried state)",
+            "r_persist_over_model": round(sum(persist) / (sum(mse) + 1e-9), 3),
+            "div_thresh_px": round(a.radius, 3), "div_consec": tc.DIV_CONSEC,
+            "rollout_fps": round(S * R / (time.time() - t0), 1),
+            "rollout_mse_curve": [round(x, 5) for x in mse],
+            "mean_centroid_err": round(cerr.mean().item(), 3),
+            "final_centroid_err": round(cerr[-1].mean().item(), 3),
+            "identity_survival": round((cerr[-1] < 2.0 * a.radius).float().mean().item(), 3),
+            "divergence_horizon": tc.divergence_horizon(med, a.radius, tc.DIV_CONSEC)}
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data-source", choices=["balls", "occlusion"], default="balls")
@@ -124,11 +170,20 @@ def main(argv=None):
     ap.add_argument("--eval-rollout", type=int, default=64)
     ap.add_argument("--eval-seeds", type=int, default=16)
     ap.add_argument("--eval-chunk", type=int, default=4)
+    ap.add_argument("--eval-batch", type=int, default=8,
+                    help="single-step eval batch (8 x 8 batches); keep small on the GPU box")
     ap.add_argument("--save-every", type=int, default=0)
     ap.add_argument("--resume", default="")
     ap.add_argument("--out", default="runs_long")
     ap.add_argument("--tag", default="")
     a = ap.parse_args(argv)
+    if a.data_source == "occlusion" and a.occ_end - a.chunk + 8 > a.eval_rollout:
+        ap.error(f"eval emergence at frame {a.occ_end - a.chunk} of the rollout needs "
+                 f"--eval-rollout >= {a.occ_end - a.chunk + 8} (got {a.eval_rollout}); "
+                 "set --occ-start/--occ-end so the gap ends inside the rollout")
+    if a.data_source == "occlusion" and a.occ_start < a.chunk:
+        ap.error(f"--occ-start {a.occ_start} < --chunk {a.chunk}: the eval gap would start "
+                 "inside the warm-up context")
     if a.seq_frames % a.chunk:
         ap.error("--seq-frames must be a multiple of --chunk")
     if a.tbptt_chunks < 1:
@@ -146,12 +201,13 @@ def main(argv=None):
     base = pathlib.Path(a.out)
     base.mkdir(parents=True, exist_ok=True)
     ckpt_path = base / f"ckpt_{a.kind}{a.tag}.pt"
-    start = 0
+    start, prior_sec = 0, 0.0
     if a.resume:
         ck = torch.load(a.resume, map_location=dev, weights_only=True)
         m.load_state_dict(ck["state"])
         opt.load_state_dict(ck["opt"])
         start = int(ck["step"])
+        prior_sec = float(ck.get("train_sec", 0.0))
         print(f"RESUME <- {a.resume} at step={start} (of {a.steps})", flush=True)
 
     m.train()
@@ -168,14 +224,17 @@ def main(argv=None):
         torch.nn.utils.clip_grad_norm_(m.parameters(), 1.0)
         opt.step()
         if step % max(1, a.steps // 10) == 0 or step == a.steps:
-            row = {"step": step, "loss": round(loss, 6), "st_s": round(step / (time.time() - t0), 3)}
+            row = {"step": step, "loss": round(loss, 6),                 # steps THIS slice ran
+                   "st_s": round((step - start) / max(time.time() - t0, 1e-9), 3)}
             log.append(row)
             print("STEP", json.dumps(row), flush=True)
         if a.save_every and step % a.save_every == 0:
-            torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": step}, ckpt_path)
-    train_sec = time.time() - t0
+            torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": step,
+                        "train_sec": prior_sec + time.time() - t0}, ckpt_path)
+    train_sec = prior_sec + time.time() - t0              # cumulative across resumed slices
     if a.save_every:
-        torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": a.steps}, ckpt_path)
+        torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": a.steps,
+                    "train_sec": train_sec}, ckpt_path)
 
     m.eval()
     a.frames = a.chunk                                   # eval context = one chunk
@@ -184,7 +243,8 @@ def main(argv=None):
         se = cb = cr = 0.0
         n_eval = 8
         for i in range(n_eval):
-            clips = tc.make_clip_batch(32, a.frames, a.grid, a.grid, device=dev, seed=90000 + i,
+            clips = tc.make_clip_batch(a.eval_batch, a.frames, a.grid, a.grid, device=dev,
+                                       seed=90000 + i,
                                        kicks=a.kicks, collisions=a.collisions, radius=a.radius,
                                        speed=a.speed, nb=a.n_balls)
             ctx, tgt = clips[:, :a.frames], clips[:, a.frames]
@@ -198,7 +258,7 @@ def main(argv=None):
         _occ.OCC_START, _occ.OCC_END = a.occ_start, a.occ_end
         roll = tc.occlusion_rollout_eval(m, a, dev)
     else:
-        roll = tc.rollout_eval(m, a, dev)
+        roll = stream_rollout_eval(m, a, dev)
     res = {"kind": a.kind, "pole_param": a.pole_param if a.kind == "wave" else None,
            "seq_frames": a.seq_frames, "chunk": a.chunk, "tbptt_chunks": a.tbptt_chunks,
            "dense": a.dense, "time_pos": "none", "write_gate": a.write_gate,
