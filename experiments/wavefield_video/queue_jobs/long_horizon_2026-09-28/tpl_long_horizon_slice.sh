@@ -4,11 +4,12 @@
 # no-op once runs_long_horizon/status.txt reads DONE). Each copy runs one slice
 # (<= SLICE_S per arm, under the conductor's 5400s cap) and resumes the next.
 # Keep STEPS fixed across slices of one OUT.
-# v2 (Zeph 2026-09-28): VRAM pre-gate -- releases ComfyUI's cached models and
-# defers if <21 GiB free (co-tenancy OOMs the arm); OOM-rescue -- an arm killed
-# by CUDA OOM under co-tenancy is reset to SLICED (same class as a box time-cap
-# kill, which the resume design already tolerates) and retried by a later copy;
-# real failures still stop and fail the queue job.
+# v2.1 (Zeph 2026-09-28): VRAM pre-gate -- defers while the ComfyUI queue is
+# busy (never touches its VRAM mid-job), otherwise calls ComfyUI /free to
+# release cached models and defers if <21 GiB free (co-tenancy OOMs the arm);
+# OOM-rescue -- an arm killed by CUDA OOM under co-tenancy is reset to SLICED
+# (same class as a box time-cap kill, which the resume design already tolerates)
+# and retried by a later copy; real failures still stop and fail the queue job.
 LOG=/workspace/slava/logs/$(basename "$0" .sh).log
 mkdir -p /workspace/slava/logs
 exec > "$LOG" 2>&1
@@ -17,7 +18,13 @@ grep -qs DONE runs_long_horizon/status.txt && { echo "suite DONE -- no-op"; exit
 export PY=/workspace/slava/comfy-house/venv/bin/python
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
-# --- v2 VRAM pre-gate -------------------------------------------------------
+# --- v2.1 VRAM pre-gate -----------------------------------------------------
+CQ=$(curl -s --max-time 5 http://127.0.0.1:8188/queue 2>/dev/null | \
+     "$PY" -c "import json,sys;d=json.load(sys.stdin);print(len(d.get('queue_running',[]))+len(d.get('queue_pending',[])))" 2>/dev/null || echo "1")
+if [ "${CQ:-1}" -gt 0 ]; then
+  echo "defer: ComfyUI queue busy (${CQ} job(s)) -- not touching its VRAM; next copy retries"
+  exit 0
+fi
 curl -s -X POST http://127.0.0.1:8188/free -H 'Content-Type: application/json' \
      -d '{"unload_models":true,"free_memory":true}' >/dev/null 2>&1 || true
 sleep 5
@@ -31,7 +38,7 @@ rc=0
 OUT=runs_long_horizon STEPS=4000 SEEDS="0 1 2" SLICE_S=4800 bash run_long_horizon.sh || rc=$?
 tail -5 runs_long_horizon/progress.txt
 
-# --- v2 OOM-rescue ----------------------------------------------------------
+# --- v2.1 OOM-rescue --------------------------------------------------------
 if [ "$rc" -ne 0 ] && grep -qs "^FAILED" runs_long_horizon/status.txt; then
   tag=$(awk 'NR==1{print $2}' runs_long_horizon/status.txt)
   if [ -n "$tag" ] && grep -qs "OutOfMemoryError" "runs_long_horizon/log_${tag}.txt"; then
