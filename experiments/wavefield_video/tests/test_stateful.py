@@ -187,6 +187,24 @@ class StatefulTests(unittest.TestCase):
         for ckpt, mb in ((True, 4), (False, 2), (True, 1)):
             with self.subTest(ckpt=ckpt, micro_batch=mb):
                 self.assertTrue(torch.allclose(grads(ckpt, mb), ref, atol=1e-5, rtol=1e-4))
+    def test_eval_only_uses_the_carried_state(self):
+        import tempfile
+        import eval_only
+        import train_long
+        common = ["--seq-frames", "16", "--chunk", "4", "--dim", "16", "--layers", "1",
+                  "--heads", "2", "--grid", "16", "--steps", "1", "--batch", "2", "--eval-seeds", "1"]
+        with tempfile.TemporaryDirectory() as d:
+            train_long.main(common + ["--eval-rollout", "4", "--out", d])
+            out = eval_only.main([f"{d}/model_wave.pt", f"{d}/result_wave.json",
+                                  "--eval-rollout", "4", "--eval-seeds", "1"])
+            self.assertEqual(out["rollout_path"], "stream_step (carried state)")
+            train_long.main(common + ["--data-source", "occlusion", "--train-occ-start", "4",
+                                      "--train-occ-end", "12", "--occ-start", "8",
+                                      "--occ-end", "16", "--eval-rollout", "24", "--kind", "ssm",
+                                      "--out", d])
+            out = eval_only.main([f"{d}/model_ssm.pt", f"{d}/result_ssm.json", "--eval-seeds", "1",
+                                  "--eval-rollout", "24"])
+            self.assertIn("exit_direction_accuracy", out)             # occlusion evaluator
 
 if __name__ == "__main__":
     unittest.main()

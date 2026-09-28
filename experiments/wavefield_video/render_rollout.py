@@ -184,12 +184,12 @@ def load_model(args, torch):
         if type(config[name]) is not bool:
             raise ValueError(f"config {name} must be a JSON boolean")
     if config["data_source"] == "occlusion":        # train_long.py: balls with a masked gap
-        config["data_source"] = "balls"
-        notes.append("Trained on occlusion clips; rendering unoccluded balls.")
+        notes.append("Trained on occlusion clips; the renderer's truth is unoccluded balls.")
     ball_options(config)
     if config["kernel_version"] not in ("separable", "dispersion"):
         raise ValueError("invalid kernel_version")
-    if config["data_source"] not in ("balls", "waves") or config["field"] not in ("wave", "advection", "vortex"):
+    if (config["data_source"] not in ("balls", "waves", "occlusion")
+            or config["field"] not in ("wave", "advection", "vortex")):
         raise ValueError("invalid data_source/field")
     # train_compare rounds matched ffn_mult to 3 decimals in result JSON. At large
     # dimensions that can reconstruct a different hidden width. Trust tensor size.
@@ -231,7 +231,7 @@ def load_model(args, torch):
 def make_truth(config, count, seed, torch):
     """Generate CPU reference; never feed its future frames to the predictor."""
     grid = config["grid"]
-    if config["data_source"] == "balls":
+    if config["data_source"] in ("balls", "occlusion"):          # occlusion: unmasked balls
         from data import make_clip_batch
         return make_clip_batch(1, count - 1, grid, grid, seed=seed,
                                kicks=config["kicks"], collisions=config["collisions"],
@@ -422,7 +422,7 @@ def make_latent_truth(config, count, seed, torch):
     Waves reuse ``make_truth`` (incl. its >64-frame spectral evolution) and carry
     no centroids -- exactly as train_compare's rollout_eval does for waves."""
     grid = config["grid"]
-    if config["data_source"] == "balls":
+    if config["data_source"] in ("balls", "occlusion"):          # occlusion: unmasked balls
         from data import make_clip_batch
         clip, meta = make_clip_batch(1, count - 1, grid, grid, seed=seed,
                                      kicks=config["kicks"], collisions=config["collisions"],
