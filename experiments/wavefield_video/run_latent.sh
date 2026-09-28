@@ -43,6 +43,16 @@ run() {  # run <label> <cmd...> under the remaining slice budget
     { [ "$rc" = "124" ] || [ "$rc" = "143" ]; } && sliced "$label at budget"
     [ "$rc" = "0" ] || failed "$label exit=$rc (see $OUT/log_${label}.txt)"
 }
+# Run identity: every stage below skips work whose outputs exist, so an OUT must
+# never be reused with different settings (it would report the old run as DONE).
+cfg="VIDEOS=$VIDEOS VAE=$VAE VAE_PATH=$VAE_PATH HEIGHT=$HEIGHT WIDTH=$WIDTH FPS=$FPS MAX_FRAMES=$MAX_FRAMES LATENTS=$LATENTS SEQ=$SEQ CHUNK=$CHUNK TBPTT=$TBPTT DIM=$DIM LAYERS=$LAYERS HEADS=$HEADS BATCH=$BATCH STEPS=$STEPS SEED=$SEED STREAM_STEPS=$STREAM_STEPS"
+if [ -f "$OUT/run_config.txt" ] && [ "$(cat "$OUT/run_config.txt")" != "$cfg" ]; then
+    echo "$OUT holds a run with different settings:" >&2
+    diff <(tr ' ' '\n' < "$OUT/run_config.txt") <(tr ' ' '\n' <<< "$cfg") >&2 || true
+    echo "use a new OUT (or delete it) instead of mixing runs" >&2
+    exit 2
+fi
+echo "$cfg" > "$OUT/run_config.txt"
 echo RUNNING > "$OUT/status.txt"
 
 # 1. encode (skipped once index.json exists; a sliced encode resumes at the next

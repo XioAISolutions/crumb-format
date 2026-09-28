@@ -247,6 +247,22 @@ class VideoVAETests(unittest.TestCase):
                                           "--resume", str(d / "tr" / "ckpt_wave.pt"),
                                           "--out", str(d / "tr")])
             self.assertIn("different latent dataset", err.getvalue())
+    def test_run_latent_refuses_a_reused_out_with_other_settings(self):
+        import os
+        import subprocess
+        here = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as d:
+            env = dict(os.environ, PY=sys.executable, VIDEOS=str(Path(d) / "none"), OUT=d,
+                       STEPS="10")
+            first = subprocess.run(["bash", str(here / "run_latent.sh")], env=env,
+                                   capture_output=True, text=True)
+            self.assertNotEqual(first.returncode, 2)               # got past the identity check
+            self.assertIn("STEPS=10", (Path(d) / "run_config.txt").read_text())
+            env["STEPS"] = "20"
+            second = subprocess.run(["bash", str(here / "run_latent.sh")], env=env,
+                                    capture_output=True, text=True)
+            self.assertEqual(second.returncode, 2)
+            self.assertIn("different settings", second.stderr)
 
 if __name__ == "__main__":
     unittest.main()
