@@ -93,7 +93,7 @@ class StatefulTests(unittest.TestCase):
 
     def test_clean_write_blank_frames_write_nothing(self):
         """clean_write: no spatial table, no embed/pi bias -> a blank clip leaves
-        the first layer's state exactly zero (LONG_HORIZON.md 8.4)."""
+        every layer's state exactly zero (LONG_HORIZON.md 8.4)."""
         torch.manual_seed(0)
         m = VideoPredictor(DIM, 2, NH, TC, H, W, "wave", causal=True, kernel_version="dispersion",
                            linear_pad=True, pole_param="halflife", time_pos="none",
@@ -101,7 +101,8 @@ class StatefulTests(unittest.TestCase):
         self.assertIsNone(m.posemb.py)
         with torch.no_grad():
             _, st = m(torch.zeros(1, TC, 3, H, W), states=[None, None])
-        self.assertEqual(st[0].abs().max().item(), 0.0)
+        for layer, z in enumerate(st):              # every layer, not just the first
+            self.assertEqual(z.abs().max().item(), 0.0, f"layer {layer}")
 
     def test_write_gate_keeps_chunk_full_stream_equivalence(self):
         for kw in (dict(write_gate=True), dict(write_gate=True, clean_write=True)):

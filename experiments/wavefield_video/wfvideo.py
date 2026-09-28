@@ -36,11 +36,11 @@ class RMSNorm(nn.Module):
 
 
 class FFN(nn.Module):
-    def __init__(self, dim, mult=4.0):
+    def __init__(self, dim, mult=4.0, bias=True):
         super().__init__()
         h = max(1, int(round(dim * mult)))
-        self.fc1 = nn.Linear(dim, h)
-        self.fc2 = nn.Linear(h, dim)
+        self.fc1 = nn.Linear(dim, h, bias=bias)
+        self.fc2 = nn.Linear(h, dim, bias=bias)
 
     def forward(self, x):
         return self.fc2(F.gelu(self.fc1(x)))
@@ -136,12 +136,13 @@ class WaveMix3D(nn.Module):
             raise ValueError(f"need 0 < hl_min < hl_max (got {hl_min}, {hl_max})")
         self.pole_param = pole_param
         self.hl_min, self.hl_max = float(hl_min), float(hl_max)
-        # pi_bias=False: a blank input writes exactly nothing into the state. With a
+        # pi_bias=False (pi and po): a blank input writes exactly nothing into the
+        # state and adds nothing back to the residual stream. With a
         # bias, every frame writes the same constant and long poles integrate it
         # into a background that drowned a frame-0 memory ~1000:1 by frame 128
         # (LONG_HORIZON.md 8.4).
         self.pi = nn.Linear(dim, dim, bias=pi_bias)
-        self.po = nn.Linear(dim, dim)
+        self.po = nn.Linear(dim, dim, bias=pi_bias)
         # write_gate: per-token, per-head sigmoid on what enters the wave, so the
         # model can learn to write events and skip static content. It scales the
         # input before the (linear, time-invariant) recurrence, so FFT training,
@@ -626,12 +627,12 @@ class FusedMix(nn.Module):
 
 
 class Block(nn.Module):
-    def __init__(self, mix, dim, ffn_mult=4.0):
+    def __init__(self, mix, dim, ffn_mult=4.0, bias=True):
         super().__init__()
         self.n1 = RMSNorm(dim)
         self.mix = mix
         self.n2 = RMSNorm(dim)
-        self.ffn = FFN(dim, mult=ffn_mult)
+        self.ffn = FFN(dim, mult=ffn_mult, bias=bias)
 
     def forward(self, x):
         x = x + self.mix(self.n1(x))
@@ -738,7 +739,9 @@ class VideoPredictor(nn.Module):
                 mix = QuatSSM(dim, n_heads, T, H, W, causal=causal)
             else:
                 raise ValueError(f"unknown kind {kind!r}")
-            blocks.append(Block(mix, dim, ffn_mult=ffn_mult))
+            # clean_write: every layer bias-free (wave pi/po, FFN) so a blank frame
+            # stays exactly zero through the whole stack -- RMSNorm maps 0 to 0.
+            blocks.append(Block(mix, dim, ffn_mult=ffn_mult, bias=not clean_write))
         self.blocks = nn.ModuleList(blocks)
         self.norm = RMSNorm(dim)
         self.head = nn.Linear(dim, 3)
