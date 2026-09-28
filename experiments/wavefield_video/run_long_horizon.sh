@@ -68,7 +68,12 @@ for seed in $SEEDS; do
     for arm in "${ARMS[@]}"; do
         IFS='|' read -r label kind frames extra <<< "$arm"
         tag="_${label}_s${seed}"
-        if [ -f "$OUT/result_${kind}${tag}.json" ]; then echo "SKIP $tag"; continue; fi
+        # Done only when BOTH artifacts exist: train_compare writes the result JSON
+        # before model_*.pt, so a slice killed in between must re-run (it resumes
+        # from the final ckpt and just re-saves).
+        if [ -f "$OUT/result_${kind}${tag}.json" ] && [ -f "$OUT/model_${kind}${tag}.pt" ]; then
+            echo "SKIP $tag"; continue
+        fi
         extra_args=()
         if [ -n "$extra" ]; then read -r -a extra_args <<< "$extra"; fi
         tgap=$(( GAP < frames - 8 ? GAP : frames - 8 ))
@@ -103,8 +108,17 @@ for seed in $SEEDS; do
 done
 
 # 5-minute health stream on each trained wave arm (constant state, collapse flags).
-for f in "$OUT"/model_wave_W_*_s0.pt "$OUT"/model_wave_E_*_s0.pt; do
-    [ -f "$f" ] || continue
+# Every wave arm x every configured seed; a missing model here means the suite is
+# incomplete, so it is a failure rather than a silent skip.
+for seed in $SEEDS; do
+  for arm in "${ARMS[@]}"; do
+    IFS='|' read -r label kind _ _ <<< "$arm"
+    [ "$kind" = "wave" ] || continue
+    f="$OUT/model_wave_${label}_s${seed}.pt"
+    if [ ! -f "$f" ]; then
+        echo "MISSING $f" | tee -a "$OUT/progress.txt"
+        echo "FAILED missing $(basename "$f")" > "$OUT/status.txt"; exit 1
+    fi
     [ -f "${f%.pt}_stream7200.json" ] && continue
     pp=softplus; [[ "$f" == *_half_* ]] && pp=halflife
     fuse=none; [[ "$(basename "$f")" == model_wave_E_* ]] && fuse=local_wave
@@ -115,5 +129,6 @@ for f in "$OUT"/model_wave_W_*_s0.pt "$OUT"/model_wave_E_*_s0.pt; do
         --stream-frames "$STREAM_FRAMES" --chunk 600 \
         --out "${f%.pt}_stream7200.json" > "${f%.pt}_stream7200.log" 2>&1 || { echo "STREAM FAIL $f" | tee -a "$OUT/progress.txt"
              echo "FAILED stream $(basename "$f")" > "$OUT/status.txt"; exit 1; }
+  done
 done
 echo DONE > "$OUT/status.txt"
