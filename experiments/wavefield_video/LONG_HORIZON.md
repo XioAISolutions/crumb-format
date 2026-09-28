@@ -204,7 +204,20 @@ write gets no gradient from the frame-128 loss.
 - **KILL (poles are not enough at this length):** halflife G=4 < 0.5, so D=128
   needs more than 1,000 steps or a different write path.
 
-RESULTS_8_1
+**Result: KILL at this budget.** Recall / argmax hit (chance ≈ 0.028):
+
+| arm | recall | argmax hit | s/step (CPU, shared) |
+|---|---|---|---|
+| halflife G=1 | 0.119 | 0.039 | 1.14 |
+| halflife G=4 | 0.118 | 0.035 | 0.73 |
+| softplus G=1 | 0.120 | 0.031 | 1.32 |
+| softplus G=4 | 0.120 | 0.031 | 1.28 |
+
+Every arm sits at the mean-blob floor. Halflife G=4 is full backprop across all
+four chunks, mathematically the single 128-frame window, and it fails too. So
+at 1,000 steps D=128 is out of reach regardless of carry; D=64 already needed
+1,000 steps (§5). Constant-memory training (G=1) is **neither proven nor
+disproven** by this run. §8.3 raises the budget.
 
 ### 8.2 Pre-registered: dense supervision
 
@@ -212,7 +225,30 @@ Balls, grid 16, T=16, 300 steps, seeds 0/1, `--no-dense` vs `--dense`, equal
 steps. PROVE: dense lowers eval MSE / copy-last by ≥ 10% on both seeds;
 otherwise it stays opt-in with the numbers reported.
 
-RESULTS_8_2
+**Result: below the bar, so dense stays opt-in** (`train_long.py --dense`).
+
+| seed | last-only MSE/copy-last | dense MSE/copy-last | Δ | copy-ratio last-only → dense |
+|---|---|---|---|---|
+| 0 | 1.008 | 0.975 | −3.3% | 0.093 → 0.220 |
+| 1 | 1.004 | 0.961 | −4.3% | 0.075 → 0.198 |
+
+Dense is better on both seeds and roughly halves the freeze tendency, and it is
+the only arm that beats copy-last. It still misses the pre-registered 10%. All
+arms have divergence horizon 1 at 300 steps (under-trained). The SEQ runner
+arms pass `--dense` explicitly for the reason above.
+
+### 8.3 Pre-registered follow-up: the same recall at 3,000 steps
+
+D=128, chunk 32, grid 6, batch 16, seed 0, **3,000 steps**; halflife G=4, then
+halflife G=1.
+
+- **PROVE (constant memory suffices):** G=1 recall ≥ 0.5.
+- **If only G=4 ≥ 0.5:** writes need gradient through the carried state;
+  training memory grows with G.
+- **If both < 0.5:** at this scale the write path, not the step budget, is the
+  limit (next: a learned input gate on `Bin`).
+
+RESULTS_8_3
 
 ## Pitch corrections
 

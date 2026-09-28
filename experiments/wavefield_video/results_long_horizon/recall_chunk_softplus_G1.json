@@ -1,0 +1,41 @@
+{
+ "args": {
+  "delays": [
+   128
+  ],
+  "pole_param": [
+   "softplus"
+  ],
+  "seeds": [
+   0
+  ],
+  "steps": 1000,
+  "batch": 16,
+  "lr": 0.003,
+  "grid": 6,
+  "dim": 32,
+  "layers": 2,
+  "heads": 4,
+  "hl_min": 2.0,
+  "hl_max": 4096.0,
+  "chunk": 32,
+  "tbptt_chunks": 1,
+  "out": "runs_long/recall_chunk_softplus_G1.json"
+ },
+ "rows": [
+  {
+   "pole_param": "softplus",
+   "delay": 128,
+   "seed": 0,
+   "steps": 1000,
+   "chunk": 32,
+   "tbptt_chunks": 1,
+   "recall": 0.1201,
+   "argmax_hit": 0.0312,
+   "mse": 0.0173,
+   "mse_forget": 0.01966,
+   "train_s": 1316.8,
+   "s_per_step": 1.3168
+  }
+ ]
+}

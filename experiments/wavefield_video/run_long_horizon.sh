@@ -69,6 +69,9 @@ fi
 # SEQ_FRAMES-long sequences walked in T_LONG chunks, with a SEQ_GAP-frame
 # occlusion mid-sequence -- a gap longer than any chunk, so only the carried
 # state can bridge it. TBPTT = chunks of gradient through the carried state.
+# --dense (every-position loss) is opt-in in train_long.py; used here because
+# LONG_HORIZON.md 8.2 measured it better on 2/2 seeds (-3..-4% MSE/copy-last,
+# 2x copy-ratio), though below the 10% bar that would make it a default.
 SEQ_FRAMES=${SEQ_FRAMES:-512}; SEQ_GAP=${SEQ_GAP:-256}; TBPTT=${TBPTT:-1}
 [ "${SEQ:-0}" = "only" ] && SEQ_ONLY=1
 # Emergence happens 32 + gap frames into the eval rollout; it must fall inside it,
@@ -125,7 +128,7 @@ for seed in $SEEDS; do
         if [ "$trainer" = "long" ]; then
             ${TIMEOUT_BIN:+$TIMEOUT_BIN "$left"} "$PY" train_long.py --data-source occlusion \
                 --grid "$GRID" --n-balls 6 --batch "$BATCH" --dim "$DIM" --layers "$LAYERS" \
-                --heads "$HEADS" --motion-loss --seq-frames "$SEQ_FRAMES" --chunk "$frames" \
+                --heads "$HEADS" --motion-loss --dense --seq-frames "$SEQ_FRAMES" --chunk "$frames" \
                 --tbptt-chunks "$TBPTT" "${occ[@]}" --eval-rollout "$EVAL_ROLLOUT" \
                 --eval-seeds "$EVAL_SEEDS" --eval-chunk 1 --save-every 250 \
                 ${extra_args[@]+"${extra_args[@]}"} ${resume[@]+"${resume[@]}"} \

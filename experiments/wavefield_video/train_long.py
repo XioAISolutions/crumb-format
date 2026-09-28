@@ -91,8 +91,10 @@ def main(argv=None):
     ap.add_argument("--chunk", type=int, default=16, help="frames per chunk (= model window T)")
     ap.add_argument("--tbptt-chunks", type=int, default=1,
                     help="chunks of gradient through the carried state before detaching")
-    ap.add_argument("--dense", action=argparse.BooleanOptionalAction, default=True,
-                    help="next-frame loss at every position (default) vs last frame only")
+    ap.add_argument("--dense", action=argparse.BooleanOptionalAction, default=False,
+                    help="next-frame loss at every position vs last frame only (default). "
+                         "Opt-in per LONG_HORIZON.md 8.2: -3..-4%% eval MSE/copy-last and 2x "
+                         "copy-ratio on 2/2 seeds, below the pre-registered 10%% bar")
     ap.add_argument("--motion-loss", action="store_true")
     ap.add_argument("--grid", type=int, default=16)
     ap.add_argument("--n-balls", type=int, default=N_BALLS)
