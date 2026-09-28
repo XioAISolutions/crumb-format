@@ -39,6 +39,7 @@ shipped. This wrapper removes each blocker without patching LongLive:
 both steps skip work whose output already exists, so a sliced box job resumes.
 """
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -138,6 +139,78 @@ def build_overlay(base, *, latent_frames, prompts, ckpt, out_dir, window=32, sin
 def latent_name(idx):
     """File LongLive writes for prompt ``idx`` with save_with_index (no LoRA, no EMA)."""
     return f"rank0-{idx}-0_regular.pt"
+
+
+def n_prompts_of(prompts):
+    """Samples LongLive's MultiTextConcatDataset yields: non-empty lines of a txt
+    file, or caption subfolders of a directory."""
+    prompts = Path(prompts)
+    if prompts.is_file():
+        return sum(1 for line in prompts.read_text(encoding="utf-8").splitlines() if line.strip())
+    cap = prompts / "caption" if (prompts / "caption").is_dir() else prompts
+    return sum(1 for d in cap.iterdir() if d.is_dir())
+
+
+def expected_stems(prompts):
+    return [Path(latent_name(i)).stem for i in range(n_prompts_of(prompts))]
+
+
+def _file_digest(path, edge=16 << 20):
+    """size + sha256 of the first and last 16 MiB: tells checkpoints apart without
+    reading 10 GB on every resume."""
+    path = Path(path)
+    h = hashlib.sha256()
+    n = path.stat().st_size
+    with open(path, "rb") as f:
+        h.update(f.read(edge))
+        if n > 2 * edge:
+            f.seek(n - edge)
+        h.update(f.read(edge))
+    return f"{n}:{h.hexdigest()[:16]}"
+
+
+def _prompts_digest(prompts):
+    prompts = Path(prompts)
+    h = hashlib.sha256()
+    files = [prompts] if prompts.is_file() else sorted(p for p in prompts.rglob("*") if p.is_file())
+    for f in files:
+        h.update(str(f.relative_to(prompts) if f != prompts else f.name).encode())
+        h.update(f.read_bytes())
+    return h.hexdigest()[:16]
+
+
+def _git_head(root):
+    try:
+        return subprocess.run(["git", "-C", str(root), "rev-parse", "HEAD"], capture_output=True,
+                              text=True, check=True).stdout.strip()
+    except Exception:
+        return None
+
+
+def run_identity(cfg, ckpt, prompts, ll_root):
+    """Everything that determines the generated latents: the effective overlay and
+    fingerprints of the checkpoint, the prompts and the LongLive checkout."""
+    return dict(overlay=cfg, ckpt=_file_digest(ckpt), prompts=_prompts_digest(prompts),
+                longlive=_git_head(ll_root))
+
+
+def check_identity(out, ident):
+    """Refuse to reuse an --out holding outputs of a different generation. Latents
+    or videos without a recorded identity are refused too (unknown provenance)."""
+    out = Path(out)
+    f = out / "run_identity.json"
+    have_outputs = any((out / "latents").glob("*.pt")) or any(out.glob("*.mp4"))
+    if f.exists():
+        old = json.loads(f.read_text())
+        if old != json.loads(json.dumps(ident)):
+            diff = sorted(k for k in set(old) | set(ident) if old.get(k) != ident.get(k))
+            raise SystemExit(f"{out} holds a generation with different {', '.join(diff)}; "
+                             "use a new --out instead of mixing runs")
+    elif have_outputs:
+        raise SystemExit(f"{out} has latents/videos but no run_identity.json; use a new --out")
+    tmp = f.with_suffix(".tmp")
+    tmp.write_text(json.dumps(ident, indent=2, sort_keys=True))
+    os.replace(tmp, f)
 
 
 # ---------------------------------------------------------------- decoding
@@ -285,16 +358,16 @@ def cmd_generate(a):
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
     prompts = Path(a.prompts).resolve()
-    n_prompts = sum(1 for line in prompts.read_text().splitlines() if line.strip()) \
-        if prompts.is_file() else None
+    n_prompts = n_prompts_of(prompts)
     cfg = build_overlay(base, latent_frames=lat, prompts=prompts, ckpt=Path(a.ckpt).resolve(),
                         out_dir=out.resolve(), window=a.window, sink=a.sink, seed=a.seed,
                         fp8=a.precision == "fp8", compile=a.compile)
-    if n_prompts is not None:
-        cfg["inference_iter"] = n_prompts - 1
+    cfg["inference_iter"] = n_prompts - 1
+    if not a.dry_run:
+        check_identity(out, run_identity(cfg, Path(a.ckpt).resolve(), prompts, ll_root))
     lat_dir = out / "latents"
-    have = [latent_name(i) for i in range(n_prompts or 0) if (lat_dir / latent_name(i)).exists()]
-    if n_prompts is not None and len(have) == n_prompts:
+    have = [latent_name(i) for i in range(n_prompts) if (lat_dir / latent_name(i)).exists()]
+    if len(have) == n_prompts:
         print("[generate] all latents present, skipping generation")
     else:
         if have:
@@ -308,7 +381,10 @@ def cmd_generate(a):
             subprocess.run(cmd, cwd=ll_root, check=True)
     if a.no_decode or a.dry_run:
         return
-    for f in sorted(lat_dir.glob("*.pt")):
+    for i in range(n_prompts):
+        f = lat_dir / latent_name(i)
+        if not f.exists():
+            raise SystemExit(f"LongLive did not write {f}")
         decode_file(f, out / (f.stem + ".mp4"), ll_root, a.vae_path, a.decode_chunk,
                     a.decode_device, "float32" if a.decode_device == "cpu" else "bfloat16")
 
@@ -349,8 +425,11 @@ def main(argv=None):
     s.add_argument("--vae-path", default=None)
     s.add_argument("--chunk", type=int, default=8)
     s.add_argument("--device", default="cuda")
+    s = sub.add_parser("expected", help="print the output stems a prompts file/dir yields")
+    s.add_argument("--prompts", required=True)
     a = ap.parse_args(argv)
-    {"plan": cmd_plan, "generate": cmd_generate, "decode": cmd_decode}[a.cmd](a)
+    {"plan": cmd_plan, "generate": cmd_generate, "decode": cmd_decode,
+     "expected": lambda a: print("\n".join(expected_stems(a.prompts)))}[a.cmd](a)
 
 
 if __name__ == "__main__":

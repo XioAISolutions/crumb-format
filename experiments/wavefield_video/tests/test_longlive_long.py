@@ -202,3 +202,49 @@ def test_generate_dry_run_writes_overlay(tmp_path):
     assert cfg["use_relative_rope"] and cfg["inference"]["save_latents_only"]
     assert cfg["num_output_frames"] == L.latent_frames_for(180)
     assert cfg["inference_iter"] == 1
+
+
+def test_expected_stems_txt_and_dir(tmp_path):
+    t = tmp_path / "p.txt"
+    t.write_text("a\n\n b \nc\n")
+    assert L.expected_stems(t) == ["rank0-0-0_regular", "rank0-1-0_regular", "rank0-2-0_regular"]
+    d = tmp_path / "caps" / "caption"
+    (d / "s0").mkdir(parents=True)
+    (d / "s1").mkdir()
+    (d / "notes.txt").write_text("x")
+    assert L.n_prompts_of(tmp_path / "caps") == 2
+
+
+def _ident(tmp_path, **over):
+    ck = tmp_path / "ck.pt"
+    if not ck.exists():
+        ck.write_bytes(b"w" * 1000)
+    pr = tmp_path / "p.txt"
+    if not pr.exists():
+        pr.write_text("a cat\n")
+    cfg = L.build_overlay(BASE, latent_frames=over.pop("lat", 16), prompts=pr, ckpt=ck,
+                          out_dir=tmp_path / "run", seed=over.pop("seed", 0))
+    return L.run_identity(cfg, ck, pr, tmp_path)
+
+
+def test_identity_guard(tmp_path):
+    out = tmp_path / "run"
+    (out / "latents").mkdir(parents=True)
+    L.check_identity(out, _ident(tmp_path))                       # fresh: records it
+    (out / "latents" / "rank0-0-0_regular.pt").write_bytes(b"x")
+    L.check_identity(out, _ident(tmp_path))                       # same config: resume ok
+    for change in (dict(lat=24), dict(seed=1)):
+        with pytest.raises(SystemExit, match="overlay"):
+            L.check_identity(out, _ident(tmp_path, **change))
+    (tmp_path / "p.txt").write_text("a dog\n")                    # same path, new contents
+    with pytest.raises(SystemExit, match="prompts"):
+        L.check_identity(out, _ident(tmp_path))
+    (tmp_path / "p.txt").write_text("a cat\n")
+    (tmp_path / "ck.pt").write_bytes(b"v" * 1000)                 # same path + size, new weights
+    with pytest.raises(SystemExit, match="ckpt"):
+        L.check_identity(out, _ident(tmp_path))
+    bare = tmp_path / "bare"
+    bare.mkdir()
+    (bare / "old.mp4").write_bytes(b"x")                          # outputs of unknown provenance
+    with pytest.raises(SystemExit, match="no run_identity"):
+        L.check_identity(bare, _ident(tmp_path))

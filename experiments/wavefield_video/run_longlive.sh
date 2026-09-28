@@ -63,31 +63,40 @@ echo "$cfg" > "$OUT/run_config.txt"
 echo RUNNING > "$OUT/status.txt"
 nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null | tee -a "$OUT/progress.txt" || true
 
+mapfile -t stems < <("$PY" longlive_long.py expected --prompts "$PROMPTS")
+[ "${#stems[@]}" -gt 0 ] || { echo "no prompts in $PROMPTS" >&2; exit 2; }
+all_evals() {  # all_evals <dir>: every prompt's eval receipt exists
+    local s; for s in "${stems[@]}"; do [ -f "$1/$s.eval.json" ] || return 1; done
+}
 for secs in $LENGTHS; do
     d="$OUT/len_${secs}s"
     mins=$("$PY" -c "print($secs / 60)")
-    if ! ls "$d"/*.eval.json >/dev/null 2>&1; then
-        echo "== generate ${secs}s $(date -u +%FT%TZ)" | tee -a "$OUT/progress.txt"
-        t0=$(date +%s)
-        vram_pid=
-        if command -v nvidia-smi >/dev/null 2>&1; then     # peak-VRAM receipt
-            nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits -l 5 \
-                > "$OUT/vram_${secs}s.csv" 2>/dev/null & vram_pid=$!
-        fi
-        "$PY" longlive_long.py generate --ll-root "$LL" --ckpt "$CKPT" --prompts "$PROMPTS" \
-            --minutes "$mins" --out "$d" --precision "$PRECISION" --window "$WINDOW" \
-            --sink "$SINK" --seed "$SEED" --decode-device "$DECODE_DEVICE" >> "$OUT/log_${secs}s.txt" 2>&1 || failed "generate ${secs}s (see $OUT/log_${secs}s.txt)"
-        [ -n "$vram_pid" ] && kill "$vram_pid" 2>/dev/null || true
-        peak=$( { sort -n "$OUT/vram_${secs}s.csv" 2>/dev/null || true; } | tail -n 1)
-        echo "   wall $(( $(date +%s) - t0 )) s for ${secs}s of video; peak VRAM ${peak:-?} MiB" | tee -a "$OUT/progress.txt"
-        for v in "$d"/*.mp4; do
-            case "$v" in *.partial.mp4) continue ;; esac
-            "$PY" long_eval.py "$v" --encoder "$ENCODER" --out "${v%.mp4}.eval.json.tmp" \
-                >> "$OUT/log_${secs}s.txt" 2>&1 || failed "eval $v"
-            mv "${v%.mp4}.eval.json.tmp" "${v%.mp4}.eval.json"
-            tail -n 1 "$OUT/log_${secs}s.txt" | tee -a "$OUT/progress.txt"
-        done
+    all_evals "$d" && continue
+    echo "== generate ${secs}s $(date -u +%FT%TZ)" | tee -a "$OUT/progress.txt"
+    t0=$(date +%s)
+    vram_pid=
+    if command -v nvidia-smi >/dev/null 2>&1; then     # peak-VRAM receipt
+        nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits -l 5 \
+            > "$OUT/vram_${secs}s.csv" 2>/dev/null & vram_pid=$!
     fi
+    # generate skips latents / mp4s already made by this same configuration and
+    # refuses an --out that holds a different one (run_identity.json)
+    "$PY" longlive_long.py generate --ll-root "$LL" --ckpt "$CKPT" --prompts "$PROMPTS" \
+        --minutes "$mins" --out "$d" --precision "$PRECISION" --window "$WINDOW" \
+        --sink "$SINK" --seed "$SEED" --decode-device "$DECODE_DEVICE" >> "$OUT/log_${secs}s.txt" 2>&1 || failed "generate ${secs}s (see $OUT/log_${secs}s.txt)"
+    [ -n "$vram_pid" ] && kill "$vram_pid" 2>/dev/null || true
+    vram_pid=
+    peak=$( { sort -n "$OUT/vram_${secs}s.csv" 2>/dev/null || true; } | tail -n 1)
+    echo "   wall $(( $(date +%s) - t0 )) s for ${secs}s of video; peak VRAM ${peak:-?} MiB" | tee -a "$OUT/progress.txt"
+    for s in "${stems[@]}"; do
+        v="$d/$s.mp4"
+        [ -f "$d/$s.eval.json" ] && continue
+        [ -f "$v" ] || failed "missing $v after generate ${secs}s"
+        "$PY" long_eval.py "$v" --encoder "$ENCODER" --out "$d/$s.eval.json.tmp" \
+            >> "$OUT/log_${secs}s.txt" 2>&1 || failed "eval $v"
+        mv "$d/$s.eval.json.tmp" "$d/$s.eval.json"
+        tail -n 1 "$OUT/log_${secs}s.txt" | tee -a "$OUT/progress.txt"
+    done
 done
 echo DONE > "$OUT/status.txt"
 "$PY" - "$OUT" <<'EOF'
