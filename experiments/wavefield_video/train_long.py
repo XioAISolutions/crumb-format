@@ -68,9 +68,10 @@ def detach_states(states):
     return [s.detach() if torch.is_tensor(s) else s for s in states]
 
 
-def sequence_loss(m, clips, moving, a):
+def sequence_loss(m, clips, moving, a, scale=1.0):
     """Walk one [B, N+1, 3, H, W] batch in chunks with carried state. Returns the
-    mean per-chunk loss (a float) after calling backward() every G chunks."""
+    mean per-chunk loss (a float) after calling backward() every G chunks; the
+    loss is multiplied by scale (micro-batch share of the full batch)."""
     B, n_chunks, T = clips.shape[0], a.seq_frames // a.chunk, a.chunk
     states = [None] * len(m.blocks)
     group, total = 0.0, 0.0
@@ -91,7 +92,7 @@ def sequence_loss(m, clips, moving, a):
             lc = tc.motion_balanced_loss(pred, tgt, last, mv)
         else:
             lc = F.mse_loss(pred, tgt)
-        group = group + lc / n_chunks
+        group = group + lc * (scale / n_chunks)
         if (c + 1) % a.tbptt_chunks == 0 or c == n_chunks - 1:
             group.backward()
             total += float(group.detach())
@@ -192,6 +193,13 @@ def main(argv=None):
     ap.add_argument("--resume", default="")
     ap.add_argument("--out", default="runs_long")
     ap.add_argument("--tag", default="")
+    ap.add_argument("--micro-batch", type=int, default=0,
+                    help="split --batch into micro-batches of this size and accumulate "
+                         "gradients (0 = whole batch at once). Exact for MSE; with "
+                         "--motion-loss the moving/static means pool per micro-batch")
+    ap.add_argument("--grad-ckpt", action="store_true",
+                    help="recompute each block's activations in backward (keeps one layer's "
+                         "FFT spectra live at a time; needed for chunk 128 x grid 32 on 24 GB)")
     a = ap.parse_args(argv)
     if a.data_source == "occlusion" and a.occ_end - a.chunk + 8 > a.eval_rollout:
         ap.error(f"eval emergence at frame {a.occ_end - a.chunk} of the rollout needs "
@@ -211,8 +219,13 @@ def main(argv=None):
     if a.data_source == "occlusion":
         a.train_occ_start = a.occ_start if a.train_occ_start is None else a.train_occ_start
         a.train_occ_end = a.occ_end if a.train_occ_end is None else a.train_occ_end
+        if not 0 < a.train_occ_start < a.train_occ_end <= a.seq_frames:
+            ap.error(f"training gap [{a.train_occ_start}, {a.train_occ_end}) must lie inside the "
+                     f"{a.seq_frames}-frame sequence with the ball re-emerging by its last frame; "
+                     "set --train-occ-start/--train-occ-end")
         _occ.OCC_START, _occ.OCC_END = a.train_occ_start, a.train_occ_end
     m = build(a).to(dev)
+    m.grad_ckpt = a.grad_ckpt
     opt = torch.optim.AdamW(m.parameters(), lr=a.lr, weight_decay=0.0)
     base = pathlib.Path(a.out)
     base.mkdir(parents=True, exist_ok=True)
@@ -236,7 +249,10 @@ def main(argv=None):
                                  move_thresh=MOVE_THRESH)
         clips, moving = gen if a.motion_loss else (gen, None)
         opt.zero_grad(set_to_none=True)
-        loss = sequence_loss(m, clips, moving, a)
+        loss, mb = 0.0, a.micro_batch or a.batch            # gradient accumulation
+        for i in range(0, a.batch, mb):
+            loss += sequence_loss(m, clips[i:i + mb], moving[i:i + mb] if moving is not None
+                                  else None, a, scale=clips[i:i + mb].shape[0] / a.batch)
         torch.nn.utils.clip_grad_norm_(m.parameters(), 1.0)
         opt.step()
         if step % max(1, a.steps // 10) == 0 or step == a.steps:
@@ -280,7 +296,8 @@ def main(argv=None):
            "dense": a.dense, "time_pos": "none", "write_gate": a.write_gate,
            "clean_write": a.clean_write, "steps": a.steps, "seed": a.seed,
            "params": sum(p.numel() for p in m.parameters()), "dim": a.dim, "layers": a.layers,
-           "heads": a.heads, "grid": a.grid, "batch": a.batch, "data_source": a.data_source,
+           "heads": a.heads, "grid": a.grid, "batch": a.batch, "micro_batch": a.micro_batch or a.batch,
+           "grad_ckpt": a.grad_ckpt, "data_source": a.data_source,
            "motion_loss": a.motion_loss, "train_occ_start": a.train_occ_start,
            "train_occ_end": a.train_occ_end, "occ_start": a.occ_start, "occ_end": a.occ_end,
            "persistent_state_bytes": m.persistent_state_bytes(), "train_sec": round(train_sec, 1),

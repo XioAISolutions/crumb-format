@@ -76,6 +76,12 @@ SEQ_FRAMES=${SEQ_FRAMES:-512}; SEQ_GAP=${SEQ_GAP:-256}; TBPTT=${TBPTT:-1}
 # WRITE (LONG_HORIZON.md 8.4): extra flags for the wave SEQ arm's write path,
 # e.g. WRITE="--write-gate" or WRITE="--clean-write"; empty = as built.
 WRITE=${WRITE:-}
+# SEQ memory: chunk 128 x grid 32 x dim 128 wave training measured (CPU peak,
+# per batch element) ~5.8 GB + 3.4 GB/extra layer without checkpointing, i.e.
+# ~16 GB/sample at 4 layers -- BATCH=4 cannot fit 24 GB. --grad-ckpt keeps one
+# layer's FFT spectra live (~5.9 + 0.9 GB/layer, ~8.6 GB/sample), so micro-
+# batches of SEQ_MICRO=2 accumulate to the full BATCH. Lower to 1 on OOM.
+SEQ_MICRO=${SEQ_MICRO:-2}
 [ "${SEQ:-0}" = "only" ] && SEQ_ONLY=1
 # Emergence happens 32 + gap frames into the eval rollout; it must fall inside it,
 # or every emergence metric silently comes back null.
@@ -132,6 +138,7 @@ for seed in $SEEDS; do
             ${TIMEOUT_BIN:+$TIMEOUT_BIN "$left"} "$PY" train_long.py --data-source occlusion \
                 --grid "$GRID" --n-balls 6 --batch "$BATCH" --dim "$DIM" --layers "$LAYERS" \
                 --heads "$HEADS" --motion-loss --dense --seq-frames "$SEQ_FRAMES" --chunk "$frames" \
+                --grad-ckpt --micro-batch "$SEQ_MICRO" \
                 --tbptt-chunks "$TBPTT" "${occ[@]}" --eval-rollout "$EVAL_ROLLOUT" \
                 --eval-seeds "$EVAL_SEEDS" --eval-chunk 1 --save-every 250 \
                 ${extra_args[@]+"${extra_args[@]}"} ${resume[@]+"${resume[@]}"} \

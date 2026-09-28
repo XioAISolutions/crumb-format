@@ -21,6 +21,7 @@ are still reproduced by the ``separable`` wave arm with every new flag off.
 """
 import math
 import torch
+import torch.utils.checkpoint
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -670,6 +671,7 @@ class VideoPredictor(nn.Module):
                  write_gate=False, clean_write=False):
         super().__init__()
         self.T, self.H, self.W = T, H, W
+        self.grad_ckpt = False       # train_long.py --grad-ckpt (stateful path only)
         self.kind = kind
         if time_pos not in ("table", "none"):
             raise ValueError(f"unknown time_pos {time_pos!r} (want table | none)")
@@ -770,7 +772,13 @@ class VideoPredictor(nn.Module):
                 raise ValueError(f"need {len(self.blocks)} states, got {len(states)}")
             new_states = []
             for blk, st in zip(self.blocks, states):
-                x, st = blk.forward_stateful(x, st)
+                if self.grad_ckpt and torch.is_grad_enabled():
+                    # Keep only each block's input; recompute its FFT activations
+                    # in backward (one layer's spectra at a time, not all layers').
+                    x, st = torch.utils.checkpoint.checkpoint(blk.forward_stateful, x, st,
+                                                              use_reentrant=False)
+                else:
+                    x, st = blk.forward_stateful(x, st)
                 new_states.append(st)
         else:
             for blk in self.blocks:

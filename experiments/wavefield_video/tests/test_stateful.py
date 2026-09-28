@@ -167,6 +167,26 @@ class StatefulTests(unittest.TestCase):
             mix = model.blocks[0].mix
             self.assertTrue(mix.write_gate and mix.pole_param == "halflife")
             self.assertNotIn("posemb.pt", model.state_dict())
+    def test_grad_ckpt_and_micro_batch_keep_gradients(self):
+        import argparse
+        import train_long
+        a = argparse.Namespace(seq_frames=8, chunk=4, dense=True, motion_loss=False, tbptt_chunks=1)
+        clips = torch.rand(4, 9, 3, H, W)
+
+        def grads(ckpt, mb):
+            torch.manual_seed(0)
+            m = VideoPredictor(DIM, 2, NH, 4, H, W, "wave", causal=True, kernel_version="dispersion",
+                               linear_pad=True, pole_param="halflife", time_pos="none")
+            torch.nn.init.normal_(m.head.weight, std=0.1)
+            m.grad_ckpt = ckpt
+            for i in range(0, 4, mb):
+                train_long.sequence_loss(m, clips[i:i + mb], None, a, scale=mb / 4)
+            return torch.cat([p.grad.flatten() for p in m.parameters() if p.grad is not None])
+
+        ref = grads(False, 4)
+        for ckpt, mb in ((True, 4), (False, 2), (True, 1)):
+            with self.subTest(ckpt=ckpt, micro_batch=mb):
+                self.assertTrue(torch.allclose(grads(ckpt, mb), ref, atol=1e-5, rtol=1e-4))
 
 if __name__ == "__main__":
     unittest.main()
