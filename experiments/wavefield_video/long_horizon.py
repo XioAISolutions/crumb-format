@@ -189,9 +189,14 @@ class HealthMonitor:
                 "prev": None if self._prev is None else self._prev.detach().clone()}
 
     def load_state_dict(self, d):
-        self.ref, self.runs, self.first = dict(d["ref"]), dict(d["runs"]), dict(d["first"])
+        # The monitor always works on CPU (generate() yields CPU chunks), but a
+        # session loaded with map_location=cuda remaps these tensors too.
+        cpu = lambda v: v.cpu() if torch.is_tensor(v) else v
+        self.ref = {k: cpu(v) for k, v in d["ref"].items()}
+        self.runs = {k: cpu(v) for k, v in d["runs"].items()}
+        self.first = dict(d["first"])
         self.first_sample = dict(d.get("first_sample", {}))
-        self.frame_index, self._prev = d["frame_index"], d["prev"]
+        self.frame_index, self._prev = d["frame_index"], cpu(d["prev"])
         return self
 
 

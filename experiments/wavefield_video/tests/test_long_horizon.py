@@ -180,6 +180,7 @@ class HealthMonitorTests(unittest.TestCase):
             p = str(Path(d) / "mon.pt")
             torch.save(a.state_dict(), p)
             b = lh.HealthMonitor(patience=5).load_state_dict(torch.load(p, weights_only=True))
+            self.assertEqual(b._prev.device.type, "cpu")
         for f in frames[9:]:
             b.update(f)
         self.assertIn("freeze", full.first)
