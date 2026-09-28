@@ -117,10 +117,19 @@ def main(argv=None):
     # A segment killed mid-encode is redone (its shard number is reused).
     # the corpus is part of the encode's identity: a resume with another --videos root
     # or changed files is refused instead of appending a second corpus
-    manifest = [[str(p.relative_to(pathlib.Path(a.videos))), p.stat().st_size,
-                 int(p.stat().st_mtime)] for p in vids]
+    root = pathlib.Path(a.videos).resolve()
+    vids = [p.resolve() for p in vids]
+    key = {p: p.relative_to(root).as_posix() for p in vids}   # canonical source key
+
+    def digest(p):                                   # content, not just size / mtime
+        h = hashlib.sha256()
+        with open(p, "rb") as fh:
+            for block in iter(lambda: fh.read(1 << 22), b""):
+                h.update(block)
+        return h.hexdigest()[:16]
+    manifest = [[key[p], p.stat().st_size, digest(p)] for p in vids]
     cfg = {"vae": vae.describe(), "height": a.height, "width": a.width, "fps": a.fps, "seg": seg,
-           "videos": str(pathlib.Path(a.videos).resolve()), "manifest": manifest}
+           "videos": str(root), "manifest": manifest}
     cfg_path, journal = out / "progress_config.json", out / "progress.jsonl"
     if cfg_path.exists() and json.loads(cfg_path.read_text()) != cfg:
         raise SystemExit(f"{out} holds a partial encode with different settings; delete it or "
@@ -152,18 +161,18 @@ def main(argv=None):
             fh.write(json.dumps(entry) + "\n")
 
     for v in vids:
-        if str(v) in finished:
+        if key[v] in finished:
             continue
-        skip = segs_done.get(str(v), 0)
+        skip = segs_done.get(key[v], 0)
         for j, (s0, frames, fps) in enumerate(iter_segments(v, a.fps, a.height, a.width, seg,
                                                             skip=skip), start=skip):
             n = valid_frames(frames.shape[0], vae.t_stride)
             if n < 1 + vae.t_stride:                 # too short to give 2 latent steps
-                log({"src": str(v), "seg": j, "shard": None})
+                log({"src": key[v], "seg": j, "shard": None})
                 continue
             z = vae.encode(frames[None, :n])[0].cpu()          # shards load on any host
             zh = z.half()
-            meta = {"src": str(v), "start_frame": s0, "n_frames": n, "fps": fps,
+            meta = {"src": key[v], "start_frame": s0, "n_frames": n, "fps": fps,
                     # content digest: the dataset fingerprint (index.json) changes when
                     # latents do, even at the same paths and lengths
                     "sha256": hashlib.sha256(zh.contiguous().view(torch.uint8).numpy()
@@ -172,10 +181,10 @@ def main(argv=None):
                     "vae": vae.describe(), "file": f"shard_{k:05d}.pt"}
             torch.save({"latents": zh, **meta}, out / (meta["file"] + ".tmp"))
             os.replace(out / (meta["file"] + ".tmp"), out / meta["file"])
-            log({"src": str(v), "seg": j, "shard": meta})
+            log({"src": key[v], "seg": j, "shard": meta})
             index.append(meta)
             k += 1
-        log({"src": str(v), "done": True})
+        log({"src": key[v], "done": True})
         print(f"ENCODED {v} -> {k} shards so far", flush=True)
     tmp = out / "index.json.tmp"                     # atomic: index.json means "complete"
     tmp.write_text(json.dumps(index, indent=1))

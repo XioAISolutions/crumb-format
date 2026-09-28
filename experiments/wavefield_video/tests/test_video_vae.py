@@ -194,6 +194,23 @@ class VideoVAETests(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 encode_videos.main([str(d / "mp4b") if x == str(d / "mp4") else x for x in args])
             encode_videos.main(args)                             # original corpus: resumes
+            # the same root spelled differently resumes (canonical keys), no re-encode
+            rel = [x for x in args]
+            rel[rel.index(str(d / "mp4"))] = str(d / "." / "mp4")
+            with unittest.mock.patch.object(VideoVAE, "encode", autospec=True,
+                                            side_effect=VideoVAE.encode) as enc:
+                (d / "lat" / "index.json").unlink()
+                encode_videos.main(rel)
+            self.assertEqual(enc.call_count, 0)
+            # same size, same name, different bytes: refused (content digest)
+            vid = sorted((d / "mp4").glob("*.mp4"))[0]
+            raw = bytearray(vid.read_bytes()); raw[-1] ^= 0xFF
+            vid.write_bytes(bytes(raw))
+            (d / "lat" / "index.json").unlink()
+            with self.assertRaises(SystemExit):
+                encode_videos.main(args)
+            raw[-1] ^= 0xFF; vid.write_bytes(bytes(raw))                   # restore
+            encode_videos.main(args)                             # identical again: resumes
             # a tampered shard no longer matches its recorded digest
             shard = torch.load(d / "lat" / "shard_00000.pt", weights_only=True)
             shard["latents"] = shard["latents"] + 1
