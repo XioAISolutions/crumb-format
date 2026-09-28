@@ -166,13 +166,16 @@ class VideoVAE(nn.Module):
 
     @property
     def fingerprint(self):
-        """sha256 over the encoder/decoder weights (names, shapes, values): shards,
+        """sha256 over the encoder/decoder weights and the latent normalization: shards,
         resumed encodes and the stream's decoder must all use the same latent space,
         and backend + shape alone cannot tell two checkpoints apart."""
         if getattr(self, "_fp", None) is None:
             import hashlib
             h = hashlib.sha256()
-            for k, v in sorted(self.model.state_dict().items()):
+            # the effective normalization too: Wan keeps it in config, not in weights
+            items = sorted(self.model.state_dict().items()) + [("_norm_mean", self.mean),
+                                                                ("_norm_std", self.std)]
+            for k, v in items:
                 h.update(f"{k}{tuple(v.shape)}{v.dtype}".encode())
                 h.update(v.detach().cpu().contiguous().view(-1).view(torch.uint8).numpy().tobytes())
             self._fp = h.hexdigest()[:16]

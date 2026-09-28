@@ -63,6 +63,12 @@ class VideoVAETests(unittest.TestCase):
             w = VideoVAE("ltx-tiny", path=d)
         self.assertTrue(torch.allclose(v.encode(x), w.encode(x), atol=1e-6))
 
+    def test_fingerprint_covers_config_only_normalization(self):
+        a, b = VideoVAE("wan-tiny"), VideoVAE("wan-tiny")
+        self.assertEqual(a.fingerprint, b.fingerprint)
+        b.std, b._fp = b.std * 2, None                   # latents_std changed, weights identical
+        self.assertNotEqual(a.fingerprint, b.fingerprint)
+
     def test_bad_inputs(self):
         with self.assertRaises(ValueError):
             VideoVAE("sora")
