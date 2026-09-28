@@ -92,7 +92,13 @@ for seed in $SEEDS; do
             echo "SLICED" > "$OUT/status.txt"
             exit 0
         fi
-        [ "$rc" = "0" ] || echo "FAIL $tag exit=$rc (see $OUT/log${tag}.txt)" | tee -a "$OUT/progress.txt"
+        if [ "$rc" != "0" ]; then
+            # Never mark the suite DONE with an arm missing: slices no-op on DONE.
+            # FAILED stops here; fix the cause, then re-queue (finished arms skip).
+            echo "FAIL $tag exit=$rc (see $OUT/log${tag}.txt)" | tee -a "$OUT/progress.txt"
+            echo "FAILED $tag exit=$rc" > "$OUT/status.txt"
+            exit 1
+        fi
     done
 done
 
@@ -106,6 +112,7 @@ for f in "$OUT"/model_wave_W_*_s0.pt; do
     "$PY" long_horizon.py stream --pole-param "$pp" --ckpt "$f" --grid "$GRID" --frames "$T_LONG" \
         --dim "$DIM" --layers "$LAYERS" --heads "$HEADS" --ffn-mult "$ffn" \
         --stream-frames "$STREAM_FRAMES" --chunk 600 \
-        --out "${f%.pt}_stream7200.json" > "${f%.pt}_stream7200.log" 2>&1 || echo "STREAM FAIL $f"
+        --out "${f%.pt}_stream7200.json" > "${f%.pt}_stream7200.log" 2>&1 || { echo "STREAM FAIL $f" | tee -a "$OUT/progress.txt"
+             echo "FAILED stream $(basename "$f")" > "$OUT/status.txt"; exit 1; }
 done
 echo DONE > "$OUT/status.txt"

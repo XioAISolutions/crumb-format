@@ -164,6 +164,18 @@ class HealthMonitor:
     def healthy(self):
         return not self.first
 
+    def state_dict(self):
+        """Everything needed to continue monitoring after a StreamSession resume:
+        a streak that spans the checkpoint keeps counting and earlier flags stay."""
+        return {"ref": dict(self.ref), "runs": dict(self.runs), "first": dict(self.first),
+                "frame_index": self.frame_index,
+                "prev": None if self._prev is None else self._prev.detach().clone()}
+
+    def load_state_dict(self, d):
+        self.ref, self.runs, self.first = dict(d["ref"]), dict(d["runs"]), dict(d["first"])
+        self.frame_index, self._prev = d["frame_index"], d["prev"]
+        return self
+
 
 # ----------------------------------------------------------------------------- stream
 def _clone_state(s):
@@ -212,6 +224,7 @@ class StreamSession:
         self.states = None
         self.frame = None
         self.t = 0
+        self.extra = None
 
     @torch.no_grad()
     def warm(self, context):
@@ -249,16 +262,20 @@ class StreamSession:
     def state_bytes(self):
         return state_nbytes(self.states) + state_nbytes(self.frame)
 
-    def save(self, path):
+    def save(self, path, extra=None):
+        """``extra``: optional dict saved alongside (e.g. a HealthMonitor state_dict)."""
         torch.save({"states": _clone_state(self.states), "frame": self.frame.detach().clone(),
-                    "t": self.t, "fingerprint": model_fingerprint(self.model)}, path)
+                    "t": self.t, "fingerprint": model_fingerprint(self.model),
+                    "extra": extra}, path)
 
     def load(self, path):
+        """Restore a saved session; returns the ``extra`` dict saved with it (or None)."""
         dev = next(self.model.parameters()).device
         ck = torch.load(path, map_location=dev, weights_only=True)
         if ck["fingerprint"] != model_fingerprint(self.model):
             raise ValueError("saved stream state was produced by different weights")
         self.states, self.frame, self.t = ck["states"], ck["frame"], ck["t"]
+        self.extra = ck.get("extra")
         return self
 
 
@@ -313,8 +330,13 @@ def cmd_stream(a):
     sess = StreamSession(m)
     if a.resume:
         sess.load(a.resume)
+        if sess.extra and "health" in sess.extra:
+            mon.load_state_dict(sess.extra["health"])
+        else:                       # older state file: flags start fresh, indices stay absolute
+            mon.frame_index = sess.t
     else:
         sess.warm(ctx)
+        mon.frame_index = sess.t    # flag frames use the same absolute index as the log
     log, t0 = [], time.time()
     sizes = set()
     for chunk in sess.generate(a.stream_frames, chunk=a.chunk):
@@ -329,7 +351,7 @@ def cmd_stream(a):
               f"fps={row['fps']} mean={st['mean']:.4f} std={st['std']:.4f} "
               f"motion={st['motion']:.5f} flags={row['flags']}", flush=True)
     if a.save_state:
-        sess.save(a.save_state)
+        sess.save(a.save_state, extra={"health": mon.state_dict()})
     res = {"mode": "long_horizon_stream", "pole_param": a.pole_param[0], "trained": bool(a.ckpt),
            "frames": a.stream_frames, "grid": a.grid, "context_ref": mon.ref,
            "state_bytes_constant": len(sizes) == 1, "collapse": dict(mon.first), "log": log}
@@ -363,7 +385,9 @@ def main(argv=None):
     for p in sub.choices.values():
         p.add_argument("--dim", type=int, default=128)
         p.add_argument("--layers", type=int, default=4)
-        p.add_argument("--n-modes", type=int, default=3)
+    # Only the budget honors --n-modes: VideoPredictor builds WaveMix3D with its
+    # default 3 modes, so memory/stream must not pretend to take it.
+    b.add_argument("--n-modes", type=int, default=3)
     s = sub.choices["stream"]
     s.add_argument("--stream-frames", type=int, default=7200, help="7200 = 5 min at 24 fps")
     s.add_argument("--chunk", type=int, default=600)

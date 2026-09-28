@@ -166,6 +166,25 @@ class StreamSessionTests(unittest.TestCase):
 
 
 class HealthMonitorTests(unittest.TestCase):
+    def test_state_round_trip_keeps_streaks_across_a_resume(self):
+        """A freeze streak that straddles a save/load must fire at the same frame."""
+        ctx = self._ctx()
+        frames = [torch.rand(1, 3, 8, 8) for _ in range(6)] + [torch.full((1, 3, 8, 8), 0.5)] * 10
+        full = lh.HealthMonitor(patience=5).calibrate(ctx)
+        for f in frames:
+            full.update(f)
+        a = lh.HealthMonitor(patience=5).calibrate(ctx)
+        for f in frames[:9]:
+            a.update(f)
+        with tempfile.TemporaryDirectory() as d:
+            p = str(Path(d) / "mon.pt")
+            torch.save(a.state_dict(), p)
+            b = lh.HealthMonitor(patience=5).load_state_dict(torch.load(p, weights_only=True))
+        for f in frames[9:]:
+            b.update(f)
+        self.assertIn("freeze", full.first)
+        self.assertEqual(b.first, full.first)
+
     def _ctx(self):
         g = torch.Generator().manual_seed(0)
         return torch.rand(1, 8, 3, 8, 8, generator=g)
@@ -192,6 +211,22 @@ class HealthMonitorTests(unittest.TestCase):
             mon.update(f)
         self.assertIn("freeze", mon.first)
         self.assertNotIn("fade", mon.first)
+
+
+class RunnerTests(unittest.TestCase):
+    def test_failed_arm_never_reports_done(self):
+        """Slices no-op on DONE, so a crashed arm must leave status FAILED."""
+        import os
+        import subprocess
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as d:
+            env = dict(os.environ, PY="false", OUT=str(Path(d) / "out"), SEEDS="0",
+                       SLICE_S="600")
+            r = subprocess.run(["bash", str(root / "run_long_horizon.sh")], env=env,
+                               capture_output=True, text=True)
+            status = (Path(d) / "out" / "status.txt").read_text()
+        self.assertNotEqual(r.returncode, 0)
+        self.assertTrue(status.startswith("FAILED"), status)
 
 
 if __name__ == "__main__":
