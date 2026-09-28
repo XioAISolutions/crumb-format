@@ -392,8 +392,15 @@ def cmd_stream(a):
     # what is left of --stream-frames (total, not additional).
     if a.checkpoint and os.path.exists(a.checkpoint):
         a.resume = a.checkpoint
+    # the warm-up context identifies the stream (dataset, batch, frames, seed):
+    # a resume must continue the same stream, not relabel an old one
+    ctx_fp = hashlib.sha256(ctx.float().contiguous().numpy().tobytes()).hexdigest()[:16]
     if a.resume:
         sess.load(a.resume)
+        old_fp = (sess.extra or {}).get("context_fp")
+        if old_fp is not None and old_fp != ctx_fp:
+            raise SystemExit(f"{a.resume} continues a stream warmed on different context "
+                             f"({old_fp} != {ctx_fp}: other --latents/--batch/--frames?)")
         if sess.extra and "health" in sess.extra:
             mon.load_state_dict(sess.extra["health"])
         else:                       # older state file: flags start fresh, indices stay absolute
@@ -424,7 +431,7 @@ def cmd_stream(a):
         return d // stride if not lead else (0 if d == 0 else (d - 1) // stride + 1)
 
     def extra_state():
-        extra = {"health": mon.state_dict(), "generated": gen}
+        extra = {"health": mon.state_dict(), "generated": gen, "context_fp": ctx_fp}
         if vae is not None:
             extra.update(prev_latent=prev, lead_frame=lead)
         if a.checkpoint:
@@ -463,7 +470,8 @@ def cmd_stream(a):
         sess.save(a.save_state, extra=extra_state())
     res = {"mode": "long_horizon_stream", "pole_param": a.pole_param[0], "trained": bool(a.ckpt),
            "vae": vae.describe() if vae is not None else None, "latents": a.latents or None,
-           "frames": a.stream_frames, "grid": a.grid,
+           "frames": a.stream_frames,
+           "grid": [shards.h, shards.w] if vae is not None else a.grid,   # latent h, w
            "context_ref": {k: v.tolist() for k, v in mon.ref.items()},
            "collapse_sample": dict(mon.first_sample),
            # over every chunk of the stream, including slices restored from --checkpoint

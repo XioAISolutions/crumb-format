@@ -223,6 +223,10 @@ class VideoVAETests(unittest.TestCase):
             done = stream(d / "lat", d / "vae", "--stream-frames", "8", "--checkpoint", ck)
             self.assertEqual(done["steps_generated"], 8)                        # done: no-op
             self.assertTrue(done["state_bytes_constant"])                       # from saved log
+            self.assertEqual(done["grid"], [2, 2])                              # latent h, w
+            with self.assertRaisesRegex(SystemExit, "different context"):     # other stream
+                stream(d / "lat", d / "vae", "--stream-frames", "8", "--checkpoint", ck,
+                       "--batch", "2")
             # a training resume onto shards from another VAE is refused
             common = ["--seq-frames", "4", "--chunk", "2", "--dim", "16", "--layers", "1",
                       "--heads", "2", "--batch", "2", "--eval-rollout", "2"]
