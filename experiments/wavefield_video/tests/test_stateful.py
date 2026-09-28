@@ -132,6 +132,9 @@ class StatefulTests(unittest.TestCase):
             with self.subTest(**kw):
                 with self.assertRaises(ValueError):
                     VideoPredictor(DIM, 1, NH, TC, H, W, **kw)
+        with self.assertRaises(ValueError):                   # a time table writes every frame
+            VideoPredictor(DIM, 1, NH, TC, H, W, "wave", kernel_version="dispersion",
+                           linear_pad=True, clean_write=True)
 
     def test_causal_gate_does_not_read_the_future(self):
         torch.manual_seed(0)

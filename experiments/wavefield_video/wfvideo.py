@@ -703,6 +703,10 @@ class VideoPredictor(nn.Module):
         if (write_gate or clean_write) and not (kind == "wave" and kernel_version == "dispersion"
                                                  and fuse == "none" and not q_mix):
             raise ValueError("write_gate/clean_write need the plain dispersion wave arm")
+        if clean_write and time_pos != "none":
+            # a temporal table adds a nonzero vector to every (blank) frame -> the
+            # constant background clean_write exists to remove (LONG_HORIZON.md 8.4)
+            raise ValueError("clean_write needs time_pos='none'")
         self.posemb = FactorizedPosEmb(dim, T, H, W, time=(time_pos == "table"),
                                        space=not clean_write)          # shared, all arms
         if fuse != "none":

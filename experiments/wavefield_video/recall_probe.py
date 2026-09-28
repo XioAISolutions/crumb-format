@@ -71,7 +71,7 @@ def run_one(pole_param, D, seed, a):
     m = VideoPredictor(a.dim, a.layers, a.heads, T, a.grid, a.grid, "wave", causal=True,
                        kernel_version="dispersion", linear_pad=True,
                        pole_param=pole_param, hl_min=a.hl_min, hl_max=a.hl_max,
-                       time_pos="none" if a.chunk else "table",
+                       time_pos="none" if a.chunk or a.clean_write else "table",
                        write_gate=a.write_gate, clean_write=a.clean_write)
     opt = torch.optim.AdamW(m.parameters(), lr=a.lr, weight_decay=0.0)
     t0 = time.time()
