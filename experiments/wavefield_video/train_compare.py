@@ -520,7 +520,8 @@ def stream_test(m, a, dev):
     res = {"mode": "stream_test", "kind": a.kind, "tag": a.tag,
            "path": "step()" if not windowed else "windowed", "window_T": T,
            "stream_frames": Ntot, "stream_batch": Bsz, "grid": a.grid,
-           "kernel_version": a.kernel_version, "checkpoints": log}
+           "kernel_version": a.kernel_version, "pole_param": a.pole_param,
+           "checkpoints": log}
     return res
 
 
@@ -646,6 +647,12 @@ def main():
                     help="predict last_frame + delta, zero-init head (default ON for v2)")
     ap.add_argument("--kernel-version", choices=["separable", "dispersion"], default="separable")
     ap.add_argument("--gate", action="store_true", help="Hyena-style content gate")
+    ap.add_argument("--pole-param", choices=["softplus", "halflife"], default="softplus",
+                    help="dispersion pole parameterization (LONG_HORIZON.md): softplus = v2 "
+                         "default (init half-life ~0.7 frame); halflife = half-life in frames, "
+                         "log-spread over [--hl-min, --hl-max] -- the minutes-scale memory arm")
+    ap.add_argument("--hl-min", type=float, default=2.0, help="shortest pole half-life (frames)")
+    ap.add_argument("--hl-max", type=float, default=4096.0, help="longest pole half-life (frames)")
     ap.add_argument("--local-fuse", action="store_true", help="parallel 3x3 depthwise local path")
     ap.add_argument("--linear-pad", action=argparse.BooleanOptionalAction, default=True,
                     help="zero-padded (linear) conv over time AND space (default ON for v2)")
@@ -697,6 +704,14 @@ def main():
                          "alias for --fuse (DEEP_DIVE_3 names the flag --fusion).")
     ap.add_argument("--occ-start", type=int, default=_occ.OCC_START,
                     help="first frame the occlusion probe hides the target (data-source occlusion)")
+    ap.add_argument("--train-occ-start", type=int, default=None,
+                    help="occlusion window for TRAINING clips only (default: --occ-start). "
+                         "Training clips start at frame 0, so with the default window "
+                         "(64..320) and --frames 17 no clip ever contains the occluder; "
+                         "set [T-gap, T) so the target frame is the first frame after the "
+                         "gap and the loss requires bridging it (LONG_HORIZON.md)")
+    ap.add_argument("--train-occ-end", type=int, default=None,
+                    help="end (exclusive) of the training-clip occlusion window (default: --occ-end)")
     ap.add_argument("--occ-end", type=int, default=_occ.OCC_END,
                     help="first frame the target is visible again (exclusive upper bound)")
     ap.add_argument("--field", choices=["wave", "advection", "vortex"], default="wave",
@@ -747,7 +762,13 @@ def main():
         # every generated clip -- train and eval -- shares one window definition.
         if not (0 <= a.occ_start <= a.occ_end):
             ap.error("require 0 <= --occ-start <= --occ-end")
-        _occ.OCC_START, _occ.OCC_END = a.occ_start, a.occ_end
+        a.train_occ_start = a.occ_start if a.train_occ_start is None else a.train_occ_start
+        a.train_occ_end = a.occ_end if a.train_occ_end is None else a.train_occ_end
+        if not (0 <= a.train_occ_start <= a.train_occ_end):
+            ap.error("require 0 <= --train-occ-start <= --train-occ-end")
+        # Training clips use the training window; eval switches to --occ-start/--occ-end
+        # right before the rollout (identical when the train flags are not given).
+        _occ.OCC_START, _occ.OCC_END = a.train_occ_start, a.train_occ_end
         if a.frames > a.occ_start:
             print(f"OCCLUSION WARN: --frames {a.frames} > --occ-start {a.occ_start}; "
                   "context already overlaps the hidden window", flush=True)
@@ -791,7 +812,8 @@ def main():
                             causal=a.causal, residual=a.residual, ffn_mult=ffn_mult,
                             kernel_version=a.kernel_version, linear_pad=a.linear_pad,
                             gate=a.gate, local_fuse=a.local_fuse, fuse=a.fuse,
-                            q_mix=a.q_mix, quat_color=a.quat_color)
+                            q_mix=a.q_mix, quat_color=a.quat_color,
+                            pole_param=a.pole_param, hl_min=a.hl_min, hl_max=a.hl_max)
         return LatentCore(vp, a.dim, cz) if a.latent else vp
 
     ffn_mult = a.ffn_mult
@@ -1033,6 +1055,8 @@ def main():
         if dev == "cuda":
             torch.cuda.empty_cache()
         roll_fn = occlusion_rollout_eval if a.data_source == "occlusion" else rollout_eval
+        if a.data_source == "occlusion":
+            _occ.OCC_START, _occ.OCC_END = a.occ_start, a.occ_end
         for attempt in range(4):              # rollout eval also OOM-hardened
             try:
                 roll = roll_fn(m, a, dev)
@@ -1062,10 +1086,13 @@ def main():
            "grid": a.grid, "frames": a.frames, "batch": a.batch,
            "causal": a.causal, "residual": a.residual, "kernel_version": a.kernel_version,
            "q_mix": a.q_mix, "quat_color": a.quat_color,
+           "pole_param": a.pole_param, "hl_min": a.hl_min, "hl_max": a.hl_max,
            "const_lr": a.const_lr, "seed": a.seed, "fp32": a.fp32,
            "no_decay_norm_head": a.no_decay_norm_head, "telemetry_every": a.telemetry_every,
            "gate": a.gate, "local_fuse": a.local_fuse, "linear_pad": a.linear_pad,
            "occ_start": a.occ_start, "occ_end": a.occ_end,
+           "train_occ_start": getattr(a, "train_occ_start", None),
+           "train_occ_end": getattr(a, "train_occ_end", None),
            "persistent_state_bytes": psb, "window_bytes": window_bytes,
            "state_bytes_total": psb + window_bytes,
            "rollout_loss_K": Kmax, "rollout_ramp": a.rollout_ramp,
