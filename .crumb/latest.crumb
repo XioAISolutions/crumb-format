@@ -1,40 +1,22 @@
---- task: feat(wave_field_llm): O(N log N) wave-field LM that reads CRUMB structure as physical priors
+--- task: wavefield video: half-life poles + long-horizon tooling toward 2–5 min, and two correctness fixes
 source: github.pr
-pr: #35
-generated: 2026-05-24T20:09:50Z
+pr: #58
+generated: 2026-09-28T00:54:50Z
 ---
 
 [goal]
-## Summary
+## What changed
 
 [context]
 Changed files in this PR:
-- README.md
-- cli/crumb.py
-- docs/wave-field-llm.md
-- pyproject.toml
-- tests/test_wave_field_crumb_adapter.py
-- tests/test_wave_field_kernels.py
-- tests/test_wave_field_layers.py
-- tests/test_wave_field_scatter_gather.py
-- tests/test_wave_field_train_smoke.py
-- wave_field_llm/__init__.py
-- wave_field_llm/__main__.py
-- wave_field_llm/baseline.py
-- wave_field_llm/bench.py
-- wave_field_llm/configs/__init__.py
-- wave_field_llm/configs/small.json
-- wave_field_llm/configs/tiny.json
-- wave_field_llm/configs/tiny_transformer.json
-- wave_field_llm/crumb_adapter.py
-- wave_field_llm/data.py
-- wave_field_llm/kernels.py
-- wave_field_llm/layers.py
-- wave_field_llm/model.py
-- wave_field_llm/sample.py
-- wave_field_llm/scatter_gather.py
-- wave_field_llm/tokenizer.py
-- wave_field_llm/train.py
+- experiments/wavefield_video/bench_scaling_honest.py
+- experiments/wavefield_video/long_horizon.py
+- experiments/wavefield_video/recall_probe.py
+- experiments/wavefield_video/run_long_horizon.sh
+- experiments/wavefield_video/test_fusion_r14.py
+- experiments/wavefield_video/tests/test_long_horizon.py
+- experiments/wavefield_video/train_compare.py
+- experiments/wavefield_video/wfvideo.py
 
 [constraints]
 Review checklist: tests pass, no breaking changes, follows project conventions
