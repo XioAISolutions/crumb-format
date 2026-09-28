@@ -284,7 +284,8 @@ def main(argv=None):
                                        kicks=a.kicks, collisions=a.collisions, radius=a.radius,
                                        speed=a.speed, nb=a.n_balls)
             ctx, tgt = clips[:, :a.frames], clips[:, a.frames]
-            p, last = m(ctx).float(), ctx[:, -1]
+            # stateful path with a zero state = the exact truncated kernel training uses
+            p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
             se += F.mse_loss(p, tgt).item()
             cb += F.mse_loss(last, tgt).item()
             cr += ((p - last).norm() / ((tgt - last).norm() + 1e-9)).item()
