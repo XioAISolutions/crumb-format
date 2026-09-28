@@ -10,7 +10,7 @@ in the code, what was fixed, and the pre-registered next runs.
 
 | Receipt | Where | What it is | What it is not |
 |---|---|---|---|
-| 417× (3.7 ms vs 1,546 ms @ N=16k) | `kernels2d_smoke.py`, OCEAN.md | one **un-warmed, single-shot** CPU call: FFT conv vs `QKᵀ` then `(QKᵀ)V` with **no softmax**, one 64-channel head, fp32 | a model step; a GPU number; FlashAttention/SDPA |
+| 417× (3.7 ms vs 1,546 ms @ N=16k) | `kernels2d_smoke.py`, OCEAN.md | one **un-warmed, single-shot** CPU call: FFT conv vs `QKᵀ` then `(QKᵀ)V` with **no softmax**, one 64-channel head, fp32. Re-measured fairly (§5) the gap is ~886×, so the ratio holds on CPU | a model step; a GPU number |
 | 1,024 frames at flat 0.207 GB | `train_compare.py --stream-test` | streaming **cost** — the docstring says "Weights need not be trained — this measures streaming cost, not accuracy" | coherent video; with the zero-init residual head an untrained stream is an exact copy of the last frame |
 | O(N log N) | FFT mixing | true asymptotically | free: `linear_pad` doubles T, H and W (8× the field) in complex64 — at grid 6, T=256 a CPU training step is ~16 s |
 
@@ -91,20 +91,33 @@ Pre-registered: "holds D" iff mean recall ≥ 0.5.
 |---|---|---|---|---|---|
 | 16 | 300 | 0, 1 | 0.117 / 0.039 | **0.662 / 1.000** | halflife HOLDS, softplus forgets |
 | 64 | 300 | 0, 1 | 0.116 / 0.037 | 0.153 / 0.057 | **both forget** (halflife fails the bar) |
-| 128 | 300 | 0 | 0.118 / 0.027 | _pending_ | |
-| 64 | 1000 | 0 | _pending_ | _pending_ | budget check |
+| 128 | 300 | 0 | 0.118 / 0.027 | 0.116 / 0.027 | both forget (budget-limited, see next row) |
+| 64 | **1000** | 0 | 0.119 / 0.039 | **0.669 / 1.000** | **halflife HOLDS**, softplus forgets |
 
-Softplus sits at ~0.12 at every delay, which is what predicting the *average*
-blob scores; its argmax hit is at chance. Half-life clearly holds only at D=16
-within 300 steps. At D=64 it is not yet a win. Untested hypothesis: the
-viscosity init (`softplus(-4)·|k|` ≈ 0.018·|k| per frame) damps the high
-spatial frequencies that encode *where* the blob is by ~e^-5 over 64 frames,
-even when the DC half-life is long. The 1,000-step row separates "needs budget"
-from "cannot".
+Softplus sits at ~0.12 at every delay and budget, which is what predicting
+the *average* blob scores; its argmax hit is at chance. It never learns to
+remember. Half-life holds at D=16 in 300 steps and at D=64 in 1,000 steps: the
+300-step D=64 miss was training budget, not the operator. (An earlier guess,
+that viscosity was erasing position detail, is contradicted by this row.)
+Longer delays need proportionally more steps. D=128 at 1,000+ steps is the
+next CPU row, and the GPU suite in §7 is the real test.
 
 ### Honest scaling (`bench_scaling_honest.py`)
 
-_pending — runs after the recall probe to avoid CPU contention._
+One 64-channel head, fp32, CPU (4 threads), warm-up 2, median of 5.
+Raw JSON for every table here: `results_long_horizon/`.
+
+| N | wave FFT | orig op (no softmax) | softmax attention | fused SDPA | SDPA ÷ wave |
+|---|---|---|---|---|---|
+| 1k | 0.18 ms | 2.9 ms | 3.0 ms | 3.1 ms | 17× |
+| 4k | 0.26 ms | 37 ms | 52 ms | 49 ms | 189× |
+| 16k | 0.97 ms | 552 ms | 837 ms | 858 ms | **886×** |
+| 64k | 26.7 ms | skipped (N×N = 17 GB) | skipped | skipped on CPU | — |
+
+So the 417× was *conservative* for this op on CPU: done fairly, the gap at 16k
+is ~886×. The caveat is scope, not size: it is one head on CPU. A 4090 runs
+the same 16k attention in about a millisecond (estimate), and a model pays it
+per head, per layer, per denoising step.
 
 ### 5-minute stream, untrained (`long_horizon.py stream --stream-frames 7200`)
 
@@ -157,9 +170,10 @@ Two things follow from this table:
 
 ## Pitch corrections
 
-- "At 16k moments one step takes ~1.5 s": one un-warmed CPU matmul pair for one
-  64-channel head without softmax. It is not a model step. On a 4090 the same op
-  is ~7e10 FLOPs, about a millisecond with fused attention (estimate).
+- "At 16k moments one step takes ~1.5 s": the *ratio* survives a fair re-measure
+  (~886× on CPU), but the absolute number is one 64-channel head on CPU, not a
+  model step. On a 4090 the same op is ~7e10 FLOPs, about a millisecond with
+  fused attention (estimate). Say "one attention op, CPU", not "one step".
 - "We streamed 1,024 frames at a flat 0.2 GB": true, with **untrained** weights.
   It shows constant memory, not minutes of coherent video.
 - "Veo, Kling, Seedance all pay the N² bill": within a shot, yes. Minute-length

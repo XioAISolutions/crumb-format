@@ -58,6 +58,10 @@ def bench(shapes, C=64, reps=5, warmup=2, device="cpu", attn_max_n=16384):
                 lambda: torch.softmax(torch.matmul(q, q.transpose(-1, -2)) / C ** 0.5, -1) @ q,
                 reps, warmup, sync), 3)
         q4 = q[:, None]                                                # [1,1,N,C]
+        if device == "cpu" and N > attn_max_n:   # CPU SDPA falls back to an N x N matrix
+            rows.append(row)
+            print(json.dumps(row), flush=True)
+            continue
         row["sdpa_ms"] = round(_time(lambda: F.scaled_dot_product_attention(q4, q4, q4),
                                      reps, warmup, sync), 3)
         for kname in ("orig", "naive", "sdpa"):

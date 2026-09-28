@@ -1,0 +1,53 @@
+{
+ "device": "cpu",
+ "torch": "2.14.0+cu130",
+ "threads": 4,
+ "machine": "x86_64",
+ "channels": 64,
+ "reps": 5,
+ "warmup": 2,
+ "rows": [
+  {
+   "T": 16,
+   "S": 64,
+   "N": 1024,
+   "wave_ms": 0.183,
+   "orig_ms": 2.886,
+   "naive_ms": 3.018,
+   "sdpa_ms": 3.101,
+   "orig_over_wave": 15.8,
+   "naive_over_wave": 16.5,
+   "sdpa_over_wave": 16.9
+  },
+  {
+   "T": 32,
+   "S": 128,
+   "N": 4096,
+   "wave_ms": 0.26,
+   "orig_ms": 36.735,
+   "naive_ms": 52.389,
+   "sdpa_ms": 49.131,
+   "orig_over_wave": 141.3,
+   "naive_over_wave": 201.5,
+   "sdpa_over_wave": 189.0
+  },
+  {
+   "T": 64,
+   "S": 256,
+   "N": 16384,
+   "wave_ms": 0.968,
+   "orig_ms": 551.859,
+   "naive_ms": 836.615,
+   "sdpa_ms": 857.605,
+   "orig_over_wave": 570.1,
+   "naive_over_wave": 864.3,
+   "sdpa_over_wave": 886.0
+  },
+  {
+   "T": 128,
+   "S": 512,
+   "N": 65536,
+   "wave_ms": 26.667
+  }
+ ]
+}
