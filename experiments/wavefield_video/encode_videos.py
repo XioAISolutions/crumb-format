@@ -17,6 +17,7 @@ train_long.py --latents OUT samples windows from these shards.
 """
 import argparse
 import json
+import os
 import pathlib
 
 import torch
@@ -119,7 +120,15 @@ def main(argv=None):
         raise SystemExit(f"{out} holds a partial encode with different settings; delete it or "
                          "use another --out")
     cfg_path.write_text(json.dumps(cfg))
-    lines = [json.loads(x) for x in journal.read_text().splitlines()] if journal.exists() else []
+    lines = []
+    if journal.exists():
+        for x in journal.read_text().splitlines():
+            try:
+                lines.append(json.loads(x))
+            except json.JSONDecodeError:              # a line cut by the slice kill: redo it
+                break
+        # rewrite without the torn tail so new lines never follow a broken one
+        journal.write_text("".join(json.dumps(d) + "\n" for d in lines))
     finished = {d["src"] for d in lines if d.get("done")}
     segs_done = {}
     for d in lines:
@@ -148,13 +157,16 @@ def main(argv=None):
             meta = {"src": str(v), "start_frame": s0, "n_frames": n, "fps": fps,
                     "latent_steps": z.shape[0], "latent_shape": list(z.shape[1:]),
                     "vae": vae.describe(), "file": f"shard_{k:05d}.pt"}
-            torch.save({"latents": z.half(), **meta}, out / meta["file"])
+            torch.save({"latents": z.half(), **meta}, out / (meta["file"] + ".tmp"))
+            os.replace(out / (meta["file"] + ".tmp"), out / meta["file"])
             log({"src": str(v), "seg": j, "shard": meta})
             index.append(meta)
             k += 1
         log({"src": str(v), "done": True})
         print(f"ENCODED {v} -> {k} shards so far", flush=True)
-    (out / "index.json").write_text(json.dumps(index, indent=1))
+    tmp = out / "index.json.tmp"                     # atomic: index.json means "complete"
+    tmp.write_text(json.dumps(index, indent=1))
+    os.replace(tmp, out / "index.json")
     print(f"DONE {len(index)} shards, {sum(m['latent_steps'] for m in index)} latent steps", flush=True)
     return index
 

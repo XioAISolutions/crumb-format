@@ -172,7 +172,7 @@ class VideoVAETests(unittest.TestCase):
             rows = journal.read_text().splitlines()
             v2 = sorted({json.loads(r)["src"] for r in rows})[1]
             cut = next(i for i, r in enumerate(rows) if json.loads(r)["src"] == v2) + 1
-            journal.write_text("\n".join(rows[:cut]) + "\n")
+            journal.write_text("\n".join(rows[:cut]) + "\n" + rows[cut][:10])   # + torn line
             (d / "lat" / "index.json").unlink()
             with unittest.mock.patch.object(VideoVAE, "encode", autospec=True,
                                             side_effect=VideoVAE.encode) as enc:
