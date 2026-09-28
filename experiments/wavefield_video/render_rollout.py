@@ -183,10 +183,13 @@ def load_model(args, torch):
     for name in ("causal", "residual", "linear_pad", "gate", "local_fuse", "kicks", "collisions"):
         if type(config[name]) is not bool:
             raise ValueError(f"config {name} must be a JSON boolean")
+    if config["data_source"] == "occlusion":        # train_long.py: balls with a masked gap
+        notes.append("Trained on occlusion clips; the renderer's truth is unoccluded balls.")
     ball_options(config)
     if config["kernel_version"] not in ("separable", "dispersion"):
         raise ValueError("invalid kernel_version")
-    if config["data_source"] not in ("balls", "waves") or config["field"] not in ("wave", "advection", "vortex"):
+    if (config["data_source"] not in ("balls", "waves", "occlusion")
+            or config["field"] not in ("wave", "advection", "vortex")):
         raise ValueError("invalid data_source/field")
     # train_compare rounds matched ffn_mult to 3 decimals in result JSON. At large
     # dimensions that can reconstruct a different hidden width. Trust tensor size.
@@ -209,9 +212,15 @@ def load_model(args, torch):
         model = LegacyPredictor(*dimensions, causal=config["causal"], posemb="posemb.pt" in state)
         notes.append("Legacy v1 architecture loaded from v1_backup/wfvideo.py; current synthetic generator may differ from training.")
     else:
-        if "posemb.pt" not in state:
+        time_pos = config.get("time_pos", "table")
+        if time_pos not in ("table", "none"):
+            raise ValueError("invalid time_pos")
+        if time_pos == "table" and "posemb.pt" not in state:
             raise ValueError("checkpoint has no v2 positional embeddings; use the matching legacy result or explicit architecture='v1' config")
-        model = VideoPredictor(*dimensions,
+        # train_long.py (LONG_HORIZON.md phase 1) options; absent keys keep the v2 defaults.
+        extra = {k: config[k] for k in ("pole_param", "hl_min", "hl_max", "write_gate", "clean_write")
+                 if config.get(k) is not None}
+        model = VideoPredictor(*dimensions, time_pos=time_pos, **extra,
                                **{k: config[k] for k in ("causal", "residual", "ffn_mult", "kernel_version",
                                                         "linear_pad", "gate", "local_fuse")})
     model.load_state_dict(state, strict=True)
@@ -222,7 +231,7 @@ def load_model(args, torch):
 def make_truth(config, count, seed, torch):
     """Generate CPU reference; never feed its future frames to the predictor."""
     grid = config["grid"]
-    if config["data_source"] == "balls":
+    if config["data_source"] in ("balls", "occlusion"):          # occlusion: unmasked balls
         from data import make_clip_batch
         return make_clip_batch(1, count - 1, grid, grid, seed=seed,
                                kicks=config["kicks"], collisions=config["collisions"],
@@ -413,7 +422,7 @@ def make_latent_truth(config, count, seed, torch):
     Waves reuse ``make_truth`` (incl. its >64-frame spectral evolution) and carry
     no centroids -- exactly as train_compare's rollout_eval does for waves."""
     grid = config["grid"]
-    if config["data_source"] == "balls":
+    if config["data_source"] in ("balls", "occlusion"):          # occlusion: unmasked balls
         from data import make_clip_batch
         clip, meta = make_clip_batch(1, count - 1, grid, grid, seed=seed,
                                      kicks=config["kicks"], collisions=config["collisions"],
@@ -650,11 +659,14 @@ def render(args):
     if out.exists() and (not out.is_dir() or any(out.iterdir())):
         raise ValueError(f"output must be new or empty: {out}")
     model, config, checkpoint, source, notes = load_model(args, torch)
-    eligible = config["kind"] == "wave" and config["kernel_version"] == "dispersion" and not (
-        config["gate"] or config["local_fuse"])
+    # train_long.py checkpoints (time_pos='none', wave or SSM) were trained through
+    # their carried state, so they render through stream_step too.
+    eligible = (config["kind"] == "wave" and config["kernel_version"] == "dispersion" and not (
+        config["gate"] or config["local_fuse"])) or config.get("time_pos") == "none"
     mode = ("recurrent" if eligible else "windowed") if args.mode == "auto" else args.mode
     if mode == "recurrent" and not eligible:
-        raise ValueError("recurrent mode requires wave + dispersion with gate=false and local_fuse=false")
+        raise ValueError("recurrent mode requires wave + dispersion with gate=false and local_fuse=false, "
+                         "or a train_long.py (time_pos='none') checkpoint")
     device = ("cuda" if torch.cuda.is_available() else "cpu") if args.device == "auto" else args.device
     if device == "cuda" and not torch.cuda.is_available():
         raise ValueError("CUDA requested but unavailable")

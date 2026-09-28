@@ -75,6 +75,37 @@ class SSMLite(nn.Module):
         y = y.permute(0, 5, 3, 4, 1, 2).reshape(B, N, D)     # back to [B, T, H, W, nh, dh]
         return self.po(y.to(x.dtype))
 
+    def forward_stateful(self, x, state=None):
+        """forward() over one T-frame chunk starting from ``state`` (step() layout
+        [B, H*W, nh, dh, d_state], None = zeros); returns (out, state_after).
+        out_t += Re(sum_z C A^(t+1) z0) and zT = A^T z0 + sum_t A^(T-1-t) B u_t,
+        so chunked training equals one long forward equals step()."""
+        B, N, D = x.shape
+        T, S = self.T, self.H * self.W
+        u = self.pi(x).view(B, T, self.H, self.W, self.nh, self.dh)
+        u = u.permute(0, 4, 5, 2, 3, 1).contiguous().float()  # [B, nh, dh, H, W, T]
+        k = self._kernel(u.device, u.dtype)
+        L = 2 * T
+        Uf = torch.fft.rfft(u, n=L, dim=-1)
+        Kf = torch.fft.rfft(k, n=L, dim=-1)[None, :, :, None, None, :]
+        y = torch.fft.irfft(Uf * Kf, n=L, dim=-1)[..., :T]
+        y = y + self.D[None, :, :, None, None, None] * u
+        A = self._poles(u.device, torch.float32)                # [nh, ds]
+        n = torch.arange(T + 1, device=u.device, dtype=torch.float32)
+        pw = A[:, :, None] ** n[None, None, :]                  # [nh, ds, T+1]
+        C = torch.view_as_complex(self.C.to(torch.float32))     # [nh, dh, ds]
+        us = u.reshape(B, self.nh, self.dh, S, T).permute(0, 3, 1, 2, 4)  # [B,S,nh,dh,T]
+        if state is not None:
+            init = torch.einsum("hcz,hzt,bshcz->bshct", C, pw[..., 1:], state).real
+            y = y + init.permute(0, 2, 3, 1, 4).reshape(y.shape)
+        rev = pw[..., :T].flip(-1)                              # A^(T-1-t)
+        zT = torch.einsum("hz,hzt,bshct->bshcz", self.B.to(torch.cfloat), rev,
+                          us.to(torch.cfloat))
+        if state is not None:
+            zT = zT + pw[None, None, :, None, :, T] * state
+        y = y.permute(0, 5, 3, 4, 1, 2).reshape(B, N, D)
+        return self.po(y.to(x.dtype)), zT
+
     # ---- O(1)-state streaming ------------------------------------------------
     def init_state(self, B, device):
         """Recurrent state for step(): complex [B, H*W, nh, dh, d_state]."""

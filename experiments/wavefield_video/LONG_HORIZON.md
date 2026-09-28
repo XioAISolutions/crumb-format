@@ -168,6 +168,128 @@ Two things follow from this table:
    divergence horizon. A stream receipt without trained weights and without
    collapse flags is not a coherence receipt.
 
+## 8. Phase 1 — train it like a language model
+
+Four more limits found in the harness, each capping any result below minutes:
+
+| limit | where | fix (opt-in; defaults byte-identical, verified against `main`) |
+|---|---|---|
+| every clip starts from a zero state; nothing carries between clips | `WaveMix3D._wave_dispersion` | `VideoPredictor.forward(frames, states=...)` carries each block's recurrent state across T-frame chunks (`_wave_dispersion_stateful`, `SSMLite.forward_stateful`) |
+| one supervised frame per T-frame forward | `train_compare.py` training loop | `forward(..., dense=True)`: next-frame targets at all T positions |
+| length-T temporal table; `stream_step` clamps it at `pt[T-1]` | `FactorizedPosEmb` | `time_pos="none"`: the recurrence carries order, so train/chunk/stream see identical inputs |
+| `--gate` pools over all T frames, so "causal + gate" models read the future (measured leak 0.055) | `_apply_gate` | prefix mean over frames ≤ t when `causal_time` |
+
+Chunked == one long forward == `stream_step` to ~1e-6 (wave softplus, wave
+halflife, SSM; `tests/test_stateful.py`). Walking a 128-frame context as 4×32
+chunks with full gradient costs 1.15 s/step on CPU vs 1.87 s/step as one
+window. With the graph kept only for the last chunk (G=1) it is 0.74 s/step,
+and memory is that of one chunk however long the sequence is.
+
+Side finding: the softplus default's circular FFT kernel leaks future frames
+into the past by |λ|^(2T−d). Measured at init: 0.7% of a frame's own effect at
+T=4, 0.01% at T=8, <1e-6 at T≥16. Runs with `--frames 4–8` carried a small
+look-ahead. The stateful path always uses the exact truncated kernel.
+
+### 8.1 Pre-registered: can constant-memory training learn memory past its chunk?
+
+Delayed recall (§5), D=128, chunk 32 (so the blob is 4 chunks back), grid 6,
+batch 16, 1,000 steps, seed 0. Arms: {softplus, halflife} × {G=1, G=4}.
+G=4 is full backprop through all four chunks (mathematically the single
+128-frame window); G=1 keeps a graph for the last chunk only, so the frame-0
+write gets no gradient from the frame-128 loss.
+
+- **PROVE (constant memory suffices):** halflife G=1 recall ≥ 0.5.
+- **If only halflife G=4 holds:** gradient through the carried state is required
+  for writes; training memory grows with G, which becomes the runner's knob.
+- **KILL (poles are not enough at this length):** halflife G=4 < 0.5, so D=128
+  needs more than 1,000 steps or a different write path.
+
+**Result: KILL at this budget.** Recall / argmax hit (chance ≈ 0.028):
+
+| arm | recall | argmax hit | s/step (CPU, shared) |
+|---|---|---|---|
+| halflife G=1 | 0.119 | 0.039 | 1.14 |
+| halflife G=4 | 0.118 | 0.035 | 0.73 |
+| softplus G=1 | 0.120 | 0.031 | 1.32 |
+| softplus G=4 | 0.120 | 0.031 | 1.28 |
+
+Every arm sits at the mean-blob floor. Halflife G=4 is full backprop across all
+four chunks, mathematically the single 128-frame window, and it fails too. So
+at 1,000 steps D=128 is out of reach regardless of carry; D=64 already needed
+1,000 steps (§5). Constant-memory training (G=1) is **neither proven nor
+disproven** by this run. §8.3 raises the budget.
+
+### 8.2 Pre-registered: dense supervision
+
+Balls, grid 16, T=16, 300 steps, seeds 0/1, `--no-dense` vs `--dense`, equal
+steps. PROVE: dense lowers eval MSE / copy-last by ≥ 10% on both seeds;
+otherwise it stays opt-in with the numbers reported.
+
+**Result: below the bar, so dense stays opt-in** (`train_long.py --dense`).
+
+| seed | last-only MSE/copy-last | dense MSE/copy-last | Δ | copy-ratio last-only → dense |
+|---|---|---|---|---|
+| 0 | 1.008 | 0.975 | −3.3% | 0.093 → 0.220 |
+| 1 | 1.004 | 0.961 | −4.3% | 0.075 → 0.198 |
+
+Dense is better on both seeds and roughly halves the freeze tendency, and it is
+the only arm that beats copy-last. It still misses the pre-registered 10%. All
+arms have divergence horizon 1 at 300 steps (under-trained). The SEQ runner
+arms pass `--dense` explicitly for the reason above.
+
+### 8.3 Pre-registered follow-up: the same recall at 3,000 steps
+
+D=128, chunk 32, grid 6, batch 16, seed 0, **3,000 steps**; halflife G=4, then
+halflife G=1.
+
+- **PROVE (constant memory suffices):** G=1 recall ≥ 0.5.
+- **If only G=4 ≥ 0.5:** writes need gradient through the carried state;
+  training memory grows with G.
+- **If both < 0.5:** at this scale the write path, not the step budget, is the
+  limit (next: a learned input gate on `Bin`).
+
+**Result: not run.** The 3,000-step run died on a container restart. It was then
+superseded by 8.4, which found that the write path, not the step budget, is the likely limit.
+
+### 8.4 Diagnosis: the memory is there, but drowned (measured before 8.3 ran)
+
+Why does even full backprop fail at D=128? Blob signal vs background in the
+first layer's wave state at init (halflife, grid 6; RMS of the state difference
+blob-vs-blank, over the RMS of the blank-clip state):
+
+| D | signal/background, as built | no spatial table + no embed bias | + no `pi` bias ("clean write") |
+|---|---|---|---|
+| 16 | 2.6e-2 | 2.4e-1 | background **exactly 0** |
+| 128 | 7.5e-4 | 4.5e-3 | background **exactly 0** |
+
+Every frame, even a blank one, writes the same per-cell constant into the
+state: the spatial position embedding plus the embed and input-projection
+biases. A shared input projection cannot cancel a per-cell constant, and
+long poles integrate it. By D=128 the frame-0 memory is under a background
+about 1,000× larger. Real video has the same problem in a stronger form: a
+static background is a per-cell constant, and long ripples would integrate
+the still scene instead of the events.
+
+Two opt-in fixes (both keep chunk == full == stream exactly):
+- `clean_write=True`: no spatial table, no embed bias, no `pi` bias, so a blank
+  input writes zero. Structural, but it cannot help with real static content.
+- `write_gate=True`: a learned per-token, per-head sigmoid on the wave input.
+  The model can learn to write events and skip static content. It is applied
+  before the time-invariant recurrence, so the FFT path is unchanged. This is
+  the one that could transfer to video.
+
+**Pre-registered (same budget as 8.1: D=128, chunk 32, 1,000 steps, seed 0,
+halflife):** arms clean G=4, clean G=1, gate G=4, gate G=1.
+- **PROVE (the background was the blocker):** any arm reaches recall ≥ 0.5,
+  where 8.1's identical-budget arms sat at 0.118.
+- **Constant memory:** a G=1 arm ≥ 0.5 means carried-state training works
+  once the write is clean.
+- **KILL:** all four arms < 0.5, so the background was not the (only) blocker
+  at this budget.
+
+**Result: pending.** Running on CPU (clean G4/G1, gate G4/G1) when this section
+merged. The verdict is recorded here either way, in the next PR.
+
 ## Pitch corrections
 
 - "At 16k moments one step takes ~1.5 s": the *ratio* survives a fair re-measure

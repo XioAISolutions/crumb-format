@@ -22,6 +22,10 @@
 #           carries memory past a gap longer than any it trained on.
 #
 # Pre-registered read (fixed before any result):
+#   SEQ=1 adds W_half_seq / S_ssm_seq (train_long.py): SEQ_FRAMES=512 sequences
+#           in T_LONG chunks with carried state and a SEQ_GAP=256 gap mid-sequence.
+#           PROVE (seq): W_half_seq exit-direction accuracy >= 0.8 on >= 2/3 seeds
+#           with TBPTT=1 -> constant-memory training bridges gaps > one chunk.
 #   PROVE  W_half exit-direction accuracy >= 0.8 and beats W_soft and
 #          A_attn by >= 0.2 on >= 2/3 seeds  -> scale the gap to 256 then 1024.
 #   KILL   halflife arms <= W_soft on exit-direction accuracy on >= 2/3 seeds ->
@@ -61,6 +65,35 @@ ARMS=(
 if [ "${HYBRID:-0}" = "1" ]; then
     ARMS+=("E_half|wave|$T_ATTN|--kernel-version dispersion --fuse local_wave --pole-param halflife")
 fi
+# SEQ=1 (LONG_HORIZON.md 8): carried-state arms trained by train_long.py on
+# SEQ_FRAMES-long sequences walked in T_LONG chunks, with a SEQ_GAP-frame
+# occlusion mid-sequence -- a gap longer than any chunk, so only the carried
+# state can bridge it. TBPTT = chunks of gradient through the carried state.
+# --dense (every-position loss) is opt-in in train_long.py; used here because
+# LONG_HORIZON.md 8.2 measured it better on 2/2 seeds (-3..-4% MSE/copy-last,
+# 2x copy-ratio), though below the 10% bar that would make it a default.
+SEQ_FRAMES=${SEQ_FRAMES:-512}; SEQ_GAP=${SEQ_GAP:-256}; TBPTT=${TBPTT:-1}
+# WRITE (LONG_HORIZON.md 8.4): extra flags for the wave SEQ arm's write path,
+# e.g. WRITE="--write-gate" or WRITE="--clean-write"; empty = as built.
+WRITE=${WRITE:-}
+# SEQ memory: chunk 128 x grid 32 x dim 128 wave training measured (CPU peak,
+# per batch element) ~5.8 GB + 3.4 GB/extra layer without checkpointing, i.e.
+# ~16 GB/sample at 4 layers -- BATCH=4 cannot fit 24 GB. --grad-ckpt keeps one
+# layer's FFT spectra live (~5.9 + 0.9 GB/layer, ~8.6 GB/sample), so micro-
+# batches of SEQ_MICRO=2 accumulate to the full BATCH. Lower to 1 on OOM.
+SEQ_MICRO=${SEQ_MICRO:-2}
+[ "${SEQ:-0}" = "only" ] && SEQ_ONLY=1
+# Emergence happens 32 + gap frames into the eval rollout; it must fall inside it,
+# or every emergence metric silently comes back null.
+need=$(( 32 + GAP + 8 )); { [ "${SEQ:-0}" = "1" ] || [ "${SEQ_ONLY:-0}" = "1" ]; } && need=$(( 32 + (SEQ_GAP > GAP ? SEQ_GAP : GAP) + 8 ))
+if [ "$EVAL_ROLLOUT" -lt "$need" ]; then
+    echo "EVAL_ROLLOUT=$EVAL_ROLLOUT too short: emergence needs >= $need frames" >&2; exit 2
+fi
+if [ "${SEQ:-0}" = "only" ]; then ARMS=(); SEQ=1; fi    # SEQ=only: carried-state arms alone
+if [ "${SEQ:-0}" = "1" ]; then
+    ARMS+=("W_half_seq|wave|$T_LONG|--pole-param halflife $WRITE|long"
+           "S_ssm_seq|ssm|$T_LONG||long")
+fi
 
 # Sliced + resumable (the box conductor kills jobs at 5400s): finished arms are
 # skipped, a live arm resumes from its ckpt, the whole slice is capped at SLICE_S
@@ -72,7 +105,7 @@ echo RUNNING > "$OUT/status.txt"
 slice_t0=$(date +%s)
 for seed in $SEEDS; do
     for arm in "${ARMS[@]}"; do
-        IFS='|' read -r label kind frames extra <<< "$arm"
+        IFS='|' read -r label kind frames extra trainer <<< "$arm"
         tag="_${label}_s${seed}"
         # Done only when BOTH artifacts exist: train_compare writes the result JSON
         # before model_*.pt, so a slice killed in between must re-run (it resumes
@@ -82,9 +115,16 @@ for seed in $SEEDS; do
         fi
         extra_args=()
         if [ -n "$extra" ]; then read -r -a extra_args <<< "$extra"; fi
-        tgap=$(( GAP < frames - 8 ? GAP : frames - 8 ))
-        occ=(--train-occ-start $((frames - tgap)) --train-occ-end "$frames"
-             --occ-start $((frames + 32)) --occ-end $((frames + 32 + GAP)))
+        if [ "$trainer" = "long" ]; then
+            # gap centered in the sequence; eval gap of the same length in rollout
+            s0=$(( (SEQ_FRAMES - SEQ_GAP) / 2 ))
+            occ=(--train-occ-start "$s0" --train-occ-end $((s0 + SEQ_GAP))
+                 --occ-start $((frames + 32)) --occ-end $((frames + 32 + SEQ_GAP)))
+        else
+            tgap=$(( GAP < frames - 8 ? GAP : frames - 8 ))
+            occ=(--train-occ-start $((frames - tgap)) --train-occ-end "$frames"
+                 --occ-start $((frames + 32)) --occ-end $((frames + 32 + GAP)))
+        fi
         resume=()
         if [ -f "$OUT/ckpt_${kind}${tag}.pt" ]; then resume=(--resume "$OUT/ckpt_${kind}${tag}.pt"); fi
         left=$(( SLICE_S - ($(date +%s) - slice_t0) ))
@@ -94,10 +134,22 @@ for seed in $SEEDS; do
         fi
         echo "== $tag $(date -u '+%Y-%m-%dT%H:%M:%SZ') ${resume[*]:-fresh}" | tee -a "$OUT/progress.txt"
         rc=0
-        ${TIMEOUT_BIN:+$TIMEOUT_BIN "$left"} "$PY" train_compare.py "${BASE[@]}" "${occ[@]}" \
-            ${extra_args[@]+"${extra_args[@]}"} ${resume[@]+"${resume[@]}"} \
-            --kind "$kind" --frames "$frames" --seed "$seed" --steps "$STEPS" \
-            --out "$OUT" --tag "$tag" >> "$OUT/log${tag}.txt" 2>&1 || rc=$?
+        if [ "$trainer" = "long" ]; then
+            ${TIMEOUT_BIN:+$TIMEOUT_BIN "$left"} "$PY" train_long.py --data-source occlusion \
+                --grid "$GRID" --n-balls 6 --batch "$BATCH" --dim "$DIM" --layers "$LAYERS" \
+                --heads "$HEADS" --motion-loss --dense --seq-frames "$SEQ_FRAMES" --chunk "$frames" \
+                --grad-ckpt --micro-batch "$SEQ_MICRO" \
+                --tbptt-chunks "$TBPTT" "${occ[@]}" --eval-rollout "$EVAL_ROLLOUT" \
+                --eval-seeds "$EVAL_SEEDS" --eval-chunk 1 --save-every 250 \
+                ${extra_args[@]+"${extra_args[@]}"} ${resume[@]+"${resume[@]}"} \
+                --kind "$kind" --seed "$seed" --steps "$STEPS" \
+                --out "$OUT" --tag "$tag" >> "$OUT/log${tag}.txt" 2>&1 || rc=$?
+        else
+            ${TIMEOUT_BIN:+$TIMEOUT_BIN "$left"} "$PY" train_compare.py "${BASE[@]}" "${occ[@]}" \
+                ${extra_args[@]+"${extra_args[@]}"} ${resume[@]+"${resume[@]}"} \
+                --kind "$kind" --frames "$frames" --seed "$seed" --steps "$STEPS" \
+                --out "$OUT" --tag "$tag" >> "$OUT/log${tag}.txt" 2>&1 || rc=$?
+        fi
         if [ "$rc" = "124" ] || [ "$rc" = "143" ]; then
             echo "SLICED $tag at the ${SLICE_S}s slice budget -- re-queue to continue" | tee -a "$OUT/progress.txt"
             echo "SLICED" > "$OUT/status.txt"
@@ -118,8 +170,9 @@ done
 # incomplete, so it is a failure rather than a silent skip.
 for seed in $SEEDS; do
   for arm in "${ARMS[@]}"; do
-    IFS='|' read -r label kind frames _ <<< "$arm"
+    IFS='|' read -r label kind frames _ trainer <<< "$arm"
     [ "$kind" = "wave" ] || continue
+    tpos=table; [ "$trainer" = "long" ] && tpos=none
     f="$OUT/model_wave_${label}_s${seed}.pt"
     if [ ! -f "$f" ]; then
         echo "MISSING $f" | tee -a "$OUT/progress.txt"
@@ -139,7 +192,7 @@ for seed in $SEEDS; do
     rc=0
     ${TIMEOUT_BIN:+$TIMEOUT_BIN "$left"} "$PY" long_horizon.py stream --pole-param "$pp" --ckpt "$f" \
         --grid "$GRID" --frames "$frames" --dim "$DIM" --layers "$LAYERS" --heads "$HEADS" \
-        --fuse "$fuse" --stream-frames "$STREAM_FRAMES" --chunk 600 \
+        --fuse "$fuse" --time-pos "$tpos" --stream-frames "$STREAM_FRAMES" --chunk 600 \
         --out "${f%.pt}_stream${STREAM_FRAMES}.json" > "${f%.pt}_stream${STREAM_FRAMES}.log" 2>&1 || rc=$?
     if [ "$rc" = "124" ] || [ "$rc" = "143" ]; then
         rm -f "${f%.pt}_stream${STREAM_FRAMES}.json"
