@@ -1,0 +1,124 @@
+{
+ "args": {
+  "delays": [
+   16,
+   64
+  ],
+  "pole_param": [
+   "softplus",
+   "halflife"
+  ],
+  "seeds": [
+   0,
+   1
+  ],
+  "steps": 300,
+  "batch": 16,
+  "lr": 0.003,
+  "grid": 6,
+  "dim": 32,
+  "layers": 2,
+  "heads": 4,
+  "hl_min": 2.0,
+  "hl_max": 4096.0,
+  "out": "runs_long/recall_16_64.json"
+ },
+ "rows": [
+  {
+   "pole_param": "softplus",
+   "delay": 16,
+   "seed": 0,
+   "steps": 300,
+   "recall": 0.1185,
+   "argmax_hit": 0.0391,
+   "mse": 0.017331,
+   "mse_forget": 0.01966,
+   "train_s": 26.1,
+   "s_per_step": 0.0869
+  },
+  {
+   "pole_param": "softplus",
+   "delay": 16,
+   "seed": 1,
+   "steps": 300,
+   "recall": 0.1146,
+   "argmax_hit": 0.0391,
+   "mse": 0.017264,
+   "mse_forget": 0.019499,
+   "train_s": 26.7,
+   "s_per_step": 0.0891
+  },
+  {
+   "pole_param": "halflife",
+   "delay": 16,
+   "seed": 0,
+   "steps": 300,
+   "recall": 0.6683,
+   "argmax_hit": 1.0,
+   "mse": 0.006522,
+   "mse_forget": 0.01966,
+   "train_s": 118.5,
+   "s_per_step": 0.395
+  },
+  {
+   "pole_param": "halflife",
+   "delay": 16,
+   "seed": 1,
+   "steps": 300,
+   "recall": 0.6559,
+   "argmax_hit": 1.0,
+   "mse": 0.00671,
+   "mse_forget": 0.019499,
+   "train_s": 107.0,
+   "s_per_step": 0.3566
+  },
+  {
+   "pole_param": "softplus",
+   "delay": 64,
+   "seed": 0,
+   "steps": 300,
+   "recall": 0.1187,
+   "argmax_hit": 0.0352,
+   "mse": 0.017327,
+   "mse_forget": 0.01966,
+   "train_s": 365.4,
+   "s_per_step": 1.2182
+  },
+  {
+   "pole_param": "softplus",
+   "delay": 64,
+   "seed": 1,
+   "steps": 300,
+   "recall": 0.1128,
+   "argmax_hit": 0.0391,
+   "mse": 0.017301,
+   "mse_forget": 0.019499,
+   "train_s": 213.3,
+   "s_per_step": 0.7109
+  },
+  {
+   "pole_param": "halflife",
+   "delay": 64,
+   "seed": 0,
+   "steps": 300,
+   "recall": 0.196,
+   "argmax_hit": 0.0938,
+   "mse": 0.015808,
+   "mse_forget": 0.01966,
+   "train_s": 206.3,
+   "s_per_step": 0.6878
+  },
+  {
+   "pole_param": "halflife",
+   "delay": 64,
+   "seed": 1,
+   "steps": 300,
+   "recall": 0.1095,
+   "argmax_hit": 0.0195,
+   "mse": 0.017365,
+   "mse_forget": 0.019499,
+   "train_s": 215.2,
+   "s_per_step": 0.7173
+  }
+ ]
+}

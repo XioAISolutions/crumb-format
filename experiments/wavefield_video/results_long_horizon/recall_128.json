@@ -1,0 +1,50 @@
+{
+ "args": {
+  "delays": [
+   128
+  ],
+  "pole_param": [
+   "softplus",
+   "halflife"
+  ],
+  "seeds": [
+   0
+  ],
+  "steps": 300,
+  "batch": 16,
+  "lr": 0.003,
+  "grid": 6,
+  "dim": 32,
+  "layers": 2,
+  "heads": 4,
+  "hl_min": 2.0,
+  "hl_max": 4096.0,
+  "out": "runs_long/recall_128.json"
+ },
+ "rows": [
+  {
+   "pole_param": "softplus",
+   "delay": 128,
+   "seed": 0,
+   "steps": 300,
+   "recall": 0.1178,
+   "argmax_hit": 0.0273,
+   "mse": 0.017344,
+   "mse_forget": 0.01966,
+   "train_s": 432.2,
+   "s_per_step": 1.4408
+  },
+  {
+   "pole_param": "halflife",
+   "delay": 128,
+   "seed": 0,
+   "steps": 300,
+   "recall": 0.1164,
+   "argmax_hit": 0.0273,
+   "mse": 0.017371,
+   "mse_forget": 0.01966,
+   "train_s": 863.7,
+   "s_per_step": 2.8791
+  }
+ ]
+}

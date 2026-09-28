@@ -94,7 +94,7 @@ class WaveMix3D(nn.Module):
 
     def __init__(self, dim, n_heads, T, H, W, kernel_version="separable",
                  causal_time=False, linear_pad=False, gate=False, local_fuse=False,
-                 n_modes=3):
+                 n_modes=3, pole_param="softplus", hl_min=2.0, hl_max=4096.0):
         super().__init__()
         self.nh = n_heads
         self.dh = dim // n_heads
@@ -105,6 +105,14 @@ class WaveMix3D(nn.Module):
         self.gate = gate
         self.local_fuse = local_fuse
         self.n_modes = n_modes
+        if pole_param not in ("softplus", "halflife"):
+            raise ValueError(f"unknown pole_param {pole_param!r} (want softplus | halflife)")
+        if pole_param != "softplus" and kernel_version != "dispersion":
+            raise ValueError("pole_param='halflife' needs kernel_version='dispersion'")
+        if not (0.0 < hl_min < hl_max):
+            raise ValueError(f"need 0 < hl_min < hl_max (got {hl_min}, {hl_max})")
+        self.pole_param = pole_param
+        self.hl_min, self.hl_max = float(hl_min), float(hl_max)
         self.pi = nn.Linear(dim, dim)
         self.po = nn.Linear(dim, dim)
 
@@ -124,8 +132,22 @@ class WaveMix3D(nn.Module):
             # output gains B, C. |k| grows with spatial frequency so a1>0 damps fast
             # (small-scale) structure more, like physical viscosity.
             sh = (n_heads, n_modes)
-            self.a0 = nn.Parameter(torch.full(sh, 0.5))
-            self.a1 = nn.Parameter(torch.full(sh, 0.1))
+            if pole_param == "softplus":
+                self.a0 = nn.Parameter(torch.full(sh, 0.5))
+                self.a1 = nn.Parameter(torch.full(sh, 0.1))
+            else:
+                # LONG_HORIZON.md: parameterize memory as a half-life in FRAMES,
+                #   hl = hl_min * (hl_max/hl_min)^sigmoid(hl_raw),  alpha_DC = ln2/hl,
+                # so |lam| < 1 always (stable) yet modes can hold ~hl_max frames. The
+                # softplus default starts at |lam| = e^-0.97 = 0.38 (half-life ~0.7
+                # frame) -- a ripple that is gone before the next frame. Init spreads
+                # the (head, mode) half-lives log-uniformly over [hl_min, hl_max] so
+                # every timescale from "blink" to "minutes" has a mode from step 0.
+                # Viscosity visc*|k| still damps fine detail faster than layout.
+                n = n_heads * n_modes
+                u = (torch.arange(n, dtype=torch.float32) + 0.5) / n
+                self.hl_raw = nn.Parameter(torch.logit(u).view(n_modes, n_heads).t().contiguous())
+                self.visc = nn.Parameter(torch.full(sh, -4.0))   # softplus(-4) ~ 0.018/|k|
             self.vx = nn.Parameter(torch.zeros(sh))
             self.vy = nn.Parameter(torch.zeros(sh))
             self.beta = nn.Parameter(torch.zeros(sh))
@@ -196,6 +218,35 @@ class WaveMix3D(nn.Module):
         h = self._lin_conv_axis(h, kt, 2, self.T)     # time
         return h
 
+    # ---- dispersion poles (shared by forward's transfer and step()) ----------
+    def half_lives(self):
+        """DC half-life in frames per (head, mode): ln2 / alpha(k=0). Diagnostic for
+        'how long does a ripple carry information' (long_horizon.py)."""
+        if self.kernel_version != "dispersion":
+            return None
+        if self.pole_param == "halflife":
+            return self.hl_min * (self.hl_max / self.hl_min) ** torch.sigmoid(self.hl_raw)
+        return math.log(2.0) / F.softplus(self.a0)
+
+    def _mode_pole(self, m, kx, ky, knorm):
+        """Mode m's complex pole lam[nh,Hp,Wp] and its input normalizer (None for
+        the softplus default, which keeps the v2 math op-for-op). For halflife
+        poles the normalizer is sqrt(1-|lam|^2) (LRU-style): as |lam| -> 1 the
+        state would otherwise grow ~1/(1-|lam|) and swamp the residual stream."""
+        if self.pole_param == "halflife":
+            hl = self.hl_min * (self.hl_max / self.hl_min) ** torch.sigmoid(self.hl_raw[:, m])
+            alpha = (math.log(2.0) / hl)[:, None, None] \
+                + F.softplus(self.visc[:, m])[:, None, None] * knorm
+        else:
+            alpha = F.softplus(self.a0[:, m][:, None, None] + self.a1[:, m][:, None, None] * knorm)
+        Omega = (self.vx[:, m][:, None, None] * kx[None, None, :]
+                 + self.vy[:, m][:, None, None] * ky[None, :, None]
+                 + self.beta[:, m][:, None, None] * knorm)             # [nh,Hp,Wp]
+        lam = torch.exp(-alpha) * torch.exp(1j * Omega)                # [nh,Hp,Wp], |lam|<1
+        if self.pole_param == "halflife":
+            return lam, torch.sqrt(-torch.expm1(-2.0 * alpha))          # sqrt(1-|lam|^2)
+        return lam, None
+
     # ---- dispersion (v2) transfer function ----------------------------------
     def _transfer(self, L, Hp, Wp, device):
         """G[nh, L, Hp, Wp] complex: temporal transfer per spatial-freq cell,
@@ -207,14 +258,22 @@ class WaveMix3D(nn.Module):
         w = (2 * math.pi) * torch.arange(L, device=device) / L        # [L]
         eiw = torch.exp(-1j * w)                                      # [L]
         G = torch.zeros(self.nh, L, Hp, Wp, dtype=torch.cfloat, device=device)
+        # halflife: truncate the impulse response lam^n to n < T. The untruncated
+        # transfer is the DTFT of an infinite response sampled at L=2T points, i.e. a
+        # CIRCULAR kernel: frame s > t leaks into output t with weight lam^(2T-(s-t)).
+        # For the softplus init (|lam| = 0.38) that is ~1e-7 and the v2 math is kept
+        # as-is; for minutes-scale poles it is O(1) future leakage (the model could
+        # read the frame it is asked to predict). sum_{n<T} lam^n e^{-iwn} =
+        # (1 - lam^T e^{-iwT}) / (1 - lam e^{-iw}) -> exact causal linear conv.
+        eiwT = torch.exp(-1j * w * self.T) if self.pole_param == "halflife" else None
         for m in range(self.n_modes):
-            alpha = F.softplus(self.a0[:, m][:, None, None] + self.a1[:, m][:, None, None] * knorm)
-            Omega = (self.vx[:, m][:, None, None] * kx[None, None, :]
-                     + self.vy[:, m][:, None, None] * ky[None, :, None]
-                     + self.beta[:, m][:, None, None] * knorm)        # [nh,Hp,Wp]
-            lam = torch.exp(-alpha) * torch.exp(1j * Omega)           # [nh,Hp,Wp], |lam|<1
+            lam, norm = self._mode_pole(m, kx, ky, knorm)             # [nh,Hp,Wp]
             denom = 1 - lam[:, None, :, :] * eiw[None, :, None, None]  # [nh,L,Hp,Wp]
             gain = (self.Cg[:, m] * self.Bg[:, m])[:, None, None, None]
+            if norm is not None:
+                gain = gain * norm[:, None, :, :]
+            if eiwT is not None:
+                gain = gain * (1 - (lam ** self.T)[:, None, :, :] * eiwT[None, :, None, None])
             G = G + gain.to(torch.cfloat) / denom
         return G
 
@@ -230,23 +289,24 @@ class WaveMix3D(nn.Module):
         return Ys.real
 
     # ---- O(1)-in-T streaming recurrence (dispersion path only) --------------
-    def _dispersion_lam(self, device):
+    def _dispersion_poles(self, device):
         """Per-mode complex temporal pole lam[n_modes, nh, Hp, Wp] -- the SAME
         lambda(k) = exp(-alpha(k)) * exp(i*Omega(k)) that ``_transfer`` builds,
-        so the recurrence below reproduces ``forward``'s dispersion math."""
+        so the recurrence below reproduces ``forward``'s dispersion math -- plus
+        the matching input normalizer [n_modes, nh, Hp, Wp] (None for softplus)."""
         Hp = 2 * self.H if self.linear_pad else self.H
         Wp = 2 * self.W if self.linear_pad else self.W
         ky = (2 * math.pi) * torch.fft.fftfreq(Hp, device=device)      # [Hp]
         kx = (2 * math.pi) * torch.fft.fftfreq(Wp, device=device)      # [Wp]
         knorm = torch.sqrt(kx[None, :] ** 2 + ky[:, None] ** 2)        # [Hp,Wp]
-        lams = []
-        for m in range(self.n_modes):
-            alpha = F.softplus(self.a0[:, m][:, None, None] + self.a1[:, m][:, None, None] * knorm)
-            Omega = (self.vx[:, m][:, None, None] * kx[None, None, :]
-                     + self.vy[:, m][:, None, None] * ky[None, :, None]
-                     + self.beta[:, m][:, None, None] * knorm)         # [nh,Hp,Wp]
-            lams.append(torch.exp(-alpha) * torch.exp(1j * Omega))     # [nh,Hp,Wp], |lam|<1
-        return torch.stack(lams, 0), Hp, Wp                            # [n_modes,nh,Hp,Wp]
+        poles = [self._mode_pole(m, kx, ky, knorm) for m in range(self.n_modes)]
+        lam = torch.stack([p[0] for p in poles], 0)                    # [n_modes,nh,Hp,Wp]
+        norm = None if poles[0][1] is None else torch.stack([p[1] for p in poles], 0)
+        return lam, norm, Hp, Wp
+
+    def _dispersion_lam(self, device):
+        lam, _, Hp, Wp = self._dispersion_poles(device)
+        return lam, Hp, Wp
 
     def init_state(self, B, device):
         """Streaming state for ``step()`` (dispersion path only): complex zeros of
@@ -283,12 +343,15 @@ class WaveMix3D(nn.Module):
         B, S, D = x_t.shape
         h = self.pi(x_t).view(B, self.H, self.W, self.nh, self.dh).permute(0, 3, 1, 2, 4)
         h = h.float()                                                  # [B,nh,H,W,dh]
-        lam, Hp, Wp = self._dispersion_lam(x_t.device)                 # [n_modes,nh,Hp,Wp]
+        lam, norm, Hp, Wp = self._dispersion_poles(x_t.device)         # [n_modes,nh,Hp,Wp]
         x_hat = torch.fft.fft2(h, s=(Hp, Wp), dim=(2, 3))              # [B,nh,Hp,Wp,dh] cfloat
         Bg = self.Bg.t()[None, :, :, None, None, None]                 # [1,n_modes,nh,1,1,1]
         Cg = self.Cg.t()[None, :, :, None, None, None]                 # [1,n_modes,nh,1,1,1]
         lam_b = lam[None, :, :, :, :, None]                            # [1,n_modes,nh,Hp,Wp,1]
-        state = lam_b * state + Bg.to(torch.cfloat) * x_hat[:, None]   # [B,n_modes,nh,Hp,Wp,dh]
+        Bin = Bg.to(torch.cfloat)
+        if norm is not None:                                           # halflife: sqrt(1-|lam|^2)
+            Bin = Bin * norm[None, :, :, :, :, None]
+        state = lam_b * state + Bin * x_hat[:, None]                   # [B,n_modes,nh,Hp,Wp,dh]
         out_hat = (Cg.to(torch.cfloat) * state).sum(1)                 # [B,nh,Hp,Wp,dh]
         out = torch.fft.ifft2(out_hat, dim=(2, 3))[..., :self.H, :self.W, :].real
         out = out.permute(0, 2, 3, 1, 4).reshape(B, S, D)              # (y,x,nh,dh) -> [B,H*W,D]
@@ -380,7 +443,8 @@ class FusedMix(nn.Module):
     T-frame clip one frame at a time reproduces ``forward`` on that clip at the last
     frame (checked by test_fusion_r14.py, mirroring sanity_check.py test 8b)."""
 
-    def __init__(self, dim, n_heads, T, H, W, fuse, causal=True, linear_pad=True):
+    def __init__(self, dim, n_heads, T, H, W, fuse, causal=True, linear_pad=True,
+                 pole_param="softplus", hl_min=2.0, hl_max=4096.0):
         super().__init__()
         self.dim, self.nh = dim, n_heads
         self.T, self.H, self.W = T, H, W
@@ -392,7 +456,8 @@ class FusedMix(nn.Module):
         elif fuse == "local_wave":
             self.glob = WaveMix3D(dim, n_heads, T, H, W, kernel_version="dispersion",
                                   causal_time=causal, linear_pad=linear_pad,
-                                  gate=False, local_fuse=False)
+                                  gate=False, local_fuse=False, pole_param=pole_param,
+                                  hl_min=hl_min, hl_max=hl_max)
         else:
             raise ValueError(f"unknown fuse {fuse!r} (want local_ssm | local_wave)")
         self.gate = nn.Linear(2 * dim, dim)
@@ -413,17 +478,30 @@ class FusedMix(nn.Module):
     # ---- O(1)-in-T streaming (global) + O(T) rolling window (local) ----------
     def init_state(self, B, device):
         return {"glob": self.glob.init_state(B, device),
-                "buf": torch.zeros(B, self.T, self.H * self.W, self.dim, device=device)}
+                "buf": torch.zeros(B, self.T, self.H * self.W, self.dim, device=device),
+                "n": torch.zeros((), dtype=torch.long, device=device)}   # filled slots
 
     def step(self, x_t, state):
-        """x_t: [B, H*W, D] (current frame's normed tokens) -> ([B,H*W,D], state)."""
+        """x_t: [B, H*W, D] (current frame's normed tokens) -> ([B,H*W,D], state).
+
+        Only the current frame's queries are computed, against the FILLED window
+        slots. (Attending the zero-initialized slots during the first T-1 frames
+        made warm-up diverge from ``forward``, where frame t sees frames <= t
+        only; the zero-init residual head hid it from the parity test.)"""
         B, S, D = x_t.shape
         hg, gstate = self.glob.step(x_t, state["glob"])
         buf = state["buf"].to(x_t.dtype)
         buf = torch.cat([buf[:, 1:], x_t.unsqueeze(1)], dim=1)     # slide: current at last slot
-        hl_full = self.local(buf.reshape(B, self.T * S, D))        # causal attn over the window
-        hl = hl_full[:, (self.T - 1) * S: self.T * S]              # current frame's output
-        return self._fuse(hl, hg), {"glob": gstate, "buf": buf}
+        n = torch.clamp(state.get("n", torch.tensor(self.T - 1)) + 1, max=self.T)
+        k_ = int(n)
+        att = self.local
+        dh = D // att.nh
+        q = att.qkv(x_t).chunk(3, dim=-1)[0].view(B, S, att.nh, dh).transpose(1, 2)
+        _, k, v = att.qkv(buf[:, self.T - k_:].reshape(B, k_ * S, D)).chunk(3, dim=-1)
+        k, v = (t.view(B, k_ * S, att.nh, dh).transpose(1, 2) for t in (k, v))
+        y = F.scaled_dot_product_attention(q, k, v)                # current frame sees <= t
+        hl = att.po(y.transpose(1, 2).reshape(B, S, D))
+        return self._fuse(hl, hg), {"glob": gstate, "buf": buf, "n": n}
 
     def state_bytes(self, B=1, device="cpu"):
         # Persistent (horizon-independent) memory is the global recurrence ONLY.
@@ -452,13 +530,17 @@ class VideoPredictor(nn.Module):
               reconstruction from scratch. (default ON for v2; off reproduces v1.)
     kind: "wave" | "attn" | "ssm" | "qssm" (quaternion-state SSM, R15).
     q_mix / quat_color: R15 hypercomplex arms on --kind wave (wfvideo_quat.py);
-              both default off and the flag-off paths are byte-identical."""
+              both default off and the flag-off paths are byte-identical.
+    pole_param: "softplus" (v2 default) | "halflife" (LONG_HORIZON.md): the wave
+              poles are parameterized by a half-life in frames in [hl_min, hl_max]
+              so the recurrent state can remember minutes, not ~1 frame."""
 
     def __init__(self, dim, n_layers, n_heads, T, H, W, kind,
                  causal=False, residual=True, ffn_mult=4.0,
                  kernel_version="separable", linear_pad=False,
                  gate=False, local_fuse=False, fuse="none",
-                 q_mix=False, quat_color=False):
+                 q_mix=False, quat_color=False,
+                 pole_param="softplus", hl_min=2.0, hl_max=4096.0):
         super().__init__()
         self.T, self.H, self.W = T, H, W
         self.kind = kind
@@ -471,6 +553,10 @@ class VideoPredictor(nn.Module):
             raise ValueError(f"--q-mix applies to kind 'wave' (got {kind!r})")
         if q_mix and fuse != "none":
             raise ValueError("--q-mix is not supported together with --fuse hybrids")
+        if pole_param != "softplus" and not (kind == "wave" and kernel_version == "dispersion"
+                                             and not q_mix) and fuse != "local_wave":
+            raise ValueError("--pole-param halflife needs the dispersion wave operator "
+                             "(--kind wave --kernel-version dispersion, or --fuse local_wave)")
         if quat_color and kind != "wave":
             raise ValueError(f"--quat-color applies to kind 'wave' (got {kind!r})")
         if quat_color and dim % 4:
@@ -493,7 +579,8 @@ class VideoPredictor(nn.Module):
         for _ in range(n_layers):
             if fuse != "none":
                 mix = FusedMix(dim, n_heads, T, H, W, fuse,
-                               causal=causal, linear_pad=linear_pad)
+                               causal=causal, linear_pad=linear_pad, pole_param=pole_param,
+                               hl_min=hl_min, hl_max=hl_max)
             elif kind == "wave":
                 if q_mix:
                     from wfvideo_quat import WaveQuatMix
@@ -503,7 +590,8 @@ class VideoPredictor(nn.Module):
                 else:
                     mix = WaveMix3D(dim, n_heads, T, H, W, kernel_version=kernel_version,
                                     causal_time=causal, linear_pad=linear_pad,
-                                    gate=gate, local_fuse=local_fuse)
+                                    gate=gate, local_fuse=local_fuse, pole_param=pole_param,
+                                    hl_min=hl_min, hl_max=hl_max)
             elif kind == "attn":
                 mix = AttnMix(dim, n_heads, T, H, W, causal=causal)
             elif kind == "ssm":

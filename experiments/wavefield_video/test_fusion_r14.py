@@ -44,6 +44,9 @@ frames = torch.rand(B, Td, 3, H, W)
 for kind, fuse in (("wave", "local_wave"), ("ssm", "local_ssm")):
     m = VideoPredictor(dim, 2, nh, Td, H, W, kind, causal=True, residual=True,
                        kernel_version="dispersion", linear_pad=True, fuse=fuse).eval()
+    # Non-zero head: the zero-init residual head makes both sides "copy last frame",
+    # which hid a warm-up mismatch (phantom zero window slots) until LONG_HORIZON.
+    torch.nn.init.normal_(m.head.weight, std=0.1)
     with torch.no_grad():
         pred_fwd = m(frames)
         sts = m.stream_init(B, frames.device)
