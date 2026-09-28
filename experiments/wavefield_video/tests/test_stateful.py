@@ -174,7 +174,8 @@ class StatefulTests(unittest.TestCase):
     def test_grad_ckpt_and_micro_batch_keep_gradients(self):
         import argparse
         import train_long
-        a = argparse.Namespace(seq_frames=8, chunk=4, dense=True, motion_loss=False, tbptt_chunks=1)
+        a = argparse.Namespace(seq_frames=8, chunk=4, dense=True, motion_loss=False, tbptt_chunks=1,
+                               head="residual")
         clips = torch.rand(4, 9, 3, H, W)
 
         def grads(ckpt, mb):

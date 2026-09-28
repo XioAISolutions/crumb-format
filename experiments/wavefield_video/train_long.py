@@ -129,14 +129,7 @@ def sequence_loss(m, clips, moving, a, scale=1.0):
         x = clips[:, c * T:(c + 1) * T]
         if a.head == "flow":
             lc, states = m.flow_loss(x, clips[:, c * T + 1:(c + 1) * T + 1], states=states)
-            group = group + lc / n_chunks
-            if (c + 1) % a.tbptt_chunks == 0 or c == n_chunks - 1:
-                group.backward()
-                total += float(group.detach())
-                group = 0.0
-                states = detach_states(states)
-            continue
-        if a.dense:
+        elif a.dense:
             pred, states = m(x, states=states, dense=True)            # [B,T,3,H,W]
             tgt, last = clips[:, c * T + 1:(c + 1) * T + 1], x
             mv = moving[:, c * T:(c + 1) * T] if moving is not None else None
@@ -146,11 +139,12 @@ def sequence_loss(m, clips, moving, a, scale=1.0):
             pred, states = m(x, states=states)                         # [B,3,H,W]
             tgt, last = clips[:, (c + 1) * T], x[:, -1]
             mv = moving[:, (c + 1) * T - 1] if moving is not None else None
-        pred = pred.float()
-        if a.motion_loss:
-            lc = tc.motion_balanced_loss(pred, tgt, last, mv)
-        else:
-            lc = F.mse_loss(pred, tgt)
+        if a.head != "flow":
+            pred = pred.float()
+            if a.motion_loss:
+                lc = tc.motion_balanced_loss(pred, tgt, last, mv)
+            else:
+                lc = F.mse_loss(pred, tgt)
         group = group + lc * (scale / n_chunks)
         if (c + 1) % a.tbptt_chunks == 0 or c == n_chunks - 1:
             group.backward()
