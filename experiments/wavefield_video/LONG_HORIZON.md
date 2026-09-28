@@ -248,7 +248,8 @@ halflife G=1.
 - **If both < 0.5:** at this scale the write path, not the step budget, is the
   limit (next: a learned input gate on `Bin`).
 
-RESULTS_8_3
+**Result: not run.** The 3,000-step run died on a container restart. It was then
+superseded by 8.4, which found that the write path, not the step budget, is the likely limit.
 
 ### 8.4 Diagnosis: the memory is there, but drowned (measured before 8.3 ran)
 
@@ -286,7 +287,8 @@ halflife):** arms clean G=4, clean G=1, gate G=4, gate G=1.
 - **KILL:** all four arms < 0.5, so the background was not the (only) blocker
   at this budget.
 
-RESULTS_8_4
+**Result: pending.** Running on CPU (clean G4/G1, gate G4/G1) when this section
+merged. The verdict is recorded here either way, in the next PR.
 
 ## Pitch corrections
 
