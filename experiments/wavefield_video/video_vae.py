@@ -155,18 +155,33 @@ class VideoVAE(nn.Module):
 
 class LatentShards:
     """Windows of consecutive latent steps from encode_videos.py shards. The last
-    ~holdout of shards (by index order, so by source video) are held out for eval."""
+    ~holdout fraction of SOURCE VIDEOS is held out for eval (whole videos, so no
+    held-out frames leak into training through a sibling segment)."""
 
     def __init__(self, root, window, holdout=0.1, device="cpu"):
         root = pathlib.Path(root)
         index = json.loads((root / "index.json").read_text())
+        if len(index) < 2:
+            raise SystemExit(f"{root}: need >= 2 shards to hold one out (have {len(index)})")
+        # Split BEFORE filtering by window, by source video: the held-out set is a
+        # fixed tail of the index, so the trainer and the stream screen (which use
+        # different windows) agree on it and no held-out segment is ever trained on.
+        srcs = list(dict.fromkeys(m["src"] for m in index))
+        n_eval_src = max(1, round(holdout * len(srcs))) if len(srcs) > 1 else 0
+        eval_srcs = set(srcs[len(srcs) - n_eval_src:])
+        if not eval_srcs:                       # one source video: hold out its tail shards
+            cut = len(index) - max(1, round(holdout * len(index)))
+            is_eval = [i >= cut for i in range(len(index))]
+        else:
+            is_eval = [m["src"] in eval_srcs for m in index]
+        self.eval_srcs = sorted({m["src"] for m, e in zip(index, is_eval) if e})
         shards = [torch.load(root / m["file"], weights_only=True)["latents"] for m in index]
-        shards = [z for z in shards if z.shape[0] >= window]
-        if len(shards) < 2:
-            raise SystemExit(f"{root}: need >= 2 shards with >= {window} latent steps "
-                             f"(have {len(shards)}); lower --seq-frames or encode longer clips")
-        n_eval = max(1, round(holdout * len(shards)))
-        self.train, self.eval = shards[:-n_eval], shards[-n_eval:]
+        self.train = [z for z, e in zip(shards, is_eval) if not e and z.shape[0] >= window]
+        self.eval = [z for z, e in zip(shards, is_eval) if e and z.shape[0] >= window]
+        if not self.train or not self.eval:
+            raise SystemExit(f"{root}: need train and held-out shards with >= {window} latent "
+                             f"steps (have {len(self.train)} / {len(self.eval)}); lower "
+                             "--seq-frames or encode longer clips")
         self.C, self.h, self.w = shards[0].shape[1:]
         self.vae = index[0]["vae"]
         self.device = device

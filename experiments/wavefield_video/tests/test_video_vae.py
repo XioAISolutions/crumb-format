@@ -76,6 +76,14 @@ class VideoVAETests(unittest.TestCase):
                                       "--out", str(d / "lat"), "--device", "cpu"])
             self.assertEqual(len(idx), 6)                         # 65 frames -> 33 + 25
             self.assertEqual([m["latent_steps"] for m in idx[:2]], [5, 4])
+            # held-out split is by source video and independent of the window
+            self.assertEqual(LatentShards(d / "lat", window=2).eval_srcs,
+                             LatentShards(d / "lat", window=4).eval_srcs)
+            self.assertEqual(len(LatentShards(d / "lat", window=2).eval_srcs), 1)
+            segs = list(encode_videos.iter_segments(sorted((d / "mp4").glob("*.mp4"))[0],
+                                                    24, 64, 64, 20))
+            self.assertEqual([x.shape[0] for _, x, _ in segs], [20, 20, 20, 5])
+            self.assertEqual([s0 for s0, _, _ in segs], [0, 20, 40, 60])
             sh = LatentShards(d / "lat", window=4)
             self.assertEqual(sh.batch(2, 4, torch.Generator().manual_seed(0)).shape,
                              (2, 4, 8, 2, 2))

@@ -27,17 +27,30 @@ from video_vae import VideoVAE, valid_frames
 EXTS = (".mp4", ".mov", ".mkv", ".webm", ".avi")
 
 
-def read_video(path, fps=None):
-    """-> (frames [T,3,H,W] float in [0,1], fps actually used)."""
+def iter_segments(path, fps, height, width, seg):
+    """Stream a video: decode one frame at a time, drop frames to ~fps, resize +
+    crop each frame immediately, and yield (start_frame, [n,3,H,W] float) segments
+    of up to ``seg`` frames. Memory is one segment at the target size, however long
+    or high-resolution the source is (a full 5-min 1080p decode would be ~180 GB)."""
     import imageio.v2 as iio
     rd = iio.get_reader(str(path), "ffmpeg")
-    src_fps = float(rd.get_meta_data().get("fps", 24.0))
-    step = max(1, round(src_fps / fps)) if fps else 1
-    frames = [torch.from_numpy(f).permute(2, 0, 1) for i, f in enumerate(rd) if i % step == 0]
-    rd.close()
-    if not frames:
-        raise ValueError(f"{path}: no frames decoded")
-    return torch.stack(frames).float() / 255.0, src_fps / step
+    try:
+        src_fps = float(rd.get_meta_data().get("fps", 24.0))
+        step = max(1, round(src_fps / fps)) if fps else 1
+        buf, start, kept = [], 0, 0
+        for i, f in enumerate(rd):
+            if i % step:
+                continue
+            x = torch.from_numpy(f).permute(2, 0, 1)[None].float() / 255.0
+            buf.append(fit(x, height, width)[0])
+            kept += 1
+            if len(buf) == seg:
+                yield start, torch.stack(buf), src_fps / step
+                start, buf = kept, []
+        if buf:
+            yield start, torch.stack(buf), src_fps / step
+    finally:
+        rd.close()
 
 
 def fit(frames, height, width):
@@ -92,13 +105,11 @@ def main(argv=None):
         raise SystemExit(f"no videos under {a.videos}")
     index, k = [], 0
     for v in vids:
-        frames, fps = read_video(v, a.fps)
-        frames = fit(frames, a.height, a.width)
-        for s0 in range(0, frames.shape[0], seg):
-            n = valid_frames(min(seg, frames.shape[0] - s0), vae.t_stride)
+        for s0, frames, fps in iter_segments(v, a.fps, a.height, a.width, seg):
+            n = valid_frames(frames.shape[0], vae.t_stride)
             if n < 1 + vae.t_stride:                 # too short to give 2 latent steps
                 continue
-            z = vae.encode(frames[None, s0:s0 + n])[0]
+            z = vae.encode(frames[None, :n])[0]
             meta = {"src": str(v), "start_frame": s0, "n_frames": n, "fps": fps,
                     "latent_steps": z.shape[0], "latent_shape": list(z.shape[1:]),
                     "vae": vae.describe(), "file": f"shard_{k:05d}.pt"}
