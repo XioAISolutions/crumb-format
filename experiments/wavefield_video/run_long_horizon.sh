@@ -13,12 +13,16 @@
 # Arms (grid 32, equal --target-params):
 #   W_soft  wave dispersion, softplus poles (v2 default; init half-life ~0.7 frame)
 #   W_half  wave dispersion, halflife poles in [2, 4096] frames
-#   E_half  local+wave hybrid, halflife poles
 #   S_ssm   generic diagonal SSM (same T=128)
 #   A_attn  causal attention, T=32 (windowed rollout)
+#   E_half  (opt-in, HYBRID=1) local+wave hybrid, halflife poles, at T=T_ATTN:
+#           its local path is full causal attention over the window, so at
+#           T=128 x grid 32 (131k tokens) it would pay the N^2 bill it exists
+#           to avoid. At T_ATTN it tests whether the halflife global state
+#           carries memory past a gap longer than any it trained on.
 #
 # Pre-registered read (fixed before any result):
-#   PROVE  W_half or E_half exit-direction accuracy >= 0.8 and beats W_soft and
+#   PROVE  W_half exit-direction accuracy >= 0.8 and beats W_soft and
 #          A_attn by >= 0.2 on >= 2/3 seeds  -> scale the gap to 256 then 1024.
 #   KILL   halflife arms <= W_soft on exit-direction accuracy on >= 2/3 seeds ->
 #          long poles are not what limits memory; stop the pole line.
@@ -51,10 +55,12 @@ BASE=(--data-source occlusion --grid "$GRID" --n-balls 6 --batch "$BATCH"
 ARMS=(
     "W_soft|wave|$T_LONG|--kernel-version dispersion --pole-param softplus"
     "W_half|wave|$T_LONG|--kernel-version dispersion --pole-param halflife"
-    "E_half|wave|$T_LONG|--kernel-version dispersion --fuse local_wave --pole-param halflife"
     "S_ssm|ssm|$T_LONG|"
     "A_attn|attn|$T_ATTN|"
 )
+if [ "${HYBRID:-0}" = "1" ]; then
+    ARMS+=("E_half|wave|$T_ATTN|--kernel-version dispersion --fuse local_wave --pole-param halflife")
+fi
 
 # Sliced + resumable (the box conductor kills jobs at 5400s): finished arms are
 # skipped, a live arm resumes from its ckpt, the whole slice is capped at SLICE_S
@@ -112,7 +118,7 @@ done
 # incomplete, so it is a failure rather than a silent skip.
 for seed in $SEEDS; do
   for arm in "${ARMS[@]}"; do
-    IFS='|' read -r label kind _ _ <<< "$arm"
+    IFS='|' read -r label kind frames _ <<< "$arm"
     [ "$kind" = "wave" ] || continue
     f="$OUT/model_wave_${label}_s${seed}.pt"
     if [ ! -f "$f" ]; then
@@ -124,7 +130,7 @@ for seed in $SEEDS; do
     fuse=none; [[ "$(basename "$f")" == model_wave_E_* ]] && fuse=local_wave
     res="$OUT/result_$(basename "${f#*model_}")"; res="${res%.pt}.json"
     ffn=$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["ffn_mult"])' "$res")
-    "$PY" long_horizon.py stream --pole-param "$pp" --ckpt "$f" --grid "$GRID" --frames "$T_LONG" \
+    "$PY" long_horizon.py stream --pole-param "$pp" --ckpt "$f" --grid "$GRID" --frames "$frames" \
         --dim "$DIM" --layers "$LAYERS" --heads "$HEADS" --ffn-mult "$ffn" --fuse "$fuse" \
         --stream-frames "$STREAM_FRAMES" --chunk 600 \
         --out "${f%.pt}_stream${STREAM_FRAMES}.json" > "${f%.pt}_stream${STREAM_FRAMES}.log" 2>&1 || { echo "STREAM FAIL $f" | tee -a "$OUT/progress.txt"

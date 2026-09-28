@@ -14,7 +14,7 @@ export PY=/workspace/slava/comfy-house/venv/bin/python
 $PY -m pytest -q tests/test_long_horizon.py || exit 1
 $PY test_fusion_r14.py | tail -1 || exit 1
 rm -rf runs_long_horizon_smoke
-OUT=runs_long_horizon_smoke GRID=8 DIM=16 LAYERS=1 HEADS=2 BATCH=2 TARGET_PARAMS=0 \
+HYBRID=1 OUT=runs_long_horizon_smoke GRID=8 DIM=16 LAYERS=1 HEADS=2 BATCH=2 TARGET_PARAMS=0 \
 STEPS=4 T_LONG=24 T_ATTN=16 GAP=8 EVAL_ROLLOUT=48 EVAL_SEEDS=2 SEEDS=0 \
 STREAM_FRAMES=60 SLICE_S=900 bash run_long_horizon.sh || exit 1
 grep -q DONE runs_long_horizon_smoke/status.txt || exit 1

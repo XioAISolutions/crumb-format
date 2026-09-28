@@ -340,9 +340,11 @@ def cmd_memory(a):
 def cmd_stream(a):
     from data import make_clip_batch
     torch.manual_seed(a.seed)
-    m = build_model(a, a.pole_param[0])
+    dev = torch.device(a.device)
+    m = build_model(a, a.pole_param[0]).to(dev)
     if a.ckpt:
-        m.load_state_dict(torch.load(a.ckpt, map_location="cpu", weights_only=True)["state"])
+        m.load_state_dict(torch.load(a.ckpt, map_location=dev, weights_only=True)["state"])
+    # Context stays on CPU for the monitor; warm() moves it to the model's device.
     ctx = make_clip_batch(a.batch, a.frames, a.grid, a.grid, seed=70000)[:, :a.frames]
     mon = HealthMonitor(patience=a.patience).calibrate(ctx)
     sess = StreamSession(m)
@@ -416,6 +418,8 @@ def main(argv=None):
     s.add_argument("--patience", type=int, default=24)
     s.add_argument("--ckpt", default="", help="train_compare.py model_*.pt (else untrained)")
     s.add_argument("--save-state", default="")
+    s.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu",
+                   help="where the stream runs (default: cuda when available)")
     s.add_argument("--fuse", choices=["none", "local_wave"], default="none",
                    help="local_wave for checkpoints of the local+wave hybrid (E_* arms)")
     s.add_argument("--resume", default="")
