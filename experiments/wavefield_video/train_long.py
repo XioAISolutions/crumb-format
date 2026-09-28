@@ -49,7 +49,8 @@ def _save_atomic(obj, path):
 def arch_kwargs(a, in_ch=3):
     """VideoPredictor keyword arguments; also saved as checkpoint metadata so
     render_rollout.load_model / eval_only.py rebuild the same model."""
-    kw = dict(causal=True, residual=True, ffn_mult=a.ffn_mult, time_pos="none", in_ch=in_ch)
+    kw = dict(causal=True, residual=True, ffn_mult=a.ffn_mult, time_pos="none", in_ch=in_ch,
+              head=a.head, flow_steps=a.flow_steps)
     if a.kind == "wave":
         kw.update(kernel_version="dispersion", linear_pad=True, pole_param=a.pole_param,
                   hl_min=a.hl_min, hl_max=a.hl_max, write_gate=a.write_gate,
@@ -126,6 +127,15 @@ def sequence_loss(m, clips, moving, a, scale=1.0):
     group, total = 0.0, 0.0
     for c in range(n_chunks):
         x = clips[:, c * T:(c + 1) * T]
+        if a.head == "flow":
+            lc, states = m.flow_loss(x, clips[:, c * T + 1:(c + 1) * T + 1], states=states)
+            group = group + lc / n_chunks
+            if (c + 1) % a.tbptt_chunks == 0 or c == n_chunks - 1:
+                group.backward()
+                total += float(group.detach())
+                group = 0.0
+                states = detach_states(states)
+            continue
         if a.dense:
             pred, states = m(x, states=states, dense=True)            # [B,T,3,H,W]
             tgt, last = clips[:, c * T + 1:(c + 1) * T + 1], x
@@ -195,6 +205,38 @@ def stream_rollout_eval(m, a, dev):
             "divergence_horizon": tc.divergence_horizon(med, a.radius, tc.DIV_CONSEC)}
 
 
+def stochastic_eval(m, a, dev, R=64, S=16):
+    """Autoregressive rollouts from held-out context, scored on what MSE blur
+    destroys: per-frame spatial-std ratio vs GT (1 = as sharp as real, -> 0 =
+    smeared/flat), blob count == n_balls (semantic_metrics.detect_blobs, with the
+    same detector's GT rate as a ceiling), and HealthMonitor's first collapse."""
+    from long_horizon import HealthMonitor
+    from semantic_metrics import detect_blobs
+    clip = tc.make_clip_batch(S, a.chunk + R - 1, a.grid, a.grid, device=dev, seed=91000,
+                              kicks=a.kicks, collisions=a.collisions, radius=a.radius,
+                              speed=a.speed, nb=a.n_balls)
+    ctx = clip[:, :a.chunk]
+    mon = HealthMonitor(patience=8).calibrate(ctx.cpu())
+    ratios, ok, ok_gt = [], 0, 0
+    with torch.no_grad():
+        st, f = m.stream_init(S, dev), None
+        for t in range(a.chunk):
+            f, st = m.stream_step(ctx[:, t], st, t)
+        for k in range(R):
+            f = f.float().clamp(0, 1)
+            gt = clip[:, a.chunk + k]
+            ratios.append((f.flatten(1).std(1) / (gt.flatten(1).std(1) + 1e-9)).mean().item())
+            mon.update(f.cpu())
+            ok += sum(len(d) == a.n_balls for d in detect_blobs(f.cpu(), radius=a.radius))
+            ok_gt += sum(len(d) == a.n_balls for d in detect_blobs(gt.cpu(), radius=a.radius))
+            f, st = m.stream_step(f, st, a.chunk + k)
+    n = R * S
+    return {"stoch_rollout": R, "std_ratio_mean": round(sum(ratios) / R, 4),
+            "std_ratio_last": round(ratios[-1], 4), "std_ratio_curve": [round(r, 4) for r in ratios],
+            "blob_count_ok": round(ok / n, 4), "blob_count_ok_gt": round(ok_gt / n, 4),
+            "collapse": dict(mon.first)}
+
+
 def pixel_eval(m, a, dev):
     """Single-step eval + copy-last baseline (train_compare.main()'s definitions),
     then train_compare's rollout / occlusion eval."""
@@ -256,6 +298,9 @@ def main(argv=None):
                     help="learned gate on what enters the wave state (LONG_HORIZON.md 8.4)")
     ap.add_argument("--clean-write", action="store_true",
                     help="blank input writes nothing: no spatial table, no embed/pi bias")
+    ap.add_argument("--head", choices=["residual", "flow"], default="residual",
+                    help="residual = MSE mean (default); flow = rectified-flow sampler (phase 3)")
+    ap.add_argument("--flow-steps", type=int, default=16, help="Euler steps per sampled frame")
     ap.add_argument("--grid", type=int, default=16)
     ap.add_argument("--n-balls", type=int, default=N_BALLS)
     ap.add_argument("--radius", type=float, default=RADIUS)
@@ -305,6 +350,10 @@ def main(argv=None):
         ap.error("--seq-frames must be a multiple of --chunk")
     if a.tbptt_chunks < 1:
         ap.error("--tbptt-chunks must be >= 1")
+    if a.head == "flow":
+        if a.motion_loss:
+            ap.error("--head flow trains a dense rectified-flow loss (no --motion-loss)")
+        a.dense = True                    # the flow loss is always dense (every position)
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     torch.manual_seed(a.seed)
@@ -420,15 +469,20 @@ def main(argv=None):
 
     m.eval()
     a.frames = a.chunk                                   # eval context = one chunk
+    if a.head == "flow":
+        m.set_flow_sampler(seed=12345)                   # reproducible sampled evals
     if data is not None:
         single, roll = latent_eval(m, data, a), {}
     else:
         single, roll = pixel_eval(m, a, dev)
+        if a.data_source == "balls":
+            roll = {**roll, **stochastic_eval(m, a, dev)}
     cfg = model_config(a, data)
     res = {**cfg, "pole_param": a.pole_param if a.kind == "wave" else None,
            "seq_frames": a.seq_frames, "chunk": a.chunk, "tbptt_chunks": a.tbptt_chunks,
            "dense": a.dense, "time_pos": "none", "write_gate": a.write_gate,
-           "clean_write": a.clean_write, "steps": a.steps, "seed": a.seed,
+           "clean_write": a.clean_write,
+           "flow_steps": a.flow_steps if a.head == "flow" else None, "steps": a.steps, "seed": a.seed,
            "params": sum(p.numel() for p in m.parameters()), "dim": a.dim, "layers": a.layers,
            "heads": a.heads, "batch": a.batch, "micro_batch": a.micro_batch or a.batch,
            "grad_ckpt": a.grad_ckpt,

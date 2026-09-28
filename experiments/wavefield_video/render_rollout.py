@@ -218,7 +218,7 @@ def load_model(args, torch):
         if time_pos == "table" and "posemb.pt" not in state:
             raise ValueError("checkpoint has no v2 positional embeddings; use the matching legacy result or explicit architecture='v1' config")
         # train_long.py (LONG_HORIZON.md phase 1) options; absent keys keep the v2 defaults.
-        extra = {k: config[k] for k in ("pole_param", "hl_min", "hl_max", "write_gate", "clean_write")
+        extra = {k: config[k] for k in ("pole_param", "hl_min", "hl_max", "write_gate", "clean_write", "head", "flow_steps")
                  if config.get(k) is not None}
         model = VideoPredictor(*dimensions, time_pos=time_pos, **extra,
                                **{k: config[k] for k in ("causal", "residual", "ffn_mult", "kernel_version",

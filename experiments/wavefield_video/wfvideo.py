@@ -668,7 +668,7 @@ class VideoPredictor(nn.Module):
                  gate=False, local_fuse=False, fuse="none",
                  q_mix=False, quat_color=False,
                  pole_param="softplus", hl_min=2.0, hl_max=4096.0, time_pos="table",
-                 write_gate=False, clean_write=False, in_ch=3):
+                 write_gate=False, clean_write=False, in_ch=3, head="residual", flow_steps=16):
         super().__init__()
         self.T, self.H, self.W = T, H, W
         self.grad_ckpt = False       # train_long.py --grad-ckpt (stateful path only)
@@ -677,6 +677,15 @@ class VideoPredictor(nn.Module):
         if quat_color and in_ch != 3:
             raise ValueError("--quat-color embeds RGB; it needs in_ch=3")
         self.in_ch = in_ch
+        # head="flow" (LONG_HORIZON.md phase 3): sample the next frame with a
+        # rectified-flow head instead of regressing its mean. Needs residual=True
+        # (the flow models next - last).
+        if head not in ("residual", "flow"):
+            raise ValueError(f"unknown head {head!r} (want residual | flow)")
+        if head == "flow" and not residual:
+            raise ValueError("head='flow' models next - last; it needs residual=True")
+        self.head_kind, self.flow_steps = head, flow_steps
+        self._flow_seed, self._flow_gen = None, None
         self.kind = kind
         if time_pos not in ("table", "none"):
             raise ValueError(f"unknown time_pos {time_pos!r} (want table | none)")
@@ -759,7 +768,45 @@ class VideoPredictor(nn.Module):
         if residual:
             nn.init.zeros_(self.head.weight)
             nn.init.zeros_(self.head.bias)
+        if head == "flow":
+            from flow_head import FlowHead
+            self.flow = FlowHead(dim, in_ch)
         self.use_ckpt = False
+
+    # ---- flow-head sampling controls --------------------------------------------
+    def set_flow_sampler(self, n_steps=None, seed=None):
+        """Euler steps per frame and a seed for reproducible sampling (None = global RNG)."""
+        if n_steps is not None:
+            self.flow_steps = n_steps
+        self._flow_seed, self._flow_gen = seed, None
+
+    def _gen(self, device):
+        if self._flow_seed is None:
+            return None
+        if self._flow_gen is None or self._flow_gen.device != torch.device(device):
+            self._flow_gen = torch.Generator(device=device).manual_seed(self._flow_seed)
+        return self._flow_gen
+
+    def _readout(self, feats, base):
+        """feats [N,H,W,D] per-frame features, base [N,C,H,W] the frame they follow ->
+        next frame [N,C,H,W]: residual head (mean) or a flow-head sample."""
+        if self.head_kind == "flow":
+            d = self.flow.sample(feats, base.shape, self.flow_steps, self._gen(base.device))
+            return base + d.to(base.dtype)
+        delta = self.head(feats).permute(0, 3, 1, 2)
+        return base + delta if self.residual else delta
+
+    def flow_loss(self, frames, targets, states=None, generator=None):
+        """Rectified-flow loss at every position: frames [B,T,C,H,W] -> targets
+        [B,T,C,H,W] (= frames shifted by one). Returns loss, or (loss, states)."""
+        if self.head_kind != "flow":
+            raise ValueError("flow_loss needs head='flow'")
+        x, new_states = self._features(frames, states)
+        B, T = frames.shape[:2]
+        c = x.reshape(B * T, self.H, self.W, -1)
+        x1 = (targets - frames).reshape(B * T, *frames.shape[2:]).to(c.dtype)
+        loss = self.flow.loss(x1, c, generator)
+        return loss if states is None else (loss, new_states)
 
     def forward(self, frames, states=None, dense=False):
         """frames: [B, T, 3, H, W] (context frames).
@@ -771,6 +818,28 @@ class VideoPredictor(nn.Module):
         states: list with one entry per block (entries may be None = zeros) to
             run this T-frame chunk from a carried recurrent state; the call then
             returns (pred, new_states) so long clips can be trained chunk by chunk."""
+        x, new_states = self._features(frames, states)
+        B, T = frames.shape[:2]
+        if self.head_kind == "flow":
+            if dense:
+                c = x.reshape(B * T, self.H, self.W, -1)
+                pred = self._readout(c, frames.reshape(B * T, *frames.shape[2:]))
+                pred = pred.reshape(frames.shape)
+            else:
+                last = x[:, (self.T - 1) * self.H * self.W: self.T * self.H * self.W]
+                pred = self._readout(last.reshape(B, self.H, self.W, -1), frames[:, -1])
+            return pred if states is None else (pred, new_states)
+        if dense:
+            delta = self.head(x).reshape(B, T, self.H, self.W, self.in_ch).permute(0, 1, 4, 2, 3)
+            pred = frames + delta if self.residual else delta         # [B,T,3,H,W]
+        else:
+            last = x[:, (self.T - 1) * self.H * self.W: self.T * self.H * self.W]  # [B, HW, D]
+            delta = self.head(last).reshape(B, self.H, self.W, self.in_ch).permute(0, 3, 1, 2)  # [B,C,H,W]
+            pred = frames[:, -1] + delta if self.residual else delta
+        return pred if states is None else (pred, new_states)
+
+    def _features(self, frames, states=None):
+        """Backbone: frames [B,T,C,H,W] -> normed tokens [B,T*H*W,D] (+ carried states)."""
         B, T, C, H, W = frames.shape
         f = frames.reshape(B * T, C, H, W)
         e = self.embed(f).reshape(B, T, self.H * self.W, -1).reshape(B, T * self.H * self.W, -1)
@@ -795,15 +864,7 @@ class VideoPredictor(nn.Module):
                     x = torch.utils.checkpoint.checkpoint(blk, x, use_reentrant=False)
                 else:
                     x = blk(x)
-        x = self.norm(x)
-        if dense:
-            delta = self.head(x).reshape(B, T, self.H, self.W, self.in_ch).permute(0, 1, 4, 2, 3)
-            pred = frames + delta if self.residual else delta         # [B,T,3,H,W]
-        else:
-            last = x[:, (self.T - 1) * self.H * self.W: self.T * self.H * self.W]  # [B, HW, D]
-            delta = self.head(last).reshape(B, self.H, self.W, self.in_ch).permute(0, 3, 1, 2)  # [B,C,H,W]
-            pred = frames[:, -1] + delta if self.residual else delta
-        return pred if states is None else (pred, new_states)
+        return self.norm(x), new_states
 
     # ---- O(1)-in-T streaming rollout (wave / ssm / local+global hybrids) -----
     def _streamable(self):
@@ -855,6 +916,8 @@ class VideoPredictor(nn.Module):
             x = x + m
             x = x + blk.ffn(blk.n2(x))
         x = self.norm(x)
+        if self.head_kind == "flow":
+            return self._readout(x.reshape(B, self.H, self.W, -1), frame), states
         delta = self.head(x).reshape(B, self.H, self.W, self.in_ch).permute(0, 3, 1, 2)
         nxt = frame + delta if self.residual else delta
         return nxt, states
