@@ -119,7 +119,7 @@ for seed in $SEEDS; do
         echo "MISSING $f" | tee -a "$OUT/progress.txt"
         echo "FAILED missing $(basename "$f")" > "$OUT/status.txt"; exit 1
     fi
-    [ -f "${f%.pt}_stream7200.json" ] && continue
+    [ -f "${f%.pt}_stream${STREAM_FRAMES}.json" ] && continue
     pp=softplus; [[ "$f" == *_half_* ]] && pp=halflife
     fuse=none; [[ "$(basename "$f")" == model_wave_E_* ]] && fuse=local_wave
     res="$OUT/result_$(basename "${f#*model_}")"; res="${res%.pt}.json"
@@ -127,7 +127,7 @@ for seed in $SEEDS; do
     "$PY" long_horizon.py stream --pole-param "$pp" --ckpt "$f" --grid "$GRID" --frames "$T_LONG" \
         --dim "$DIM" --layers "$LAYERS" --heads "$HEADS" --ffn-mult "$ffn" --fuse "$fuse" \
         --stream-frames "$STREAM_FRAMES" --chunk 600 \
-        --out "${f%.pt}_stream7200.json" > "${f%.pt}_stream7200.log" 2>&1 || { echo "STREAM FAIL $f" | tee -a "$OUT/progress.txt"
+        --out "${f%.pt}_stream${STREAM_FRAMES}.json" > "${f%.pt}_stream${STREAM_FRAMES}.log" 2>&1 || { echo "STREAM FAIL $f" | tee -a "$OUT/progress.txt"
              echo "FAILED stream $(basename "$f")" > "$OUT/status.txt"; exit 1; }
   done
 done

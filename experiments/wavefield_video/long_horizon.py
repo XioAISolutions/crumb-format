@@ -118,47 +118,64 @@ class HealthMonitor:
       freeze    mean |f_t - f_(t-1)| < freeze_ratio x context motion (copy-last collapse)
       nonfinite any NaN/Inf                                   (immediate)
 
-    Ratios are measured against the context clip so the same thresholds work for
-    black-background balls and bright latents alike. ``freeze`` is skipped when
-    the context itself is static."""
+    Ratios are measured against each sample's OWN context clip, and streaks are
+    kept per batch sample, so one collapsed rollout cannot hide behind a healthy
+    one in the batch average. ``first[k]`` is the earliest frame any sample
+    collapsed; ``first_sample[k]`` says which. ``freeze`` is skipped for a sample
+    whose context is itself static."""
     fade_ratio: float = 0.5
     flat_ratio: float = 0.5
     freeze_ratio: float = 0.1
     patience: int = 24
-    ref: dict = field(default_factory=dict)
-    runs: dict = field(default_factory=dict)
+    ref: dict = field(default_factory=dict)      # per-sample [B] tensors
+    runs: dict = field(default_factory=dict)     # per-sample [B] streak counters
     first: dict = field(default_factory=dict)
+    first_sample: dict = field(default_factory=dict)
     frame_index: int = 0
     _prev: torch.Tensor = None
+
+    @staticmethod
+    def _stats(f):                               # f: [B,C,H,W] -> per-sample [B]
+        return f.flatten(1).mean(1), f.flatten(2).std(-1).mean(1)
 
     def calibrate(self, context):
         """context: [B,T,C,H,W] frames the rollout starts from."""
         c = context.float()
-        self.ref = {"mean": c.mean().item(),
-                    "std": c.flatten(2).std(-1).mean().item(),
-                    "motion": (c[:, 1:] - c[:, :-1]).abs().mean().item() if c.shape[1] > 1 else 0.0}
+        B = c.shape[0]
+        m, sd = self._stats(c.flatten(0, 1))
+        motion = ((c[:, 1:] - c[:, :-1]).abs().flatten(1).mean(1) if c.shape[1] > 1
+                  else torch.zeros(B))
+        self.ref = {"mean": m.view(B, -1).mean(1), "std": sd.view(B, -1).mean(1),
+                    "motion": motion}
         self._prev = c[:, -1]
         return self
 
     def update(self, frame):
-        """frame: [B,C,H,W]. Returns this frame's stats."""
+        """frame: [B,C,H,W]. Returns batch-mean stats for logging; flags are per sample."""
         f = frame.float()
-        st = {"mean": f.mean().item(), "std": f.flatten(1).std(-1).mean().item(),
-              "motion": (f - self._prev).abs().mean().item() if self._prev is not None else 0.0}
+        mean, std = self._stats(f)
+        motion = ((f - self._prev).abs().flatten(1).mean(1) if self._prev is not None
+                  else torch.zeros(f.shape[0]))
         self._prev = f
         conds = {
-            "fade": st["mean"] < self.fade_ratio * self.ref["mean"],
-            "flatten": st["std"] < self.flat_ratio * self.ref["std"],
-            "freeze": self.ref["motion"] > 1e-6 and st["motion"] < self.freeze_ratio * self.ref["motion"],
+            "fade": mean < self.fade_ratio * self.ref["mean"],
+            "flatten": std < self.flat_ratio * self.ref["std"],
+            "freeze": (self.ref["motion"] > 1e-6) & (motion < self.freeze_ratio * self.ref["motion"]),
         }
         for k, bad in conds.items():
-            self.runs[k] = self.runs.get(k, 0) + 1 if bad else 0
-            if self.runs[k] >= self.patience and k not in self.first:
+            run = self.runs.get(k, torch.zeros_like(bad, dtype=torch.long))
+            run = torch.where(bad, run + 1, torch.zeros_like(run))
+            self.runs[k] = run
+            hit = (run >= self.patience).nonzero().flatten()
+            if hit.numel() and k not in self.first:
                 self.first[k] = self.frame_index - self.patience + 1
-        if not torch.isfinite(f).all() and "nonfinite" not in self.first:
+                self.first_sample[k] = int(hit[0])
+        bad = ~torch.isfinite(f.flatten(1)).all(1)
+        if bad.any() and "nonfinite" not in self.first:
             self.first["nonfinite"] = self.frame_index
+            self.first_sample["nonfinite"] = int(bad.nonzero()[0])
         self.frame_index += 1
-        return st
+        return {"mean": mean.mean().item(), "std": std.mean().item(), "motion": motion.mean().item()}
 
     @property
     def healthy(self):
@@ -168,11 +185,12 @@ class HealthMonitor:
         """Everything needed to continue monitoring after a StreamSession resume:
         a streak that spans the checkpoint keeps counting and earlier flags stay."""
         return {"ref": dict(self.ref), "runs": dict(self.runs), "first": dict(self.first),
-                "frame_index": self.frame_index,
+                "first_sample": dict(self.first_sample), "frame_index": self.frame_index,
                 "prev": None if self._prev is None else self._prev.detach().clone()}
 
     def load_state_dict(self, d):
         self.ref, self.runs, self.first = dict(d["ref"]), dict(d["runs"]), dict(d["first"])
+        self.first_sample = dict(d.get("first_sample", {}))
         self.frame_index, self._prev = d["frame_index"], d["prev"]
         return self
 
@@ -354,7 +372,9 @@ def cmd_stream(a):
     if a.save_state:
         sess.save(a.save_state, extra={"health": mon.state_dict()})
     res = {"mode": "long_horizon_stream", "pole_param": a.pole_param[0], "trained": bool(a.ckpt),
-           "frames": a.stream_frames, "grid": a.grid, "context_ref": mon.ref,
+           "frames": a.stream_frames, "grid": a.grid,
+           "context_ref": {k: v.tolist() for k, v in mon.ref.items()},
+           "collapse_sample": dict(mon.first_sample),
            "state_bytes_constant": len(sizes) == 1, "collapse": dict(mon.first), "log": log}
     if a.out:
         with open(a.out, "w") as fh:

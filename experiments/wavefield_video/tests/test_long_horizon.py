@@ -204,6 +204,17 @@ class HealthMonitorTests(unittest.TestCase):
             mon.update(torch.rand(1, 3, 8, 8, generator=g) * scale)
         self.assertEqual(mon.first.get("fade"), 10)   # motion shrinks too: freeze may co-fire
 
+    def test_one_collapsed_sample_is_not_hidden_by_a_healthy_one(self):
+        g = torch.Generator().manual_seed(2)
+        ctx = torch.rand(2, 8, 3, 8, 8, generator=g)
+        mon = lh.HealthMonitor(patience=5).calibrate(ctx)
+        for _ in range(20):
+            f = torch.rand(2, 3, 8, 8, generator=g)
+            f[1] *= 0.05                                  # sample 1 fades, sample 0 is fine
+            mon.update(f)
+        self.assertEqual(mon.first.get("fade"), 0)
+        self.assertEqual(mon.first_sample.get("fade"), 1)
+
     def test_frozen_rollout_is_flagged(self):
         mon = lh.HealthMonitor(patience=5).calibrate(self._ctx())
         f = torch.rand(1, 3, 8, 8)
