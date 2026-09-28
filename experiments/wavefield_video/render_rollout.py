@@ -183,6 +183,9 @@ def load_model(args, torch):
     for name in ("causal", "residual", "linear_pad", "gate", "local_fuse", "kicks", "collisions"):
         if type(config[name]) is not bool:
             raise ValueError(f"config {name} must be a JSON boolean")
+    if config["data_source"] == "occlusion":        # train_long.py: balls with a masked gap
+        config["data_source"] = "balls"
+        notes.append("Trained on occlusion clips; rendering unoccluded balls.")
     ball_options(config)
     if config["kernel_version"] not in ("separable", "dispersion"):
         raise ValueError("invalid kernel_version")
@@ -209,9 +212,15 @@ def load_model(args, torch):
         model = LegacyPredictor(*dimensions, causal=config["causal"], posemb="posemb.pt" in state)
         notes.append("Legacy v1 architecture loaded from v1_backup/wfvideo.py; current synthetic generator may differ from training.")
     else:
-        if "posemb.pt" not in state:
+        time_pos = config.get("time_pos", "table")
+        if time_pos not in ("table", "none"):
+            raise ValueError("invalid time_pos")
+        if time_pos == "table" and "posemb.pt" not in state:
             raise ValueError("checkpoint has no v2 positional embeddings; use the matching legacy result or explicit architecture='v1' config")
-        model = VideoPredictor(*dimensions,
+        # train_long.py (LONG_HORIZON.md phase 1) options; absent keys keep the v2 defaults.
+        extra = {k: config[k] for k in ("pole_param", "hl_min", "hl_max", "write_gate", "clean_write")
+                 if config.get(k) is not None}
+        model = VideoPredictor(*dimensions, time_pos=time_pos, **extra,
                                **{k: config[k] for k in ("causal", "residual", "ffn_mult", "kernel_version",
                                                         "linear_pad", "gate", "local_fuse")})
     model.load_state_dict(state, strict=True)

@@ -37,7 +37,9 @@ from data import MOVE_THRESH, N_BALLS, RADIUS, SPEED
 from wfvideo import VideoPredictor
 
 
-def build(a):
+def arch_kwargs(a):
+    """VideoPredictor keyword arguments; also saved as checkpoint metadata so
+    render_rollout.load_model / eval_only.py rebuild the same model."""
     kw = dict(causal=True, residual=True, ffn_mult=a.ffn_mult, time_pos="none")
     if a.kind == "wave":
         kw.update(kernel_version="dispersion", linear_pad=True, pole_param=a.pole_param,
@@ -45,7 +47,21 @@ def build(a):
                   clean_write=a.clean_write)
     elif a.write_gate or a.clean_write:
         raise SystemExit("--write-gate/--clean-write apply to --kind wave")
-    return VideoPredictor(a.dim, a.layers, a.heads, a.chunk, a.grid, a.grid, a.kind, **kw)
+    return kw
+
+
+def build(a):
+    return VideoPredictor(a.dim, a.layers, a.heads, a.chunk, a.grid, a.grid, a.kind, **arch_kwargs(a))
+
+
+def model_config(a):
+    """render_rollout-compatible config: frames is the chunk (the model's T)."""
+    cfg = dict(kernel_version="separable", linear_pad=False, gate=False, local_fuse=False)
+    cfg.update(arch_kwargs(a))
+    cfg.update(kind=a.kind, dim=a.dim, layers=a.layers, heads=a.heads, frames=a.chunk,
+               grid=a.grid, kicks=a.kicks, collisions=a.collisions, radius=a.radius,
+               speed=a.speed, n_balls=a.n_balls, data_source=a.data_source)
+    return cfg
 
 
 def detach_states(states):
@@ -259,7 +275,7 @@ def main(argv=None):
         roll = tc.occlusion_rollout_eval(m, a, dev)
     else:
         roll = stream_rollout_eval(m, a, dev)
-    res = {"kind": a.kind, "pole_param": a.pole_param if a.kind == "wave" else None,
+    res = {**model_config(a), "pole_param": a.pole_param if a.kind == "wave" else None,
            "seq_frames": a.seq_frames, "chunk": a.chunk, "tbptt_chunks": a.tbptt_chunks,
            "dense": a.dense, "time_pos": "none", "write_gate": a.write_gate,
            "clean_write": a.clean_write, "steps": a.steps, "seed": a.seed,
@@ -270,7 +286,7 @@ def main(argv=None):
            "persistent_state_bytes": m.persistent_state_bytes(), "train_sec": round(train_sec, 1),
            "log_tail": log[-3:], **single, **roll}
     (base / f"result_{a.kind}{a.tag}.json").write_text(json.dumps(res, indent=1))
-    torch.save({"state": m.state_dict()}, base / f"model_{a.kind}{a.tag}.pt")
+    torch.save({"state": m.state_dict(), "config": model_config(a)}, base / f"model_{a.kind}{a.tag}.pt")
     keys = ("eval_mse_over_copylast", "copy_ratio", "divergence_horizon", "exit_direction_accuracy",
             "position_error_at_emergence")
     print("RESULT", json.dumps({k: res.get(k) for k in keys}), flush=True)

@@ -148,6 +148,25 @@ class StatefulTests(unittest.TestCase):
         early = slice(0, (TC - 1) * H * W)
         self.assertLess((y - y2)[:, early].abs().max().item(), 1e-5)
 
+    def test_train_long_checkpoint_loads_in_renderer(self):
+        import tempfile
+        import render_rollout
+        import train_long
+        with tempfile.TemporaryDirectory() as d:
+            train_long.main(["--seq-frames", "8", "--chunk", "4", "--dim", "16", "--layers", "1",
+                             "--heads", "2", "--grid", "16", "--steps", "1", "--batch", "2",
+                             "--eval-rollout", "4", "--pole-param", "halflife", "--write-gate",
+                             "--clean-write", "--out", d])
+            args = render_rollout.parser().parse_args(["--ckpt", f"{d}/model_wave.pt", "--out", d])
+            model, config, *_ = render_rollout.load_model(args, torch)   # strict state load
+            for src in ("checkpoint:config", f"{d}/result_wave.json"):
+                if not src.startswith("checkpoint"):
+                    args.config = Path(src)
+                    model, config, *_ = render_rollout.load_model(args, torch)
+                self.assertEqual((config["frames"], config["time_pos"]), (4, "none"))
+            mix = model.blocks[0].mix
+            self.assertTrue(mix.write_gate and mix.pole_param == "halflife")
+            self.assertNotIn("posemb.pt", model.state_dict())
 
 if __name__ == "__main__":
     unittest.main()
