@@ -1,0 +1,168 @@
+# LONG_HORIZON — what stands between this repo and 2–5 minute video
+
+_2026-09-28 · branch `claude/crumbllm-video-optimization-w52xup` (off `crumb-llm-standalone`)_
+
+Target: 2–5 min = **2,880–7,200 frames at 24 fps**. The pitch rests on three
+receipts; here is what each one actually measured, then the four blockers found
+in the code, what was fixed, and the pre-registered next runs.
+
+## 1. What the receipts measure
+
+| Receipt | Where | What it is | What it is not |
+|---|---|---|---|
+| 417× (3.7 ms vs 1,546 ms @ N=16k) | `kernels2d_smoke.py`, OCEAN.md | one **un-warmed, single-shot** CPU call: FFT conv vs `QKᵀ` then `(QKᵀ)V` with **no softmax**, one 64-channel head, fp32 | a model step; a GPU number; FlashAttention/SDPA |
+| 1,024 frames at flat 0.207 GB | `train_compare.py --stream-test` | streaming **cost** — the docstring says "Weights need not be trained — this measures streaming cost, not accuracy" | coherent video; with the zero-init residual head an untrained stream is an exact copy of the last frame |
+| O(N log N) | FFT mixing | true asymptotically | free: `linear_pad` doubles T, H and W (8× the field) in complex64 — at grid 6, T=256 a CPU training step is ~16 s |
+
+Re-measured fairly in `bench_scaling_honest.py` (warm-up, median of reps,
+softmax, and PyTorch SDPA): see §5.
+
+## 2. Blocker A — the ripple forgets in under one frame
+
+`state = fade × state + new_frame` carries the past only while `fade^t` is not ~0.
+The v2 pole is `|λ| = exp(-softplus(a0 + a1|k|))` with `a0 = 0.5` →
+**|λ| ≈ 0.38, half-life ≈ 0.71 frames** at init.
+
+`python long_horizon.py memory` (dim 128, 4 layers, 8 heads, 3 modes):
+
+| poles | half-life min/median/max (frames) | poles holding ≥1% after 1 s / 10 s / 2 min / 5 min |
+|---|---|---|
+| softplus (v2 default) | 0.71 / 0.71 / 0.71 | 0/24 · 0/24 · 0/24 · 0/24 |
+| **halflife** (new) | 2.3 / 77 / 3,494 | 22/24 · 15/24 · 7/24 · 4/24 |
+
+Training can move `a0`, but reaching a 2,000-frame half-life means driving it to
+≈ −8 through a softplus whose slope there is ~3e-4: thousands of steps of
+consistently signed gradient (see Blocker B for why that gradient does not exist).
+
+**Fix (`--pole-param halflife`)**: `hl = hl_min·(hl_max/hl_min)^σ(raw)`,
+`α_DC = ln2/hl`, plus viscosity `softplus(visc)·|k|` so fine detail still damps
+faster than layout. Half-lives are initialized log-uniformly over
+`[hl_min, hl_max]` = [2, 4096] frames, and the input is normalized by
+`sqrt(1-|λ|²)` (LRU-style) so near-unit poles don't blow up the residual
+stream. Default stays `softplus`, so every existing run and test is unchanged.
+
+## 3. Blocker B — gradients never see more than ~0.7 s
+
+Nearly every run trains with `--frames 16/17`. A dependency longer than the
+training clip gets no gradient, however long the pole. The occlusion suite
+(`run_occlusion.sh`, the "decisive" R14/R15 experiment) makes this concrete:
+training clips are frames 0–17 and always start at frame 0, but the target is
+hidden on [64, 320). **No arm ever sees the occluder during training**, yet all
+arms are scored on tracking through a 256-frame gap. Its wave-vs-SSM kill
+criterion cannot come out on architecture.
+
+This is where O(N log N) actually pays: *training* on long clips in parallel.
+Streaming at constant memory is common to every recurrent or sliding-window
+model.
+
+**Fix**: `--train-occ-start/--train-occ-end` put the gap at `[T−gap, T)` of each
+training clip, so the loss target (frame T) is the first frame after the gap
+and the loss *requires* memory. `run_long_horizon.sh` trains wave/SSM at T=128
+and attention at the T it can afford (32), then evaluates on a post-context gap.
+
+## 4. Blocker C — two correctness bugs (fixed)
+
+1. **Future leakage in the FFT forward for long poles.** `_transfer` is the
+   DTFT of the infinite impulse response sampled at L=2T points: a *circular*
+   kernel. Frame s>t leaks into output t with weight `λ^(2T−(s−t))`. With
+   |λ|=0.38 that is ~1e-7, but for minute-scale poles it is O(1): the model could
+   read frames it is asked to predict. The halflife path now uses the exact
+   truncated response `(1−λ^T e^{−iωT})/(1−λe^{−iω})`, and
+   `test_halflife_forward_is_causal` guards it. The softplus default keeps the v2
+   math (leak ≤ |λ|^(T+1)); any run where `a0` trained strongly negative had the
+   same channel open.
+2. **Hybrid streaming warm-up (`FusedMix.step`)** attended to zero-filled
+   window slots during the first T−1 frames, so `stream_step` ≠ `forward` for
+   `local_wave` and `local_ssm` (max err 0.014–0.04). `test_fusion_r14.py` passed
+   only because the zero-init residual head makes both sides "copy last frame".
+   Now it attends only to filled slots (current-frame queries only, which is
+   also T× fewer queries). The test randomizes the head, and the error is ~1e-6.
+
+## 5. Evidence from this change (CPU, 4 threads)
+
+### Delayed recall (`recall_probe.py`)
+
+A blob on frame 0, black frames 1…D−1, target = frame 0 again. The only route
+is the wave path across D frames. Grid 6, dim 32, 2 layers, 300 steps,
+batch 16. recall = 1 − MSE/MSE(forget); chance argmax hit = 1/36 = 0.028.
+Pre-registered: "holds D" iff mean recall ≥ 0.5.
+
+| delay D | steps | seeds | softplus recall / argmax hit | halflife recall / argmax hit | verdict |
+|---|---|---|---|---|---|
+| 16 | 300 | 0, 1 | 0.117 / 0.039 | **0.662 / 1.000** | halflife HOLDS, softplus forgets |
+| 64 | 300 | 0, 1 | 0.116 / 0.037 | 0.153 / 0.057 | **both forget** (halflife fails the bar) |
+| 128 | 300 | 0 | 0.118 / 0.027 | _pending_ | |
+| 64 | 1000 | 0 | _pending_ | _pending_ | budget check |
+
+Softplus sits at ~0.12 at every delay, which is what predicting the *average*
+blob scores; its argmax hit is at chance. Half-life clearly holds only at D=16
+within 300 steps. At D=64 it is not yet a win. Untested hypothesis: the
+viscosity init (`softplus(-4)·|k|` ≈ 0.018·|k| per frame) damps the high
+spatial frequencies that encode *where* the blob is by ~e^-5 over 64 frames,
+even when the DC half-life is long. The 1,000-step row separates "needs budget"
+from "cannot".
+
+### Honest scaling (`bench_scaling_honest.py`)
+
+_pending — runs after the recall probe to avoid CPU contention._
+
+### 5-minute stream, untrained (`long_horizon.py stream --stream-frames 7200`)
+
+Both pole types: state constant at 24.0 MB (batch 2, grid 16), ~50 fps on
+CPU. `HealthMonitor` flags **freeze at frame 0**, as it should: an untrained
+residual model is copy-last. This is the 1,024-frame receipt extended to 7,200
+frames, and it shows why a cost receipt says nothing about coherence.
+
+## 6. What 2–5 minutes costs with a real video VAE (`long_horizon.py budget`)
+
+480×848, 24 fps, dim 512, 12 layers, 3 modes:
+
+| clip | VAE | latent steps | tokens/step | tokens | wave state | full-context KV (bf16) |
+|---|---|---|---|---|---|---|
+| 2 min | Wan2.1 (4×8×8, patch 2) | 720 | 1,590 | 1.14 M | 74.5 MB | 2.2 GB |
+| 2 min | LTX (8×32×32) | 360 | 405 | 146 k | 19.0 MB | 285 MB |
+| 5 min | Wan2.1 | 1,800 | 1,590 | 2.86 M | 74.5 MB | 5.5 GB |
+| 5 min | LTX | **900** | 405 | 365 k | 19.0 MB | 712 MB |
+
+Two things follow from this table:
+- **Memory is not the wall on a 4090.** With an LTX-class VAE, even a
+  full-context 5-minute KV cache is under 1 GB. The constant-state advantage is
+  real but small in bytes. The N² *compute* over 365 k tokens is the real cost
+  (N²/2 pairs × 4·dim × 12 layers ≈ 1.6e15 FLOPs per full causal pass, i.e.
+  ~10–20 s on a 4090 at ~80–165 dense TFLOPS, multiplied by denoising steps; an
+  estimate, not a measurement). Shipping long-video systems avoid that
+  with windowed context, which is also linear.
+- **5 minutes through LTX is 900 latent steps**, which is inside the 1,024-step
+  horizon already streamed. The step that is missing is a latent space that does
+  not collapse: the home-made 16× AE "fades to black" in both arms. Use a
+  pretrained video VAE rather than training a new one.
+
+## 7. Next runs, in order, with kill criteria
+
+1. **`run_long_horizon.sh` on the box** (preflight `STEPS=20 SEEDS=0` first; not
+   yet run on GPU). PROVE: a halflife arm reaches exit-direction accuracy ≥ 0.8
+   and beats softplus and T=32 attention by ≥ 0.2 on ≥ 2/3 seeds → grow the gap
+   to 256, then 1,024. KILL: halflife ≤ softplus on ≥ 2/3 seeds → long poles are
+   not the limit; stop the pole line.
+2. **Re-scope `run_occlusion.sh`**: with default flags its emergence metrics
+   measure the training window, not the architecture. Pass `--train-occ-*` or
+   stop citing it as decisive.
+3. **Latent track on a pretrained VAE** (LTX or Wan2.1, frozen): same
+   next-latent objective, same `HealthMonitor` on decoded frames. KILL:
+   `fade`/`flatten` fires before 256 latent steps on held-out clips.
+4. **Every long render goes through `StreamSession` + `HealthMonitor`.** Report
+   the frame of the first collapse flag as the headline number, alongside
+   divergence horizon. A stream receipt without trained weights and without
+   collapse flags is not a coherence receipt.
+
+## Pitch corrections
+
+- "At 16k moments one step takes ~1.5 s": one un-warmed CPU matmul pair for one
+  64-channel head without softmax. It is not a model step. On a 4090 the same op
+  is ~7e10 FLOPs, about a millisecond with fused attention (estimate).
+- "We streamed 1,024 frames at a flat 0.2 GB": true, with **untrained** weights.
+  It shows constant memory, not minutes of coherent video.
+- "Veo, Kling, Seedance all pay the N² bill": within a shot, yes. Minute-length
+  systems bound cost with windowed or chunked context, which is also linear in
+  length. The differentiator worth testing is §3: learning dependencies longer
+  than any affordable attention window, because long training clips are cheap.
