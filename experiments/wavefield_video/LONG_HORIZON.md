@@ -360,6 +360,34 @@ and the threshold itself (step 256) is unchanged. **PASS** if nothing fires
 through 900 steps (5 minutes); then judge the decoded frames by eye before any
 claim.
 
+## 10. Phase 3 — a generative head, so uncertainty doesn't turn into blur
+
+An MSE head predicts the conditional mean of the next frame. When the future
+branches (a random kick, an occluded ball's exit side, any real video), the
+mean is a blend of futures: blobs smear, and feeding the smear back compounds
+it into the fade/flatten collapse. `flow_head.py` adds a rectified-flow head.
+It is a small per-frame conv velocity net conditioned on the backbone's causal
+feature for that frame, so backbone, carried state and streaming are
+unchanged. It samples `next − last` from noise in N Euler steps
+(`VideoPredictor(head="flow")`, `train_long.py --head flow`).
+
+### 10.1 Pre-registered toy
+
+Balls with `--kicks` (random velocity kicks), grid 16, halflife wave backbone,
+equal steps and seeds; residual (MSE) vs flow. Scoring comes from
+`stochastic_eval`, identical for both heads: 64-step autoregressive rollouts
+from held-out context. Metrics: spatial-std ratio vs GT (1 = as sharp as real),
+the fraction of frames where `detect_blobs` finds exactly `n_balls` (next to
+the same detector's rate on GT), and the first HealthMonitor collapse.
+
+- **PROVE:** flow keeps mean std ratio ≥ 0.8 and blob-count accuracy ≥ 70% of
+  the GT rate, while the MSE arm's std ratio falls below 0.5 or `flatten`
+  fires.
+- **KILL:** flow's blob-count accuracy is no better than MSE's, so sampling
+  buys nothing at this scale, and the head stays opt-in pending a larger run.
+
+RESULTS_10_1
+
 ## Pitch corrections
 
 - "At 16k moments one step takes ~1.5 s": the *ratio* survives a fair re-measure
