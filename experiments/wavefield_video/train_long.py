@@ -76,13 +76,13 @@ def latent_eval(m, data, a):
     gen = torch.Generator().manual_seed(90000)
     R = min(a.eval_rollout, min(z.shape[0] for z in data.eval) - a.chunk - 1)
     with torch.no_grad():
-        x = data.batch(16, a.chunk + 1, gen, "eval")
+        x = data.batch(a.eval_batch, a.chunk + 1, gen, "eval")
         p = m(x[:, :a.chunk], states=[None] * len(m.blocks))[0].float()   # exact kernel
         se, cb = F.mse_loss(p, x[:, -1]).item(), F.mse_loss(x[:, -2], x[:, -1]).item()
         out = {"eval_mse": round(se, 6), "eval_mse_over_copylast": round(se / (cb + 1e-9), 4),
                "latent_rollout_steps": max(R, 0)}
         if R >= 1:
-            clip = data.batch(8, a.chunk + R, gen, "eval")
+            clip = data.batch(a.eval_batch, a.chunk + R, gen, "eval")
             st = m.stream_init(clip.shape[0], clip.device)
             f = None
             for t in range(a.chunk):
@@ -312,12 +312,18 @@ def main(argv=None):
             if fp_ck is not None and fp_now is not None and fp_ck != fp_now:
                 ap.error(f"--resume {a.resume} was trained on VAE {fp_ck}; --latents {a.latents} "
                          f"was encoded with {fp_now}")
+            if ck.get("data_fp") is not None and ck["data_fp"] != data.fingerprint:
+                ap.error(f"--resume {a.resume} was trained on a different latent dataset "
+                         f"({ck['data_fp']} != {data.fingerprint} for --latents {a.latents})")
         if data is not None and "dgen" in ck:            # continue the latent sample stream
             dgen.set_state(ck["dgen"].cpu())
         opt.load_state_dict(ck["opt"])
         start = int(ck["step"])
         prior_sec = float(ck.get("train_sec", 0.0))
         print(f"RESUME <- {a.resume} at step={start} (of {a.steps})", flush=True)
+
+    def resume_meta():          # latent runs: sampler position + what it samples from
+        return {"dgen": dgen.get_state(), "vae": data.vae, "data_fp": data.fingerprint}
 
     m.train()
     log, t0 = [], time.time()
@@ -346,12 +352,12 @@ def main(argv=None):
         if a.save_every and step % a.save_every == 0:
             torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": step,
                         "train_sec": prior_sec + time.time() - t0,
-                        **({"dgen": dgen.get_state(), "vae": data.vae} if data is not None else {})}, ckpt_path)
+                        **(resume_meta() if data is not None else {})}, ckpt_path)
     train_sec = prior_sec + time.time() - t0              # cumulative across resumed slices
     if a.save_every:
         torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": a.steps,
                     "train_sec": train_sec,
-                    **({"dgen": dgen.get_state(), "vae": data.vae} if data is not None else {})}, ckpt_path)
+                    **(resume_meta() if data is not None else {})}, ckpt_path)
 
     m.eval()
     a.frames = a.chunk                                   # eval context = one chunk
@@ -368,6 +374,7 @@ def main(argv=None):
            "heads": a.heads, "batch": a.batch, "micro_batch": a.micro_batch or a.batch,
            "grad_ckpt": a.grad_ckpt,
            "latents": a.latents or None, "vae": data.vae if data is not None else None,
+           "latents_fp": data.fingerprint if data is not None else None,
            "motion_loss": a.motion_loss, "train_occ_start": a.train_occ_start,
            "train_occ_end": a.train_occ_end, "occ_start": a.occ_start, "occ_end": a.occ_end,
            "persistent_state_bytes": m.persistent_state_bytes(), "train_sec": round(train_sec, 1),

@@ -238,6 +238,15 @@ class VideoVAETests(unittest.TestCase):
                                           "--resume", str(d / "tr" / "ckpt_wave.pt"),
                                           "--out", str(d / "tr")])
             self.assertIn("was trained on VAE", err.getvalue())
+            # same VAE, different dataset (other segmentation of the same videos)
+            encode_videos.main([x if x not in (str(d / "lat"), "33") else
+                                {str(d / "lat"): str(d / "lat3"), "33": "41"}[x] for x in args])
+            err = io.StringIO()
+            with self.assertRaises(SystemExit), contextlib.redirect_stderr(err):
+                train_long.main(common + ["--latents", str(d / "lat3"), "--steps", "2",
+                                          "--resume", str(d / "tr" / "ckpt_wave.pt"),
+                                          "--out", str(d / "tr")])
+            self.assertIn("different latent dataset", err.getvalue())
 
 if __name__ == "__main__":
     unittest.main()

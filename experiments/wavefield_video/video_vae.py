@@ -189,7 +189,12 @@ class LatentShards:
 
     def __init__(self, root, window, holdout=0.1, device="cpu"):
         root = pathlib.Path(root)
-        index = json.loads((root / "index.json").read_text())
+        raw = (root / "index.json").read_text()
+        index = json.loads(raw)
+        # identifies the dataset (every shard's source, span and encoder), so a
+        # resumed run cannot silently continue on different videos
+        import hashlib
+        self.fingerprint = hashlib.sha256(raw.encode()).hexdigest()[:16]
         if len(index) < 2:
             raise SystemExit(f"{root}: need >= 2 shards to hold one out (have {len(index)})")
         # Split BEFORE filtering by window, by source video: the held-out set is a
