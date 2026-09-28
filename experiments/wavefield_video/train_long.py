@@ -82,7 +82,9 @@ def latent_eval(m, data, a):
     """Teacher-forced next-latent MSE vs copy-last on held-out shards, plus an
     autoregressive rollout (stream_step from one chunk of real context)."""
     gen = torch.Generator().manual_seed(90000)
-    R = min(a.eval_rollout, min(z.shape[0] for z in data.eval) - a.chunk - 1)
+    # the longest held-out shard sets the horizon: batch() samples only shards long
+    # enough for the requested window, so one short tail must not cap it
+    R = min(a.eval_rollout, max(z.shape[0] for z in data.eval) - a.chunk)
     with torch.no_grad():
         x = data.batch(a.eval_batch, a.chunk + 1, gen, "eval")
         p = m(x[:, :a.chunk], states=[None] * len(m.blocks))[0].float()   # exact kernel

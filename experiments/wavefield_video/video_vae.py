@@ -201,18 +201,6 @@ class LatentShards:
         self.fingerprint = hashlib.sha256(raw.encode()).hexdigest()[:16]
         if len(index) < 2:
             raise SystemExit(f"{root}: need >= 2 shards to hold one out (have {len(index)})")
-        # Split BEFORE filtering by window, by source video: the held-out set is a
-        # fixed tail of the index, so the trainer and the stream screen (which use
-        # different windows) agree on it and no held-out segment is ever trained on.
-        srcs = list(dict.fromkeys(m["src"] for m in index))
-        n_eval_src = max(1, round(holdout * len(srcs))) if len(srcs) > 1 else 0
-        eval_srcs = set(srcs[len(srcs) - n_eval_src:])
-        if not eval_srcs:                       # one source video: hold out its tail shards
-            cut = len(index) - max(1, round(holdout * len(index)))
-            is_eval = [i >= cut for i in range(len(index))]
-        else:
-            is_eval = [m["src"] in eval_srcs for m in index]
-        self.eval_srcs = sorted({m["src"] for m, e in zip(index, is_eval) if e})
         shards = []
         for m in index:             # each shard must still be what the index recorded
             z = torch.load(root / m["file"], weights_only=True)["latents"]
@@ -221,6 +209,26 @@ class LatentShards:
                 raise SystemExit(f"{root / m['file']}: content does not match index.json "
                                  f"({m.get('sha256')} != {got}); re-encode {root}")
             shards.append(z)
+        # Split BEFORE filtering by window, by source video: the held-out set is a
+        # fixed tail of the index, so the trainer and the stream screen (which use
+        # different windows) agree on it and no held-out segment is ever trained on.
+        srcs = list(dict.fromkeys(m["src"] for m in index))
+        n_eval_src = max(1, round(holdout * len(srcs))) if len(srcs) > 1 else 0
+        eval_srcs = set(srcs[len(srcs) - n_eval_src:])
+        if not eval_srcs:
+            # one source video: hold out its tail, counted in FULL-length segments so
+            # a short final remainder (which a window may filter out) is never the
+            # whole held-out set. Still independent of the window.
+            full = max(z.shape[0] for z in shards)
+            want = max(1, round(holdout * sum(z.shape[0] == full for z in shards)))
+            cut, seen = len(index), 0
+            while cut > 1 and seen < want:
+                cut -= 1
+                seen += shards[cut].shape[0] == full
+            is_eval = [i >= cut for i in range(len(index))]
+        else:
+            is_eval = [m["src"] in eval_srcs for m in index]
+        self.eval_srcs = sorted({m["src"] for m, e in zip(index, is_eval) if e})
         self.train = [z for z, e in zip(shards, is_eval) if not e and z.shape[0] >= window]
         self.eval = [z for z, e in zip(shards, is_eval) if e and z.shape[0] >= window]
         if not self.train or not self.eval:

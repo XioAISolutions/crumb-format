@@ -27,6 +27,49 @@ if HAVE:
 from wfvideo import VideoPredictor
 
 
+def _write_shards(root, specs, C=2, h=2, w=2):
+    """specs: [(src, latent_steps)] -> a minimal encode_videos-style shard dir."""
+    import hashlib
+    root.mkdir(parents=True, exist_ok=True)
+    index = []
+    for i, (src, n) in enumerate(specs):
+        z = torch.randn(n, C, h, w, generator=torch.Generator().manual_seed(i))
+        torch.save({"latents": z}, root / f"s{i}.pt")
+        index.append({"file": f"s{i}.pt", "src": src, "latent_steps": n, "vae": {"backend": "x"},
+                      "sha256": hashlib.sha256(z.contiguous().view(torch.uint8).numpy().tobytes()).hexdigest()[:16]})
+    (root / "index.json").write_text(json.dumps(index))
+
+
+@unittest.skipUnless(HAVE, "needs diffusers + imageio + imageio-ffmpeg (requirements-video.txt)")
+class HeldOutSplitTests(unittest.TestCase):
+    def test_single_source_short_tail_still_holds_out_a_full_segment(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "lat"
+            _write_shards(root, [("a.mp4", 10)] * 5 + [("a.mp4", 3)])   # short final remainder
+            for window in (4, 8):
+                sh = LatentShards(root, window=window)
+                self.assertEqual([z.shape[0] for z in sh.eval], [10])
+                self.assertEqual(len(sh.train), 4)
+            # the split itself does not depend on the window
+            small = LatentShards(root, window=2)
+            self.assertEqual(len(small.eval), 2)                       # full segment + tail
+            self.assertEqual(len(small.train), 4)
+
+    def test_rollout_horizon_from_longest_held_out_shard(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "lat"
+            _write_shards(root, [("a.mp4", 12), ("b.mp4", 12), ("c.mp4", 20), ("c.mp4", 4)])
+            sh = LatentShards(root, window=4)
+            self.assertEqual(sorted(z.shape[0] for z in sh.eval), [4, 20])
+            m = VideoPredictor(16, 1, 2, 2, 2, 2, "wave", in_ch=2, time_pos="none",
+                               causal=True, kernel_version="dispersion", linear_pad=True,
+                               pole_param="halflife")
+            a = type("A", (), dict(eval_rollout=64, chunk=2, eval_batch=2))()
+            out = train_long.latent_eval(m, sh, a)
+            self.assertEqual(out["latent_rollout_steps"], 18)          # 20 - chunk, not 4 - chunk - 1
+            self.assertEqual(len(out["latent_rollout_mse"]), 18)
+
+
 @unittest.skipUnless(HAVE, "needs diffusers + imageio + imageio-ffmpeg (requirements-video.txt)")
 class VideoVAETests(unittest.TestCase):
     def test_tiny_shapes_and_strides(self):
