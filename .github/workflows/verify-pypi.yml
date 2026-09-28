@@ -1,0 +1,110 @@
+name: Verify PyPI release
+
+# Two jobs, two different failures to catch.
+#
+# `verify-published` runs after a release and proves the artifact on the public
+# index actually works — installed from PyPI, outside the source tree, running
+# the README's own quickstart.
+#
+# `detect-drift` runs weekly and is the one that matters most. crumb-format
+# served 0.2.0 from April while the repository moved to 1.1.0, for four months,
+# with nothing to notice. A scheduled comparison between the published version
+# and the working tree turns that silent failure into a red build.
+
+on:
+  release:
+    types: [published]
+  schedule:
+    # Mondays, 09:00 UTC.
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Package version to verify, without the leading v
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  verify-published:
+    if: github.event_name != 'schedule'
+    name: verify-published (${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Resolve the version to verify
+        id: package
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          raw="${REQUESTED_VERSION:-${RELEASE_TAG}}"
+          version="${raw#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-.+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Invalid version: '$version'" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Install from the public PyPI index only
+        env:
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          python -m pip install --upgrade pip
+          for attempt in $(seq 1 20); do
+            if python -m pip install --no-cache-dir \
+              --index-url https://pypi.org/simple \
+              "crumb-format==$VERSION"; then
+              exit 0
+            fi
+            echo "PyPI has not propagated crumb-format==$VERSION yet (attempt $attempt/20)."
+            sleep 15
+          done
+          echo "Unable to install crumb-format==$VERSION from public PyPI." >&2
+          exit 1
+
+      - name: Verify installed metadata
+        env:
+          VERSION: ${{ steps.package.outputs.version }}
+        run: |
+          python -c "import importlib.metadata as m, os; \
+            got = m.version('crumb-format'); want = os.environ['VERSION']; \
+            assert got == want, f'{got} != {want}'"
+
+      # The README quickstart, run against the published artifact from a
+      # directory that is not the repository.
+      - name: Run the documented quickstart from the installed package
+        run: |
+          cp examples/transcript-checkout-openai.json /tmp/transcript.json
+          cd /tmp
+          crumb --version
+          crumb doctor
+          crumb --help-all > /dev/null
+          crumb from-messages -i transcript.json -o handoff.crumb --stats
+          crumb validate handoff.crumb
+          crumb measure handoff.crumb --source transcript.json --json > measure.json
+          python -c "import json; d=json.load(open('measure.json')); \
+            assert d['tokens']['saved_pct'] > 80, d; \
+            assert d['retention']['overall'] > 0.85, d"
+
+  detect-drift:
+    if: github.event_name == 'schedule'
+    name: Published version matches the working tree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Compare PyPI against the repository
+        run: python scripts/release_check.py --check-pypi

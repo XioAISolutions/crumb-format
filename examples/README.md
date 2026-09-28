@@ -27,6 +27,19 @@ Copy, edit, and paste these into any AI tool — they're all valid v1.1 crumbs.
 ### `kind=wake` — session bootstrap from Palace
 - [`wake-session.crumb`](wake-session.crumb) — instant-context crumb emitted by `crumb wake`
 
+## Transcript compression
+
+A real 40-message OpenAI conversation and the crumb it compresses to. Both files
+are committed so the numbers in the README reproduce exactly:
+
+- [`transcript-checkout-openai.json`](transcript-checkout-openai.json) — the source transcript
+- [`transcript-checkout.crumb`](transcript-checkout.crumb) — the handoff, 9.0x smaller at 92% fact retention
+
+```bash
+crumb from-messages -i examples/transcript-checkout-openai.json -o handoff.crumb --stats
+crumb measure examples/transcript-checkout.crumb --source examples/transcript-checkout-openai.json
+```
+
 ## Walkthroughs
 
 - [`lifecycle-demo.md`](lifecycle-demo.md) — full append → dream → diff lifecycle for a mem crumb

@@ -7,8 +7,8 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from crumb_llm.sample import generate, load_checkpoint  # noqa: E402
-from crumb_llm.train import load_config, train  # noqa: E402
+from crumb_wavelm.sample import generate, load_checkpoint  # noqa: E402
+from crumb_wavelm.train import load_config, train  # noqa: E402
 
 
 def test_train_tiny_converges_a_bit(tmp_path):

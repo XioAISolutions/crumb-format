@@ -6,7 +6,7 @@ import pytest
 
 torch = pytest.importorskip("torch")
 
-from crumb_llm.v2 import (  # noqa: E402
+from crumb_wavelm.v2 import (  # noqa: E402
     SmoothCausalKernel,
     LearnedScatterGather,
     QueryFrequencyGate,

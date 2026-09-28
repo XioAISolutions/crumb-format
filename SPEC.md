@@ -507,7 +507,7 @@ A consumer MAY compress a crumb to fit a token budget by composing the additive 
 4. **Escalate MeTalk** (levels 1 → 2 → 3) — dictionary, grammar strip, aggressive condensing.
 5. If still over budget, fail loudly rather than truncate required content.
 
-The reference CLI exposes this as `crumb squeeze --budget N`. A consumer MAY implement a subset — the ordering is prescriptive, but every step is optional.
+The reference CLI exposes this as `crumb optimize --mode budget --budget N`. A consumer MAY implement a subset — the ordering is prescriptive, but every step is optional.
 
 ---
 

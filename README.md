@@ -1,12 +1,115 @@
 # CRUMB
 
-**The copy-paste AI handoff format. No install required.**
+**Quit Claude Code mid-task, open Cursor or ChatGPT, and keep going — without re-explaining the architecture, the failed approaches, or the open questions.**
 
 ![CRUMB CLI overview](docs/assets/crumb-banner.svg)
 
 ---
 
-Switching AI tools mid-task? Paste a CRUMB. The next AI gets the goal, the context, and the constraints — without the chat-log noise. CRUMB is just structured text; you don't need any tool to use it.
+A raw transcript is the worst possible way to move context between tools: it is optimised for a human replaying a conversation, not for an agent picking up work. CRUMB is a small structured block that carries what the next tool actually needs — the goal, what was diagnosed, the decisions, the files touched, the constraints, and what is still open.
+
+```bash
+# Crumb the session you just finished — finds it for you
+crumb capture --last
+#   crumb capture: .crumb/session-fb203b95.crumb
+#   49,489 → 2,403 tokens (95% smaller), 18% fact retention
+
+# Then paste it into whatever you open next.
+```
+
+Or let it happen on its own. `install.sh` registers **both** lifecycle hooks, so
+the loop closes without anyone remembering any of it:
+
+| Hook | Command | Effect |
+| --- | --- | --- |
+| `SessionEnd` | `crumb capture` | every session leaves a handoff in `.crumb/` |
+| `SessionStart` | `crumb resume` | the next session starts with it already in context |
+
+`crumb resume` injects on a fresh `startup` only. **Not on `clear`** — that is
+the user asking for a clean slate, and restoring the old context would override
+an explicit instruction. **Not on `compact`** — compaction fires mid-session,
+and the newest crumb is from the last session that *ended*, so injecting it
+would restore a different session's detail at the worst possible moment
+(`--on startup,compact` exists for workflows where that is genuinely wanted).
+It skips handoffs older than a week, states the age of the one it injects,
+injects at most once per session even if the hook is registered twice (plugin
+*and* `install.sh`), and tells the model to verify anything load-bearing
+against the current tree rather than trusting a snapshot. It cannot fail the
+session it is attached to: every problem exits 0 with the reason on stderr.
+
+## Where it reads from
+
+| Source | How |
+| --- | --- |
+| **Claude Code** | `SessionEnd` + `SessionStart` hooks (automatic, both directions) or `crumb capture --transcript <session>.jsonl` |
+| **OpenAI Chat Completions** | `crumb from-messages` — `messages[]`, a bare array, or a response with `choices` |
+| **Anthropic Messages API** | content blocks: `text`, `tool_use`, `tool_result`, `thinking` |
+| **ChatGPT data export** | `conversations.json` |
+| **Claude.ai data export** | `chat_messages` |
+| **Cursor** | rules + MCP server (`integrations/cursor/install.sh`) |
+| **Anything else** | it is just text — paste it, or hand-write it |
+
+Every captured crumb **carries its own receipt**, so the cost travels with the
+artifact instead of scrolling past in a terminal:
+
+```text
+BEGIN CRUMB
+v=1.4
+kind=task
+source=transcript.claude-code
+measured=3705->565 tokens, 84.8% saved, 30.5% retention, tiktoken:o200k_base
+---
+```
+
+`crumb measure` on that file reproduces the header exactly — the receipt is
+written to a fixed point, since it is part of the file it measures. It is
+excluded from fact matching, so a crumb can never inflate its own retention
+with the digits in its own receipt. `--no-receipt` omits it; `measured=` is an
+optional header that existing parsers already ignore, so the spec stays at 1.4.
+
+And unlike every other tool in this space, **you can check what it cost you**:
+
+```bash
+crumb measure handoff.crumb --source session.jsonl
+#   Saved: 88.9% (9.0x smaller)
+#   Fact retention: 91.7% (11/12) — broken down by paths, identifiers, urls, error codes
+```
+
+Retention is a **lexical** proxy — it reports which load-bearing tokens survived, not whether the next model succeeds. It also falls on very long sessions: a 40-message conversation retains ~92%, while a 1,000-message one retains ~18%, because a 50k-token session genuinely cannot be carried losslessly in a 2.4k handoff. The number is reported as measured rather than tuned, so you can see the trade instead of taking it on trust.
+
+## What compression actually costs
+
+Six strategies, seven transcripts, reproducible in two seconds with no API key
+([full writeup](docs/BENCHMARK.md)):
+
+```text
+long-claude-code.jsonl  (159 messages)
+  strategy                         tokens    saved  retained   example losses
+  recency-window-4                    169    95.4%      6.1%   module_00, module_01, module_02
+  head-truncate-10                    251    93.2%      6.1%   1200ms, 502, https://…/ledger
+  crumb                               547    85.2%     30.5%   module_00, module_01, module_02
+  full-transcript                   3,705     0.0%    100.0%   —
+```
+
+A structured handoff retains 3–5× more than truncation at comparable
+compression — and head-truncation drops the whole diagnosis, because in a real
+session the conclusion is at the end.
+
+**And retention is not task success.** A separate harness probes whether the
+next model can still *use* what survived, and there CRUMB does not win: at the
+recoverability ceiling a recency window matches it at 56% of the tokens on the
+long session, and beats it on the tool-heavy one. Both numbers are real and they
+measure different things — which is exactly why the proxy is labelled a proxy.
+See [`docs/TASK_SUCCESS.md`](docs/TASK_SUCCESS.md).
+
+It does not win everywhere. On tool-heavy sessions, clearing old tool results
+retains 62% where CRUMB retains 27%, at a quarter of the compression. That row
+is in the benchmark on purpose; a test fails the build if no strategy beats
+CRUMB on any axis anywhere.
+
+```bash
+python benchmarks/compare.py
+```
 
 ## Step 1 — Add "crumb it" to your AI (30 seconds, no install)
 
@@ -78,9 +181,21 @@ Paste it at the start of any session. No more "I like concise answers, don't use
 
 Six kinds: `task` (what to do next), `mem` (long-term memory), `map` (repo overview), `log` (session transcript), `todo` (work items), `agent` (reusable persona).
 
-## Optional — install the CLI for power tooling
+## Install
 
-Everything above works with no install. The CLI is for power users who want to validate, search, lint, pack, or pipeline CRUMBs at scale.
+### Claude Code plugin — both hooks, no `pip`
+
+```
+/plugin marketplace add XioAISolutions/crumb-format
+/plugin install crumb-format
+```
+
+That installs from GitHub and wires up everything: the `SessionEnd` and
+`SessionStart` hooks, the MCP tools, and the `/crumb-export` and `/crumb-import`
+commands. The CLI is stdlib-only and runs straight from the plugin checkout, so
+there is no build step and no package index in the path.
+
+### CLI, for pipelines and CI
 
 ```bash
 pip install crumb-format
@@ -89,6 +204,14 @@ crumb doctor        # check your install
 crumb --help        # core commands
 crumb --help-all    # full surface (~46 commands grouped by concern)
 ```
+
+> **Note:** the published wheel is behind the repository while a PyPI trusted
+> publisher is registered — see [docs/RELEASING.md](docs/RELEASING.md). Until
+> then the plugin above, or a source install, gets you the current version:
+> `pip install "crumb-format @ git+https://github.com/XioAISolutions/crumb-format@main"`
+
+Everything in the sections above works with no install at all — CRUMB is text.
+The CLI is for validating, searching, linting, packing, or pipelining at scale.
 
 The five core commands cover most workflows:
 
@@ -101,6 +224,70 @@ crumb lint handoff.crumb --check-deadlines                     # safety + freshn
 ```
 
 Run `crumb --help-all` for the full surface (search, palace memory, governance, format bridges, v1.4 features).
+
+## Compress a real conversation — with receipts
+
+`crumb from-messages` reads the formats conversations are actually stored in and turns one into a handoff:
+
+| Input | Shape |
+| --- | --- |
+| OpenAI Chat Completions | `{"messages": [...]}`, a bare array, or a response with `choices` |
+| Anthropic Messages API | content blocks — `text`, `tool_use`, `tool_result`, `thinking` |
+| ChatGPT data export | `conversations.json` (mapping tree) |
+| Claude.ai data export | `chat_messages` |
+| Any of the above | as JSONL |
+
+Run it against the transcript committed in `examples/` — every number below reproduces:
+
+```bash
+crumb from-messages -i examples/transcript-checkout-openai.json -o handoff.crumb --stats
+```
+
+```text
+Read 40 messages as openai-messages.
+  3,560 → 394 tokens (89% smaller, 9.0x) via heuristic:chars/4
+  Fact retention: 92% (11/12 load-bearing tokens kept)
+```
+
+You get a v1.4 task crumb with the goal, what was diagnosed, the decisions that were reached, the files and tools touched, the constraints stated along the way, and the open threads as `[handoff]` items — see [`examples/transcript-checkout.crumb`](examples/transcript-checkout.crumb). Reasoning traces are dropped; they're the most expensive and least reusable part of any transcript. Extraction is deterministic and calls no model, so the same conversation always produces the same crumb.
+
+**And you can check the claim.** `crumb measure` compares a crumb against the source it came from:
+
+```bash
+crumb measure examples/transcript-checkout.crumb \
+  --source examples/transcript-checkout-openai.json
+```
+
+```text
+  Tokenizer:         heuristic:chars/4  (approximate — pip install tiktoken for exact counts)
+  Source:            3,560 tokens
+  CRUMB:             394 tokens
+  Saved:             88.9%  (9.0x smaller)
+----------------------------------------------------------
+  Fact retention:    91.7%  (11/12 load-bearing tokens kept)
+    urls           100.0%  (1/1)
+    paths           80.0%  (4/5)  lost: next.js
+    errors         100.0%  (1/1)
+    identifiers    100.0%  (4/4)
+    numbers        100.0%  (1/1)
+```
+
+That output is the tool working as intended, including the miss. The first run of this fixture scored 58%: it was dropping the diagnosis (`sessionStorage is cleared by the redirect`), the latency, the error code, and the spec URL — carrying the *fix* but not the *why*, so the next model would have had to re-derive it. The extractor was fixed because the measurement showed the loss.
+
+Two numbers, both reproducible. Token counts come from `tiktoken` when it's installed (`pip install crumb-format[measure]`) and from a `chars/4` heuristic when it isn't — and the report always names which one it used, because a compression ratio computed from `len(text) // 4` isn't a measurement.
+
+Retention is a **lexical proxy**: it checks whether load-bearing tokens (paths, URLs, identifiers, error codes, numbers with units) survive compression. It answers "what got dropped", not "does the next model still succeed" — treat it as a regression guard, not a benchmark. The per-category breakdown is the useful part: it tells you *what kind* of information your packing drops.
+
+Wire it into CI so a packing change can't silently start losing context:
+
+```bash
+crumb measure handoff.crumb --source conversation.json \
+  --min-saved 80 --min-retention 85 --json
+```
+
+Exits non-zero when either threshold is missed.
+
+> Compression is not free and the numbers say so. On a short conversation the crumb is *larger* than the source — structure has a fixed cost that only pays back across a long session. `crumb measure` reports that as negative savings rather than hiding it.
 
 ## Native integrations — `crumb it` inside your AI tool
 
@@ -382,8 +569,8 @@ crumb metalk task.crumb --level 1
 # Aggressive condensing (~50-60% savings)
 crumb metalk task.crumb --level 3
 
-# Chain with compress for maximum density
-crumb compress task.crumb --metalk
+# Chain with signal compression for maximum density
+crumb optimize task.crumb --mode signal --metalk
 ```
 
 Output shows live stats: `MeTalk: 127 → 68 tokens (46.5% saved, 1.87x ratio)`.
@@ -497,15 +684,15 @@ repos:
 - [`api/`](api/) -- REST API server with OpenAPI 3.1 spec
 - [`a2a/`](a2a/) -- Google A2A protocol bridge (agent card, task handler, server)
 - [`validators/`](validators/) -- Python and Node reference validators
-- [`tests/`](tests/) -- 291 tests covering the full surface area
+- [`tests/`](tests/) -- 916 tests covering the full surface area
 - [`docs/HANDOFF_PATTERNS.md`](docs/HANDOFF_PATTERNS.md) -- practical handoff patterns
-- [`crumb_llm/`](crumb_llm/) -- **Crumb LLM**: standalone experimental O(N log N) physics-based language model ([architecture doc](docs/crumb-llm-architecture.md))
+- [`crumb_wavelm/`](crumb_wavelm/) -- **Crumb LLM**: the standalone experimental O(N log N) physics-based language model, **not shipped in the `crumb-format` wheel** ([architecture doc](docs/crumb-llm-architecture.md))
 
 ## Crumb LLM (standalone experimental)
 
 **Crumb LLM** is an experimental open-source architecture that replaces
 traditional O(N²) transformer attention with physics-based wave equations
-at O(N log N) complexity. It ships as its own `crumb-llm` package and CLI.
+at O(N log N) complexity. It ships as its own `crumb-wavelm` package and CLI.
 `crumb-format` is optional; when installed, CRUMB sections, priorities, and
 fold pairs become physical priors on the wave field rather than being
 flattened away by a tokenizer.
@@ -516,32 +703,40 @@ field, the kernel propagates information via FFT, and tokens gather back.
 Advanced physics include dispersion, boundary conditions (periodic /
 absorbing / reflecting), interference mixing, and Gabor wavelet heads.
 
+> **Not part of the format, and not installed with it.** This is research code
+> with no bearing on the CRUMB wire format, so it is no longer bundled in the
+> `crumb-format` wheel — `pip install crumb-format` does not carry a PyTorch
+> model. Build it from a checkout:
+
 ```bash
-pip install crumb-llm
+git clone https://github.com/XioAISolutions/crumb-format
+cd crumb-format && pip install torch numpy
+python -m crumb_wavelm.setup_standalone --output ./crumb-wavelm-pkg
+pip install ./crumb-wavelm-pkg
 
 # List and download registered checkpoints
-crumb-llm models
-crumb-llm download crumb-llm-tiny-local
-crumb-llm generate --ckpt ~/.cache/crumb-llm/models/crumb-llm-tiny-local --prompt "BEGIN CRUMB"
+crumb-wavelm models
+crumb-wavelm download crumb-llm-tiny-local
+crumb-wavelm generate --ckpt ~/.cache/crumb-wavelm/models/crumb-llm-tiny-local --prompt "BEGIN CRUMB"
 
 # Train a tiny model on the bundled crumb corpus (~2 min on CPU)
-crumb-llm train --config tiny --steps 500 --out /tmp/crumb_run
+crumb-wavelm train --config tiny --steps 500 --out /tmp/crumb_run
 
 # Generate text
-crumb-llm generate --ckpt /tmp/crumb_run --prompt "BEGIN CRUMB"
+crumb-wavelm generate --ckpt /tmp/crumb_run --prompt "BEGIN CRUMB"
 
 # Score a crumb's perplexity
-crumb-llm perplexity --ckpt /tmp/crumb_run examples/task-bug-fix.crumb
+crumb-wavelm perplexity --ckpt /tmp/crumb_run examples/task-bug-fix.crumb
 
 # Benchmark: Crumb LLM vs transformer at various sequence lengths
-crumb-llm bench --lens 1024,4096,8192
+crumb-wavelm bench --lens 1024,4096,8192
 
 # See all options
-crumb-llm info
+crumb-wavelm info
 ```
 
 Local checkpoints can be added to the registry with
-`crumb-llm register my-model --path /path/to/checkpoint --alias mine`.
+`crumb-wavelm register my-model --path /path/to/checkpoint --alias mine`.
 The bundled tiny checkpoint can be prepared for public upload with
 `python scripts/publish_crumb_llm_model.py`.
 

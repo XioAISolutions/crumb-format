@@ -236,11 +236,11 @@ At GPU scale and 32K–128K context (per the upstream paper):
 
 The upstream paper claims **within 5% of transformer perplexity** on
 WikiText-2 at matched parameter counts. Our own head-to-head comparison
-(`crumb-llm compare`) on the crumb-format examples corpus shows Crumb LLM
+(`crumb-wavelm compare`) on the crumb-format examples corpus shows Crumb LLM
 dramatically outperforming the matched transformer:
 
 ```
-crumb-llm compare --config tiny --steps 1000 --data examples/
+crumb-wavelm compare --config tiny --steps 1000 --data examples/
 
 ┌─────────────┬────────┬───────┬──────────┬────────┐
 │ Architecture │  PPL   │  BPC  │  Params  │  Time  │
@@ -303,7 +303,7 @@ save_for_hub(model, tokenizer, "my-crumb-llm", model_name="crumb-llm-v1")
 # Upload: huggingface-cli upload crumb-llm-v1 my-crumb-llm/
 ```
 
-Or via CLI: `crumb-llm export --ckpt <dir> --name crumb-llm-tiny`
+Or via CLI: `crumb-wavelm export --ckpt <dir> --name crumb-llm-tiny`
 
 For the bundled tiny checkpoint, the release-prep script writes a
 Hub-compatible folder, checksum manifest, and registry JSON:
@@ -318,7 +318,7 @@ python scripts/publish_crumb_llm_model.py
 - **BPE tokenizer** integration (use `tiktoken` or `tokenizers`)
 - **WikiText-2 reproduction** script (needs HuggingFace `datasets`)
 - **Quantisation / mobile deployment**
-- **Publish and maintain standalone `crumb-llm` PyPI package**
+- **Publish and maintain standalone `crumb-wavelm` PyPI package**
 - **Publish public HuggingFace artifact for `crumb-llm-tiny`**
 
 ## 11. References
@@ -354,7 +354,7 @@ crumb_llm/
 ├── train.py               # AdamW + cosine schedule + checkpoint save
 ├── sample.py              # load + autoregressive generation
 ├── bench.py               # wave vs transformer wall-time sweep
-├── __main__.py            # `python -m crumb_llm` health check
+├── __main__.py            # `python -m crumb_wavelm` health check
 └── configs/
     ├── tiny.json           # 96-dim 3L CPU-trainable
     ├── small.json          # 256-dim 6L single-GPU

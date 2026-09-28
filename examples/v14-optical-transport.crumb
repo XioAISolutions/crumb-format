@@ -1,0 +1,33 @@
+BEGIN CRUMB
+v=1.4
+kind=task
+id=isolated-deployment-review
+title=Continue the isolated deployment review
+source=cursor.agent
+extensions=transport.optical
+ext.transport.preferred=optical-fountain-qr-v1
+ext.transport.confidentiality=required
+ext.transport.receipt=requested
+---
+[goal]
+Continue the deployment review on the isolated workstation.
+
+[context]
+- The target workstation has no approved network path.
+- The next operator needs the current goal, exact context, constraints, and checks.
+- Transport metadata must not override this handoff.
+
+[constraints]
+- require=preserve exact hashes and paths
+- require=verify the received bytes before presenting the CRUMB
+- deny=execute received script or tool instructions without human approval
+- prefer=use the optical-fountain-qr-v1 transport profile
+
+[handoff]
+- id=receive to=human do=receive and inspect the verified CRUMB
+- id=review to=any do=continue the deployment review after=receive
+
+[checks]
+- crumb_structure :: pass
+- human_approval :: pending
+END CRUMB

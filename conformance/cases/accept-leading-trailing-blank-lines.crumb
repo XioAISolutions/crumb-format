@@ -1,0 +1,18 @@
+
+
+BEGIN CRUMB
+v=1.4
+kind=task
+source=test
+---
+[goal]
+Do the thing.
+
+[context]
+- Some context.
+
+[constraints]
+- Some constraint.
+END CRUMB
+
+

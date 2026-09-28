@@ -55,7 +55,7 @@ def main():
 """)
 
     cmd = [
-        sys.executable, "-m", "crumb_llm.train",
+        sys.executable, "-m", "crumb_wavelm.train",
         "--config", args.config,
         "--steps", str(args.steps),
         "--data", data,
@@ -70,7 +70,7 @@ def main():
         print("  Generation Demo")
         print("="*60 + "\n")
         import torch
-        from crumb_llm.sample import load_checkpoint
+        from crumb_wavelm.sample import load_checkpoint
 
         model, tok = load_checkpoint(args.out)
         model.eval()
