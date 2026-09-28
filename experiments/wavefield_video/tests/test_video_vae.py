@@ -239,9 +239,30 @@ class VideoVAETests(unittest.TestCase):
             cut = next(i for i, r in enumerate(rows) if json.loads(r)["src"] == v2) + 1
             journal.write_text("\n".join(rows[:cut]) + "\n" + rows[cut][:10])   # + torn line
             (d / "lat" / "index.json").unlink()
+            real_replace, replaced = encode_videos.os.replace, []
+
+            def spy(src, dst):
+                replaced.append(Path(dst).name)
+                return real_replace(src, dst)
             with unittest.mock.patch.object(VideoVAE, "encode", autospec=True,
-                                            side_effect=VideoVAE.encode) as enc:
+                                            side_effect=VideoVAE.encode) as enc, \
+                    unittest.mock.patch.object(encode_videos.os, "replace", side_effect=spy):
                 resumed = encode_videos.main(args)
+            self.assertIn("progress.jsonl", replaced)           # torn tail repaired atomically
+            for r in journal.read_text().splitlines():
+                json.loads(r)                                   # no torn text left behind
+            (d / "lat" / "index.json").unlink()
+            replaced.clear()
+            before = journal.read_bytes()
+            with unittest.mock.patch.object(encode_videos.os, "replace", side_effect=spy):
+                encode_videos.main(args)                        # intact journal, all done
+            self.assertNotIn("progress.jsonl", replaced)        # never rewritten
+            self.assertEqual(journal.read_bytes(), before)
+            # a last line whose newline was cut is repaired, not glued to the next write
+            journal.write_bytes(before.rstrip(b"\n"))
+            (d / "lat" / "index.json").unlink()
+            encode_videos.main(args)
+            self.assertEqual(journal.read_bytes(), before)
             self.assertEqual(len(full), 6)                      # 3 videos x 2 segments
             self.assertEqual(enc.call_count, 3)                 # v2's 2nd segment + v3's two
             self.assertEqual(resumed, full)

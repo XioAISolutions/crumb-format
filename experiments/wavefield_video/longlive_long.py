@@ -155,18 +155,15 @@ def expected_stems(prompts):
     return [Path(latent_name(i)).stem for i in range(n_prompts_of(prompts))]
 
 
-def _file_digest(path, edge=16 << 20):
-    """size + sha256 of the first and last 16 MiB: tells checkpoints apart without
-    reading 10 GB on every resume."""
+def _file_digest(path, block=8 << 20):
+    """size + sha256 of every byte (streamed). ~30 s for the 10 GB checkpoint: once
+    per generate call, cheap next to the generation it guards."""
     path = Path(path)
     h = hashlib.sha256()
-    n = path.stat().st_size
     with open(path, "rb") as f:
-        h.update(f.read(edge))
-        if n > 2 * edge:
-            f.seek(n - edge)
-        h.update(f.read(edge))
-    return f"{n}:{h.hexdigest()[:16]}"
+        for chunk in iter(lambda: f.read(block), b""):
+            h.update(chunk)
+    return f"{path.stat().st_size}:{h.hexdigest()[:16]}"
 
 
 def _prompts_digest(prompts):
@@ -187,11 +184,19 @@ def _git_head(root):
         return None
 
 
-def run_identity(cfg, ckpt, prompts, ll_root):
-    """Everything that determines the generated latents: the effective overlay and
-    fingerprints of the checkpoint, the prompts and the LongLive checkout."""
-    return dict(overlay=cfg, ckpt=_file_digest(ckpt), prompts=_prompts_digest(prompts),
-                longlive=_git_head(ll_root))
+def vae_weights_path(ll_root, vae_path=None):
+    return Path(vae_path) if vae_path else Path(ll_root) / "wan_models/Wan2.2-TI2V-5B/Wan2.2_VAE.pth"
+
+
+def run_identity(cfg, ckpt, prompts, ll_root, vae=None):
+    """Everything that determines the outputs: the effective overlay, full-content
+    digests of the generator checkpoint and the decoder VAE weights, the prompts
+    and the LongLive checkout."""
+    ident = dict(overlay=cfg, ckpt=_file_digest(ckpt), prompts=_prompts_digest(prompts),
+                 longlive=_git_head(ll_root))
+    if vae is not None:
+        ident["vae"] = _file_digest(vae) if Path(vae).exists() else "missing"
+    return ident
 
 
 def check_identity(out, ident):
@@ -364,7 +369,8 @@ def cmd_generate(a):
                         fp8=a.precision == "fp8", compile=a.compile)
     cfg["inference_iter"] = n_prompts - 1
     if not a.dry_run:
-        check_identity(out, run_identity(cfg, Path(a.ckpt).resolve(), prompts, ll_root))
+        vae = vae_weights_path(ll_root, a.vae_path)
+        check_identity(out, run_identity(cfg, Path(a.ckpt).resolve(), prompts, ll_root, vae))
     lat_dir = out / "latents"
     have = [latent_name(i) for i in range(n_prompts) if (lat_dir / latent_name(i)).exists()]
     if len(have) == n_prompts:

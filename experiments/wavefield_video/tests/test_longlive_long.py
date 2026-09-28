@@ -216,6 +216,9 @@ def test_expected_stems_txt_and_dir(tmp_path):
 
 
 def _ident(tmp_path, **over):
+    vae = tmp_path / "vae.pth"
+    if not vae.exists():
+        vae.write_bytes(b"v" * 100)
     ck = tmp_path / "ck.pt"
     if not ck.exists():
         ck.write_bytes(b"w" * 1000)
@@ -224,7 +227,7 @@ def _ident(tmp_path, **over):
         pr.write_text("a cat\n")
     cfg = L.build_overlay(BASE, latent_frames=over.pop("lat", 16), prompts=pr, ckpt=ck,
                           out_dir=tmp_path / "run", seed=over.pop("seed", 0))
-    return L.run_identity(cfg, ck, pr, tmp_path)
+    return L.run_identity(cfg, ck, pr, tmp_path, vae)
 
 
 def test_identity_guard(tmp_path):
@@ -243,8 +246,31 @@ def test_identity_guard(tmp_path):
     (tmp_path / "ck.pt").write_bytes(b"v" * 1000)                 # same path + size, new weights
     with pytest.raises(SystemExit, match="ckpt"):
         L.check_identity(out, _ident(tmp_path))
+    (tmp_path / "ck.pt").write_bytes(b"w" * 1000)
+    ck = bytearray(b"w" * 1000)
+    ck[500] = ord("x")                                            # one middle byte, same size
+    (tmp_path / "ck.pt").write_bytes(bytes(ck))
+    with pytest.raises(SystemExit, match="ckpt"):
+        L.check_identity(out, _ident(tmp_path))
+    (tmp_path / "ck.pt").write_bytes(b"w" * 1000)
+    (tmp_path / "vae.pth").write_bytes(b"u" * 100)                # decoder weights replaced
+    with pytest.raises(SystemExit, match="vae"):
+        L.check_identity(out, _ident(tmp_path))
     bare = tmp_path / "bare"
     bare.mkdir()
     (bare / "old.mp4").write_bytes(b"x")                          # outputs of unknown provenance
     with pytest.raises(SystemExit, match="no run_identity"):
         L.check_identity(bare, _ident(tmp_path))
+
+
+def test_checkpoint_digest_covers_the_middle(tmp_path):
+    """Same size and same first/last 16 MiB, one byte changed in the middle."""
+    f = tmp_path / "big.pt"
+    n = 40 << 20
+    with open(f, "wb") as fh:
+        fh.truncate(n)
+    a = L._file_digest(f)
+    with open(f, "r+b") as fh:
+        fh.seek(n // 2)
+        fh.write(b"\x01")
+    assert L._file_digest(f) != a

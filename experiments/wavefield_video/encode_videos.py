@@ -143,13 +143,20 @@ def main(argv=None):
         os.replace(cfg_path.with_suffix(".tmp"), cfg_path)
     lines = []
     if journal.exists():
-        for x in journal.read_text().splitlines():
+        raw = journal.read_text()
+        torn = bool(raw) and not raw.endswith("\n")    # last write cut before its newline
+        for x in raw.splitlines():
             try:
                 lines.append(json.loads(x))
             except json.JSONDecodeError:              # a line cut by the slice kill: redo it
+                torn = True
                 break
-        # rewrite without the torn tail so new lines never follow a broken one
-        journal.write_text("".join(json.dumps(d) + "\n" for d in lines))
+        if torn:
+            # drop the torn tail so new lines never follow a broken one; atomically,
+            # so a kill during the repair cannot truncate the valid prefix
+            tmp = journal.with_suffix(".jsonl.tmp")
+            tmp.write_text("".join(json.dumps(d) + "\n" for d in lines))
+            os.replace(tmp, journal)
     finished = {d["src"] for d in lines if d.get("done")}
     segs_done = {}
     for d in lines:
