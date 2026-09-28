@@ -78,10 +78,7 @@ class VideoVAE(nn.Module):
             if tiny and not path:
                 self.model = _tiny(base)
             else:
-                cls = self._cls(base)
-                src = path or p["hf"]
-                sub = None if path else p["subfolder"]
-                self.model = cls.from_pretrained(src, subfolder=sub, torch_dtype=dtype)
+                self.model = self._load(self._cls(base), path or p["hf"], p["subfolder"], dtype)
             self.channels = self.model.config.latent_channels if base == "ltx" else self.model.config.z_dim
             if hasattr(self.model, "enable_tiling"):
                 self.model.enable_tiling()           # bounded memory on long clips
@@ -91,6 +88,20 @@ class VideoVAE(nn.Module):
         # on the VAE's device: callers pass CPU or GPU latents (normalize after moving)
         self.register_buffer("mean", mean.to(self.device), persistent=False)
         self.register_buffer("std", std.to(self.device), persistent=False)
+
+    @staticmethod
+    def _load(cls, src, subfolder, dtype):
+        """src: a VAE directory, a pipeline directory (VAE in ``subfolder``), or an
+        HF id of either kind. Local dirs are resolved by where config.json is; HF
+        ids try the pipeline layout first, then the repository root."""
+        local = pathlib.Path(src).expanduser()
+        if local.is_dir():
+            sub = None if (local / "config.json").is_file() else subfolder
+            return cls.from_pretrained(str(local), subfolder=sub, torch_dtype=dtype)
+        try:
+            return cls.from_pretrained(src, subfolder=subfolder, torch_dtype=dtype)
+        except (OSError, EnvironmentError, ValueError):
+            return cls.from_pretrained(src, torch_dtype=dtype)
 
     @staticmethod
     def _cls(base):

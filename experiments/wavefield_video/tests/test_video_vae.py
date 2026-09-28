@@ -58,6 +58,10 @@ class VideoVAETests(unittest.TestCase):
             v.save(d)
             w = VideoVAE("ltx-tiny", path=d)
         self.assertTrue(torch.allclose(v.encode(x), w.encode(x), atol=1e-6))
+        with tempfile.TemporaryDirectory() as d:          # pipeline layout: VAE under vae/
+            v.save(Path(d) / "vae")
+            w = VideoVAE("ltx-tiny", path=d)
+        self.assertTrue(torch.allclose(v.encode(x), w.encode(x), atol=1e-6))
 
     def test_bad_inputs(self):
         with self.assertRaises(ValueError):
