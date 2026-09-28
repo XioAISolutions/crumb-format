@@ -290,6 +290,39 @@ halflife):** arms clean G=4, clean G=1, gate G=4, gate G=1.
 **Result: pending.** Running on CPU (clean G4/G1, gate G4/G1) when this section
 merged. The verdict is recorded here either way, in the next PR.
 
+## 9. Phase 2 — a pretrained video VAE under the wave model
+
+The home-made per-frame ConvAE fades to black in both arms and compresses no
+time. Production video VAEs compress time as well, so the predictor runs on
+latent steps: 5 minutes at 24 fps is 7,193 usable frames (1+8k) → **900 LTX
+latent steps**, inside the 1,024-step horizon already streamed.
+
+| piece | file | what it does |
+|---|---|---|
+| adapter | `video_vae.py` | `VideoVAE("ltx"\|"wan"\|"conv"\|"*-tiny")`: `encode` [B,T,3,H,W]→[B,Tl,C,h,w] (per-channel normalized), `decode`, strides, save/load; `LatentShards` windows over encoded shards with a held-out split |
+| offline encode | `encode_videos.py` | mp4 folder → resize/crop → resample fps → 1+t·k segments → `shard_*.pt` + `index.json`; `--synthetic N` writes moving-ball mp4s for smoke |
+| training | `train_long.py --latents DIR` | phase 1 carried-state trainer on latent sequences (`VideoPredictor(in_ch=C)`); eval = held-out next-latent MSE vs copy-last + an autoregressive latent rollout curve |
+| 5-minute screen | `long_horizon.py stream --latents DIR --vae ltx` | warm on real held-out latents, stream N latent steps, decode chunk by chunk, `HealthMonitor` on **decoded pixels** |
+| box runner | `run_latent.sh`, `queue_jobs/latent_2026-09-28/` | encode → train → decoded 900-step stream, sliced/resumable like `run_long_horizon.sh` |
+
+Verified here with tiny random LTX/Wan configs: shapes and strides (LTX 17→3
+steps, 32× spatial; Wan 17→5, 8×), save/load round trip, mp4 → shards →
+training → decoded stream (`tests/test_video_vae.py`), and a full
+`run_latent.sh` pass. **Not verified here:** anything about quality. Hugging
+Face is blocked in this container, so real LTX/Wan weights have only run on
+the box.
+
+Known limits: chunks of generated latents are decoded independently, so a
+causal VAE's first-frame handling can show at chunk seams (use a large
+`--chunk` for the screen). Shards are loaded fully into memory, which is fine
+for hours of 256×448 latents (≈0.1 MB per latent step at fp16) but not for
+datasets far larger than that.
+
+Pre-registered box read (`run_latent.sh`): **KILL** if fade or flatten fires
+before latent step 256 (~34 s of LTX video) on the held-out stream. **PASS**
+if nothing fires through 900 steps (5 minutes); then judge the decoded frames
+by eye before any claim.
+
 ## Pitch corrections
 
 - "At 16k moments one step takes ~1.5 s": the *ratio* survives a fair re-measure

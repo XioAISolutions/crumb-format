@@ -1,0 +1,5 @@
+# Optional deps for the pretrained video-VAE latent path (LONG_HORIZON.md phase 2).
+# torch is required separately (CUDA build on the box).
+diffusers>=0.35
+imageio>=2.30
+imageio-ffmpeg>=0.5
