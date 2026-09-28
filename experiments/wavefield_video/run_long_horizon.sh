@@ -34,12 +34,19 @@ T_LONG=${T_LONG:-128}
 T_ATTN=${T_ATTN:-32}
 GAP=${GAP:-64}
 mkdir -p "$OUT"
+if ! command -v "$PY" >/dev/null 2>&1; then
+    echo "Python not executable: $PY (override with PY=/path/to/python)" >&2; exit 2
+fi
 
-BASE=(--data-source occlusion --grid 32 --n-balls 6 --batch 4
-      --target-params 2000000 --causal --residual --linear-pad
-      --dim 128 --layers 4 --heads 8 --ckpt
+GRID=${GRID:-32}; DIM=${DIM:-128}; LAYERS=${LAYERS:-4}; HEADS=${HEADS:-8}; BATCH=${BATCH:-4}
+TARGET_PARAMS=${TARGET_PARAMS:-2000000}; EVAL_ROLLOUT=${EVAL_ROLLOUT:-512}; EVAL_SEEDS=${EVAL_SEEDS:-8}
+STREAM_FRAMES=${STREAM_FRAMES:-7200}
+BASE=(--data-source occlusion --grid "$GRID" --n-balls 6 --batch "$BATCH"
+      --target-params "$TARGET_PARAMS" --causal --residual --linear-pad
+      --dim "$DIM" --layers "$LAYERS" --heads "$HEADS" --ckpt
       --motion-loss --rollout-loss 1 --const-lr
-      --eval-rollout 512 --eval-seeds 8 --eval-chunk 1 --auto-batch --save-every 500)
+      --eval-rollout "$EVAL_ROLLOUT" --eval-seeds "$EVAL_SEEDS" --eval-chunk 1
+      --auto-batch --save-every 250)
 
 ARMS=(
     "W_soft|wave|$T_LONG|--kernel-version dispersion --pole-param softplus"
@@ -49,30 +56,56 @@ ARMS=(
     "A_attn|attn|$T_ATTN|"
 )
 
+# Sliced + resumable (the box conductor kills jobs at 5400s): finished arms are
+# skipped, a live arm resumes from its ckpt, the whole slice is capped at SLICE_S
+# wall seconds (arms share the budget), and the script stops at the boundary. Re-queue the same
+# command until $OUT/status.txt reads DONE. Keep STEPS fixed across slices.
+SLICE_S=${SLICE_S:-4800}
+TIMEOUT_BIN=$(command -v timeout || true)
+echo RUNNING > "$OUT/status.txt"
+slice_t0=$(date +%s)
 for seed in $SEEDS; do
     for arm in "${ARMS[@]}"; do
         IFS='|' read -r label kind frames extra <<< "$arm"
         tag="_${label}_s${seed}"
         if [ -f "$OUT/result_${kind}${tag}.json" ]; then echo "SKIP $tag"; continue; fi
-        read -r -a extra_args <<< "$extra"
+        extra_args=()
+        if [ -n "$extra" ]; then read -r -a extra_args <<< "$extra"; fi
         tgap=$(( GAP < frames - 8 ? GAP : frames - 8 ))
         occ=(--train-occ-start $((frames - tgap)) --train-occ-end "$frames"
              --occ-start $((frames + 32)) --occ-end $((frames + 32 + GAP)))
-        echo "== $tag $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-        "$PY" train_compare.py "${BASE[@]}" "${occ[@]}" ${extra_args[@]+"${extra_args[@]}"} \
+        resume=()
+        if [ -f "$OUT/ckpt_${kind}${tag}.pt" ]; then resume=(--resume "$OUT/ckpt_${kind}${tag}.pt"); fi
+        left=$(( SLICE_S - ($(date +%s) - slice_t0) ))
+        if [ "$left" -lt 120 ]; then
+            echo "SLICED before $tag (budget spent) -- re-queue to continue" | tee -a "$OUT/progress.txt"
+            echo "SLICED" > "$OUT/status.txt"; exit 0
+        fi
+        echo "== $tag $(date -u '+%Y-%m-%dT%H:%M:%SZ') ${resume[*]:-fresh}" | tee -a "$OUT/progress.txt"
+        rc=0
+        ${TIMEOUT_BIN:+$TIMEOUT_BIN "$left"} "$PY" train_compare.py "${BASE[@]}" "${occ[@]}" \
+            ${extra_args[@]+"${extra_args[@]}"} ${resume[@]+"${resume[@]}"} \
             --kind "$kind" --frames "$frames" --seed "$seed" --steps "$STEPS" \
-            --out "$OUT" --tag "$tag" > "$OUT/log${tag}.txt" 2>&1 || echo "FAIL $tag"
+            --out "$OUT" --tag "$tag" >> "$OUT/log${tag}.txt" 2>&1 || rc=$?
+        if [ "$rc" = "124" ] || [ "$rc" = "143" ]; then
+            echo "SLICED $tag at the ${SLICE_S}s slice budget -- re-queue to continue" | tee -a "$OUT/progress.txt"
+            echo "SLICED" > "$OUT/status.txt"
+            exit 0
+        fi
+        [ "$rc" = "0" ] || echo "FAIL $tag exit=$rc (see $OUT/log${tag}.txt)" | tee -a "$OUT/progress.txt"
     done
 done
 
 # 5-minute health stream on each trained wave arm (constant state, collapse flags).
 for f in "$OUT"/model_wave_W_*_s0.pt; do
     [ -f "$f" ] || continue
+    [ -f "${f%.pt}_stream7200.json" ] && continue
     pp=softplus; [[ "$f" == *W_half* ]] && pp=halflife
     res="$OUT/result_$(basename "${f#*model_}")"; res="${res%.pt}.json"
     ffn=$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["ffn_mult"])' "$res")
-    "$PY" long_horizon.py stream --pole-param "$pp" --ckpt "$f" --grid 32 --frames "$T_LONG" \
-        --dim 128 --layers 4 --heads 8 --ffn-mult "$ffn" --stream-frames 7200 --chunk 600 \
+    "$PY" long_horizon.py stream --pole-param "$pp" --ckpt "$f" --grid "$GRID" --frames "$T_LONG" \
+        --dim "$DIM" --layers "$LAYERS" --heads "$HEADS" --ffn-mult "$ffn" \
+        --stream-frames "$STREAM_FRAMES" --chunk 600 \
         --out "${f%.pt}_stream7200.json" > "${f%.pt}_stream7200.log" 2>&1 || echo "STREAM FAIL $f"
 done
 echo DONE > "$OUT/status.txt"
