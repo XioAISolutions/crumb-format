@@ -659,11 +659,14 @@ def render(args):
     if out.exists() and (not out.is_dir() or any(out.iterdir())):
         raise ValueError(f"output must be new or empty: {out}")
     model, config, checkpoint, source, notes = load_model(args, torch)
-    eligible = config["kind"] == "wave" and config["kernel_version"] == "dispersion" and not (
-        config["gate"] or config["local_fuse"])
+    # train_long.py checkpoints (time_pos='none', wave or SSM) were trained through
+    # their carried state, so they render through stream_step too.
+    eligible = (config["kind"] == "wave" and config["kernel_version"] == "dispersion" and not (
+        config["gate"] or config["local_fuse"])) or config.get("time_pos") == "none"
     mode = ("recurrent" if eligible else "windowed") if args.mode == "auto" else args.mode
     if mode == "recurrent" and not eligible:
-        raise ValueError("recurrent mode requires wave + dispersion with gate=false and local_fuse=false")
+        raise ValueError("recurrent mode requires wave + dispersion with gate=false and local_fuse=false, "
+                         "or a train_long.py (time_pos='none') checkpoint")
     device = ("cuda" if torch.cuda.is_available() else "cpu") if args.device == "auto" else args.device
     if device == "cuda" and not torch.cuda.is_available():
         raise ValueError("CUDA requested but unavailable")

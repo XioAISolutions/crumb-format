@@ -15,8 +15,8 @@ Chunked == one long forward == stream_step, exactly (tests/test_stateful.py),
 so a model trained this way streams with the same state it trained with.
 time_pos="none" is used so no length-T position table limits the horizon.
 
-Evaluation reuses train_compare's rollout_eval (balls) and occlusion_rollout_eval
-(occlusion; recurrent arms stream through stream_step), with --chunk frames of
+Evaluation streams through the carried state: stream_rollout_eval (balls) and
+train_compare's occlusion_rollout_eval (occlusion), with --chunk frames of
 context. Result JSON keeps train_compare's field names.
 
     python train_long.py --data-source occlusion --grid 16 --seq-frames 256 --chunk 64 \\
@@ -205,9 +205,9 @@ def main(argv=None):
         ap.error(f"eval emergence at frame {a.occ_end - a.chunk} of the rollout needs "
                  f"--eval-rollout >= {a.occ_end - a.chunk + 8} (got {a.eval_rollout}); "
                  "set --occ-start/--occ-end so the gap ends inside the rollout")
-    if a.data_source == "occlusion" and a.occ_start < a.chunk:
-        ap.error(f"--occ-start {a.occ_start} < --chunk {a.chunk}: the eval gap would start "
-                 "inside the warm-up context")
+    if a.data_source == "occlusion" and a.occ_start <= a.chunk:
+        ap.error(f"--occ-start {a.occ_start} <= --chunk {a.chunk}: the eval gap would cover the "
+                 "warm-up context or the single-step target frame")
     if a.seq_frames % a.chunk:
         ap.error("--seq-frames must be a multiple of --chunk")
     if a.tbptt_chunks < 1:
@@ -270,6 +270,10 @@ def main(argv=None):
 
     m.eval()
     a.frames = a.chunk                                   # eval context = one chunk
+    if a.data_source == "occlusion":
+        # eval window (starts after the context and its target frame), so the
+        # single-step target is ordinary motion, as in train_compare's arms
+        _occ.OCC_START, _occ.OCC_END = a.occ_start, a.occ_end
     # Single-step eval + copy-last baseline, same definitions as train_compare.main().
     with torch.no_grad():
         se = cb = cr = 0.0
@@ -287,7 +291,6 @@ def main(argv=None):
     single = {"eval_mse": round(se / n_eval, 6), "eval_mse_over_copylast": round(se / (cb + 1e-9), 4),
               "copy_ratio": round(cr / n_eval, 4)}
     if a.data_source == "occlusion":
-        _occ.OCC_START, _occ.OCC_END = a.occ_start, a.occ_end
         roll = tc.occlusion_rollout_eval(m, a, dev)
     else:
         roll = stream_rollout_eval(m, a, dev)

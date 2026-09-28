@@ -3,6 +3,7 @@
 LONG_HORIZON.md phase 1: carried-state chunks, dense next-frame loss,
 time-invariant positions, causal gate."""
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -208,6 +209,11 @@ class StatefulTests(unittest.TestCase):
             out = eval_only.main([f"{d}/model_ssm.pt", f"{d}/result_ssm.json", "--eval-seeds", "1",
                                   "--eval-rollout", "24"])
             self.assertIn("exit_direction_accuracy", out)             # occlusion evaluator
+            args = __import__("render_rollout").parser().parse_args(
+                ["--ckpt", f"{d}/model_ssm.pt", "--out", f"{d}/r", "--frames", "6", "--device", "cpu"])
+            __import__("render_rollout").render(args)                 # auto mode
+            meta = json.loads(Path(f"{d}/r/metrics.json").read_text())
+            self.assertEqual(meta["rollout"]["mode"], "recurrent")    # SSM through its state
 
 if __name__ == "__main__":
     unittest.main()
