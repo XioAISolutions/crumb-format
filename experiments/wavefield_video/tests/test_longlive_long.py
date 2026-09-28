@@ -1,0 +1,204 @@
+"""longlive_long: planning numbers, the overlay, and the constant-memory decoder.
+
+The decoder is checked against a small causal VAE with the Wan2.2 ``WanVAE_``
+calling convention (conv2, decoder(x, feat_cache, feat_idx, first_chunk),
+_feat_map/_conv_idx, clear_cache): chunked streaming must equal one full
+decode for every chunk size. (Against LongLive's real vae2_2 module with a
+small random config the same check gives 0 uint8 difference; see
+LONGLIVE_4090.md.)
+"""
+import os
+import sys
+
+import numpy as np
+import pytest
+import torch
+import torch.nn as nn
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import longlive_long as L  # noqa: E402
+
+
+def test_plan_numbers():
+    p = L.plan(5)
+    assert p["latent_frames"] % L.BLOCK == 0
+    assert p["pixel_frames"] >= 5 * 60 * L.FPS
+    assert p["pixel_frames"] - L.T_STRIDE * L.BLOCK < 5 * 60 * L.FPS   # at most one block over
+    assert p["needs_relative_rope"]                                     # 1800 > 1024 rows
+    assert p["resolution"] == "1280x704"
+    # the absolute RoPE table ends at 1024 latent frames = 4093 frames ~ 2.84 min
+    assert L.pixel_frames(L.ROPE_ROWS) == 4093
+    assert not L.plan(2)["needs_relative_rope"]
+    assert L.plan(3)["needs_relative_rope"]
+    # one float32 copy of a 5-minute decoded clip is tens of GB (the release path)
+    assert p["release_decode_copy_gb"] > 70
+    assert p["latent_gb"] < 1
+
+
+def test_vram_estimate():
+    fp8, bf16 = L.vram_estimate("fp8"), L.vram_estimate("bf16")
+    assert 9.0 < bf16["kv_cache"] < 10.5                  # 30 x 2 x 32 x 880 x 3072 x 2 B
+    assert bf16["total"] - fp8["total"] > 3.5
+    assert fp8["total"] < 19.0 and bf16["total"] > 21.0   # bf16: <2 GiB headroom on 24 GB
+    assert L.vram_estimate("fp8", window=24)["total"] < L.vram_estimate("fp8")["total"]
+
+
+BASE = {
+    "model_kwargs": {"model_name": "Wan2.2-TI2V-5B", "num_frame_per_block": 8, "local_attn_size": 32},
+    "num_output_frames": 8,
+    "data": {"data_path": "example/long_example.txt", "image_or_video_shape": [1, 8, 48, 44, 80]},
+    "inference": {"sampling_steps": 4, "sink_size": 8, "streaming_vae": True, "vae_device": "cuda:2"},
+    "checkpoints": {"generator_ckpt": "/path/to/model_bf16.pt"},
+    "fp8_quant": True,
+    "logging": {"seed": 0},
+}
+
+
+def test_overlay_sets_every_blocker_fix(tmp_path):
+    lat = L.latent_frames_for(300)
+    cfg = L.build_overlay(BASE, latent_frames=lat, prompts="p.txt", ckpt="c.pt",
+                          out_dir=tmp_path, window=24, sink=4, seed=3)
+    assert cfg["num_output_frames"] == lat
+    assert cfg["data"]["image_or_video_shape"] == [1, lat, 48, 44, 80]
+    assert cfg["use_relative_rope"] is True
+    inf = cfg["inference"]
+    assert inf["save_latents_only"] is True and inf["streaming_vae"] is False
+    assert "vae_device" not in inf
+    assert inf["sink_size"] == 4 and cfg["model_kwargs"]["local_attn_size"] == 24
+    assert cfg["checkpoints"]["generator_ckpt"] == "c.pt" and cfg["logging"]["seed"] == 3
+    assert cfg["output_folder"] == str(tmp_path / "latents") and cfg["save_with_index"]
+    assert BASE["inference"]["streaming_vae"] is True       # input not mutated
+    # normalize_config flattens sections onto the top level; nothing may conflict
+    flat = {}
+    for sec in ("data", "inference", "logging", "checkpoints"):
+        for k, v in cfg[sec].items():
+            assert k not in cfg or cfg[k] == v, k
+            flat[k] = v
+    bf16 = L.build_overlay(BASE, latent_frames=lat, prompts="p", ckpt="c", out_dir=tmp_path, fp8=False)
+    assert bf16["fp8_quant"] is False
+    assert cfg["torch_compile"] is False
+    comp = L.build_overlay({**BASE, "torch_compile": "auto"}, latent_frames=lat, prompts="p",
+                           ckpt="c", out_dir=tmp_path, compile=True)
+    assert comp["torch_compile"] == "auto"
+
+
+class _CausalConv(nn.Conv3d):
+    """Temporal kernel 3, causal, with a 2-frame feature cache (Wan's CACHE_T)."""
+
+    def __init__(self, cin, cout):
+        super().__init__(cin, cout, (3, 3, 3), padding=(0, 1, 1))
+
+    def forward(self, x, cache=None):
+        pad = cache if cache is not None else x.new_zeros(*x.shape[:2], 2, *x.shape[3:])
+        return super().forward(torch.cat([pad, x], 2))
+
+
+class TinyCausalVAE(nn.Module):
+    """Decoder with the WanVAE_ calling convention: one latent frame per call,
+    the first call emits 1 frame and every later call emits 2 (temporal x2),
+    output channels 3*2*2 for a patch-2 unpatchify."""
+
+    def __init__(self, z=6, d=8):
+        super().__init__()
+        self.z_dim = z
+        self.conv2 = nn.Conv3d(z, z, 1)
+        self.c1, self.c2 = _CausalConv(z, d), _CausalConv(d, 12 * 2)
+        self.clear_cache()
+
+    def clear_cache(self):
+        self._feat_map = [None, None]
+        self._conv_idx = [0]
+
+    def _step(self, conv, x, feat_cache, feat_idx):
+        i = feat_idx[0]
+        pad = feat_cache[i]
+        if pad is None:
+            pad = x.new_zeros(*x.shape[:2], 2, *x.shape[3:])
+        feat_cache[i] = torch.cat([pad, x], 2)[:, :, -2:].clone()
+        feat_idx[0] += 1
+        return conv(x, pad)
+
+    def decoder(self, x, feat_cache=None, feat_idx=[0], first_chunk=False):
+        h = torch.tanh(self._step(self.c1, x, feat_cache, feat_idx))
+        h = self._step(self.c2, h, feat_cache, feat_idx)                 # [1, 24, 1, h, w]
+        a, b = h[:, :12], h[:, 12:]
+        return a if first_chunk else torch.cat([a, b], 2)
+
+    def decode(self, z, scale):
+        self.clear_cache()
+        z = z / scale[1].view(1, -1, 1, 1, 1) + scale[0].view(1, -1, 1, 1, 1)
+        x = self.conv2(z)
+        outs = []
+        for i in range(x.shape[2]):
+            self._conv_idx = [0]
+            outs.append(self.decoder(x[:, :, i:i + 1], feat_cache=self._feat_map,
+                                     feat_idx=self._conv_idx, first_chunk=i == 0))
+        from einops import rearrange
+        out = rearrange(torch.cat(outs, 2), "b (c r q) f h w -> b c f (h q) (w r)", q=2, r=2)
+        self.clear_cache()
+        return out
+
+
+@pytest.mark.parametrize("chunk", [1, 2, 3, 7, 50])
+def test_stream_decode_equals_full_decode(chunk):
+    torch.manual_seed(0)
+    m = TinyCausalVAE().eval()
+    T = 7
+    z = torch.randn(T, 6, 3, 4)
+    mean, std = torch.randn(6) * 0.1, torch.rand(6) + 0.5
+    with torch.no_grad():
+        ref = m.decode(z.permute(1, 0, 2, 3)[None], [mean, 1 / std]).float().clamp(-1, 1)
+    ref8 = ((ref[0].permute(1, 2, 3, 0) * 0.5 + 0.5) * 255).round().to(torch.uint8).numpy()
+    got = []
+    n = L.stream_decode(m, z, mean, std, got.append, chunk=chunk)
+    g = np.concatenate(got)
+    assert n == g.shape[0] == ref8.shape[0] == 1 + 2 * (T - 1)
+    assert g.dtype == np.uint8 and g.shape[1:] == (6, 8, 3)
+    assert np.array_equal(g, ref8)
+    assert m._feat_map == [None, None]                 # cache cleared afterwards
+
+
+def test_stream_decode_is_causal_not_reset_per_chunk():
+    """Resetting the cache at every chunk (what a naive chunked decode does)
+    changes the output; the carried cache must not."""
+    torch.manual_seed(1)
+    m = TinyCausalVAE().eval()
+    z = torch.randn(6, 6, 3, 4)
+    mean, std = torch.zeros(6), torch.ones(6)
+    full = []
+    L.stream_decode(m, z, mean, std, full.append, chunk=6)
+    naive = []
+    for s in range(0, 6, 2):
+        L.stream_decode(m, z[s:s + 2], mean, std, naive.append, chunk=2)
+    assert sum(x.shape[0] for x in naive) != np.concatenate(full).shape[0] or \
+        not np.array_equal(np.concatenate(naive), np.concatenate(full))
+
+
+def test_decode_file_writes_mp4_atomically(tmp_path):
+    pytest.importorskip("imageio_ffmpeg")
+    torch.manual_seed(2)
+    m = TinyCausalVAE().eval()
+    lat = torch.randn(5, 6, 8, 8)
+    f = tmp_path / "lat.pt"
+    torch.save(lat, f)
+    out = tmp_path / "v.mp4"
+    n = L.decode_file(f, out, ll_root=None, chunk=2, device="cpu", dtype="float32",
+                      _vae=(m, torch.zeros(6), torch.ones(6), None))
+    assert n == 9 and out.exists() and not (tmp_path / "v.partial.mp4").exists()
+    assert L.decode_file(f, out, ll_root=None, _vae=(m, torch.zeros(6), torch.ones(6), None)) is None
+
+
+def test_generate_dry_run_writes_overlay(tmp_path):
+    yaml = pytest.importorskip("yaml")
+    ll = tmp_path / "ll"
+    (ll / "configs" / "fp8").mkdir(parents=True)
+    (ll / "configs" / "fp8" / "inference_fp8.yaml").write_text(yaml.safe_dump(BASE))
+    prompts = tmp_path / "p.txt"
+    prompts.write_text("a cat\n\na dog\n")
+    out = tmp_path / "run"
+    L.main(["generate", "--ll-root", str(ll), "--ckpt", "c.pt", "--prompts", str(prompts),
+            "--minutes", "3", "--out", str(out), "--dry-run"])
+    cfg = yaml.safe_load((out / "longlive_overlay.yaml").read_text())
+    assert cfg["use_relative_rope"] and cfg["inference"]["save_latents_only"]
+    assert cfg["num_output_frames"] == L.latent_frames_for(180)
+    assert cfg["inference_iter"] == 1
