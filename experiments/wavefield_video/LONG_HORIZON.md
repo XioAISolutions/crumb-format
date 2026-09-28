@@ -374,7 +374,9 @@ unchanged. It samples `next − last` from noise in N Euler steps
 ### 10.1 Pre-registered toy
 
 Balls with `--kicks` (random velocity kicks), grid 16, halflife wave backbone,
-equal steps and seeds; residual (MSE) vs flow. Scoring comes from
+equal steps and seeds; residual (MSE) vs flow. Exact run: seq 16, chunk 16,
+dim 64, 2 layers, 600 steps, seeds 0 and 1, both arms trained with the dense
+loss (flow is always dense, so the residual arm gets `--dense` to match). Scoring comes from
 `stochastic_eval`, identical for both heads: 64-step autoregressive rollouts
 from held-out context. Metrics: spatial-std ratio vs GT (1 = as sharp as real),
 the fraction of frames where `detect_blobs` finds exactly `n_balls` (next to
