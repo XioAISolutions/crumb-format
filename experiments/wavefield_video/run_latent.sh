@@ -73,4 +73,4 @@ if [ ! -f "$js" ]; then
     mv "$js.tmp" "$js"
 fi
 echo DONE > "$OUT/status.txt"
-"$PY" -c 'import json,sys; d=json.load(open(sys.argv[1])); print("collapse:", d["collapse"] or "none", "decoded frames:", d["log"][-1]["decoded_frames"])' "$js"
+"$PY" -c 'import json,sys; d=json.load(open(sys.argv[1])); print("collapse (latent steps; KILL if < 256):", d.get("collapse_latent_step") or "none", "| decoded frames:", d["log"][-1]["decoded_frames"])' "$js"

@@ -312,9 +312,13 @@ training → decoded stream (`tests/test_video_vae.py`), and a full
 Face is blocked in this container, so real LTX/Wan weights have only run on
 the box.
 
-Known limits: chunks of generated latents are decoded independently, so a
-causal VAE's first-frame handling can show at chunk seams (use a large
-`--chunk` for the screen). Shards are loaded fully into memory, which is fine
+Known limits: each chunk of generated latents is decoded with the previous
+latent prepended, and its duplicated first frame is dropped. That keeps the
+timeline continuous (N latents give stride·N frames), but the VAE's temporal
+context still restarts at every seam, so use a large `--chunk` for the screen.
+Collapse positions are reported both in decoded frames (`collapse`) and in
+generated latent steps (`collapse_latent_step`). The KILL rule reads the
+latter. Shards are loaded fully into memory, which is fine
 for hours of 256×448 latents (≈0.1 MB per latent step at fp16) but not for
 datasets far larger than that.
 

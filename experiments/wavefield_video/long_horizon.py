@@ -383,15 +383,35 @@ def cmd_stream(a):
         if sess.extra and "health" in sess.extra:
             mon.load_state_dict(sess.extra["health"])
         else:                       # older state file: flags start fresh, indices stay absolute
-            mon.frame_index = sess.t
+            # (latent mode: decoded-frame indices restart at 0 with frame_step)
+            mon.frame_index = sess.t if vae is None else 0
     else:
         sess.warm(ctx)
         if vae is None:
             mon.frame_index = sess.t    # flag frames use the same absolute index as the log
     log, t0, t_start = [], time.time(), sess.t
     sizes = set()
+    # Latent mode: decode each chunk with the previous latent prepended and drop its
+    # duplicated first frame, so N generated latents give the continuous stride*N
+    # frame timeline (independent decodes lose stride-1 frames per seam). Each
+    # decoded frame records the generated latent step it came from, so collapse
+    # positions are reported in latent steps, the pre-registered unit.
+    ex = sess.extra or {}
+    prev = ex.get("prev_latent", ctx[:, -1] if vae is not None and not a.resume else None)
+    frame_step = list(ex.get("frame_step", []))      # decoded frame index -> latent step
+    gen = int(ex.get("generated", 0))                # latent steps generated so far
     for chunk in sess.generate(a.stream_frames, chunk=a.chunk):
-        frames = view(chunk)                       # latents -> decoded pixels in latent mode
+        if vae is not None:
+            if prev is None:                         # causal VAE: latent 0 -> 1 frame
+                frames = view(chunk)
+                steps = [0] + [1 + i // vae.t_stride for i in range(frames.shape[1] - 1)]
+            else:
+                frames = view(torch.cat([prev[:, None].to(chunk), chunk], 1))[:, 1:]
+                steps = [i // vae.t_stride for i in range(frames.shape[1])]
+            frame_step += [gen + s for s in steps]
+            prev, gen = chunk[:, -1], gen + chunk.shape[1]
+        else:
+            frames = chunk
         for i in range(frames.shape[1]):
             st = mon.update(frames[:, i])
         sizes.add(sess.state_bytes())
@@ -400,18 +420,26 @@ def cmd_stream(a):
                "fps": round((sess.t - t_start) / max(time.time() - t0, 1e-9), 1),
                "state_bytes": sess.state_bytes(), "last": {k: round(v, 5) for k, v in st.items()},
                "flags": dict(mon.first)}
+        if vae is not None:
+            row["flags_latent_step"] = {k: frame_step[v] for k, v in mon.first.items()}
         log.append(row)
         print(f"STREAM t={row['frame']:6d} state={_fmt_bytes(row['state_bytes'])} "
               f"fps={row['fps']} mean={st['mean']:.4f} std={st['std']:.4f} "
               f"motion={st['motion']:.5f} flags={row['flags']}", flush=True)
     if a.save_state:
-        sess.save(a.save_state, extra={"health": mon.state_dict()})
+        extra = {"health": mon.state_dict()}
+        if vae is not None:
+            extra.update(prev_latent=prev, frame_step=frame_step, generated=gen)
+        sess.save(a.save_state, extra=extra)
     res = {"mode": "long_horizon_stream", "pole_param": a.pole_param[0], "trained": bool(a.ckpt),
            "vae": vae.describe() if vae is not None else None, "latents": a.latents or None,
            "frames": a.stream_frames, "grid": a.grid,
            "context_ref": {k: v.tolist() for k, v in mon.ref.items()},
            "collapse_sample": dict(mon.first_sample),
            "state_bytes_constant": len(sizes) == 1, "collapse": dict(mon.first), "log": log}
+    if vae is not None:     # collapse above is in decoded frames; the KILL rule reads latent steps
+        res["collapse_latent_step"] = {k: frame_step[v] for k, v in mon.first.items()}
+        res["latent_steps_generated"] = gen
     if a.out:
         with open(a.out, "w") as fh:
             json.dump(res, fh, indent=1)

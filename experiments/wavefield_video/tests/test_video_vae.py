@@ -9,6 +9,7 @@ import json
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import torch
@@ -101,7 +102,25 @@ class VideoVAETests(unittest.TestCase):
                            "--dim", "16", "--layers", "1", "--heads", "2", "--stream-frames", "8",
                            "--chunk", "4", "--batch", "1", "--device", "cpu"])
             self.assertEqual(out["vae"]["backend"], "ltx-tiny")
-            self.assertEqual(out["log"][-1]["decoded_frames"], 2 * (1 + 8 * 3))   # 2 chunks of 4 steps
+            # 8 latent steps decoded with a one-latent overlap: one continuous 8*8-frame
+            # timeline (independent chunk decodes would give 2 * (1 + 8*3) = 50)
+            self.assertEqual(out["log"][-1]["decoded_frames"], 8 * 8)
+            self.assertEqual(out["latent_steps_generated"], 8)
+            # force a flag at decoded frame 20: it must be reported as latent step 20 // 8 = 2
+            orig = lh.HealthMonitor.update
+
+            def update(mon, frame):
+                if mon.frame_index == 20:
+                    mon.first.setdefault("fade", 20)
+                return orig(mon, frame)
+            with unittest.mock.patch.object(lh.HealthMonitor, "update", update):
+                out = lh.main(["stream", "--pole-param", "halflife", "--time-pos", "none",
+                               "--ckpt", str(d / "run" / "model_wave.pt"), "--latents", str(d / "lat"),
+                               "--vae", "ltx-tiny", "--vae-path", str(d / "vae"), "--frames", "2",
+                               "--dim", "16", "--layers", "1", "--heads", "2", "--stream-frames", "8",
+                               "--chunk", "4", "--batch", "1", "--device", "cpu"])
+            self.assertEqual(out["collapse"]["fade"], 20)
+            self.assertEqual(out["collapse_latent_step"]["fade"], 2)
             json.dumps(out)                                        # result stays JSON-able
 
     def test_resample_30_to_24_fps(self):
