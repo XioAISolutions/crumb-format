@@ -127,6 +127,22 @@ class VideoVAETests(unittest.TestCase):
         with self.assertRaises(ValueError):
             VideoPredictor(16, 1, 2, 4, 4, 4, "wave", quat_color=True, in_ch=8)
 
+    def test_hidden_and_appledouble_files_are_skipped(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            VideoVAE("ltx-tiny").save(d / "vae")
+            args = ["--synthetic", "1", "--videos", str(d / "mp4"), "--vae", "ltx-tiny",
+                    "--vae-path", str(d / "vae"), "--height", "64", "--width", "64",
+                    "--max-frames", "33", "--device", "cpu"]
+            encode_videos.main(args + ["--out", str(d / "lat0")])
+            real = sorted((d / "mp4").glob("*.mp4"))[0]
+            (d / "mp4" / f"._{real.name}").write_bytes(b"\x00\x05\x16\x07 AppleDouble")
+            (d / "mp4" / ".hidden").mkdir()
+            (d / "mp4" / ".hidden" / "x.mp4").write_bytes(b"junk")
+            with contextlib.redirect_stdout(io.StringIO()):
+                idx = encode_videos.main(["--synthetic", "0"] + args[2:] + ["--out", str(d / "lat")])
+            self.assertEqual({Path(m["src"]).name for m in idx}, {real.name})
+
     def test_videos_to_shards_to_training_to_decoded_stream(self):
         with tempfile.TemporaryDirectory() as d:
             d = Path(d)

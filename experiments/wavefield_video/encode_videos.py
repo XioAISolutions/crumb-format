@@ -108,7 +108,11 @@ def main(argv=None):
     seg = valid_frames(a.max_frames, vae.t_stride)
     out = pathlib.Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    vids = sorted(p for p in pathlib.Path(a.videos).rglob("*") if p.suffix.lower() in EXTS)
+    root = pathlib.Path(a.videos)
+    # skip hidden paths: macOS AppleDouble "._clip.mp4" sidecars (copied along by
+    # tar/rsync/zip from a Mac) have video suffixes but are not videos, and crash ffmpeg
+    vids = sorted(p for p in root.rglob("*") if p.suffix.lower() in EXTS and p.is_file()
+                  and not any(part.startswith(".") for part in p.relative_to(root).parts))
     if not vids:
         raise SystemExit(f"no videos under {a.videos}")
     # Resumable: every encoded segment is journaled (progress.jsonl) with its shard,
