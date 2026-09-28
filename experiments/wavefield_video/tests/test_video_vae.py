@@ -211,6 +211,16 @@ class VideoVAETests(unittest.TestCase):
                                 for x in args])
             with self.assertRaisesRegex(SystemExit, "was trained on"):
                 stream(d / "lat2", d / "vae2", "--stream-frames", "4")
+            # a checkpoint without a fingerprint (older format) is refused, not trusted
+            saved = torch.load(d / "run" / "model_wave.pt", weights_only=True)
+            saved["config"].pop("vae")
+            torch.save(saved, d / "run" / "model_legacy.pt")
+            with self.assertRaisesRegex(SystemExit, "records no VAE fingerprint"):
+                lh.main(["stream", "--pole-param", "halflife", "--time-pos", "none",
+                         "--ckpt", str(d / "run" / "model_legacy.pt"), "--latents", str(d / "lat"),
+                         "--vae", "ltx-tiny", "--vae-path", str(d / "vae"), "--frames", "2",
+                         "--dim", "16", "--layers", "1", "--heads", "2", "--chunk", "2",
+                         "--batch", "1", "--device", "cpu", "--stream-frames", "4"])
             # a sliced screen (--checkpoint) equals an uninterrupted one
             whole = stream(d / "lat", d / "vae", "--stream-frames", "8")
             ck = str(d / "screen.state")

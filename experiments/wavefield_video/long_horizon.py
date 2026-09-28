@@ -370,10 +370,17 @@ def cmd_stream(a):
         shards = LatentShards(a.latents, a.frames, device="cpu")
         vae = VideoVAE(a.vae, path=a.vae_path, device=dev)
         # shards, decoder and predictor must share one latent space
-        for what, fp in ((f"the encoder that wrote {a.latents}", shards.vae.get("fingerprint")),
-                         (f"the VAE {a.ckpt} was trained on",
-                          (ck_cfg.get("vae") or {}).get("fingerprint"))):
-            if fp is not None and fp != vae.fingerprint:
+        # (missing metadata fails closed: an unverifiable latent space is refused)
+        checks = [(f"the encoder that wrote {a.latents}", shards.vae.get("fingerprint"))]
+        if a.ckpt:
+            checks.append((f"the VAE {a.ckpt} was trained on",
+                           (ck_cfg.get("vae") or {}).get("fingerprint")))
+        for what, fp in checks:
+            if fp is None:
+                raise SystemExit(f"cannot verify {what}: it records no VAE fingerprint "
+                                 "(written before fingerprints); re-encode / retrain with "
+                                 "this version")
+            if fp != vae.fingerprint:
                 raise SystemExit(f"--vae weights ({vae.fingerprint}) differ from {what} ({fp}): "
                                  "the stream would mix latent spaces")
         ctx = shards.batch(a.batch, a.frames, torch.Generator().manual_seed(70000), "eval")
