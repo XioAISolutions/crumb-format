@@ -168,6 +168,52 @@ Two things follow from this table:
    divergence horizon. A stream receipt without trained weights and without
    collapse flags is not a coherence receipt.
 
+## 8. Phase 1 — train it like a language model
+
+Four more limits found in the harness, each capping any result below minutes:
+
+| limit | where | fix (opt-in; defaults byte-identical, verified against `main`) |
+|---|---|---|
+| every clip starts from a zero state; nothing carries between clips | `WaveMix3D._wave_dispersion` | `VideoPredictor.forward(frames, states=...)` carries each block's recurrent state across T-frame chunks (`_wave_dispersion_stateful`, `SSMLite.forward_stateful`) |
+| one supervised frame per T-frame forward | `train_compare.py` training loop | `forward(..., dense=True)`: next-frame targets at all T positions |
+| length-T temporal table; `stream_step` clamps it at `pt[T-1]` | `FactorizedPosEmb` | `time_pos="none"`: the recurrence carries order, so train/chunk/stream see identical inputs |
+| `--gate` pools over all T frames, so "causal + gate" models read the future (measured leak 0.055) | `_apply_gate` | prefix mean over frames ≤ t when `causal_time` |
+
+Chunked == one long forward == `stream_step` to ~1e-6 (wave softplus, wave
+halflife, SSM; `tests/test_stateful.py`). Walking a 128-frame context as 4×32
+chunks with full gradient costs 1.15 s/step on CPU vs 1.87 s/step as one
+window. With the graph kept only for the last chunk (G=1) it is 0.74 s/step,
+and memory is that of one chunk however long the sequence is.
+
+Side finding: the softplus default's circular FFT kernel leaks future frames
+into the past by |λ|^(2T−d). Measured at init: 0.7% of a frame's own effect at
+T=4, 0.01% at T=8, <1e-6 at T≥16. Runs with `--frames 4–8` carried a small
+look-ahead. The stateful path always uses the exact truncated kernel.
+
+### 8.1 Pre-registered: can constant-memory training learn memory past its chunk?
+
+Delayed recall (§5), D=128, chunk 32 (so the blob is 4 chunks back), grid 6,
+batch 16, 1,000 steps, seed 0. Arms: {softplus, halflife} × {G=1, G=4}.
+G=4 is full backprop through all four chunks (mathematically the single
+128-frame window); G=1 keeps a graph for the last chunk only, so the frame-0
+write gets no gradient from the frame-128 loss.
+
+- **PROVE (constant memory suffices):** halflife G=1 recall ≥ 0.5.
+- **If only halflife G=4 holds:** gradient through the carried state is required
+  for writes; training memory grows with G, which becomes the runner's knob.
+- **KILL (poles are not enough at this length):** halflife G=4 < 0.5, so D=128
+  needs more than 1,000 steps or a different write path.
+
+RESULTS_8_1
+
+### 8.2 Pre-registered: dense supervision
+
+Balls, grid 16, T=16, 300 steps, seeds 0/1, `--no-dense` vs `--dense`, equal
+steps. PROVE: dense lowers eval MSE / copy-last by ≥ 10% on both seeds;
+otherwise it stays opt-in with the numbers reported.
+
+RESULTS_8_2
+
 ## Pitch corrections
 
 - "At 16k moments one step takes ~1.5 s": the *ratio* survives a fair re-measure

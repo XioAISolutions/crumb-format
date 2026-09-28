@@ -46,17 +46,37 @@ def make_batch(bs, D, grid, gen, sigma=0.8):
     return clip
 
 
+def predict(m, ctx, a):
+    """Frame-D prediction from D context frames. chunk=0: one D-frame window.
+    chunk>0: walk the context in chunk-frame pieces carrying the recurrent state;
+    only the last --tbptt-chunks chunks keep a graph (earlier ones run under
+    no_grad), so training memory is that of G chunks however long D is."""
+    if not a.chunk:
+        return m(ctx)
+    n = ctx.shape[1] // a.chunk
+    states = [None] * len(m.blocks)
+    for c in range(n):
+        x = ctx[:, c * a.chunk:(c + 1) * a.chunk]
+        with torch.set_grad_enabled(torch.is_grad_enabled() and c >= n - a.tbptt_chunks):
+            pred, states = m(x, states=states)
+    return pred
+
+
 def run_one(pole_param, D, seed, a):
     torch.manual_seed(seed)
     gen = torch.Generator().manual_seed(seed)
-    m = VideoPredictor(a.dim, a.layers, a.heads, D, a.grid, a.grid, "wave", causal=True,
+    if a.chunk and D % a.chunk:
+        raise SystemExit(f"--delays {D} must be a multiple of --chunk {a.chunk}")
+    T = a.chunk or D
+    m = VideoPredictor(a.dim, a.layers, a.heads, T, a.grid, a.grid, "wave", causal=True,
                        kernel_version="dispersion", linear_pad=True,
-                       pole_param=pole_param, hl_min=a.hl_min, hl_max=a.hl_max)
+                       pole_param=pole_param, hl_min=a.hl_min, hl_max=a.hl_max,
+                       time_pos="none" if a.chunk else "table")
     opt = torch.optim.AdamW(m.parameters(), lr=a.lr, weight_decay=0.0)
     t0 = time.time()
     for _ in range(a.steps):
         clip = make_batch(a.batch, D, a.grid, gen)
-        loss = F.mse_loss(m(clip[:, :D]), clip[:, D])
+        loss = F.mse_loss(predict(m, clip[:, :D], a), clip[:, D])
         opt.zero_grad(set_to_none=True)
         loss.backward()
         torch.nn.utils.clip_grad_norm_(m.parameters(), 1.0)
@@ -66,11 +86,12 @@ def run_one(pole_param, D, seed, a):
     egen = torch.Generator().manual_seed(10_000 + seed)
     with torch.no_grad():
         clip = make_batch(256, D, a.grid, egen)
-        pred = m(clip[:, :D])
+        pred = predict(m, clip[:, :D], a)
         mse = F.mse_loss(pred, clip[:, D]).item()
         base = F.mse_loss(torch.zeros_like(clip[:, D]), clip[:, D]).item()
         hit = (pred.sum(1).flatten(1).argmax(1) == clip[:, D].sum(1).flatten(1).argmax(1)).float().mean().item()
     return {"pole_param": pole_param, "delay": D, "seed": seed, "steps": a.steps,
+            "chunk": a.chunk, "tbptt_chunks": a.tbptt_chunks if a.chunk else None,
             "recall": round(1 - mse / base, 4), "argmax_hit": round(hit, 4),
             "mse": round(mse, 6), "mse_forget": round(base, 6),
             "train_s": round(train_s, 1), "s_per_step": round(train_s / a.steps, 4)}
@@ -91,6 +112,10 @@ def main(argv=None):
     ap.add_argument("--heads", type=int, default=4)
     ap.add_argument("--hl-min", type=float, default=2.0)
     ap.add_argument("--hl-max", type=float, default=4096.0)
+    ap.add_argument("--chunk", type=int, default=0,
+                    help="0 = one D-frame window; >0 = carried-state chunks of this length")
+    ap.add_argument("--tbptt-chunks", type=int, default=1,
+                    help="with --chunk: chunks of gradient through the carried state")
     ap.add_argument("--out", default="")
     a = ap.parse_args(argv)
     rows = []

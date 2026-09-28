@@ -54,20 +54,29 @@ class FactorizedPosEmb(nn.Module):
     table the v1 attention arm carried per layer -- so no arm can win just by
     memorizing absolute position in a huge dedicated table."""
 
-    def __init__(self, dim, T, H, W):
+    def __init__(self, dim, T, H, W, time=True):
         super().__init__()
         self.T, self.H, self.W = T, H, W
-        self.pt = nn.Parameter(torch.zeros(T, dim))
+        # time=False drops the absolute temporal table (LONG_HORIZON.md phase 1):
+        # a length-T table cannot describe frame 5,000, and stream_step had to clamp
+        # it to pt[T-1]; without it training, chunked training and streaming see
+        # the same inputs and the causal recurrence alone carries order.
+        self.pt = nn.Parameter(torch.zeros(T, dim)) if time else None
         self.py = nn.Parameter(torch.zeros(H, dim))
         self.px = nn.Parameter(torch.zeros(W, dim))
         for p in (self.pt, self.py, self.px):
-            nn.init.normal_(p, std=0.02)
+            if p is not None:
+                nn.init.normal_(p, std=0.02)
 
     def forward(self, x):  # x: [B, N, dim], N = T*H*W in (t, y, x) order
         B, N, D = x.shape
-        pos = (self.pt[:, None, None, :]
-               + self.py[None, :, None, :]
-               + self.px[None, None, :, :])          # [T, H, W, dim]
+        if self.pt is not None:                  # original summation order (byte-identical)
+            pos = (self.pt[:, None, None, :]
+                   + self.py[None, :, None, :]
+                   + self.px[None, None, :, :])      # [T, H, W, dim]
+        else:
+            pos = (self.py[None, :, None, :] + self.px[None, None, :, :]).expand(
+                N // (self.H * self.W), -1, -1, -1)
         return x + pos.reshape(1, N, D)
 
 
@@ -248,7 +257,7 @@ class WaveMix3D(nn.Module):
         return lam, None
 
     # ---- dispersion (v2) transfer function ----------------------------------
-    def _transfer(self, L, Hp, Wp, device):
+    def _transfer(self, L, Hp, Wp, device, exact=None):
         """G[nh, L, Hp, Wp] complex: temporal transfer per spatial-freq cell,
         G(w,k) = sum_m C_m B_m / (1 - lambda_m(k) e^{-i w}) -- the frequency
         response of z_t = lambda z_{t-1} + B x_t summed over modes."""
@@ -265,7 +274,11 @@ class WaveMix3D(nn.Module):
         # as-is; for minutes-scale poles it is O(1) future leakage (the model could
         # read the frame it is asked to predict). sum_{n<T} lam^n e^{-iwn} =
         # (1 - lam^T e^{-iwT}) / (1 - lam e^{-iw}) -> exact causal linear conv.
-        eiwT = torch.exp(-1j * w * self.T) if self.pole_param == "halflife" else None
+        # ``exact`` forces the truncation for any pole family (the stateful path
+        # needs chunk == full == stream exactly); None keeps the per-family default.
+        if exact is None:
+            exact = self.pole_param == "halflife"
+        eiwT = torch.exp(-1j * w * self.T) if exact else None
         for m in range(self.n_modes):
             lam, norm = self._mode_pole(m, kx, ky, knorm)             # [nh,Hp,Wp]
             denom = 1 - lam[:, None, :, :] * eiw[None, :, None, None]  # [nh,L,Hp,Wp]
@@ -287,6 +300,44 @@ class WaveMix3D(nn.Module):
         Yt = torch.fft.ifft(Xt * G, n=L, dim=2)[:, :, :self.T]
         Ys = torch.fft.ifft2(Yt, dim=(3, 4))[..., :self.H, :self.W, :]
         return Ys.real
+
+    def _wave_dispersion_stateful(self, h, z0):
+        """Chunk of the dispersion recurrence with a carried state (LONG_HORIZON.md
+        phase 1). h: [B,nh,T,H,W,dh]; z0: the step()/init_state() layout
+        [B,n_modes,nh,Hp,Wp,dh] or None (zeros). Returns (y [B,nh,T,H,W,dh], zT).
+
+        With z_{-1} = z0 the recurrence z_t = lam z_{t-1} + Bin x_t gives
+            out_t = sum_m Cg_m lam_m^(t+1) z0_m  +  (exact causal conv of x),
+            zT    = lam^T z0 + sum_s lam^(T-1-s) Bin x_s,
+        so walking a long clip in T-frame chunks equals one long forward and
+        equals step() frame by frame -- training can learn dependencies longer
+        than the chunk it fits in memory."""
+        B = h.shape[0]
+        T = self.T
+        Hp = 2 * self.H if self.linear_pad else self.H
+        Wp = 2 * self.W if self.linear_pad else self.W
+        L = 2 * T
+        Xs = torch.fft.fft2(h, s=(Hp, Wp), dim=(3, 4))                 # [B,nh,T,Hp,Wp,dh]
+        Xt = torch.fft.fft(Xs, n=L, dim=2)
+        G = self._transfer(L, Hp, Wp, h.device, exact=True)[None, :, :, :, :, None]
+        Yt = torch.fft.ifft(Xt * G, n=L, dim=2)[:, :, :T]              # zero-state part
+        lam, norm, _, _ = self._dispersion_poles(h.device)             # [M,nh,Hp,Wp]
+        n = torch.arange(T + 1, device=h.device, dtype=torch.float32).to(torch.cfloat)
+        pw = lam[..., None] ** n                                       # [M,nh,Hp,Wp,T+1]
+        Cg = self.Cg.t().to(torch.cfloat)                              # [M,nh]
+        Bin = self.Bg.t().to(torch.cfloat)[:, :, None, None]           # [M,nh,1,1]
+        if norm is not None:
+            Bin = Bin * norm
+        if z0 is not None:
+            # out_t += sum_m Cg_m lam_m^(t+1) z0_m
+            Yt = Yt + torch.einsum("mn,mnyxt,bmnyxd->bntyxd", Cg, pw[..., 1:], z0)
+        # zT = lam^T z0 + sum_s lam^(T-1-s) Bin x_s
+        rev = pw[..., :T].flip(-1)                                     # lam^(T-1-s), s=0..T-1
+        zT = torch.einsum("mnyx,mnyxs,bnsyxd->bmnyxd", Bin, rev, Xs)
+        if z0 is not None:
+            zT = zT + pw[..., T][None, ..., None] * z0
+        Ys = torch.fft.ifft2(Yt, dim=(3, 4))[..., :self.H, :self.W, :]
+        return Ys.real, zT
 
     # ---- O(1)-in-T streaming recurrence (dispersion path only) --------------
     def _dispersion_poles(self, device):
@@ -366,6 +417,14 @@ class WaveMix3D(nn.Module):
         return out + loc
 
     def _apply_gate(self, out, h):
+        if self.causal_time:
+            # Prefix mean over frames <= t. The all-T mean the gate used before
+            # let a "causal" model read future frames through g (LONG_HORIZON.md).
+            per_t = h.mean(dim=(3, 4))                                 # [B,nh,T,dh]
+            cnt = torch.arange(1, h.shape[2] + 1, device=h.device, dtype=h.dtype)
+            pooled = per_t.cumsum(2) / cnt[None, None, :, None]
+            g = torch.sigmoid(self.gate_fc(pooled))                    # [B,nh,T,dh]
+            return out * g[:, :, :, None, None, :]
         pooled = h.mean(dim=(2, 3, 4))                    # [B,nh,dh] per-head content summary
         g = torch.sigmoid(self.gate_fc(pooled))           # [B,nh,dh]
         return out * g[:, :, None, None, None, :]
@@ -384,6 +443,21 @@ class WaveMix3D(nn.Module):
             out = self._apply_gate(out, h)
         out = out.permute(0, 2, 3, 4, 1, 5).reshape(B, N, D)
         return self.po(out.to(x.dtype))
+
+    def forward_stateful(self, x, state=None):
+        """forward() over one T-frame chunk starting from ``state`` (None = zeros);
+        returns (out, state_after_chunk) in the step() layout."""
+        if self.kernel_version != "dispersion" or self.gate:
+            raise ValueError("stateful chunks need the dispersion operator without --gate "
+                             "(the gate's running mean is not carried)")
+        B, N, D = x.shape
+        h = self.pi(x).view(B, self.T, self.H, self.W, self.nh, self.dh).permute(0, 4, 1, 2, 3, 5)
+        h = h.float()
+        out, zT = self._wave_dispersion_stateful(h, state)
+        if self.local_fuse:
+            out = self._apply_local(out, h)
+        out = out.permute(0, 2, 3, 4, 1, 5).reshape(B, N, D)
+        return self.po(out.to(x.dtype)), zT
 
 
 class AttnMix(nn.Module):
@@ -520,6 +594,14 @@ class Block(nn.Module):
         x = x + self.mix(self.n1(x))
         return x + self.ffn(self.n2(x))
 
+    def forward_stateful(self, x, state):
+        if not hasattr(self.mix, "forward_stateful"):
+            raise ValueError(f"{type(self.mix).__name__} has no carried-state forward "
+                             "(stateful chunks support the wave dispersion and ssm arms)")
+        m, state = self.mix.forward_stateful(self.n1(x), state)
+        x = x + m
+        return x + self.ffn(self.n2(x)), state
+
 
 class VideoPredictor(nn.Module):
     """Frames [B,T,3,H,W] -> per-cell tokens -> mix -> predict next frame.
@@ -540,10 +622,13 @@ class VideoPredictor(nn.Module):
                  kernel_version="separable", linear_pad=False,
                  gate=False, local_fuse=False, fuse="none",
                  q_mix=False, quat_color=False,
-                 pole_param="softplus", hl_min=2.0, hl_max=4096.0):
+                 pole_param="softplus", hl_min=2.0, hl_max=4096.0, time_pos="table"):
         super().__init__()
         self.T, self.H, self.W = T, H, W
         self.kind = kind
+        if time_pos not in ("table", "none"):
+            raise ValueError(f"unknown time_pos {time_pos!r} (want table | none)")
+        self.time_pos = time_pos
         self.fuse = fuse
         self.residual = residual
         # R15 hypercomplex arms (HYPERCOMPLEX_STUDY.md sec 4-E2/E3): wave-scope,
@@ -566,7 +651,7 @@ class VideoPredictor(nn.Module):
             self.embed = QuatEmbed(dim)
         else:
             self.embed = nn.Conv2d(3, dim, 3, padding=1)
-        self.posemb = FactorizedPosEmb(dim, T, H, W)   # shared, all arms, always on
+        self.posemb = FactorizedPosEmb(dim, T, H, W, time=(time_pos == "table"))  # shared, all arms
         if fuse != "none":
             # Hybrid arm: the global memory kind must agree with --kind so config,
             # streaming, and state-byte accounting all name the same operator.
@@ -611,22 +696,43 @@ class VideoPredictor(nn.Module):
             nn.init.zeros_(self.head.bias)
         self.use_ckpt = False
 
-    def forward(self, frames):  # frames: [B, T, 3, H, W] (context frames)
+    def forward(self, frames, states=None, dense=False):
+        """frames: [B, T, 3, H, W] (context frames).
+
+        dense=False (default): predict the frame after the last one, [B,3,H,W].
+        dense=True: predict the next frame at EVERY position, [B,T,3,H,W]
+            (pred[:, t] targets frames[t+1]) -- T targets per causal forward
+            instead of one (LONG_HORIZON.md phase 1).
+        states: list with one entry per block (entries may be None = zeros) to
+            run this T-frame chunk from a carried recurrent state; the call then
+            returns (pred, new_states) so long clips can be trained chunk by chunk."""
         B, T, C, H, W = frames.shape
         f = frames.reshape(B * T, C, H, W)
         e = self.embed(f).reshape(B, T, self.H * self.W, -1).reshape(B, T * self.H * self.W, -1)
         x = self.posemb(e)
-        for blk in self.blocks:
-            if self.use_ckpt and self.training:
-                x = torch.utils.checkpoint.checkpoint(blk, x, use_reentrant=False)
-            else:
-                x = blk(x)
+        new_states = None
+        if states is not None:
+            if len(states) != len(self.blocks):
+                raise ValueError(f"need {len(self.blocks)} states, got {len(states)}")
+            new_states = []
+            for blk, st in zip(self.blocks, states):
+                x, st = blk.forward_stateful(x, st)
+                new_states.append(st)
+        else:
+            for blk in self.blocks:
+                if self.use_ckpt and self.training:
+                    x = torch.utils.checkpoint.checkpoint(blk, x, use_reentrant=False)
+                else:
+                    x = blk(x)
         x = self.norm(x)
-        last = x[:, (self.T - 1) * self.H * self.W: self.T * self.H * self.W]  # [B, HW, D]
-        delta = self.head(last).reshape(B, self.H, self.W, 3).permute(0, 3, 1, 2)  # [B,3,H,W]
-        if self.residual:
-            return frames[:, -1] + delta
-        return delta
+        if dense:
+            delta = self.head(x).reshape(B, T, self.H, self.W, 3).permute(0, 1, 4, 2, 3)
+            pred = frames + delta if self.residual else delta         # [B,T,3,H,W]
+        else:
+            last = x[:, (self.T - 1) * self.H * self.W: self.T * self.H * self.W]  # [B, HW, D]
+            delta = self.head(last).reshape(B, self.H, self.W, 3).permute(0, 3, 1, 2)  # [B,3,H,W]
+            pred = frames[:, -1] + delta if self.residual else delta
+        return pred if states is None else (pred, new_states)
 
     # ---- O(1)-in-T streaming rollout (wave / ssm / local+global hybrids) -----
     def _streamable(self):
@@ -667,9 +773,10 @@ class VideoPredictor(nn.Module):
         B = frame.shape[0]
         e = self.embed(frame).reshape(B, self.H * self.W, -1)            # [B,HW,D]
         pe = self.posemb
-        tpos = min(t_index, self.T - 1)
         spatial = (pe.py[:, None, :] + pe.px[None, :, :]).reshape(self.H * self.W, -1)
-        x = e + pe.pt[tpos][None, None, :] + spatial[None]
+        x = e + spatial[None]
+        if pe.pt is not None:                    # time_pos="table": clamp past T
+            x = x + pe.pt[min(t_index, self.T - 1)][None, None, :]
         for i, blk in enumerate(self.blocks):
             m, states[i] = blk.mix.step(blk.n1(x), states[i])
             x = x + m

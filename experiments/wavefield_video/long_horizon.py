@@ -315,7 +315,8 @@ def build_model(a, pole_param):
                           causal=True, ffn_mult=4.0 if a.ffn_mult is None else a.ffn_mult,
                           kernel_version="dispersion",
                           linear_pad=True, fuse=getattr(a, "fuse", "none"),
-                          pole_param=pole_param, hl_min=a.hl_min, hl_max=a.hl_max)
+                          pole_param=pole_param, hl_min=a.hl_min, hl_max=a.hl_max,
+                          time_pos=getattr(a, "time_pos", "table"))
 
 
 def cmd_budget(a):
@@ -414,6 +415,8 @@ def main(argv=None):
         p.add_argument("--frames", type=int, default=16, help="context window T")
         p.add_argument("--heads", type=int, default=8)
         p.add_argument("--seed", type=int, default=0)
+        p.add_argument("--time-pos", choices=["table", "none"], default="table",
+                       help="none for checkpoints from train_long.py (no temporal table)")
         p.add_argument("--ffn-mult", type=float, default=None,
                        help="FFN multiplier (default 4.0; with --ckpt, inferred exactly "
                             "from the checkpoint's FFN width)")
