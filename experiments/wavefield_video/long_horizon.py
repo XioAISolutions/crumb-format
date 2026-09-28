@@ -22,6 +22,8 @@ the next GPU runs are judged on the axes that decide whether minutes work.
     python long_horizon.py stream --frames 7200 --chunk 600 --pole-param halflife
 """
 import argparse
+import copy
+import itertools
 import hashlib
 import json
 import os
@@ -384,6 +386,15 @@ def cmd_stream(a):
                 raise SystemExit(f"--vae weights ({vae.fingerprint}) differ from {what} ({fp}): "
                                  "the stream would mix latent spaces")
         ctx = shards.batch(a.batch, a.frames, torch.Generator().manual_seed(70000), "eval")
+        # The decoder's temporal receptive field, measured on these weights: every
+        # chunk is decoded with that much history and lookahead, so the frames the
+        # monitor judges are the ones a single decode of the whole stream would give,
+        # not chunk-boundary resets (video_vae.StreamDecoder).
+        from video_vae import StreamDecoder, measure_temporal_rf
+        rf_back, rf_fwd = measure_temporal_rf(vae, shards.C, shards.h, shards.w)
+        dec = StreamDecoder(vae, history=rf_back + 1, lookahead=rf_fwd + 1)
+        print(f"DECODER receptive field: {rf_back} back / {rf_fwd} forward latents -> "
+              f"history {dec.H}, lookahead {dec.L}", flush=True)
         m = build_model(a, a.pole_param[0], write_gate=wg, clean_write=cw, in_ch=shards.C, H=shards.h, W=shards.w).to(dev)
     else:
         m = build_model(a, a.pole_param[0], write_gate=wg, clean_write=cw).to(dev)
@@ -424,14 +435,21 @@ def cmd_stream(a):
             mon.frame_index = sess.t    # flag frames use the same absolute index as the log
     t0, t_start = time.time(), sess.t
     sizes = set()
-    # Latent mode: decode each chunk with the previous latent prepended and drop its
-    # duplicated first frame, so N generated latents give the continuous stride*N
-    # frame timeline (independent decodes lose stride-1 frames per seam). Each
-    # decoded frame records the generated latent step it came from, so collapse
-    # positions are reported in latent steps, the pre-registered unit.
+    # Latent mode: StreamDecoder (above) emits each generated latent's frames once
+    # its receptive field is available; generated latent g gives decoded frames
+    # [g*stride, (g+1)*stride), so collapse positions map to latent steps, the
+    # pre-registered unit. The last `lookahead` latents are emitted by flush() at
+    # the end of the stream.
     ex = sess.extra or {}
-    prev = ex.get("prev_latent", ctx[:, -1] if vae is not None and not a.resume else None)
     gen = int(ex.get("generated", 0))                # steps generated so far
+    if vae is not None:
+        if a.resume:
+            if "decoder" not in ex:
+                raise SystemExit(f"{a.resume} was decoded with the old one-latent overlap "
+                                 "(chunk seams); start the stream fresh")
+            dec.load_state_dict(ex["decoder"])
+        else:
+            dec.seed(ctx)
     # --checkpoint: per-chunk log rows go to a sidecar JSONL (append-only), so the
     # checkpoint itself stays constant-size; it records only how many rows count.
     log_path = a.checkpoint + ".log.jsonl" if a.checkpoint else None
@@ -442,36 +460,45 @@ def cmd_stream(a):
     if log_path:                     # drop rows written after the last checkpoint
         with open(log_path, "w") as fh:
             fh.writelines(json.dumps(r) + "\n" for r in log)
-    # Decoded frame d -> generated latent step, in closed form (O(1) state): with an
-    # overlap latent before the first chunk every latent gives `stride` frames
-    # (d // stride); without one, latent 0 gives a single frame first.
-    lead = int(ex.get("lead_frame", prev is None))
     stride = vae.t_stride if vae is not None else 1
 
-    def latent_step(d):
-        return d // stride if not lead else (0 if d == 0 else (d - 1) // stride + 1)
+    def latent_step(d):          # decoded frame -> generated latent step (O(1))
+        return d // stride
 
     def extra_state():
         extra = {"health": mon.state_dict(), "generated": gen, "context_fp": ctx_fp}
         if vae is not None:
-            extra.update(prev_latent=prev, lead_frame=lead)
+            extra.update(decoder=dec.state_dict())
         if a.checkpoint:
             extra["log_rows"] = len(log)
         return extra
 
     todo = max(0, a.stream_frames - gen) if a.checkpoint else a.stream_frames
-    for chunk in sess.generate(todo, chunk=a.chunk) if todo else ():
-        if vae is not None:
-            if prev is None:                         # causal VAE: latent 0 -> 1 frame
-                frames = view(chunk)
-            else:
-                frames = view(torch.cat([prev[:, None].to(chunk), chunk], 1))[:, 1:]
-            prev = chunk[:, -1]
+    chunks = sess.generate(todo, chunk=a.chunk) if todo else iter(())
+    # End of this invocation: flush the held-back lookahead latents (the true end of
+    # the stream so far). The flush is never checkpointed: the checkpoint keeps the
+    # pre-flush state, so a resumed / extended stream continues exactly as an
+    # uninterrupted one would, and its flush rows fall after log_rows and are dropped.
+    if vae is not None:
+        chunks = itertools.chain(chunks, [None])
+    st, pre_flush = None, None
+    for chunk in chunks:
+        if chunk is None:
+            pre_flush = copy.deepcopy(extra_state())
+            frames = dec.flush()
+        elif vae is not None:
+            frames = dec.push(chunk)
         else:
             frames = chunk
-        gen += chunk.shape[1]
-        for i in range(frames.shape[1]):
+        if chunk is not None:
+            gen += chunk.shape[1]
+        for i in range(frames.shape[1] if frames is not None else 0):
             st = mon.update(frames[:, i])
+        if st is None:                               # nothing decoded yet (lookahead):
+            if a.checkpoint and chunk is not None:   # still checkpoint the generation
+                sess.save(a.checkpoint + ".tmp", extra=extra_state())
+                os.replace(a.checkpoint + ".tmp", a.checkpoint)
+            continue
         sizes.add(sess.state_bytes())
         row = {"frame": sess.t,       # fps: frames (latent steps) generated by THIS invocation
                "decoded_frames": mon.frame_index if vae is not None else None,
@@ -487,11 +514,11 @@ def cmd_stream(a):
         print(f"STREAM t={row['frame']:6d} state={_fmt_bytes(row['state_bytes'])} "
               f"fps={row['fps']} mean={st['mean']:.4f} std={st['std']:.4f} "
               f"motion={st['motion']:.5f} flags={row['flags']}", flush=True)
-        if a.checkpoint:                             # atomic: a kill mid-save keeps the old file
+        if a.checkpoint and chunk is not None:       # atomic: a kill mid-save keeps the old file
             sess.save(a.checkpoint + ".tmp", extra=extra_state())
             os.replace(a.checkpoint + ".tmp", a.checkpoint)
-    if a.save_state:
-        sess.save(a.save_state, extra=extra_state())
+    if a.save_state:                                 # pre-flush, like --checkpoint
+        sess.save(a.save_state, extra=pre_flush if pre_flush is not None else extra_state())
     res = {"mode": "long_horizon_stream", "pole_param": a.pole_param[0], "trained": bool(a.ckpt),
            "vae": vae.describe() if vae is not None else None, "latents": a.latents or None,
            "frames": a.stream_frames,
@@ -502,6 +529,7 @@ def cmd_stream(a):
            "state_bytes_constant": len(sizes | {r["state_bytes"] for r in log}) == 1,
            "collapse": dict(mon.first), "log": log}
     if vae is not None:     # collapse above is in decoded frames; the KILL rule reads latent steps
+        res["decoder_rf"] = {"back": rf_back, "fwd": rf_fwd, "history": dec.H, "lookahead": dec.L}
         res["collapse_latent_step"] = {k: latent_step(v) for k, v in mon.first.items()}
         res["latent_steps_generated"] = gen
     res["steps_generated"] = gen

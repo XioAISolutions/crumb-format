@@ -228,7 +228,11 @@ def _ident(tmp_path, **over):
         pr.write_text("a cat\n")
     cfg = L.build_overlay(BASE, latent_frames=over.pop("lat", 16), prompts=pr, ckpt=ck,
                           out_dir=tmp_path / "run", seed=over.pop("seed", 0))
-    return L.run_identity(cfg, ck, pr, tmp_path, vae)
+    ll = tmp_path / "ll"
+    ll.mkdir(exist_ok=True)
+    if not (ll / "inference.py").exists():
+        (ll / "inference.py").write_text("# LongLive\n")
+    return L.run_identity(cfg, ck, pr, ll, vae)
 
 
 def test_identity_guard(tmp_path):
@@ -257,6 +261,17 @@ def test_identity_guard(tmp_path):
     (tmp_path / "vae.pth").write_bytes(b"u" * 100)                # decoder weights replaced
     with pytest.raises(SystemExit, match="vae"):
         L.check_identity(out, _ident(tmp_path))
+    (tmp_path / "vae.pth").write_bytes(b"v" * 100)
+    L.check_identity(out, _ident(tmp_path))                       # restored: ok again
+    (tmp_path / "ll" / "inference.py").write_text("# locally edited\n")   # dirty / non-git LongLive
+    with pytest.raises(SystemExit, match="longlive_src"):
+        L.check_identity(out, _ident(tmp_path))
+    (tmp_path / "ll" / "inference.py").write_text("# LongLive\n")
+    inside = tmp_path / "ll" / "run_inside"                       # an --out inside the checkout
+    inside.mkdir()
+    a = L._source_digest(tmp_path / "ll", exclude=[inside])
+    (inside / "run_identity.json").write_text("{}")
+    assert L._source_digest(tmp_path / "ll", exclude=[inside]) == a
     bare = tmp_path / "bare"
     bare.mkdir()
     (bare / "old.mp4").write_bytes(b"x")                          # outputs of unknown provenance

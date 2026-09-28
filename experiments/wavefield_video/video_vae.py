@@ -186,6 +186,98 @@ class VideoVAE(nn.Module):
         return self._fp
 
 
+def _frame_start(j, stride):
+    """First decoded frame of window-local latent j (a causal video VAE gives
+    latent 0 one frame and every later latent `stride` frames)."""
+    return 0 if j <= 0 else 1 + (j - 1) * stride
+
+
+def _latent_of_frame(f, stride):
+    return 0 if f == 0 else (f - 1) // stride + 1
+
+
+def measure_temporal_rf(vae, C, h, w, n=40, max_n=320, tol=1e-4):
+    """(back, fwd): how many latents before / after latent i the decoded frames of
+    latent i depend on (above tol x the output scale), measured on the actual
+    weights by perturbing one latent of an n-latent probe. The probe doubles until
+    the dependency fits inside it; one that still reaches the probe's ends at max_n
+    latents is refused (chunked decoding could not reproduce a single decode)."""
+    while True:
+        g = torch.Generator().manual_seed(0)
+        z = torch.randn(1, n, C, h, w, generator=g) * 0.5
+        m = n // 4                                  # causal decoders reach mostly forward in frames
+        z2 = z.clone()
+        z2[:, m] += 1.0
+        with torch.no_grad():
+            a, b = vae.decode(z), vae.decode(z2)
+        d = (a - b).abs().flatten(2).amax(2)[0]                  # [frames]
+        hit = (d > tol * max(float(a.abs().max()), 1e-6)).nonzero().flatten().tolist()
+        if not hit:
+            return 0, 0
+        lo, hi = _latent_of_frame(hit[0], vae.t_stride), _latent_of_frame(hit[-1], vae.t_stride)
+        if lo > 0 and hi < n - 1:
+            return hi - m, m - lo
+        if n >= max_n:
+            raise SystemExit(f"decoder temporal receptive field exceeds a {n}-latent probe; "
+                             "chunked decoding cannot match a single decode")
+        n *= 2
+
+
+class StreamDecoder:
+    """Decode a latent stream chunk by chunk with the frames a single decode of the
+    whole stream would give, up to the decoder's temporal receptive field: every
+    decode sees `history` latents before and `lookahead` latents after the ones it
+    emits (those are held back until their lookahead arrives; flush() emits them at
+    the true end of the stream). Constant memory: the buffer holds at most
+    history + lookahead + one chunk of latents.
+
+    Latents are indexed globally: seed() context gets negative indices and is never
+    emitted; generated latent g gives decoded frames [g*stride, (g+1)*stride)."""
+
+    def __init__(self, vae, history, lookahead):
+        if history < 1:
+            raise ValueError("history must be >= 1 (the first window latent decodes to one frame)")
+        self.vae, self.H, self.L = vae, int(history), int(lookahead)
+        self.buf, self.start, self.emitted, self.total = None, 0, 0, 0
+
+    def seed(self, ctx):
+        self.buf = ctx[:, -self.H:].detach().cpu().float()
+        self.start, self.emitted, self.total = -self.buf.shape[1], 0, 0
+
+    def _emit(self, upto):
+        if upto <= self.emitted:
+            return None
+        w0 = max(self.start, self.emitted - self.H)
+        win = self.buf[:, w0 - self.start:self.total - self.start]
+        x = self.vae.decode(win).cpu()
+        s = self.vae.t_stride
+        f0 = _frame_start(self.emitted - w0, s)
+        f1 = _frame_start(upto - w0, s)
+        self.emitted = upto
+        keep = max(self.start, self.emitted - self.H)             # history for the next window
+        self.buf, self.start = self.buf[:, keep - self.start:], keep
+        return x[:, f0:f1]
+
+    def push(self, chunk):
+        chunk = chunk.detach().cpu().float()
+        self.buf = chunk if self.buf is None else torch.cat([self.buf, chunk], 1)
+        self.total += chunk.shape[1]
+        return self._emit(self.total - self.L)
+
+    def flush(self):
+        return self._emit(self.total)
+
+    def state_dict(self):
+        return {"H": self.H, "L": self.L, "buf": self.buf, "start": self.start,
+                "emitted": self.emitted, "total": self.total}
+
+    def load_state_dict(self, d):
+        if (d["H"], d["L"]) != (self.H, self.L):
+            raise SystemExit(f"stream state was decoded with history/lookahead {d['H']}/{d['L']}, "
+                             f"this decoder measures {self.H}/{self.L}")
+        self.buf, self.start, self.emitted, self.total = d["buf"], d["start"], d["emitted"], d["total"]
+
+
 class LatentShards:
     """Windows of consecutive latent steps from encode_videos.py shards. The last
     ~holdout fraction of SOURCE VIDEOS is held out for eval (whole videos, so no

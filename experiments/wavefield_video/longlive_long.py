@@ -188,12 +188,34 @@ def vae_weights_path(ll_root, vae_path=None):
     return Path(vae_path) if vae_path else Path(ll_root) / "wan_models/Wan2.2-TI2V-5B/Wan2.2_VAE.pth"
 
 
-def run_identity(cfg, ckpt, prompts, ll_root, vae=None):
+_SRC_SUFFIXES = {".py", ".yaml", ".yml", ".json", ".cu", ".cuh", ".cpp", ".c", ".h", ".txt", ".cfg", ".toml"}
+_SRC_SKIP_DIRS = {".git", "__pycache__", "wan_models", "videos", "LongLive-2.0-5B", "outputs"}
+
+
+def _source_digest(root, exclude=(), max_file=8 << 20):
+    """sha256 over the LongLive source tree as it is on disk (code, configs; not
+    weights or outputs, nor ``exclude`` dirs such as an --out placed inside it), so
+    uncommitted edits and non-git checkouts are covered."""
+    root = Path(root).resolve()
+    skip = {Path(e).resolve() for e in exclude}
+    h = hashlib.sha256()
+    for dirpath, dirs, files in os.walk(root):
+        dirs[:] = sorted(d for d in dirs if d not in _SRC_SKIP_DIRS
+                         and (Path(dirpath) / d).resolve() not in skip)
+        for name in sorted(files):
+            f = Path(dirpath) / name
+            if f.suffix.lower() in _SRC_SUFFIXES and f.stat().st_size <= max_file:
+                h.update(f.relative_to(root).as_posix().encode() + b"\0")
+                h.update(f.read_bytes())
+    return h.hexdigest()[:16]
+
+
+def run_identity(cfg, ckpt, prompts, ll_root, vae=None, out=None):
     """Everything that determines the outputs: the effective overlay, full-content
     digests of the generator checkpoint and the decoder VAE weights, the prompts
     and the LongLive checkout."""
     ident = dict(overlay=cfg, ckpt=_file_digest(ckpt), prompts=_prompts_digest(prompts),
-                 longlive=_git_head(ll_root))
+                 longlive=_git_head(ll_root), longlive_src=_source_digest(ll_root, exclude=[out] if out else ()))
     if vae is not None:
         ident["vae"] = _file_digest(vae) if Path(vae).exists() else "missing"
     return ident
@@ -388,7 +410,7 @@ def cmd_generate(a):
     ident = None
     if not a.dry_run:
         vae = vae_weights_path(ll_root, a.vae_path)
-        ident = run_identity(cfg, Path(a.ckpt).resolve(), prompts, ll_root, vae)
+        ident = run_identity(cfg, Path(a.ckpt).resolve(), prompts, ll_root, vae, out=out)
         check_identity(out, ident)
     lat_dir = out / "latents"
     have = [latent_name(i) for i in range(n_prompts) if (lat_dir / latent_name(i)).exists()]

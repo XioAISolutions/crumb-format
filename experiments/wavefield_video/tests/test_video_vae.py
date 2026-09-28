@@ -71,6 +71,52 @@ class HeldOutSplitTests(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE, "needs diffusers + imageio + imageio-ffmpeg (requirements-video.txt)")
+class StreamDecoderTests(unittest.TestCase):
+    """Chunked stream decoding must give the frames of ONE decode of the whole
+    stream (Codex review: a one-latent overlap resets the decoder at every chunk)."""
+
+    def _check(self, backend, tol):
+        from video_vae import StreamDecoder, measure_temporal_rf
+        v = VideoVAE(backend, device="cpu")
+        back, fwd = measure_temporal_rf(v, v.channels, 2, 2)
+        g = torch.Generator().manual_seed(1)
+        ctx = torch.randn(1, back + 2, v.channels, 2, 2, generator=g) * 0.5
+        gen = torch.randn(1, 30, v.channels, 2, 2, generator=g) * 0.5
+        full = v.decode(torch.cat([ctx, gen], 1))
+        ref = full[:, 1 + (ctx.shape[1] - 1) * v.t_stride:]           # frames of `gen`
+
+        def run(H, L, split=None):
+            d = StreamDecoder(v, H, L)
+            d.seed(ctx)
+            out = []
+            for i in range(0, 30, 7):
+                if split is not None and i == split:                  # save / restore mid-stream
+                    st = d.state_dict()
+                    d = StreamDecoder(v, H, L)
+                    d.load_state_dict(st)
+                x = d.push(gen[:, i:i + 7])
+                out += [x] if x is not None else []
+            x = d.flush()
+            out += [x] if x is not None else []
+            return torch.cat(out, 1)
+        exact = run(back + 1, fwd + 1)
+        self.assertEqual(exact.shape, ref.shape)
+        self.assertLess(float((exact - ref).abs().max()), tol)
+        self.assertTrue(torch.equal(run(back + 1, fwd + 1, split=14), exact))
+        old = run(1, 0)                                               # the previous scheme
+        self.assertGreater(float((old - ref).abs().max()), 100 * tol)
+        return back, fwd
+
+    def test_ltx_tiny_matches_single_decode(self):
+        back, fwd = self._check("ltx-tiny", 1e-5)
+        self.assertGreater(fwd, 0)                                    # LTX decoder looks ahead
+
+    def test_wan_tiny_matches_single_decode(self):
+        back, fwd = self._check("wan-tiny", 5e-4)                     # causal: probe tolerance
+        self.assertEqual(fwd, 0)
+
+
+@unittest.skipUnless(HAVE, "needs diffusers + imageio + imageio-ffmpeg (requirements-video.txt)")
 class VideoVAETests(unittest.TestCase):
     def test_tiny_shapes_and_strides(self):
         x = torch.rand(1, 19, 3, 64, 64)
