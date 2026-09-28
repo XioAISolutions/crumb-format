@@ -151,6 +151,25 @@ class VideoVAETests(unittest.TestCase):
             b = torch.load(d / "cut" / "model_wave.pt", weights_only=True)["state"]
             for k in a:
                 self.assertTrue(torch.allclose(a[k], b[k], atol=1e-6), k)
+    def test_encode_resumes_after_a_killed_slice(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            VideoVAE("ltx-tiny").save(d / "vae")
+            args = ["--videos", str(d / "mp4"), "--vae", "ltx-tiny", "--vae-path", str(d / "vae"),
+                    "--height", "64", "--width", "64", "--max-frames", "33", "--out", str(d / "lat"),
+                    "--device", "cpu"]
+            full = encode_videos.main(["--synthetic", "3"] + args)
+            # simulate a slice killed while encoding video 2: only video 1 journaled
+            journal = d / "lat" / "progress.jsonl"
+            journal.write_text(journal.read_text().splitlines()[0] + "\n")
+            (d / "lat" / "index.json").unlink()
+            with unittest.mock.patch.object(encode_videos, "iter_segments",
+                                            wraps=encode_videos.iter_segments) as seg:
+                resumed = encode_videos.main(args)
+            self.assertEqual(seg.call_count, 2)                  # video 1 not re-encoded
+            self.assertEqual(resumed, full)
+            with self.assertRaises(SystemExit):                  # settings changed mid-encode
+                encode_videos.main(args[:-6] + ["--height", "32", "--width", "32"] + args[-4:])
 
 if __name__ == "__main__":
     unittest.main()

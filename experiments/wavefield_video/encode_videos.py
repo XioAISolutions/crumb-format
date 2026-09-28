@@ -105,8 +105,25 @@ def main(argv=None):
     vids = sorted(p for p in pathlib.Path(a.videos).rglob("*") if p.suffix.lower() in EXTS)
     if not vids:
         raise SystemExit(f"no videos under {a.videos}")
-    index, k = [], 0
+    # Resumable: every finished video is journaled (progress.jsonl) with its shards,
+    # so a run killed by a slice budget continues at the next unfinished video.
+    # A partly encoded video is redone (its shard numbers are reused).
+    cfg = {"vae": vae.describe(), "height": a.height, "width": a.width, "fps": a.fps, "seg": seg}
+    cfg_path, journal = out / "progress_config.json", out / "progress.jsonl"
+    if cfg_path.exists() and json.loads(cfg_path.read_text()) != cfg:
+        raise SystemExit(f"{out} holds a partial encode with different settings; delete it or "
+                         "use another --out")
+    cfg_path.write_text(json.dumps(cfg))
+    done = [json.loads(line) for line in journal.read_text().splitlines()] if journal.exists() else []
+    finished = {d["src"] for d in done}
+    index = [m for d in done for m in d["shards"]]
+    k = len(index)
+    if finished:
+        print(f"RESUME {len(finished)} videos / {k} shards already encoded", flush=True)
     for v in vids:
+        if str(v) in finished:
+            continue
+        mine = []
         for s0, frames, fps in iter_segments(v, a.fps, a.height, a.width, seg):
             n = valid_frames(frames.shape[0], vae.t_stride)
             if n < 1 + vae.t_stride:                 # too short to give 2 latent steps
@@ -116,8 +133,11 @@ def main(argv=None):
                     "latent_steps": z.shape[0], "latent_shape": list(z.shape[1:]),
                     "vae": vae.describe(), "file": f"shard_{k:05d}.pt"}
             torch.save({"latents": z.half(), **meta}, out / meta["file"])
-            index.append(meta)
+            mine.append(meta)
             k += 1
+        index += mine
+        with journal.open("a") as fh:
+            fh.write(json.dumps({"src": str(v), "shards": mine}) + "\n")
         print(f"ENCODED {v} -> {k} shards so far", flush=True)
     (out / "index.json").write_text(json.dumps(index, indent=1))
     print(f"DONE {len(index)} shards, {sum(m['latent_steps'] for m in index)} latent steps", flush=True)

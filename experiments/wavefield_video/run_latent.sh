@@ -44,7 +44,8 @@ run() {  # run <label> <cmd...> under the remaining slice budget
 }
 echo RUNNING > "$OUT/status.txt"
 
-# 1. encode (skipped once index.json exists; delete LATENTS to re-encode)
+# 1. encode (skipped once index.json exists; a sliced encode resumes at the next
+#    unfinished video via LATENTS/progress.jsonl; delete LATENTS to re-encode)
 if [ ! -f "$LATENTS/index.json" ]; then
     echo "== encode $(date -u +%FT%TZ)" | tee -a "$OUT/progress.txt"
     run encode "$PY" encode_videos.py --videos "$VIDEOS" "${vae_args[@]}" --height "$HEIGHT" \
