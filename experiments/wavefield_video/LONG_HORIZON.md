@@ -388,7 +388,30 @@ the same detector's rate on GT), and the first HealthMonitor collapse.
 - **KILL:** flow's blob-count accuracy is no better than MSE's, so sampling
   buys nothing at this scale, and the head stays opt-in pending a larger run.
 
-RESULTS_10_1
+**Result (raw JSON in `results_long_horizon/flow_10_1/`; 600 steps, CPU; the run
+used the phase 3 code before the later train_long plumbing fixes, which do not
+touch the flow head or `stochastic_eval`):**
+
+| arm | std ratio mean / last (GT = 1) | blob count OK (GT 1.00) | 1-step MSE / copy-last | collapse |
+|---|---|---|---|---|
+| residual (MSE), s0 | 1.67 / 2.50 | 0.115 | 0.851 | none |
+| residual (MSE), s1 | 1.79 / 2.08 | 0.065 | 0.814 | none |
+| flow, s0 | 1.64 / 2.18 | 0.043 | 1.547 | none |
+| flow, s1 | 1.30 / 1.64 | 0.056 | 1.530 | none |
+
+- **KILL.** Flow's blob-count accuracy (0.043, 0.056) is no better than MSE's
+  (0.115, 0.065) on either seed, and its single-step error is 1.5× copy-last
+  against 0.8× for MSE. At this scale sampling buys nothing; the head stays
+  opt-in.
+- **The premise did not show up either.** The pre-registered story was "MSE
+  blurs toward the mean, flow stays sharp". Neither head flattened: both roll out
+  *too* much spatial variance (std ratio 1.3–2.5), i.e. they drift and sharpen
+  noise rather than fade. So this toy never tested blur. It tested drift, and on
+  drift the flow head is not better.
+- **What it does not show.** 600 steps is little for a rectified-flow head
+  (its 1-step error is still worse than copying), and the kicks toy may not
+  branch enough to make the mean blurry. A fair re-test needs a run where the
+  MSE arm is shown to flatten first; otherwise there is nothing for flow to fix.
 
 ## Pitch corrections
 
