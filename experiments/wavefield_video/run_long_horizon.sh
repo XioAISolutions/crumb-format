@@ -128,13 +128,27 @@ for seed in $SEEDS; do
     [ -f "${f%.pt}_stream${STREAM_FRAMES}.json" ] && continue
     pp=softplus; [[ "$f" == *_half_* ]] && pp=halflife
     fuse=none; [[ "$(basename "$f")" == model_wave_E_* ]] && fuse=local_wave
-    res="$OUT/result_$(basename "${f#*model_}")"; res="${res%.pt}.json"
-    ffn=$("$PY" -c 'import json,sys; print(json.load(open(sys.argv[1]))["ffn_mult"])' "$res")
-    "$PY" long_horizon.py stream --pole-param "$pp" --ckpt "$f" --grid "$GRID" --frames "$frames" \
-        --dim "$DIM" --layers "$LAYERS" --heads "$HEADS" --ffn-mult "$ffn" --fuse "$fuse" \
-        --stream-frames "$STREAM_FRAMES" --chunk 600 \
-        --out "${f%.pt}_stream${STREAM_FRAMES}.json" > "${f%.pt}_stream${STREAM_FRAMES}.log" 2>&1 || { echo "STREAM FAIL $f" | tee -a "$OUT/progress.txt"
-             echo "FAILED stream $(basename "$f")" > "$OUT/status.txt"; exit 1; }
+    # Streams share the slice budget too: stop at the boundary rather than let
+    # the conductor kill a half-done stream (re-queue resumes at this stream).
+    left=$(( SLICE_S - ($(date +%s) - slice_t0) ))
+    if [ "$left" -lt 300 ]; then
+        echo "SLICED before stream $(basename "$f") (budget spent) -- re-queue" | tee -a "$OUT/progress.txt"
+        echo "SLICED" > "$OUT/status.txt"; exit 0
+    fi
+    # FFN width is read from the checkpoint itself (no rounded ffn_mult).
+    rc=0
+    ${TIMEOUT_BIN:+$TIMEOUT_BIN "$left"} "$PY" long_horizon.py stream --pole-param "$pp" --ckpt "$f" \
+        --grid "$GRID" --frames "$frames" --dim "$DIM" --layers "$LAYERS" --heads "$HEADS" \
+        --fuse "$fuse" --stream-frames "$STREAM_FRAMES" --chunk 600 \
+        --out "${f%.pt}_stream${STREAM_FRAMES}.json" > "${f%.pt}_stream${STREAM_FRAMES}.log" 2>&1 || rc=$?
+    if [ "$rc" = "124" ] || [ "$rc" = "143" ]; then
+        rm -f "${f%.pt}_stream${STREAM_FRAMES}.json"
+        echo "SLICED stream $(basename "$f") at the ${SLICE_S}s budget -- re-queue" | tee -a "$OUT/progress.txt"
+        echo "SLICED" > "$OUT/status.txt"; exit 0
+    elif [ "$rc" != "0" ]; then
+        echo "STREAM FAIL $f exit=$rc" | tee -a "$OUT/progress.txt"
+        echo "FAILED stream $(basename "$f")" > "$OUT/status.txt"; exit 1
+    fi
   done
 done
 echo DONE > "$OUT/status.txt"

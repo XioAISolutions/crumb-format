@@ -225,6 +225,25 @@ class HealthMonitorTests(unittest.TestCase):
         self.assertNotIn("fade", mon.first)
 
 
+class StreamCliTests(unittest.TestCase):
+    def test_ckpt_ffn_width_is_rebuilt_exactly(self):
+        """ffn_mult 63.984387 -> width 2048, but the 3-decimal 63.984 rebuilds
+        2047; the stream CLI must read the width from the checkpoint."""
+        torch.manual_seed(0)
+        m = VideoPredictor(32, 1, 4, 4, 4, 4, "wave", causal=True, ffn_mult=63.984387,
+                           kernel_version="dispersion", linear_pad=True)
+        self.assertEqual(m.blocks[0].ffn.fc1.out_features, 2048)
+        self.assertEqual(int(round(32 * 63.984)), 2047)
+        with tempfile.TemporaryDirectory() as d:
+            p = str(Path(d) / "model.pt")
+            torch.save({"state": m.state_dict()}, p)
+            res = lh.main(["stream", "--pole-param", "softplus", "--ckpt", p, "--grid", "4",
+                           "--frames", "4", "--dim", "32", "--layers", "1", "--heads", "4",
+                           "--stream-frames", "4", "--chunk", "4", "--batch", "1",
+                           "--device", "cpu"])
+        self.assertTrue(res["trained"])
+
+
 class RunnerTests(unittest.TestCase):
     def test_failed_arm_never_reports_done(self):
         """Slices no-op on DONE, so a crashed arm must leave status FAILED."""

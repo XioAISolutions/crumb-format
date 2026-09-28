@@ -312,7 +312,8 @@ def _fmt_bytes(n):
 
 def build_model(a, pole_param):
     return VideoPredictor(a.dim, a.layers, a.heads, a.frames, a.grid, a.grid, "wave",
-                          causal=True, ffn_mult=a.ffn_mult, kernel_version="dispersion",
+                          causal=True, ffn_mult=4.0 if a.ffn_mult is None else a.ffn_mult,
+                          kernel_version="dispersion",
                           linear_pad=True, fuse=getattr(a, "fuse", "none"),
                           pole_param=pole_param, hl_min=a.hl_min, hl_max=a.hl_max)
 
@@ -346,9 +347,14 @@ def cmd_stream(a):
     from data import make_clip_batch
     torch.manual_seed(a.seed)
     dev = torch.device(a.device)
+    sd = None
+    if a.ckpt:
+        sd = torch.load(a.ckpt, map_location=dev, weights_only=True)["state"]
+        if a.ffn_mult is None:          # exact width from the weights, not a rounded JSON mult
+            a.ffn_mult = sd["blocks.0.ffn.fc1.weight"].shape[0] / a.dim
     m = build_model(a, a.pole_param[0]).to(dev)
     if a.ckpt:
-        m.load_state_dict(torch.load(a.ckpt, map_location=dev, weights_only=True)["state"])
+        m.load_state_dict(sd)
     # Context stays on CPU for the monitor; warm() moves it to the model's device.
     ctx = make_clip_batch(a.batch, a.frames, a.grid, a.grid, seed=70000)[:, :a.frames]
     mon = HealthMonitor(patience=a.patience).calibrate(ctx)
@@ -408,8 +414,9 @@ def main(argv=None):
         p.add_argument("--frames", type=int, default=16, help="context window T")
         p.add_argument("--heads", type=int, default=8)
         p.add_argument("--seed", type=int, default=0)
-        p.add_argument("--ffn-mult", type=float, default=4.0,
-                       help="match the checkpoint (train_compare's result JSON 'ffn_mult')")
+        p.add_argument("--ffn-mult", type=float, default=None,
+                       help="FFN multiplier (default 4.0; with --ckpt, inferred exactly "
+                            "from the checkpoint's FFN width)")
     for p in sub.choices.values():
         p.add_argument("--dim", type=int, default=128)
         p.add_argument("--layers", type=int, default=4)
