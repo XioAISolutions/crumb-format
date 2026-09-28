@@ -68,3 +68,38 @@ def test_reads_mp4_stream(tmp_path):
     rep = E.main([str(p), "--encoder", "pixel", "--out", str(tmp_path / "r.json")])
     assert rep["n_samples"] == 140 and len(rep["windows"]) == 3
     assert (tmp_path / "r.json").exists()
+
+
+def _flat_samples(colour_after, dur=90, per_sec=2):
+    """Grayscale textured opening with a moving square; after 45 s the scene turns colour_after."""
+    rng = np.random.default_rng(0)
+    bg = (rng.random((H, W)) * 120 + 60).astype(np.float32)
+    for i in range(dur * per_sec):
+        t = i / per_sec
+        x = int(8 + 40 * (0.5 + 0.5 * np.sin(t * 1.3)))
+        g = bg.copy()
+        g[10:22, x:x + 10] = 220
+        f = np.repeat(g[..., None], 3, -1)
+        if t > 45:
+            f = f * np.asarray(colour_after, np.float32)
+        yield t, np.clip(f, 0, 255).astype(np.uint8)
+
+
+def test_zero_saturation_baseline_still_bounds_colour():
+    ok = E.evaluate(_flat_samples((1.0, 1.0, 1.0)), E.PixelEncoder(), window=30)
+    assert ok["baseline"]["sat"] < 1e-6 and ok["verdict"] == "PASS", ok["windows"]
+    bad = E.evaluate(_flat_samples((1.0, 0.3, 0.3)), E.PixelEncoder(), window=30)
+    assert any("colour" in w["fails"] for w in bad["windows"]), bad["windows"]
+
+
+def test_black_opening_still_bounds_luma():
+    def samples():
+        for i in range(180):
+            t = i / 2
+            v = 0 if t < 30 else 200
+            f = np.full((H, W, 3), v, np.uint8)
+            f[10:22, int(t) % 50:int(t) % 50 + 10] = 255 if t >= 30 else 3
+            yield t, f
+    r = E.evaluate(samples(), E.PixelEncoder(), window=30)
+    assert r["baseline"]["luma"] < 0.02
+    assert any("fade" in w["fails"] for w in r["windows"]), r["windows"]

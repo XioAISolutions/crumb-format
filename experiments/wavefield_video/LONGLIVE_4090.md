@@ -37,7 +37,8 @@ Verified here, on CPU:
 features. It judges every 30 s window against window 0:
 
 - **drift_ratio**(w) = sim(w, 0) / sim(1, 0) ≥ 0.9
-- **luma, contrast, saturation** within ±25 % of window 0 (fade, flatten, colour)
+- **luma, contrast, saturation** within ±25 % of window 0 (fade, flatten, colour).
+  The band is ±25 % of max(window 0, 0.02), so a black or grayscale opening still bounds later windows.
 - **motion** ≥ 25 % of window 0 (freeze)
 
 A clip **passes** when no window fails. The start of the first failing window is

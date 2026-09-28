@@ -22,6 +22,8 @@ Pre-registered read (fixed in LONGLIVE_4090.md before any run):
     drift_ratio(w) = sim(window w, window 0) / sim(window 1, window 0)
     PASS  every window: drift_ratio >= 0.9, luma and contrast within +-25 % of
           window 0, motion >= 25 % of window 0, saturation within +-25 %.
+          (+-25 % of max(window 0, 0.02), so a black or grayscale opening still
+          bounds later windows; a static opening has no motion baseline.)
     The first failing window's start time is the clip's coherent horizon.
 """
 import argparse
@@ -31,6 +33,7 @@ import math
 import numpy as np
 
 THRESH = dict(drift=0.9, luma=0.25, contrast=0.25, motion=0.25, sat=0.25)
+FLOOR = dict(luma=0.02, contrast=0.02, sat=0.02)   # [0,1] units; see the fade/flatten/colour checks
 
 
 # ---------------------------------------------------------------- encoders
@@ -175,7 +178,9 @@ def evaluate(samples, encoder, window=30.0, batch=32):
         if w >= 1 and r["drift_ratio"] < THRESH["drift"]:
             fails.append("drift")
         for k, key in (("luma", "luma"), ("contrast", "contrast"), ("sat", "sat")):
-            if base[k] > 1e-6 and abs(r[k] / base[k] - 1) > THRESH[key]:
+            # relative to window 0, floored so a zero baseline (a black or grayscale
+            # opening) still bounds later windows instead of disabling the check
+            if abs(r[k] - base[k]) / max(base[k], FLOOR[k]) > THRESH[key]:
                 fails.append({"luma": "fade", "contrast": "flatten", "sat": "colour"}[k])
         if base["motion"] > 1e-6 and not math.isnan(r["motion"]) and r["motion"] < THRESH["motion"] * base["motion"]:
             fails.append("freeze")

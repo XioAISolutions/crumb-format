@@ -71,8 +71,11 @@ all_evals() {  # all_evals <dir>: every prompt's eval receipt exists
 for secs in $LENGTHS; do
     d="$OUT/len_${secs}s"
     mins=$("$PY" -c "print($secs / 60)")
-    all_evals "$d" && continue
-    echo "== generate ${secs}s $(date -u +%FT%TZ)" | tee -a "$OUT/progress.txt"
+    # no skip before generate: it re-checks the full-content run identity
+    # (checkpoint, prompts, VAE) even when every receipt exists, and refuses
+    # stale outputs; with matching inputs it only re-hashes and returns
+    fresh=1; all_evals "$d" && fresh=0
+    [ "$fresh" = 1 ] && echo "== generate ${secs}s $(date -u +%FT%TZ)" | tee -a "$OUT/progress.txt"
     t0=$(date +%s)
     vram_pid=
     if command -v nvidia-smi >/dev/null 2>&1; then     # peak-VRAM receipt
@@ -87,7 +90,7 @@ for secs in $LENGTHS; do
     [ -n "$vram_pid" ] && kill "$vram_pid" 2>/dev/null || true
     vram_pid=
     peak=$( { sort -n "$OUT/vram_${secs}s.csv" 2>/dev/null || true; } | tail -n 1)
-    echo "   wall $(( $(date +%s) - t0 )) s for ${secs}s of video; peak VRAM ${peak:-?} MiB" | tee -a "$OUT/progress.txt"
+    [ "$fresh" = 1 ] && echo "   wall $(( $(date +%s) - t0 )) s for ${secs}s of video; peak VRAM ${peak:-?} MiB" | tee -a "$OUT/progress.txt"
     for s in "${stems[@]}"; do
         v="$d/$s.mp4"
         [ -f "$d/$s.eval.json" ] && continue

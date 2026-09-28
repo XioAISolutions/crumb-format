@@ -185,7 +185,8 @@ def test_decode_file_writes_mp4_atomically(tmp_path):
     n = L.decode_file(f, out, ll_root=None, chunk=2, device="cpu", dtype="float32",
                       _vae=(m, torch.zeros(6), torch.ones(6), None))
     assert n == 9 and out.exists() and not (tmp_path / "v.partial.mp4").exists()
-    assert L.decode_file(f, out, ll_root=None, _vae=(m, torch.zeros(6), torch.ones(6), None)) is None
+    assert L.decode_file(f, out, ll_root=None, chunk=2, device="cpu", dtype="float32",
+                         _vae=(m, torch.zeros(6), torch.ones(6), None)) is None
 
 
 def test_generate_dry_run_writes_overlay(tmp_path):
@@ -274,3 +275,24 @@ def test_checkpoint_digest_covers_the_middle(tmp_path):
         fh.seek(n // 2)
         fh.write(b"\x01")
     assert L._file_digest(f) != a
+
+
+def test_decode_provenance_guard(tmp_path):
+    pytest.importorskip("imageio_ffmpeg")
+    torch.manual_seed(3)
+    m = TinyCausalVAE().eval()
+    vae = (m, torch.zeros(6), torch.ones(6), None)
+    f = tmp_path / "lat.pt"
+    torch.save(torch.randn(3, 6, 8, 8), f)
+    out = tmp_path / "v.mp4"
+    kw = dict(ll_root=None, chunk=2, device="cpu", dtype="float32", _vae=vae, vae_digest="A")
+    assert L.decode_file(f, out, **kw) == 5
+    assert L.decode_file(f, out, **kw) is None                   # same inputs: kept
+    with pytest.raises(SystemExit, match="other inputs"):
+        L.decode_file(f, out, **{**kw, "vae_digest": "B"})       # another VAE
+    torch.save(torch.randn(3, 6, 8, 8), f)                        # other latents, same path
+    with pytest.raises(SystemExit, match="other inputs"):
+        L.decode_file(f, out, **kw)
+    (tmp_path / "v.mp4.provenance.json").unlink()
+    with pytest.raises(SystemExit, match="unrecorded"):
+        L.decode_file(f, out, **kw)

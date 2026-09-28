@@ -302,14 +302,26 @@ def load_wan22_vae(ll_root, vae_path=None, device="cuda", dtype="bfloat16"):
 
 
 def decode_file(latent_path, out_path, ll_root, vae_path=None, chunk=8, device="cuda",
-                dtype="bfloat16", fps=FPS, _vae=None):
-    """Latents file -> mp4, written to a temp name and renamed when complete."""
+                dtype="bfloat16", fps=FPS, _vae=None, vae_digest=None):
+    """Latents file -> mp4, written to a temp name and renamed when complete.
+    ``<mp4>.provenance.json`` records what the mp4 was decoded from (latents and VAE
+    digests, dtype, fps). An existing mp4 is kept only when that record matches;
+    one decoded from other inputs, or with no record, is refused."""
     import imageio.v2 as imageio
     import torch
     out_path = Path(out_path)
+    if vae_digest is None:
+        vae_digest = "injected" if _vae is not None else _file_digest(vae_weights_path(ll_root, vae_path))
+    prov = dict(latents=_file_digest(latent_path), vae=vae_digest, dtype=dtype, fps=fps)
+    prov_path = out_path.with_name(out_path.name + ".provenance.json")
+    old = json.loads(prov_path.read_text()) if prov_path.exists() else None
     if out_path.exists():
-        print(f"[decode] exists, skipping: {out_path}")
-        return None
+        if old == prov:
+            print(f"[decode] exists, same inputs, skipping: {out_path}")
+            return None
+        raise SystemExit(f"{out_path} exists but was decoded from "
+                         f"{'other inputs' if old else 'unrecorded inputs'}; "
+                         "delete it or choose another --out")
     lat = torch.load(latent_path, map_location="cpu")
     if lat.dim() == 5:
         lat = lat[0]
@@ -324,6 +336,11 @@ def decode_file(latent_path, out_path, ll_root, vae_path=None, chunk=8, device="
                           dtype=getattr(torch, dtype))
     finally:
         writer.close()
+    # record first: a crash between the two renames leaves a record with no mp4,
+    # which simply decodes again
+    ptmp = prov_path.with_suffix(".tmp")
+    ptmp.write_text(json.dumps(prov, sort_keys=True))
+    os.replace(ptmp, prov_path)
     os.replace(tmp, out_path)
     print(f"[decode] {latent_path} -> {out_path}: {n} frames, {n / fps:.1f} s")
     return n
@@ -368,9 +385,11 @@ def cmd_generate(a):
                         out_dir=out.resolve(), window=a.window, sink=a.sink, seed=a.seed,
                         fp8=a.precision == "fp8", compile=a.compile)
     cfg["inference_iter"] = n_prompts - 1
+    ident = None
     if not a.dry_run:
         vae = vae_weights_path(ll_root, a.vae_path)
-        check_identity(out, run_identity(cfg, Path(a.ckpt).resolve(), prompts, ll_root, vae))
+        ident = run_identity(cfg, Path(a.ckpt).resolve(), prompts, ll_root, vae)
+        check_identity(out, ident)
     lat_dir = out / "latents"
     have = [latent_name(i) for i in range(n_prompts) if (lat_dir / latent_name(i)).exists()]
     if len(have) == n_prompts:
@@ -392,7 +411,8 @@ def cmd_generate(a):
         if not f.exists():
             raise SystemExit(f"LongLive did not write {f}")
         decode_file(f, out / (f.stem + ".mp4"), ll_root, a.vae_path, a.decode_chunk,
-                    a.decode_device, "float32" if a.decode_device == "cpu" else "bfloat16")
+                    a.decode_device, "float32" if a.decode_device == "cpu" else "bfloat16",
+                    vae_digest=ident["vae"])
 
 
 def cmd_decode(a):
