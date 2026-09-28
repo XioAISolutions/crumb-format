@@ -104,6 +104,30 @@ class VideoVAETests(unittest.TestCase):
             self.assertEqual(out["log"][-1]["decoded_frames"], 2 * (1 + 8 * 3))   # 2 chunks of 4 steps
             json.dumps(out)                                        # result stays JSON-able
 
+    def test_resample_30_to_24_fps(self):
+        with tempfile.TemporaryDirectory() as d:
+            src = encode_videos.write_synthetic(d, 1, frames=60, size=32, fps=30)[0]
+            segs = list(encode_videos.iter_segments(src, 24, 32, 32, 100))
+            self.assertEqual(sum(x.shape[0] for _, x, _ in segs), 48)       # 2 s at 24 fps
+            self.assertEqual(segs[0][2], 24)
+
+    def test_sliced_latent_run_equals_uninterrupted(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            VideoVAE("ltx-tiny").save(d / "vae")
+            encode_videos.main(["--synthetic", "3", "--videos", str(d / "mp4"), "--vae", "ltx-tiny",
+                                "--vae-path", str(d / "vae"), "--height", "64", "--width", "64",
+                                "--max-frames", "33", "--out", str(d / "lat"), "--device", "cpu"])
+            common = ["--latents", str(d / "lat"), "--seq-frames", "4", "--chunk", "2", "--dim", "16",
+                      "--layers", "1", "--heads", "2", "--batch", "2", "--eval-rollout", "2"]
+            train_long.main(common + ["--steps", "4", "--out", str(d / "full")])
+            train_long.main(common + ["--steps", "2", "--save-every", "2", "--out", str(d / "cut")])
+            train_long.main(common + ["--steps", "4", "--resume", str(d / "cut" / "ckpt_wave.pt"),
+                                      "--out", str(d / "cut")])
+            a = torch.load(d / "full" / "model_wave.pt", weights_only=True)["state"]
+            b = torch.load(d / "cut" / "model_wave.pt", weights_only=True)["state"]
+            for k in a:
+                self.assertTrue(torch.allclose(a[k], b[k], atol=1e-6), k)
 
 if __name__ == "__main__":
     unittest.main()

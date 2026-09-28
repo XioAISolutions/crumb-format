@@ -57,7 +57,7 @@ if ! { [ -f "$OUT/result_wave${tag}.json" ] && [ -f "$OUT/model_wave${tag}.pt" ]
     resume=(); [ -f "$OUT/ckpt_wave${tag}.pt" ] && resume=(--resume "$OUT/ckpt_wave${tag}.pt")
     echo "== train $(date -u +%FT%TZ) ${resume[*]:-fresh}" | tee -a "$OUT/progress.txt"
     run train "$PY" train_long.py --latents "$LATENTS" --kind wave --pole-param halflife \
-        --seq-frames "$SEQ" --chunk "$CHUNK" --tbptt-chunks "$TBPTT" --dim "$DIM" \
+        --seq-frames "$SEQ" --chunk "$CHUNK" --tbptt-chunks "$TBPTT" --dense --dim "$DIM" \
         --layers "$LAYERS" --heads "$HEADS" --batch "$BATCH" --steps "$STEPS" --seed "$SEED" \
         --eval-rollout 256 --save-every 500 ${resume[@]+"${resume[@]}"} --out "$OUT" --tag "$tag"
 fi

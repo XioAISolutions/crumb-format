@@ -88,8 +88,9 @@ class VideoVAE(nn.Module):
         self.model.to(device=device, dtype=dtype).eval().requires_grad_(False)
         self.device, self.dtype = torch.device(device), dtype
         mean, std = self._stats()
-        self.register_buffer("mean", mean, persistent=False)
-        self.register_buffer("std", std, persistent=False)
+        # on the VAE's device: callers pass CPU or GPU latents (normalize after moving)
+        self.register_buffer("mean", mean.to(self.device), persistent=False)
+        self.register_buffer("std", std.to(self.device), persistent=False)
 
     @staticmethod
     def _cls(base):
@@ -105,7 +106,7 @@ class VideoVAE(nn.Module):
             s = torch.tensor(self.model.config.latents_std)
         else:
             m, s = torch.zeros(C), torch.ones(C)
-        m, s = m.float().view(C), s.float().view(C)
+        m, s = m.detach().float().cpu().view(C), s.detach().float().cpu().view(C)
         if not torch.isfinite(s).all() or (s <= 0).any():
             s = torch.ones(C)
         return m.view(1, 1, C, 1, 1), s.view(1, 1, C, 1, 1)
@@ -128,12 +129,12 @@ class VideoVAE(nn.Module):
         else:
             z = self.model.encode((x * 2 - 1).permute(0, 2, 1, 3, 4)).latent_dist.mode()
             z = z.permute(0, 2, 1, 3, 4)                          # [B,Tl,C,h,w]
-        return ((z.float() - self.mean) / self.std)
+        return (z.float() - self.mean) / self.std
 
     @torch.no_grad()
     def decode(self, z):
         """normalized latents [B,Tl,C,h,w] -> frames [B,T,3,H,W] in [0,1]."""
-        z = (z.float() * self.std + self.mean).to(self.device, self.dtype)
+        z = (z.to(self.device).float() * self.std + self.mean).to(self.dtype)
         B, Tl = z.shape[:2]
         if self.base == "conv":
             x = self.model.decode(z.reshape(B * Tl, *z.shape[2:]))

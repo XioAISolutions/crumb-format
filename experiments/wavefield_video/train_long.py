@@ -306,6 +306,8 @@ def main(argv=None):
     if a.resume:
         ck = torch.load(a.resume, map_location=dev, weights_only=True)
         m.load_state_dict(ck["state"])
+        if data is not None and "dgen" in ck:            # continue the latent sample stream
+            dgen.set_state(ck["dgen"].cpu())
         opt.load_state_dict(ck["opt"])
         start = int(ck["step"])
         prior_sec = float(ck.get("train_sec", 0.0))
@@ -337,11 +339,13 @@ def main(argv=None):
             print("STEP", json.dumps(row), flush=True)
         if a.save_every and step % a.save_every == 0:
             torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": step,
-                        "train_sec": prior_sec + time.time() - t0}, ckpt_path)
+                        "train_sec": prior_sec + time.time() - t0,
+                        **({"dgen": dgen.get_state()} if data is not None else {})}, ckpt_path)
     train_sec = prior_sec + time.time() - t0              # cumulative across resumed slices
     if a.save_every:
         torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": a.steps,
-                    "train_sec": train_sec}, ckpt_path)
+                    "train_sec": train_sec,
+                    **({"dgen": dgen.get_state()} if data is not None else {})}, ckpt_path)
 
     m.eval()
     a.frames = a.chunk                                   # eval context = one chunk

@@ -36,19 +36,21 @@ def iter_segments(path, fps, height, width, seg):
     rd = iio.get_reader(str(path), "ffmpeg")
     try:
         src_fps = float(rd.get_meta_data().get("fps", 24.0))
-        step = max(1, round(src_fps / fps)) if fps else 1
+        # Keep the first source frame at or after each target timestamp k/fps, so
+        # 30 -> 24 fps drops 1 frame in 5 (an integer skip would keep all 30).
+        out_fps = min(fps, src_fps) if fps else src_fps
         buf, start, kept = [], 0, 0
         for i, f in enumerate(rd):
-            if i % step:
+            if i / src_fps < kept / out_fps - 1e-6 * (1 / src_fps):
                 continue
             x = torch.from_numpy(f).permute(2, 0, 1)[None].float() / 255.0
             buf.append(fit(x, height, width)[0])
             kept += 1
             if len(buf) == seg:
-                yield start, torch.stack(buf), src_fps / step
+                yield start, torch.stack(buf), out_fps
                 start, buf = kept, []
         if buf:
-            yield start, torch.stack(buf), src_fps / step
+            yield start, torch.stack(buf), out_fps
     finally:
         rd.close()
 
@@ -109,7 +111,7 @@ def main(argv=None):
             n = valid_frames(frames.shape[0], vae.t_stride)
             if n < 1 + vae.t_stride:                 # too short to give 2 latent steps
                 continue
-            z = vae.encode(frames[None, :n])[0]
+            z = vae.encode(frames[None, :n])[0].cpu()          # shards load on any host
             meta = {"src": str(v), "start_frame": s0, "n_frames": n, "fps": fps,
                     "latent_steps": z.shape[0], "latent_shape": list(z.shape[1:]),
                     "vae": vae.describe(), "file": f"shard_{k:05d}.pt"}
