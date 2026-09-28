@@ -287,8 +287,38 @@ halflife):** arms clean G=4, clean G=1, gate G=4, gate G=1.
 - **KILL:** all four arms < 0.5, so the background was not the (only) blocker
   at this budget.
 
-**Result: pending.** Running on CPU (clean G4/G1, gate G4/G1) when this section
-merged. The verdict is recorded here either way, in the next PR.
+**Result (seed 0, raw JSON in `results_long_horizon/write_8_4/`):**
+
+| arm | recall | argmax hit (chance 0.028) | s/step (shared CPU) |
+|---|---|---|---|
+| 8.1 baseline, as built (G=1 / G=4) | 0.119 / 0.118 | 0.039 / 0.035 | — |
+| clean write, G=4 | **0.998** | **1.000** | 4.42 |
+| clean write, G=1 | **0.993** | **1.000** | 0.89 |
+| write gate, G=4 | 0.119 | 0.039 | 1.37 |
+| write gate, G=1 | 0.119 | 0.035 | 0.94 |
+
+- **PROVE: the background was the blocker.** At the budget where every 8.1 arm
+  sat at chance, removing the per-frame constant write takes recall from 0.119
+  to 0.998. The step budget was never the limit.
+- **Constant memory: PASS.** Clean write with G=1 (gradient never crosses a
+  32-frame chunk; memory is constant in sequence length) reaches 0.993 on a
+  128-frame dependency. Carried-state training learns dependencies 4× longer
+  than any window it backpropagates through, once the write is clean.
+- **Write gate: fails.** Both G values stay at the baseline. A gate initialized
+  nearly open (sigmoid(2) ≈ 0.88) does not learn to close on constant content
+  in 1,000 steps. **This is the uncomfortable half.** Clean write works because
+  a blank frame writes exactly zero. Real video has no blank frames: a static
+  background is the same per-cell constant, and it is content, not a bias, so
+  clean write cannot remove it. Nothing here yet handles real static content.
+- **Runner default.** The ball scenes are effectively blank-background (median
+  pixel ≈ 7e-7), so `run_long_horizon.sh` now defaults the wave SEQ arm to
+  `WRITE=--clean-write`. `WRITE=` restores the as-built write.
+- **Next (not run; to be pre-registered as 8.5 before any result):** write
+  temporal differences (x_t − x_{t−1}) into the wave state. A static
+  background then writes exactly zero on real video too, and events still
+  write. Cheaper alternatives are a gate initialized closed or a longer gate
+  budget. Either way the test is the same D=128 probe plus a static textured
+  background, where clean write alone must fail.
 
 ## 9. Phase 2 — a pretrained video VAE under the wave model
 

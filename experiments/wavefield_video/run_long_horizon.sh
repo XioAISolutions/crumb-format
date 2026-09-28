@@ -73,9 +73,11 @@ fi
 # LONG_HORIZON.md 8.2 measured it better on 2/2 seeds (-3..-4% MSE/copy-last,
 # 2x copy-ratio), though below the 10% bar that would make it a default.
 SEQ_FRAMES=${SEQ_FRAMES:-512}; SEQ_GAP=${SEQ_GAP:-256}; TBPTT=${TBPTT:-1}
-# WRITE (LONG_HORIZON.md 8.4): extra flags for the wave SEQ arm's write path,
-# e.g. WRITE="--write-gate" or WRITE="--clean-write"; empty = as built.
-WRITE=${WRITE:-}
+# WRITE (LONG_HORIZON.md 8.4): extra flags for the wave SEQ arm's write path.
+# Default --clean-write: 8.4 measured D=128 recall 0.119 -> 0.993 at G=1 with it,
+# and the ball scenes are blank-background. WRITE= (empty) = as built;
+# WRITE=--write-gate failed 8.4 (0.119) and is kept only for comparison.
+WRITE=${WRITE---clean-write}
 # SEQ memory: chunk 128 x grid 32 x dim 128 wave training measured (CPU peak,
 # per batch element) ~5.8 GB + 3.4 GB/extra layer without checkpointing, i.e.
 # ~16 GB/sample at 4 layers -- BATCH=4 cannot fit 24 GB. --grad-ckpt keeps one
