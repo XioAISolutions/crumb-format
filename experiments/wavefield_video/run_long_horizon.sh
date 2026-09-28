@@ -73,6 +73,9 @@ fi
 # LONG_HORIZON.md 8.2 measured it better on 2/2 seeds (-3..-4% MSE/copy-last,
 # 2x copy-ratio), though below the 10% bar that would make it a default.
 SEQ_FRAMES=${SEQ_FRAMES:-512}; SEQ_GAP=${SEQ_GAP:-256}; TBPTT=${TBPTT:-1}
+# WRITE (LONG_HORIZON.md 8.4): extra flags for the wave SEQ arm's write path,
+# e.g. WRITE="--write-gate" or WRITE="--clean-write"; empty = as built.
+WRITE=${WRITE:-}
 [ "${SEQ:-0}" = "only" ] && SEQ_ONLY=1
 # Emergence happens 32 + gap frames into the eval rollout; it must fall inside it,
 # or every emergence metric silently comes back null.
@@ -82,7 +85,7 @@ if [ "$EVAL_ROLLOUT" -lt "$need" ]; then
 fi
 if [ "${SEQ:-0}" = "only" ]; then ARMS=(); SEQ=1; fi    # SEQ=only: carried-state arms alone
 if [ "${SEQ:-0}" = "1" ]; then
-    ARMS+=("W_half_seq|wave|$T_LONG|--pole-param halflife|long"
+    ARMS+=("W_half_seq|wave|$T_LONG|--pole-param halflife $WRITE|long"
            "S_ssm_seq|ssm|$T_LONG||long")
 fi
 

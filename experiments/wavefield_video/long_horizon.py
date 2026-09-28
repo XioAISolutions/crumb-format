@@ -310,13 +310,14 @@ def _fmt_bytes(n):
         n /= 1024
 
 
-def build_model(a, pole_param):
+def build_model(a, pole_param, write_gate=False, clean_write=False):
     return VideoPredictor(a.dim, a.layers, a.heads, a.frames, a.grid, a.grid, "wave",
                           causal=True, ffn_mult=4.0 if a.ffn_mult is None else a.ffn_mult,
                           kernel_version="dispersion",
                           linear_pad=True, fuse=getattr(a, "fuse", "none"),
                           pole_param=pole_param, hl_min=a.hl_min, hl_max=a.hl_max,
-                          time_pos=getattr(a, "time_pos", "table"))
+                          time_pos=getattr(a, "time_pos", "table"),
+                          write_gate=write_gate, clean_write=clean_write)
 
 
 def cmd_budget(a):
@@ -353,7 +354,10 @@ def cmd_stream(a):
         sd = torch.load(a.ckpt, map_location=dev, weights_only=True)["state"]
         if a.ffn_mult is None:          # exact width from the weights, not a rounded JSON mult
             a.ffn_mult = sd["blocks.0.ffn.fc1.weight"].shape[0] / a.dim
-    m = build_model(a, a.pole_param[0]).to(dev)
+    # Write-path options are read off the checkpoint itself (LONG_HORIZON.md 8.4).
+    wg = sd is not None and any(k.endswith("mix.wg.weight") for k in sd)
+    cw = sd is not None and "posemb.py" not in sd
+    m = build_model(a, a.pole_param[0], write_gate=wg, clean_write=cw).to(dev)
     if a.ckpt:
         m.load_state_dict(sd)
     # Context stays on CPU for the monitor; warm() moves it to the model's device.

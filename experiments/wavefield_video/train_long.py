@@ -40,7 +40,10 @@ def build(a):
     kw = dict(causal=True, residual=True, ffn_mult=a.ffn_mult, time_pos="none")
     if a.kind == "wave":
         kw.update(kernel_version="dispersion", linear_pad=True, pole_param=a.pole_param,
-                  hl_min=a.hl_min, hl_max=a.hl_max)
+                  hl_min=a.hl_min, hl_max=a.hl_max, write_gate=a.write_gate,
+                  clean_write=a.clean_write)
+    elif a.write_gate or a.clean_write:
+        raise SystemExit("--write-gate/--clean-write apply to --kind wave")
     return VideoPredictor(a.dim, a.layers, a.heads, a.chunk, a.grid, a.grid, a.kind, **kw)
 
 
@@ -96,6 +99,10 @@ def main(argv=None):
                          "Opt-in per LONG_HORIZON.md 8.2: -3..-4%% eval MSE/copy-last and 2x "
                          "copy-ratio on 2/2 seeds, below the pre-registered 10%% bar")
     ap.add_argument("--motion-loss", action="store_true")
+    ap.add_argument("--write-gate", action="store_true",
+                    help="learned gate on what enters the wave state (LONG_HORIZON.md 8.4)")
+    ap.add_argument("--clean-write", action="store_true",
+                    help="blank input writes nothing: no spatial table, no embed/pi bias")
     ap.add_argument("--grid", type=int, default=16)
     ap.add_argument("--n-balls", type=int, default=N_BALLS)
     ap.add_argument("--radius", type=float, default=RADIUS)
@@ -194,7 +201,8 @@ def main(argv=None):
         roll = tc.rollout_eval(m, a, dev)
     res = {"kind": a.kind, "pole_param": a.pole_param if a.kind == "wave" else None,
            "seq_frames": a.seq_frames, "chunk": a.chunk, "tbptt_chunks": a.tbptt_chunks,
-           "dense": a.dense, "time_pos": "none", "steps": a.steps, "seed": a.seed,
+           "dense": a.dense, "time_pos": "none", "write_gate": a.write_gate,
+           "clean_write": a.clean_write, "steps": a.steps, "seed": a.seed,
            "params": sum(p.numel() for p in m.parameters()), "dim": a.dim, "layers": a.layers,
            "heads": a.heads, "grid": a.grid, "batch": a.batch, "data_source": a.data_source,
            "motion_loss": a.motion_loss, "train_occ_start": a.train_occ_start,
