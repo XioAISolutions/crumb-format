@@ -71,7 +71,8 @@ if [ ! -f "$js" ]; then
     run stream "$PY" long_horizon.py stream --pole-param halflife --time-pos none \
         --ckpt "$OUT/model_wave${tag}.pt" --latents "$LATENTS" "${vae_args[@]}" \
         --frames "$CHUNK" --dim "$DIM" --layers "$LAYERS" --heads "$HEADS" \
-        --stream-frames "$STREAM_STEPS" --chunk 32 --batch 2 --out "$js.tmp"
+        --stream-frames "$STREAM_STEPS" --chunk 32 --batch 2 --checkpoint "$OUT/stream${tag}.state" \
+        --out "$js.tmp"
     mv "$js.tmp" "$js"
 fi
 echo DONE > "$OUT/status.txt"

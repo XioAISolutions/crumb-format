@@ -185,12 +185,31 @@ class VideoVAETests(unittest.TestCase):
             train_long.main(["--latents", str(d / "lat"), "--seq-frames", "4", "--chunk", "2",
                              "--dim", "16", "--layers", "1", "--heads", "2", "--steps", "1",
                              "--batch", "2", "--eval-rollout", "2", "--out", str(d / "run")])
-            with self.assertRaises(SystemExit):
-                lh.main(["stream", "--pole-param", "halflife", "--time-pos", "none",
-                         "--ckpt", str(d / "run" / "model_wave.pt"), "--latents", str(d / "lat"),
-                         "--vae", "ltx-tiny", "--vae-path", str(d / "vae2"), "--frames", "2",
-                         "--dim", "16", "--layers", "1", "--heads", "2", "--stream-frames", "4",
-                         "--chunk", "2", "--batch", "1", "--device", "cpu"])
+            def stream(lat, vae, *extra):
+                return lh.main(["stream", "--pole-param", "halflife", "--time-pos", "none",
+                                "--ckpt", str(d / "run" / "model_wave.pt"), "--latents", str(lat),
+                                "--vae", "ltx-tiny", "--vae-path", str(vae), "--frames", "2",
+                                "--dim", "16", "--layers", "1", "--heads", "2", "--chunk", "2",
+                                "--batch", "1", "--device", "cpu", *extra])
+            with self.assertRaisesRegex(SystemExit, "encoder that wrote"):   # decoder != encoder
+                stream(d / "lat", d / "vae2", "--stream-frames", "4")
+            # shards and decoder agree (vae2) but the predictor was trained on vae's latents
+            encode_videos.main([x if x not in (str(d / "vae"), str(d / "lat")) else
+                                {str(d / "vae"): str(d / "vae2"), str(d / "lat"): str(d / "lat2")}[x]
+                                for x in args])
+            with self.assertRaisesRegex(SystemExit, "was trained on"):
+                stream(d / "lat2", d / "vae2", "--stream-frames", "4")
+            # a sliced screen (--checkpoint) equals an uninterrupted one
+            whole = stream(d / "lat", d / "vae", "--stream-frames", "8")
+            ck = str(d / "screen.state")
+            stream(d / "lat", d / "vae", "--stream-frames", "4", "--checkpoint", ck)   # "killed"
+            sliced = stream(d / "lat", d / "vae", "--stream-frames", "8", "--checkpoint", ck)
+            self.assertEqual(sliced["steps_generated"], 8)
+            self.assertEqual(sliced["log"][-1]["decoded_frames"], whole["log"][-1]["decoded_frames"])
+            self.assertEqual(sliced["log"][-1]["last"], whole["log"][-1]["last"])
+            self.assertEqual(len(sliced["log"]), len(whole["log"]))
+            self.assertEqual(stream(d / "lat", d / "vae", "--stream-frames", "8",
+                                    "--checkpoint", ck)["steps_generated"], 8)   # done: no-op
 
 if __name__ == "__main__":
     unittest.main()

@@ -24,6 +24,7 @@ the next GPU runs are judged on the axes that decide whether minutes work.
 import argparse
 import hashlib
 import json
+import os
 import math
 import time
 from dataclasses import dataclass, field
@@ -349,9 +350,10 @@ def cmd_stream(a):
     from data import make_clip_batch
     torch.manual_seed(a.seed)
     dev = torch.device(a.device)
-    sd = None
+    sd, ck_cfg = None, {}
     if a.ckpt:
-        sd = torch.load(a.ckpt, map_location=dev, weights_only=True)["state"]
+        saved = torch.load(a.ckpt, map_location=dev, weights_only=True)
+        sd, ck_cfg = saved["state"], saved.get("config") or {}
         if a.ffn_mult is None:          # exact width from the weights, not a rounded JSON mult
             a.ffn_mult = sd["blocks.0.ffn.fc1.weight"].shape[0] / a.dim
     # Write-path options are read off the checkpoint itself (LONG_HORIZON.md 8.4).
@@ -367,10 +369,13 @@ def cmd_stream(a):
             raise SystemExit("--latents needs --vae (and --vae-path for real weights)")
         shards = LatentShards(a.latents, a.frames, device="cpu")
         vae = VideoVAE(a.vae, path=a.vae_path, device=dev)
-        enc = shards.vae.get("fingerprint")
-        if enc is not None and enc != vae.fingerprint:
-            raise SystemExit(f"--vae weights ({vae.fingerprint}) differ from the encoder that "
-                             f"wrote {a.latents} ({enc}): decoded frames would be meaningless")
+        # shards, decoder and predictor must share one latent space
+        for what, fp in ((f"the encoder that wrote {a.latents}", shards.vae.get("fingerprint")),
+                         (f"the VAE {a.ckpt} was trained on",
+                          (ck_cfg.get("vae") or {}).get("fingerprint"))):
+            if fp is not None and fp != vae.fingerprint:
+                raise SystemExit(f"--vae weights ({vae.fingerprint}) differ from {what} ({fp}): "
+                                 "the stream would mix latent spaces")
         ctx = shards.batch(a.batch, a.frames, torch.Generator().manual_seed(70000), "eval")
         m = build_model(a, a.pole_param[0], write_gate=wg, clean_write=cw, in_ch=shards.C, H=shards.h, W=shards.w).to(dev)
     else:
@@ -382,6 +387,11 @@ def cmd_stream(a):
     view = (lambda z: vae.decode(z).cpu()) if vae is not None else (lambda x: x)
     mon = HealthMonitor(patience=a.patience).calibrate(view(ctx))
     sess = StreamSession(m, clamp=None if vae is not None else (0.0, 1.0))
+    # --checkpoint FILE: resumable screen for sliced jobs. The state is saved after
+    # every chunk; if FILE exists the stream continues from it and generates only
+    # what is left of --stream-frames (total, not additional).
+    if a.checkpoint and os.path.exists(a.checkpoint):
+        a.resume = a.checkpoint
     if a.resume:
         sess.load(a.resume)
         if sess.extra and "health" in sess.extra:
@@ -393,7 +403,7 @@ def cmd_stream(a):
         sess.warm(ctx)
         if vae is None:
             mon.frame_index = sess.t    # flag frames use the same absolute index as the log
-    log, t0, t_start = [], time.time(), sess.t
+    t0, t_start = time.time(), sess.t
     sizes = set()
     # Latent mode: decode each chunk with the previous latent prepended and drop its
     # duplicated first frame, so N generated latents give the continuous stride*N
@@ -402,7 +412,8 @@ def cmd_stream(a):
     # positions are reported in latent steps, the pre-registered unit.
     ex = sess.extra or {}
     prev = ex.get("prev_latent", ctx[:, -1] if vae is not None and not a.resume else None)
-    gen = int(ex.get("generated", 0))                # latent steps generated so far
+    gen = int(ex.get("generated", 0))                # steps generated so far
+    log = list(ex.get("log", [])) if a.checkpoint else []
     # Decoded frame d -> generated latent step, in closed form (O(1) state): with an
     # overlap latent before the first chunk every latent gives `stride` frames
     # (d // stride); without one, latent 0 gives a single frame first.
@@ -412,15 +423,25 @@ def cmd_stream(a):
     def latent_step(d):
         return d // stride if not lead else (0 if d == 0 else (d - 1) // stride + 1)
 
-    for chunk in sess.generate(a.stream_frames, chunk=a.chunk):
+    def extra_state():
+        extra = {"health": mon.state_dict(), "generated": gen}
+        if vae is not None:
+            extra.update(prev_latent=prev, lead_frame=lead)
+        if a.checkpoint:
+            extra["log"] = log                       # one row per chunk
+        return extra
+
+    todo = max(0, a.stream_frames - gen) if a.checkpoint else a.stream_frames
+    for chunk in sess.generate(todo, chunk=a.chunk) if todo else ():
         if vae is not None:
             if prev is None:                         # causal VAE: latent 0 -> 1 frame
                 frames = view(chunk)
             else:
                 frames = view(torch.cat([prev[:, None].to(chunk), chunk], 1))[:, 1:]
-            prev, gen = chunk[:, -1], gen + chunk.shape[1]
+            prev = chunk[:, -1]
         else:
             frames = chunk
+        gen += chunk.shape[1]
         for i in range(frames.shape[1]):
             st = mon.update(frames[:, i])
         sizes.add(sess.state_bytes())
@@ -435,11 +456,11 @@ def cmd_stream(a):
         print(f"STREAM t={row['frame']:6d} state={_fmt_bytes(row['state_bytes'])} "
               f"fps={row['fps']} mean={st['mean']:.4f} std={st['std']:.4f} "
               f"motion={st['motion']:.5f} flags={row['flags']}", flush=True)
+        if a.checkpoint:                             # atomic: a kill mid-save keeps the old file
+            sess.save(a.checkpoint + ".tmp", extra=extra_state())
+            os.replace(a.checkpoint + ".tmp", a.checkpoint)
     if a.save_state:
-        extra = {"health": mon.state_dict()}
-        if vae is not None:
-            extra.update(prev_latent=prev, lead_frame=lead, generated=gen)
-        sess.save(a.save_state, extra=extra)
+        sess.save(a.save_state, extra=extra_state())
     res = {"mode": "long_horizon_stream", "pole_param": a.pole_param[0], "trained": bool(a.ckpt),
            "vae": vae.describe() if vae is not None else None, "latents": a.latents or None,
            "frames": a.stream_frames, "grid": a.grid,
@@ -449,6 +470,7 @@ def cmd_stream(a):
     if vae is not None:     # collapse above is in decoded frames; the KILL rule reads latent steps
         res["collapse_latent_step"] = {k: latent_step(v) for k, v in mon.first.items()}
         res["latent_steps_generated"] = gen
+    res["steps_generated"] = gen
     if a.out:
         with open(a.out, "w") as fh:
             json.dump(res, fh, indent=1)
@@ -500,6 +522,9 @@ def main(argv=None):
     s.add_argument("--fuse", choices=["none", "local_wave"], default="none",
                    help="local_wave for checkpoints of the local+wave hybrid (E_* arms)")
     s.add_argument("--resume", default="")
+    s.add_argument("--checkpoint", default="",
+                   help="save state after every chunk; resume from it if present and stop at "
+                        "--stream-frames total (sliced jobs)")
     s.add_argument("--out", default="")
     a = ap.parse_args(argv)
     return {"budget": cmd_budget, "memory": cmd_memory, "stream": cmd_stream}[a.cmd](a)
