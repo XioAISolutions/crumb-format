@@ -100,7 +100,7 @@ def plan(minutes, precision="fp8", window=32, sink=8):
 
 # ---------------------------------------------------------------- overlay
 def build_overlay(base, *, latent_frames, prompts, ckpt, out_dir, window=32, sink=8,
-                  seed=0, fp8=True, compile=False):
+                  seed=0, fp8=True, compile=False, relative_rope=True):
     """Return a copy of a LongLive inference config (a plain dict, as loaded by
     yaml) set up for one long latents-only run. Keys go where the release code
     reads them: grouped sections are flattened by ``normalize_config``, so a key
@@ -119,7 +119,9 @@ def build_overlay(base, *, latent_frames, prompts, ckpt, out_dir, window=32, sin
     inf["async_vae"] = False
     inf["save_latents_only"] = True                     # blocker 2
     inf.pop("vae_device", None)
-    cfg["use_relative_rope"] = True                     # blocker 1
+    # sm89 OOM fix: int8 KV cache (the repo's nvfp4 config uses the same
+    # switches). Halves/eighths the cache init that OOMs a 24 GB card.
+    cfg["use_relative_rope"] = bool(relative_rope)                     # blocker 1
     cfg["output_folder"] = str(Path(out_dir) / "latents")
     cfg["save_with_index"] = True
     cfg["num_samples"] = 1
@@ -472,7 +474,8 @@ def cmd_generate(a):
         raise SystemExit(f"no prompts in {prompts} (need non-empty lines, or caption subfolders)")
     cfg = build_overlay(base, latent_frames=lat, prompts=prompts, ckpt=Path(a.ckpt).resolve(),
                         out_dir=out.resolve(), window=a.window, sink=a.sink, seed=a.seed,
-                        fp8=a.precision == "fp8", compile=a.compile)
+                        fp8=a.precision == "fp8", compile=a.compile,
+                        relative_rope=(a.relative_rope == "on"))
     cfg["inference_iter"] = n_prompts - 1
     ident = None
     if not a.dry_run:
@@ -533,6 +536,8 @@ def main(argv=None):
             s.add_argument("--no-decode", action="store_true")
             s.add_argument("--dry-run", action="store_true", help="write the overlay only")
             s.add_argument("--force", action="store_true")
+            s.add_argument("--relative-rope", choices=["on", "off"], default="on",
+                           help="store raw K in cache / window-relative RoPE (default on)")
             s.add_argument("--compile", action="store_true",
                            help="keep the base config's torch_compile setting (default: eager)")
     s = sub.add_parser("decode")
