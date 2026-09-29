@@ -35,6 +35,7 @@ import data_occlusion as _occ
 import train_compare as tc
 from data import MOVE_THRESH, N_BALLS, RADIUS, SPEED
 from wfvideo import VideoPredictor
+from rollout_training import check_resume_objective, rollout_sequence_loss, training_objective
 
 
 def arch_kwargs(a):
@@ -72,6 +73,8 @@ def sequence_loss(m, clips, moving, a, scale=1.0):
     """Walk one [B, N+1, 3, H, W] batch in chunks with carried state. Returns the
     mean per-chunk loss (a float) after calling backward() every G chunks; the
     loss is multiplied by scale (micro-batch share of the full batch)."""
+    if getattr(a, "rollout_k", 0):
+        return rollout_sequence_loss(m, clips, moving, a, scale)
     B, n_chunks, T = clips.shape[0], a.seq_frames // a.chunk, a.chunk
     states = [None] * len(m.blocks)
     group, total = 0.0, 0.0
@@ -161,6 +164,9 @@ def main(argv=None):
                     help="next-frame loss at every position vs last frame only (default). "
                          "Opt-in per LONG_HORIZON.md 8.2: -3..-4%% eval MSE/copy-last and 2x "
                          "copy-ratio on 2/2 seeds, below the pre-registered 10%% bar")
+    ap.add_argument("--rollout-k", type=int, default=0,
+                    help="self-generate the final K chunks after a ground-truth prefix; "
+                         "0 preserves teacher forcing. Feedback and state detach at TBPTT boundaries")
     ap.add_argument("--motion-loss", action="store_true")
     ap.add_argument("--write-gate", action="store_true",
                     help="learned gate on what enters the wave state (LONG_HORIZON.md 8.4)")
@@ -208,6 +214,12 @@ def main(argv=None):
     if a.data_source == "occlusion" and a.occ_start <= a.chunk:
         ap.error(f"--occ-start {a.occ_start} <= --chunk {a.chunk}: the eval gap would cover the "
                  "warm-up context or the single-step target frame")
+    if a.chunk <= 0 or a.seq_frames <= 0:
+        ap.error("--chunk and --seq-frames must be positive")
+    if a.rollout_k < 0:
+        ap.error("--rollout-k must be >= 0")
+    if a.rollout_k >= a.seq_frames // a.chunk:
+        ap.error("--rollout-k requires at least one ground-truth context chunk")
     if a.seq_frames % a.chunk:
         ap.error("--seq-frames must be a multiple of --chunk")
     if a.tbptt_chunks < 1:
@@ -230,9 +242,19 @@ def main(argv=None):
     base = pathlib.Path(a.out)
     base.mkdir(parents=True, exist_ok=True)
     ckpt_path = base / f"ckpt_{a.kind}{a.tag}.pt"
+    objective = training_objective(a)
+    extra = {"training_objective": objective} if objective is not None else {}
+    if objective is not None:
+        print("TRAINING_OBJECTIVE", json.dumps({**objective, "device": dev,
+              "context_frames": a.seq_frames - a.rollout_k * a.chunk,
+              "generated_frames": a.rollout_k * a.chunk}), flush=True)
     start, prior_sec = 0, 0.0
     if a.resume:
         ck = torch.load(a.resume, map_location=dev, weights_only=True)
+        try:
+            check_resume_objective(ck, a)
+        except ValueError as exc:
+            ap.error(str(exc))
         m.load_state_dict(ck["state"])
         opt.load_state_dict(ck["opt"])
         start = int(ck["step"])
@@ -262,11 +284,11 @@ def main(argv=None):
             print("STEP", json.dumps(row), flush=True)
         if a.save_every and step % a.save_every == 0:
             torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": step,
-                        "train_sec": prior_sec + time.time() - t0}, ckpt_path)
+                        "train_sec": prior_sec + time.time() - t0, **extra}, ckpt_path)
     train_sec = prior_sec + time.time() - t0              # cumulative across resumed slices
     if a.save_every:
         torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": a.steps,
-                    "train_sec": train_sec}, ckpt_path)
+                    "train_sec": train_sec, **extra}, ckpt_path)
 
     m.eval()
     a.frames = a.chunk                                   # eval context = one chunk
@@ -305,9 +327,10 @@ def main(argv=None):
            "motion_loss": a.motion_loss, "train_occ_start": a.train_occ_start,
            "train_occ_end": a.train_occ_end, "occ_start": a.occ_start, "occ_end": a.occ_end,
            "persistent_state_bytes": m.persistent_state_bytes(), "train_sec": round(train_sec, 1),
-           "log_tail": log[-3:], **single, **roll}
+           "log_tail": log[-3:], **single, **roll, **extra}
     (base / f"result_{a.kind}{a.tag}.json").write_text(json.dumps(res, indent=1))
-    torch.save({"state": m.state_dict(), "config": model_config(a)}, base / f"model_{a.kind}{a.tag}.pt")
+    torch.save({"state": m.state_dict(), "config": model_config(a), **extra},
+               base / f"model_{a.kind}{a.tag}.pt")
     keys = ("eval_mse_over_copylast", "copy_ratio", "divergence_horizon", "exit_direction_accuracy",
             "position_error_at_emergence")
     print("RESULT", json.dumps({k: res.get(k) for k in keys}), flush=True)
