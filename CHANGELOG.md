@@ -1,5 +1,20 @@
 # Changelog
 
+## v1.4.0
+
+Post-v1.3.0 mainline content, versioned so the trunk merge no longer answers to an existing tag.
+
+### One trunk: engine + wave-lattice lines merged
+
+- The standalone wave-lattice line (ported modules under `crumb_wavelm/`) and the engine line are merged into a single `main`; the `crumb-llm` name stays reserved for the analysis product.
+
+### Long-horizon memory + correctness (PR #58)
+
+- Per-channel half-life fade (opt-in): at 1,000 training steps the model recovers a 64-frame occlusion (recall 0.67 vs 0.12 at the default fade).
+- `run_long_horizon.sh`: pre-registered pass/kill criteria and a resume-and-slice runner that respects the 5,400 s box cap.
+- Fixes: no future-frame leakage in training under long memory; streaming/training match for hybrid arms; the fusion test now catches the divergence it previously missed.
+- Benchmark honesty: the CPU attention comparison, re-measured fairly, is about 886x (the 417x figure was an un-warmed single-shot measurement).
+
 ## v1.3.0
 
 Everything below shipped after `v1.2.0` was tagged. It is a separate version
