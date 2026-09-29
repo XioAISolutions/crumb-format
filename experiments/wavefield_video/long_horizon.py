@@ -519,6 +519,12 @@ def cmd_stream(a):
                 raise SystemExit(f"{a.resume} was sampled with flow seed {old_seed}; --seed "
                                  f"{a.seed} would continue a different trajectory -- resume "
                                  "with the same --seed, or start fresh")
+            # the Euler step count is not a weight, so the model fingerprint misses it
+            old_steps = (sess.extra or {}).get("flow_steps")
+            if old_steps != head["flow_steps"]:
+                raise SystemExit(f"{a.resume} was sampled with {old_steps} Euler steps; this "
+                                 f"checkpoint samples with {head['flow_steps']} -- the rollout "
+                                 "would change integration mid-trajectory; start fresh")
         if sess.extra and "health" in sess.extra:
             mon.load_state_dict(sess.extra["health"])
         else:                       # older state file: flags start fresh, indices stay absolute
@@ -568,7 +574,7 @@ def cmd_stream(a):
     def extra_state():
         extra = {"health": mon.state_dict(), "generated": gen, "context_fp": ctx_fp}
         if head["head"] == "flow":
-            extra["flow_seed"] = a.seed
+            extra.update(flow_seed=a.seed, flow_steps=head["flow_steps"])
         if vae is not None:
             extra.update(decoder=dec.state_dict())
         if a.checkpoint:

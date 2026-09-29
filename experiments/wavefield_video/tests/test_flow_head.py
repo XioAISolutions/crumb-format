@@ -225,6 +225,13 @@ class FlowHeadTests(unittest.TestCase):
             # resuming that stream under another --seed would splice in another trajectory
             with self.assertRaises(SystemExit):
                 lh.main(args + ["--checkpoint", cp, "--stream-frames", "12", "--seed", "1"])
+            # ... or under the same weights with another Euler step count
+            other = torch.load(full / "model_wave.pt", weights_only=True)
+            other["config"]["flow_steps"] = 3
+            torch.save(other, Path(d) / "steps3.pt")
+            with self.assertRaisesRegex(SystemExit, "Euler steps"):
+                lh.main([x if x != str(full / "model_wave.pt") else str(Path(d) / "steps3.pt")
+                         for x in args] + ["--checkpoint", cp, "--stream-frames", "12"])
             # render_rollout: the same command renders the same sampled video
             import render_rollout
             pngs = []
