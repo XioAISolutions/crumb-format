@@ -1,0 +1,56 @@
+[plan] 1808 latent frames = 7229 frames = 5.02 min; est. VRAM 11.9 GiB of 23.6
+[generate] /workspace/slava/venvs/longlive/bin/python inference.py --config_path /workspace/slava/exp/pr63/runs_longlive_cfg16g/len_300s/longlive_overlay.yaml (cwd /root/LongLive)
+Free VRAM 23.24053955078125 GB
+KV inference with 8 frames per block (kv_quant=False, vae_decode=batch)
+Loading generator from /root/LongLive/LongLive-2.0-5B/model_bf16.pt
+[FP8] TorchAO W8A8 quantized 300 linear layers with per-tensor scaling; kept 6 layers in BF16
+[data] data_path=/workspace/slava/exp/pr63/prompts_long.txt, mode=txt, num_blocks=226
+Number of prompts: 1
+0it [00:00, ?it/s]sampled_noise.device cuda:0
+[... 2 prompt-echo lines omitted (226 block-prompts) — full log md5 812a31c4f7c35d8d5bd6de388bb19934 on box runs_longlive_cfg16g/log_300s.txt ...]
+[mem] pre: alloc=17.21 reserved=23.13
+[mem] te dev: cuda:0
+[mem] post-clear: alloc=17.21 reserved=17.22
+0it [00:02, ?it/s]
+Traceback (most recent call last):
+  File "/root/LongLive/inference.py", line 650, in <module>
+    generated = pipeline.inference(**inference_kwargs)
+  File "/root/LongLive/pipeline/causal_diffusion_inference.py", line 212, in inference
+    conditional_dict, conditional_dict_list = encode_prompt_blocks(
+  File "/root/LongLive/utils/prompt_conditioning.py", line 17, in encode_prompt_blocks
+    conditional_dict = text_encoder(text_prompts=flat_prompts)
+  File "/workspace/slava/venvs/longlive/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/venvs/longlive/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/LongLive/utils/wan_5b_wrapper.py", line 49, in forward
+    context = self.text_encoder(ids, mask)
+  File "/workspace/slava/venvs/longlive/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/venvs/longlive/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/LongLive/wan_5b/modules/t5.py", line 307, in forward
+    x = block(x, mask, pos_bias=e)
+  File "/workspace/slava/venvs/longlive/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/venvs/longlive/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/LongLive/wan_5b/modules/t5.py", line 173, in forward
+    x = fp16_clamp(x + self.attn(self.norm1(x), mask=mask, pos_bias=e))
+  File "/workspace/slava/venvs/longlive/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/venvs/longlive/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/LongLive/wan_5b/modules/t5.py", line 102, in forward
+    attn_bias = x.new_zeros(b, n, q.size(1), k.size(1))
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 7.06 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.45 GiB is free. Process 1844993 has 22.16 GiB memory in use. Of the allocated memory 21.66 GiB is allocated by PyTorch, and 51.39 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/longlive_long.py", line 555, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/longlive_long.py", line 550, in main
+    {"plan": cmd_plan, "generate": cmd_generate, "decode": cmd_decode,
+  File "/workspace/slava/exp/pr63/longlive_long.py", line 499, in cmd_generate
+    subprocess.run(cmd, cwd=ll_root, check=True)
+  File "/usr/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/workspace/slava/venvs/longlive/bin/python', 'inference.py', '--config_path', '/workspace/slava/exp/pr63/runs_longlive_cfg16g/len_300s/longlive_overlay.yaml']' returned non-zero exit status 1.

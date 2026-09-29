@@ -1,0 +1,20 @@
+# box python3: Python 3.10.12 | 2026-09-29T22:12:56Z
+PASS  unpatched rejected by verify | FAIL  marker missing
+PASS  clean apply -> APPLIED | APPLIED 9c24612de9b1d2e4e84d666724f128e5d131de75a785a5391973005938c4defc /workspace/slava/ll_prompt_chunk_test/t_clean.py
+PASS  verify clean | PASS  structure verified: chunk guard, single-call path, ordered sliced chunk loop, cat dim=0, prompt_embeds read
+PASS  re-apply idempotent + validated | ALREADY PATCHED (structure verified): /workspace/slava/ll_prompt_chunk_test/t_clean.py
+PASS  broken rejected by verify | FAIL  STRUCTURE FAIL: loop call must slice flat_prompts[_ll_i:_ll_i + _ll_chunk], got: text_encoder(text_prompts=flat_prompts[0:_ll_chunk])
+PASS  broken rejected by apply (fail closed) | STRUCTURE FAIL: loop call must slice flat_prompts[_ll_i:_ll_i + _ll_chunk], got: text_encoder(text_prompts=flat_prompts[0:_ll_chunk])
+PASS  default call sizes [16,16,8] | [16, 16, 8]
+PASS  chunk-7 call sizes [7x5,5] | [7, 7, 7, 7, 7, 5]
+PASS  explicit single-call sizes [40] | [40]
+PASS  prompts arrive in order | [16, 16, 8]
+PASS  per-block embeddings match single-call | equal
+PASS  chunk-7 embeddings match single-call | equal
+PASS  block i -> prompt i end-to-end | [[0.0], [1.0], [2.0]]
+PASS  conditional_dict prompt_embeds in order | [0.0, 1.0, 2.0]
+PASS  slice-bug variant caught (runtime/equality) | runtime guard: Text encoder returned 48 embeddings for 40 prompts.
+PASS  reversed-order variant caught by equality test | [[32.0], [33.0], [34.0]]
+PASS  live box file passes verify | PASS  structure verified: chunk guard, single-call path, ordered sliced chunk loop, cat dim=0, prompt_embeds read
+SELFTEST OK
+rc=0

@@ -1,0 +1,3 @@
+# 2026-09-29T22:12:57Z
+PASS  structure verified: chunk guard, single-call path, ordered sliced chunk loop, cat dim=0, prompt_embeds read
+rc=0
