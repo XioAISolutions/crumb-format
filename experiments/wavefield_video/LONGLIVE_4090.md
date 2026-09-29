@@ -86,3 +86,13 @@ Receipts to send back:
 - Peak VRAM from `nvidia-smi` during the 5 min run.
 - The 30 s and 5 min mp4s, so the frames can be checked by eye. A metric pass
   is not a quality claim.
+
+## Run environment notes (2026-09-29)
+
+Three blockers hit on the box during the first fp8 rungs; clear them before any retry:
+
+1. **`flash_attn` must be present or generation dies at the FA2 assert** (`wan_5b/modules/attention.py` — the FA3/FA4/TE branches are default-off). The venv ships without it. Install the prebuilt wheel matching this venv (torch ABI = 0): `flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl` from the Dao-AILab releases, `pip install --no-deps` (keep the canonical filename — a renamed copy fails as invalid wheel filename). Smoke a varlen full + windowed call on the GPU before the next retry.
+2. **Two cache bugs in the pinned source** (`pipeline/causal_diffusion_inference.py`): unused negative-CFG KV/cross-attn caches allocate with guidance off, and the chunk-reset path touches `crossattn_cache_neg` unguarded. Apply `scripts/longlive_cfg_cache_patch.py` (AST-anchored, fail-closed, exclusive-create) and verify with `scripts/check_longlive_cache.py` plus a SHA readback of the patched file.
+3. **Run identity:** after any source/venv change, retry into a fresh `--out` (c01o → `runs_longlive_cfg16b`, c01p → `runs_longlive_cfg16c`).
+
+Status at 2026-09-29 13:35Z: both cache bugs fixed on the box (pipeline SHA `7873c583…`); flash-attn 2.7.4.post1 installed + GPU smoke passed; retry `c01p` (LENGTHS=10, fp8, window 16) queued. Receipts: `receipts/ll_fp8_20260929/`.

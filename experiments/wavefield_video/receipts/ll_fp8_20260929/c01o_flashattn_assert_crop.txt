@@ -1,0 +1,7 @@
+    x_attn = _cross_attend(x_chunked)  # [B * num_chunks, tokens_per_chunk, C]
+  File "/root/LongLive/wan_5b/modules/causal_model.py", line 238, in _cross_attend
+    x_attn = flash_attention(q, k, v, k_lens=context_lens)
+  File "/root/LongLive/wan_5b/modules/attention.py", line 241, in flash_attention
+    assert FLASH_ATTN_2_AVAILABLE
+AssertionError
+Traceback (most recent call last):
