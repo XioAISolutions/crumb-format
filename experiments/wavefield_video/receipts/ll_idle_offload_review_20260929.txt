@@ -1,0 +1,975 @@
+OpenAI Codex v0.154.0
+--------
+workdir: /Users/slavaz/.hermes/cache/scratch/idle_offload_review
+model: gpt-6-astra
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: ultra
+reasoning summaries: none
+session id: 01a0ee06-5e1b-75b2-a34c-22ced4a347ea
+--------
+user
+You are an independent, skeptical code reviewer. Work read-only: modify nothing. Read every file in this directory (01_apply_script.py, 02_verify_script.py, 03_corrected_region.txt, 04_pipeline_git_diff.txt, 05_context.md, 06_git_status.txt, 07_test_longlive_cache_runtime.py, 08_test_longlive_reset.py). 05_context.md defines the goal, history, and five questions to answer. Produce findings as BLOCKER/MAJOR/MINOR with file references, answer each of the five questions explicitly, then a final verdict line: PASS-with-limitations or FAIL. Say cannot verify when evidence is insufficient; do not guess. Under 900 words.
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+warning: Skill descriptions were shortened to fit the skills context budget. Codex can still see every skill, but some descriptions are shorter. Disable unused skills or plugins to leave more room for the rest.
+codex
+I’ll read all eight files and the relevant review context, then check the five questions against the code and test evidence. I’ll keep everything read-only.
+exec
+/bin/zsh -lc 'cat ~/.ai-memory/MEMORY.md' in /Users/slavaz/.hermes/cache/scratch/idle_offload_review
+ succeeded in 0ms:
+# Shared AI Memory
+
+> Loaded by all AIs at session start. Keep under 200 lines.
+> Detailed notes live in topic files — link them here, don't inline them.
+> Last updated: 2026-09-28 · Canonical private repo: github.com/slavazeph-coder/ai-memory
+
+## User: slavaz
+
+→ [user.md](user.md) — profile, environment, workflow, decision style; candid peer-like collaboration, artistic expression, and nature
+
+## Tools & Setup
+
+- 2026-09-23: OpenRouter added as an optional Hermes provider and live-tested; DeepSeek remains main. Details in [Zeph configuration notes](hermes-zeph-reorganization-2026-09-19.md).
+
+- 2026-09-22: [Hermes private Tailscale access](hermes-tailscale-access-2026-09-22.md) — rootless zeph-mac browser/SSH node, owner-only access, user-login services; full Mac VPN still needs administrator setup.
+
+→ [tools.md](tools.md) — AI CLIs, MCP servers, config files, slash commands
+
+- 2026-06-14: NVIDIA SkillSpector v2.1.4 is globally installed; system-wide audit details and false-positive caveats are in `tools.md`
+- 2026-07-02: **Supermemory removed entirely** (server, plugins, env bridges) after recurring auth failures; memory is now markdown-only with zero external dependencies. Concept search: `bash ~/.ai-memory/memory-search.sh "<terms>"`. Removed artifacts recoverable in `~/.Trash/supermemory-removed-2026-07-02/`; full removal manifest in `tools.md`. Do not re-wire `SUPERMEMORY_*` — any doc mentioning it is stale.
+- 2026-06-15: Shannon v1.7.0 + Docker Desktop local pentest setup verified against disposable Juice Shop; OAuth and Docker overlay workaround details are in `tools.md`
+- 2026-06-17: OpenClaw 2026.6.8 + Ollama cloud uses a local proxy workaround for broken macOS DNS/trust; cloud inference still needs an Ollama subscription. Details in `tools.md` and `openclaw-learnings.md`
+- 2026-07-15: Safe macOS disk cleanup recovered 5+ GB by clearing rebuildable npm, uv, and pip caches; details and remaining low-risk candidates are in `tools.md`
+- 2026-09-21: [Hermes shutdown and disk pressure](hermes-disk-pressure-2026-09-21.md) — recurrent ENOSPC traced to growing Lean build artifacts; nslean auto-resume paused,2.36GiB verified remote-backed media cache reclaimed, gateway/native reply recovered. Storage still tight; preserve uv's live Leonardo MCP environment.
+- 2026-09-19: [Zeph audit and reorganization](hermes-zeph-reorganization-2026-09-19.md) — current local memory entry point and service ownership; Flash main / Pro delegation / Codex fallback; curated memory freed; local model context corrected to 8,192. Runtime and delivery claims require timestamped verification.
+- 2026-08-11: [Zeph on Hermes](hermes-zeph-imessage-2026-08-11.md) — historical migration and Photon setup; version, model selection and XIO publishing boundary have changed since. Read the September 19 reference for current local configuration. OpenClaw remains retired; never ingest its sensitive Trash archive.
+
+## Feedback & Preferences
+
+→ [feedback.md](feedback.md) — response style rules, collaboration rules (with Why/How)
+→ [feedback_ultraplan.md](feedback_ultraplan.md) — in plan mode, don't auto-ExitPlanMode; user often hands plans to Ultraplan for remote refinement
+
+## Active Projects
+
+- [Wavefield video R12](wavefield-video-r12-2026-09-25.md) — local no-commit difficulty ladder, semantic blob counting, pixel/latent evaluation, and CPU smoke commands.
+
+- [XIO customer-demand decision](xio-customer-demand-2026-09-26.md) — customer-first research supersedes the Sept19 owner-sends pilot recommendation; proposes one bounded website enquiry repair test at unvalidated C$399, with price/acquisition/scope risks. No launch, outreach or payment. Historical [Sept19 brief](xio-positioning-2026-09-19.md) remains for provenance.
+
+- [Generator audit R2-D](generator-audit-r2d-2026-09-28.md) — tone + control-side steering outcomes, house-video model (`brainsnn/generator_audit`, receipt `rung2/R2D_VERDICT.md`): positive-prompt tone clause ADVANCEs (blind review preferred it 4/4 panels, narrow; minor content drift logged); control-side MACRO objects (0.4–0.6 m) DO reach the take while 3–4 cm micro-geometry stays take-invisible; take-side run-to-run floor quantified (mean|d| 9.5 / 48.7 % >6 @4-step L0, crf14). n=1 chunk; no chain-scale claim; nothing public.
+
+- [brainsnn-earned-work-2026-09-08](brainsnn-earned-work-2026-09-08.md) — BrainSNN engine first; old-client outreach cancelled; PR142 restores original cyan/violet identity and simpler homepage, with /office separate; /engine + API/MCP retained; context learning remains next
+
+- [portfolio-registry](projects/portfolio-registry/MEMORY.md) — 2026-08-11 cross-namespace registry for all 21 visible repos under `slavazeph-coder` + `XioAISolutions`; canonical roles, active PR anchors, duplication risks, evidence boundaries, and execution priority. Treat as dated GitHub-derived context and reverify remote/deployment state before action.
+- [rulearc](projects/rulearc/MEMORY.md) — ISC building-permit challenge submission branch/PR; current evidence claim stays TRL 5, Phase 2 targets TRL 8, and external TRL 6/certification evidence remains mandatory
+- [penguinwalk](projects/penguinwalk/MEMORY.md) — injected Shadow-DOM webpage-chat; **#16/#17/#18 + all 9 Dependabot PRs merged**, `main` at `c3b1d5f`, 195 tests green; ⚠️ **Railway auto-deploy is broken — merging does NOT deploy** (`x-railway-fallback: true`); Safari conversion still needs `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`
+- [gaugegap-foundry](projects/gaugegap-foundry/MEMORY.md) — finite benchmark infrastructure; Sept 8 audit confirms existing Navier–Stokes track is 2D Taylor–Green numerics, not a 3D continuum proof; Sept 9 follow-up independently rebuilt and verified external C/D proofs with Lean + Nanoda; local research fork adds Lean-checked energy/forcing consequences, with no new Millennium claim
+- [mirofish](projects/mirofish/MEMORY.md) — 24/7 Polymarket trading bot; **HALTED 2026-05-11 after Polymarket reconciliation showed $285 cost / $3 value / $0.91 USDC; local DB only had 16 of 38 positions; CRYPTO_ONLY filter bypassed** — see `incident-2026-05-11.md`
+- [new-project-workspace](projects/new-project-workspace/MEMORY.md) — local multi-project workspace with repo-local `.ai-memory/`
+- [the-brain](projects/the-brain/MEMORY.md) — BrainSNN/TRIBE is canonical; the old agent shell and `ui/openclaw-office` are legacy surfaces only
+- [brainsnn-gpu-model-selection-2026-09-10](brainsnn-gpu-model-selection-2026-09-10.md) — OBLITERATUS Qwen3-4B is DEGENERATE by its own metadata (perplexity inf/coherence 0.0); use `huihui-ai/Huihui-Qwen3-4B-Instruct-2507-abliterated`; always read `abliteration_metadata.json` first; workflow_dispatch needs the file on the DEFAULT branch; job-level `env:` cannot use the `runner` context; ⚠️ `amd-droplet` IP was recycled to a Cloudways tenant — do not connect
+- [brainsnn-deploy](brainsnn-deploy.md) — brainsnn.com (BrainSNN app in the-brain repo) ships via `railway up` from `brainsnn-r3f-app/` → Railway `wonderful-charisma`/`the-brain`/prod; verify deploys by grepping the live bundle, not local hashes
+- [social-agent-aqua-idle-rootcause](social-agent-aqua-idle-rootcause.md) — Aqua LaunchAgents die on GUI-idle AND on any unattended restart (2026-09-02→09-08 = 5d19h fleet-wide outage); FileVault On ⇒ auto-login impossible ⇒ LaunchDaemons are the ONLY fix; `pmset wake` is wrong; current installer = `~/.xio-agents/control-plane/setup_reliability_daemons.sh` (the old social-agent one was stale/broken)
+- [social-agent-overhaul-2026-06-22](social-agent-overhaul-2026-06-22.md) — historical overhaul; its IG+LinkedIn+Facebook channel note was superseded on 2026-07-28 by the content-v2 channel update
+- [social-agent-content-overhaul-2026-07-05](social-agent-content-overhaul-2026-07-05.md) — post-time LLM captions (OpenAI→Ollama qwen3:14b) with anti-fabrication grounding gate; weekday lanes favor business/outcome; personal LI re-enabled (dropped again 2026-07-12); real Buffer metrics wired but **blocked until token regenerated with insights:read**; OpenAI account out of quota
+- [social-agent-hardening-2026-07-11](social-agent-hardening-2026-07-11.md) — timeouts/atomic-writes/log-rotation/401-handling shipped (local commit `a6b3288`); `leonardo` MCP server registered (lucid/phoenix models, key rotated); matplotlib infographic style rejected as dated → Leonardo cinematic + typography; **⚠️ `~/.openclaw/workspace` git origin pointed at PUBLIC xio-ai-assets — renamed `wrong-remote-do-not-push`, never push**; catch-up LaunchDaemon still needs user sudo
+- [social-agent-content-v3-2026-07-28](social-agent-content-v3-2026-07-28.md) — current proof-led XIO social pipeline in `~/.xio-agents/social-agent`: Instagram Reel + XIO LinkedIn editorial/PDF + native-text X; 50-day 30/15/5 library, owner-approved Quiet Proof audio, per-channel publication receipts, and active guarded 9:00 Toronto LaunchAgent
+- [xio-agent-runtime-2026-07-28](xio-agent-runtime-2026-07-28.md) — the 9 AM social LaunchAgent was retired 2026-07-28 for `com.xioai.agent-runtime`, a signed 15-min heartbeat running outcomes/acquisition/mission-control/nurture **server-side on xioai.co — it does NOT post social**; `~/.openclaw/workspace/social-agent` is a dead path
+- [xio-self-improve-cycle](xio-self-improve-cycle.md) — since 2026-09-23 **merged into the single `social-agent-morning-check` task** (09:30: verbatim brief, then autonomous diagnose/fix/journal; memory = `control-plane/self-improve/JOURNAL.md`); read that journal before debugging this stack, and note its hard "never weaken a gate / never publish" boundaries
+- [social-agent-project-memory-fix-2026-09-08](social-agent-project-memory-fix-2026-09-08.md) — social copy came from a 576h-stale cache for 24 days; `SOCIAL_AGENT_PROJECT_MEMORY` defaulted to another project's memory inside TCC-protected `~/Documents`, where a LaunchAgent's read **blocks** instead of erroring. Now pinned to `~/.ai-memory/MEMORY.md` in both `.env` and the plist
+- [xio-daily-brief-task](xio-daily-brief-task.md) — scheduled task `social-agent-morning-check` (daily 09:30) = whole-business brief (verbatim collector stdout), and since 2026-09-23 also runs the self-improve cycle (no longer read-only); 2026-08-03 audit keeps Buffer as sole publisher and rejects Instagrapi/GramAddict for XIO production
+- [ai-collab-vscode](projects/ai-collab-vscode/MEMORY.md) — VS Code + AI CLI bootstrap/setup tool; one-shot `setup.sh`
+- [compliance-ai](projects/compliance-ai/MEMORY.md) — XIO Compliance Brain pivot + AMD MI300X hackathon branch; preserve dirty `/Users/slavaz/compliance-AI`
+- [xio-landing](projects/xio-landing/MEMORY.md) — `xioai.co` Next.js app; current ladder is AI Setup Day, AI Workflow Build, and Private AI System, with an XIO-owned signed sales runtime and Mission Control close desk. Grace PR #21 merged as `e923081`, canonical Railway deployment and live smoke passed, while real Mistral activation remains unverified pending the owner-key preflight and telemetry.
+- [xioai-ca](projects/xioai-ca/MEMORY.md) — `xioai.ca` Railway site is `XioAISolutions/XIO-AI-EXO` (Vite/React/Express), not the `XIO-CO` Next app; commercial robot pages are now customer-facing Keenon catalog pages with Buy Now purchase-intent CTAs and internal detail pages, not a 20-robot launch-fleet campaign
+- [crumb-format](projects/crumb-format/MEMORY.md) — copy-paste AI handoff format; CrumbLLM direction is standalone `crumb-llm` package/CLI, with native acceleration/robotics-space roadmap lenses and optional adapters only
+- [crumbbeam](projects/crumbbeam/MEMORY.md) — optical CRUMB transport; PR #1 stays draft until current software blockers and real iPhone/Android evidence are resolved
+- [crumb-bob](projects/crumb-bob/MEMORY.md) — IBM Bob replay memory pack generator; v0.3.1 final submission media pushed at d618850, including PDF deck and narrated MP4; 290 tests passed
+
+## OpenClaw Learnings
+
+→ [openclaw-learnings.md](openclaw-learnings.md) — historical observations from the retired OpenClaw main agent; do not treat old provider, Supermemory, or active-path notes as current configuration
+
+## AI Collaboration Setup (established 2026-03-16)
+
+- **Two CLIs**: Claude Code (`claude`) + Codex CLI (`codex`) run as independent peers
+- **Shared memory**: `~/.ai-memory/` — both AIs read/write here
+- **Claude wiring**: `~/.claude/CLAUDE.md` imports this file; `autoMemoryDirectory` writes here
+- **Codex wiring**: `~/.codex/AGENTS.md` instructs Codex to read this file
+- **MCP**: Codex also registered as MCP server in Claude (user scope) for inline delegation
+- **Project memory**: scaffold with `/init-memory` → creates `.ai-memory/` + wires both AIs
+- **Collaboration workflow**: `/with-codex <task>` to plan+divide, then independent terminals
+- **Resilience rule**: two terminals beats MCP-subordinate — if Claude cools down, Codex keeps running
+
+## Reference
+
+→ [autonomous-income-2026-09-18.md](autonomous-income-2026-09-18.md) — user rejects sales/collection friction; live $199 shared CUDA optimization bounty fits evolutionary search but pays after October review; no verified $100 within-hours route or earnings
+
+→ [hermes-deepseek-2026-09-14.md](hermes-deepseek-2026-09-14.md) — historical Pro/file-tool and timeout repair receipts; main routing has since returned to Flash, as recorded in the September 19 reorganization topic
+
+→ [claude-cli-hermes-2026-09-14.md](claude-cli-hermes-2026-09-14.md) — Claude Pro CLI login renewed; Hermes terminal --model sonnet live-tested CLAUDE_OK; default Fable5 has usage-credit limit, no provider switch or token export
+
+→ [revenue-now-2026-09-13.md](revenue-now-2026-09-13.md) — cited first-payment research and US$219 automation debugging offer draft; no confirmed buyer/earnings or outreach; Stripe account selection pending
+
+→ [simon-vast-ssh.md](simon-vast-ssh.md) — Sept14 06:43: Codex watcher PAUSED verified in live scheduler DB, next_run_atNULL,0queued items; last heartbeat completed06:18UTC. Stay paused for Hermes cutover; no remote actions. Receipt `~/.brainsnn-monitor/pause-verification-20260914.json`.
+
+→ [reference/agent-sdk/INDEX.md](reference/agent-sdk/INDEX.md) — local mirror of the **Claude Agent SDK** docs (all 30 pages as raw markdown in `reference/agent-sdk/pages/`). Read this instead of WebFetching code.claude.com/docs/en/agent-sdk/ — saves tokens. The big API refs (`python.md`/`typescript.md`, ~160 KB each) have section line-maps in INDEX for targeted `Read offset=` lookups. Re-pull: `bash ~/.ai-memory/reference/agent-sdk/refresh.sh`
+→ [reference/token-optimization.md](reference/token-optimization.md) — token/cost settings + habits (model=sonnet, MAX_THINKING_TOKENS, subagent=haiku; /clear, /compact; read local packs not the web). Adapted from ECC.
+→ [ecc-skill-adoption-2026-09-15.md](ecc-skill-adoption-2026-09-15.md) — second ECC pass: **not installed** (collides with `~/.ai-memory`, and 292 skills would bloat the context skill index; Hermes is only an experimental/minimal adapter). Mined 3 skills instead: `agent-payment-x402` (the missing payment path), `benchmark-optimization-loop`, `click-path-audit`. Also records that the upstream payment skill pins a **stale single-maintainer** key-holding npm package — not wired.
+→ [moltbook-recon-2026-09-16.md](moltbook-recon-2026-09-16.md) — defensive Moltbook threat recon built (`~/.hermes/workspaces/threat-recon/`, 23 tests, cron `07797ad284ba`, silent unless HIGH+). Reads need **no auth and no agent identity**. Verified against the Coinbase Bazaar index: the x402 agent economy is **15.7k endpoints over only 2k hosts**, median list price **$0.01**, and ~$10.5k/month total excluding one gift-card rail — **do not build on agent-to-agent payments; the buyer must be human.** Also: litellm 1.82.7/1.82.8 credential-stealer incident (we are NOT affected, 1.101.0 clean), and our 8 GitHub Actions workflows pin by mutable tag in **24/24** references (teamPCP-class exposure).
+
+## Quick Reference
+
+- **Private git repo** → `github.com/slavazeph-coder/ai-memory`. New machine: `git clone … ~/.ai-memory && bash ~/.ai-memory/build-local.sh`
+- Global memory: `~/.ai-memory/` (canonical, pullable); per-project: `<repo>/.ai-memory/` — wire with `bash ~/.ai-memory/wire-project.sh`
+- Sync: `memory-sync.sh <init|pull|push|status>` · rebuild bulk: `build-local.sh` · standard: [README.md](README.md)
+- New project setup: `/init-memory` · Collaborative task: `/with-codex <task>`
+- Memory format: markdown + YAML frontmatter (`type`, `description`)
+
+- [testdisk-pr206-review-2026-09-12](testdisk-pr206-review-2026-09-12.md) — local PhotoRec review contribution with actual executable red/green tests; existing PR author retained, no payment claim or external submission
+
+- 2026-09-12: [Max-boil research and PhotoRec correction](max-boil-research-2026-09-12.md) —9fresh Lean axiom closures; compact-support force-removal obstruction with unformalized PDE bridge;10PhotoRec executable tests pass; no Millennium/prize/payment claim.
+
+- 2026-09-13: [Bounty hunt and tested Expensify draft](bounty-hunt-2026-09-13.md) — 25 local patch tests pass; available $500 tinygrad task, conditional paid programs and stale-offer exclusions; no submission or earnings.
+
+- 2026-09-13 profile retry: [Bounty hunt](bounty-hunt-2026-09-13.md) now records supplied Freelancer/Upwork profiles, two application drafts, and the first-withdrawal delay.
+
+- [Browser/job retry September13 evening](browser-job-retry-2026-09-13.md) — four more unsent proposals and official Chrome connection steps; no login or earnings.
+
+- [Hermes freelance delivery assessment](freelance-hermes-delivery-2026-09-14.md) — CPU delivery plan for four shortlisted jobs; current cloud config and unverified GPU readiness.
+
+exec
+/bin/zsh -lc "pwd && rg --files -g 'AGENTS.md' -g '.ai-memory/MEMORY.md' -g '0[1-8]*'" in /Users/slavaz/.hermes/cache/scratch/idle_offload_review
+ succeeded in 0ms:
+/Users/slavaz/.hermes/cache/scratch/idle_offload_review
+08_test_longlive_reset.py
+04_pipeline_git_diff.txt
+07_test_longlive_cache_runtime.py
+05_context.md
+06_git_status.txt
+02_verify_script.py
+03_corrected_region.txt
+01_apply_script.py
+
+exec
+/bin/zsh -lc 'cat 05_context.md && wc -l 0* && cat 06_git_status.txt' in /Users/slavaz/.hermes/cache/scratch/idle_offload_review
+ succeeded in 0ms:
+# Context: LongLive idle-offload patch — independent review request
+
+Reviewer: static review only; do not modify or run any file. Packet:
+- 01_apply_script.py — the patcher that installs the change (fail-closed anchors + AST structure check).
+- 02_verify_script.py — standalone AST verifier for the installed change.
+- 03_corrected_region.txt — the post-patch source region (authoritative readback from the box).
+- 04_pipeline_git_diff.txt — ALL local modifications of the pinned LongLive checkout (commit 6b36d20) vs upstream.
+- 06_git_status.txt — local status snapshot + pinned commit.
+- 07_test_longlive_cache_runtime.py / 08_test_longlive_reset.py — the CPU regression harness; note it execs ONLY class CausalDiffusionInferencePipeline with a minimal namespace (torch, List, Optional, wan_default_config, encode_prompt_blocks) and the inference() body truncated at the first current_start_frame assignment; module-level imports are NOT available (hence the local `import os as _ll_os` inside the method).
+
+## Goal and change
+
+A 24GB sm89 card runs LongLive-2.0 5B in fp8, text-to-video, latents-only (`save_latents_only=True`; decode runs later in a separate process). On the pinned pipeline, the text encoder (~11 GB bf16) and the VAE stay resident on GPU through denoising although both are idle once the prompts are encoded. The previous attempt (c01p) OOMed in the denoise forward pass (peak 24.16 of 24.56 GiB).
+
+The change: an env-guarded (`LL_OFFLOAD_IDLE=1`) insert right after the prompt-encoding if/else in `CausalDiffusionInferencePipeline.inference()` that moves `self.text_encoder` and `self.vae` to CPU and empties the CUDA cache.
+
+## History (why the verifier exists)
+
+v1 of the insert was placed between `if use_cfg:` and its `else:`. The `else:` re-attached to the inserted `if`, so on the env=1 path `unconditional_dict` would never be assigned, and on the env=0 + guidance!=1.0 path CFG's unconditional dict would be silently nulled. It compiled and passed the naive regressions (their env did not exercise the difference). Caught by region readback before the first run; v2 (this packet) inserts after the complete if/else and adds the AST verifier.
+
+## Questions (answer each explicitly)
+
+1. Four-way semantics matrix — guidance_scale == 1.0 / != 1.0 × LL_OFFLOAD_IDLE == 0 / 1: enumerate the four cells and confirm each matches the original behavior of the code path (esp. that the `use_cfg` if/else is intact and no `else` was re-attached to the inserted `if`).
+2. Is moving `self.text_encoder` to CPU at this point safe for the rest of the same process? (Enumerate post-encode uses of the text encoder, if any, in the diff and the region.)
+3. Is moving `self.vae` to CPU safe for latents-only runs, and what exactly happens in a decode (`save_latents_only=False`) run if someone exports LL_OFFLOAD_IDLE=1 by mistake? (Trace the decode path; state whether it errors, silently degrades, or works.)
+4. DynamicSwapInstaller interplay: the text encoder is wrapped at load time when `low_memory` is on (`utils/memory.py` is not in the packet — reason from the diff/context if possible; if you cannot verify, say so). Does `module.to("cpu")` move the underlying storages? Can any later attribute access stream weights back to the GPU silently?
+5. Patcher/verifier themselves: blind spots of `_assert_structure` and `verify_ll_idle.py`; anything else in 04_pipeline_git_diff.txt that shows a silent behavior change (else-reattachment class bugs, changed guarding conditions, probe prints that alter execution).
+
+## Verdict format
+
+Findings as BLOCKER / MAJOR / MINOR with file references; then a final line: PASS-with-limitations or FAIL. If evidence is insufficient for a claim, say "cannot verify" instead of guessing. Keep it under ~900 words.
+     115 01_apply_script.py
+      69 02_verify_script.py
+      39 03_corrected_region.txt
+     192 04_pipeline_git_diff.txt
+      31 05_context.md
+      10 06_git_status.txt
+      78 07_test_longlive_cache_runtime.py
+      13 08_test_longlive_reset.py
+     547 total
+ M inference.py
+ M pipeline/causal_diffusion_inference.py
+ M utils/fp8.py
+?? inference.py.bak_memprobe
+?? pipeline/causal_diffusion_inference.py.bak2
+?? pipeline/causal_diffusion_inference.py.before_cfg_guard
+?? pipeline/causal_diffusion_inference.py.before_cfg_reset
+?? pipeline/causal_diffusion_inference.py.before_idle
+===LOG===
+6b36d20 Merge pull request #101 from NVlabs/agent/add-pwc-badge
+
+exec
+/bin/zsh -lc 'cat ~/.ai-memory/user.md ~/.ai-memory/feedback.md && if [ -f .ai-memory/MEMORY.md ]; then cat .ai-memory/MEMORY.md; fi' in /Users/slavaz/.hermes/cache/scratch/idle_offload_review
+ succeeded in 0ms:
+---
+type: user
+description: slavaz's profile, expertise, preferences across all AI sessions
+---
+
+# User: slavaz
+
+## Environment
+- macOS (Darwin 25.3.0), shell: zsh
+- Home: `/Users/slavaz`
+
+## Role & Expertise
+<!-- To be filled as sessions reveal more -->
+
+## Communication Preferences
+- Concise and direct — no filler, no preamble, no trailing summaries of what was just done
+- Lead with the action or answer, not the reasoning
+- One sentence where possible; markdown bullets over prose
+- Prefers candid, peer-like collaboration with independent judgment and respectful disagreement (2026-09-18).
+- Requests respect for artistic expression and attention to the natural world in relevant discussions (2026-09-18).
+
+## Workflow
+- Runs Claude Code + Codex CLI side-by-side in two independent terminals
+- Prefers two-terminal setup for resilience: if one AI hits cooldown, the other keeps running
+- Uses `/with-codex` to plan and divide a task, then lets both AIs run independently
+- Git is the shared state — both AIs read/write the same working tree
+- Codex also registered as MCP server inside Claude (user scope) for inline delegation when convenient
+
+## Decision-making style
+- Asks "which is smoothest to operate" — prioritises resilience and low friction over integration elegance
+- Thinks ahead to failure modes (e.g. cooldowns) when choosing architecture
+---
+type: feedback
+description: Cross-AI corrections, preferences, and behavioral rules discovered in sessions
+originSessionId: c082dc79-a930-4178-974c-a68ee8301ed0
+---
+
+# Feedback & Preferences
+
+## Response Style
+
+**No trailing summaries.**
+**Why:** User can read the diff/output themselves — restating it wastes time.
+**How to apply:** End responses at the last meaningful action or decision point.
+
+**No filler or preamble.**
+**Why:** User wants signal, not ceremony.
+**How to apply:** Lead with the action or answer. Skip "Great question", "Let me help you with", "Here's what I did".
+
+**Short and direct.**
+**Why:** Stated preference — one sentence where possible.
+**How to apply:** Prefer bullets over prose. If it fits in one sentence, don't use three.
+
+## AI Collaboration
+
+**For XIO positioning, start with current paid customer jobs and challenge the offer before building.**
+**Why:** On 2026-09-26 the user rejected a technology-led framing and asked for one simple, current, severely stress-tested offer based on what customers need and already pay for.
+**How to apply:** Separate actual order evidence, advertised budgets and seller claims. Count acquisition, access, delivery and rework effort. A research-selected offer remains a hypothesis until buyers pay XIO for that exact scope at workable economics.
+
+**For urgent earnings, evaluate time to collected money and user effort first.**
+**Why:** On 2026-09-18 the user rejected another automation-service proposal because selling and collecting payments create too much friction. They asked for autonomous, brute-force/evolutionary work with a $100 within-hours target.
+**How to apply:** Verify real available rewards, payment terms, eligibility, and settlement timing before building. Distinguish completed work, advertised prizes, accepted rewards, and collected money. Do not substitute sales drafts or an unfunded agent framework for this request.
+
+**Two independent terminals beats MCP-subordinate for resilience.**
+**Why:** If Claude is in cooldown, Codex (as MCP server) is also unreachable. Two terminals are independent peers.
+**How to apply:** Default to two-terminal setup for any long-running work. Use MCP delegation only for quick inline tasks.
+
+**`/with-codex` is for kickoff, not ongoing orchestration.**
+**Why:** After planning, both AIs work best running independently on their own subtasks.
+**How to apply:** Use `/with-codex` to divide the task; after that, let each terminal run free.
+
+**Git is the coordination layer.**
+**Why:** Both AIs share the same working tree — commits, file edits, and branches are visible to both.
+**How to apply:** Structure work so each AI owns non-overlapping files/concerns; commit frequently as handoff points.
+
+## Product / Release Posture
+
+**Standalone cannibalization over ecosystem bridge code.**
+**Why:** When a competing/adjacent project has good ideas (e.g. WeaveMind/Weft for CRUMB), user prefers absorbing the _ideas_ as native features rather than writing bridge code to the external system. Bridge code rots and ties the project to someone else's runtime; native features compound. Correction was explicit: "without\* ties to others" (2026-04-15, crumb-format 0.4.0).
+**How to apply:** When a user asks to "use" or "incorporate" another project's ideas, default to cannibalizing features into the native codebase. Only add bridge/adapter code if the user explicitly asks for interop.
+
+**Additive-only wire-format bumps.**
+**Why:** Handoff formats live or die on compatibility. Every past format file must keep parsing under every future parser — user was explicit that v1.2 additions be invisible to v1.1 parsers.
+**How to apply:** When extending a wire format, prefer optional headers + optional sections that older parsers ignore. Put novel shape into namespaced section names (`[fold:X/summary]`) rather than nested grammar. Validate new primitives as additive checks that never reject old files.
+
+## Visual Style
+
+**For XIO logo animation, prefer clean, edgy, futuristic treatments over hazy glow-heavy looks.**
+**Why:** User corrected the first logo GIF toward a cleaner edge/futuristic direction.
+**How to apply:** Use crisp logo edges, restrained bloom, dark clean backgrounds, subtle scan/circuit motion, and avoid muddy over-glow.
+
+**For professional XIO logo GIFs, keep the mark readable while motion happens around it.**
+**Why:** User asked for a more professional pass with possible zoom or spin after two glow/edge-heavy attempts.
+**How to apply:** Prefer centered logo, controlled zoom-breathe, subtle 3D yaw/orbital accents, clean contrast, and avoid full flips that make the logo unreadable mid-loop.
+
+**For high-impact XIO logo deliverables, the preferred concept is a polished portal reveal package.**
+**Why:** User chose the recommended portal reveal direction for website/social use and wanted a ZIP package of deliverables.
+**How to apply:** Build a dimensional cyan portal reveal with logo assembly, restrained zoom/yaw, key-frame preview, full-size GIF, smaller GIF, and ZIP package.
+
+**For the XIO logo mark itself, prefer a more solid metallic/chrome body over transparent neon strokes.**
+**Why:** User asked to make the logo more solid/metallic after reviewing the portal reveal.
+**How to apply:** Thicken the extracted mark, use silver/chrome gradients, add cyan rim light, reduce see-through glow, and keep the dark background restrained.
+
+**Preserve BrainSNN’s visual identity when improving positioning or capability.**
+**Why:** On 2026-09-09 the owner said the new scheme ruined the previous colour/feel and looked complicated and messy.
+**How to apply:** Reuse the original near-black, cyan/violet, rounded Sapient Playground design. Keep the homepage focused on a few useful actions; put operational records, roadmaps and API details on dedicated routes. A stronger engine does not require replacing the brand or filling the homepage with its architecture.
+
+exec
+/bin/zsh -lc "sed -n '40,76p' ~/.ai-memory/MEMORY.md" in /Users/slavaz/.hermes/cache/scratch/idle_offload_review
+ succeeded in 0ms:
+
+- [brainsnn-earned-work-2026-09-08](brainsnn-earned-work-2026-09-08.md) — BrainSNN engine first; old-client outreach cancelled; PR142 restores original cyan/violet identity and simpler homepage, with /office separate; /engine + API/MCP retained; context learning remains next
+
+- [portfolio-registry](projects/portfolio-registry/MEMORY.md) — 2026-08-11 cross-namespace registry for all 21 visible repos under `slavazeph-coder` + `XioAISolutions`; canonical roles, active PR anchors, duplication risks, evidence boundaries, and execution priority. Treat as dated GitHub-derived context and reverify remote/deployment state before action.
+- [rulearc](projects/rulearc/MEMORY.md) — ISC building-permit challenge submission branch/PR; current evidence claim stays TRL 5, Phase 2 targets TRL 8, and external TRL 6/certification evidence remains mandatory
+- [penguinwalk](projects/penguinwalk/MEMORY.md) — injected Shadow-DOM webpage-chat; **#16/#17/#18 + all 9 Dependabot PRs merged**, `main` at `c3b1d5f`, 195 tests green; ⚠️ **Railway auto-deploy is broken — merging does NOT deploy** (`x-railway-fallback: true`); Safari conversion still needs `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`
+- [gaugegap-foundry](projects/gaugegap-foundry/MEMORY.md) — finite benchmark infrastructure; Sept 8 audit confirms existing Navier–Stokes track is 2D Taylor–Green numerics, not a 3D continuum proof; Sept 9 follow-up independently rebuilt and verified external C/D proofs with Lean + Nanoda; local research fork adds Lean-checked energy/forcing consequences, with no new Millennium claim
+- [mirofish](projects/mirofish/MEMORY.md) — 24/7 Polymarket trading bot; **HALTED 2026-05-11 after Polymarket reconciliation showed $285 cost / $3 value / $0.91 USDC; local DB only had 16 of 38 positions; CRYPTO_ONLY filter bypassed** — see `incident-2026-05-11.md`
+- [new-project-workspace](projects/new-project-workspace/MEMORY.md) — local multi-project workspace with repo-local `.ai-memory/`
+- [the-brain](projects/the-brain/MEMORY.md) — BrainSNN/TRIBE is canonical; the old agent shell and `ui/openclaw-office` are legacy surfaces only
+- [brainsnn-gpu-model-selection-2026-09-10](brainsnn-gpu-model-selection-2026-09-10.md) — OBLITERATUS Qwen3-4B is DEGENERATE by its own metadata (perplexity inf/coherence 0.0); use `huihui-ai/Huihui-Qwen3-4B-Instruct-2507-abliterated`; always read `abliteration_metadata.json` first; workflow_dispatch needs the file on the DEFAULT branch; job-level `env:` cannot use the `runner` context; ⚠️ `amd-droplet` IP was recycled to a Cloudways tenant — do not connect
+- [brainsnn-deploy](brainsnn-deploy.md) — brainsnn.com (BrainSNN app in the-brain repo) ships via `railway up` from `brainsnn-r3f-app/` → Railway `wonderful-charisma`/`the-brain`/prod; verify deploys by grepping the live bundle, not local hashes
+- [social-agent-aqua-idle-rootcause](social-agent-aqua-idle-rootcause.md) — Aqua LaunchAgents die on GUI-idle AND on any unattended restart (2026-09-02→09-08 = 5d19h fleet-wide outage); FileVault On ⇒ auto-login impossible ⇒ LaunchDaemons are the ONLY fix; `pmset wake` is wrong; current installer = `~/.xio-agents/control-plane/setup_reliability_daemons.sh` (the old social-agent one was stale/broken)
+- [social-agent-overhaul-2026-06-22](social-agent-overhaul-2026-06-22.md) — historical overhaul; its IG+LinkedIn+Facebook channel note was superseded on 2026-07-28 by the content-v2 channel update
+- [social-agent-content-overhaul-2026-07-05](social-agent-content-overhaul-2026-07-05.md) — post-time LLM captions (OpenAI→Ollama qwen3:14b) with anti-fabrication grounding gate; weekday lanes favor business/outcome; personal LI re-enabled (dropped again 2026-07-12); real Buffer metrics wired but **blocked until token regenerated with insights:read**; OpenAI account out of quota
+- [social-agent-hardening-2026-07-11](social-agent-hardening-2026-07-11.md) — timeouts/atomic-writes/log-rotation/401-handling shipped (local commit `a6b3288`); `leonardo` MCP server registered (lucid/phoenix models, key rotated); matplotlib infographic style rejected as dated → Leonardo cinematic + typography; **⚠️ `~/.openclaw/workspace` git origin pointed at PUBLIC xio-ai-assets — renamed `wrong-remote-do-not-push`, never push**; catch-up LaunchDaemon still needs user sudo
+- [social-agent-content-v3-2026-07-28](social-agent-content-v3-2026-07-28.md) — current proof-led XIO social pipeline in `~/.xio-agents/social-agent`: Instagram Reel + XIO LinkedIn editorial/PDF + native-text X; 50-day 30/15/5 library, owner-approved Quiet Proof audio, per-channel publication receipts, and active guarded 9:00 Toronto LaunchAgent
+- [xio-agent-runtime-2026-07-28](xio-agent-runtime-2026-07-28.md) — the 9 AM social LaunchAgent was retired 2026-07-28 for `com.xioai.agent-runtime`, a signed 15-min heartbeat running outcomes/acquisition/mission-control/nurture **server-side on xioai.co — it does NOT post social**; `~/.openclaw/workspace/social-agent` is a dead path
+- [xio-self-improve-cycle](xio-self-improve-cycle.md) — since 2026-09-23 **merged into the single `social-agent-morning-check` task** (09:30: verbatim brief, then autonomous diagnose/fix/journal; memory = `control-plane/self-improve/JOURNAL.md`); read that journal before debugging this stack, and note its hard "never weaken a gate / never publish" boundaries
+- [social-agent-project-memory-fix-2026-09-08](social-agent-project-memory-fix-2026-09-08.md) — social copy came from a 576h-stale cache for 24 days; `SOCIAL_AGENT_PROJECT_MEMORY` defaulted to another project's memory inside TCC-protected `~/Documents`, where a LaunchAgent's read **blocks** instead of erroring. Now pinned to `~/.ai-memory/MEMORY.md` in both `.env` and the plist
+- [xio-daily-brief-task](xio-daily-brief-task.md) — scheduled task `social-agent-morning-check` (daily 09:30) = whole-business brief (verbatim collector stdout), and since 2026-09-23 also runs the self-improve cycle (no longer read-only); 2026-08-03 audit keeps Buffer as sole publisher and rejects Instagrapi/GramAddict for XIO production
+- [ai-collab-vscode](projects/ai-collab-vscode/MEMORY.md) — VS Code + AI CLI bootstrap/setup tool; one-shot `setup.sh`
+- [compliance-ai](projects/compliance-ai/MEMORY.md) — XIO Compliance Brain pivot + AMD MI300X hackathon branch; preserve dirty `/Users/slavaz/compliance-AI`
+- [xio-landing](projects/xio-landing/MEMORY.md) — `xioai.co` Next.js app; current ladder is AI Setup Day, AI Workflow Build, and Private AI System, with an XIO-owned signed sales runtime and Mission Control close desk. Grace PR #21 merged as `e923081`, canonical Railway deployment and live smoke passed, while real Mistral activation remains unverified pending the owner-key preflight and telemetry.
+- [xioai-ca](projects/xioai-ca/MEMORY.md) — `xioai.ca` Railway site is `XioAISolutions/XIO-AI-EXO` (Vite/React/Express), not the `XIO-CO` Next app; commercial robot pages are now customer-facing Keenon catalog pages with Buy Now purchase-intent CTAs and internal detail pages, not a 20-robot launch-fleet campaign
+- [crumb-format](projects/crumb-format/MEMORY.md) — copy-paste AI handoff format; CrumbLLM direction is standalone `crumb-llm` package/CLI, with native acceleration/robotics-space roadmap lenses and optional adapters only
+- [crumbbeam](projects/crumbbeam/MEMORY.md) — optical CRUMB transport; PR #1 stays draft until current software blockers and real iPhone/Android evidence are resolved
+- [crumb-bob](projects/crumb-bob/MEMORY.md) — IBM Bob replay memory pack generator; v0.3.1 final submission media pushed at d618850, including PDF deck and narrated MP4; 290 tests passed
+
+## OpenClaw Learnings
+
+→ [openclaw-learnings.md](openclaw-learnings.md) — historical observations from the retired OpenClaw main agent; do not treat old provider, Supermemory, or active-path notes as current configuration
+
+## AI Collaboration Setup (established 2026-03-16)
+
+- **Two CLIs**: Claude Code (`claude`) + Codex CLI (`codex`) run as independent peers
+- **Shared memory**: `~/.ai-memory/` — both AIs read/write here
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+exec
+/bin/zsh -lc 'nl -ba 04_pipeline_git_diff.txt && nl -ba 07_test_longlive_cache_runtime.py && nl -ba 08_test_longlive_reset.py' in /Users/slavaz/.hermes/cache/scratch/idle_offload_review
+ succeeded in 0ms:
+     1	diff --git a/inference.py b/inference.py
+     2	index 11a694e..0345220 100644
+     3	--- a/inference.py
+     4	+++ b/inference.py
+     5	@@ -639,6 +639,13 @@ for i, batch_data in tqdm(enumerate(dataloader), disable=(local_rank != 0)):
+     6	     )
+     7	     if initial_latent is not None:
+     8	         inference_kwargs["initial_latent"] = initial_latent
+     9	+    print("[mem] pre: alloc=%.2f reserved=%.2f" % (torch.cuda.memory_allocated()/2**30, torch.cuda.memory_reserved()/2**30), flush=True)
+    10	+    try:
+    11	+        print("[mem] te dev: " + str(next(pipeline.text_encoder.parameters()).device), flush=True)
+    12	+    except StopIteration:
+    13	+        pass
+    14	+    import gc as _g; _g.collect(); torch.cuda.empty_cache()
+    15	+    print("[mem] post-clear: alloc=%.2f reserved=%.2f" % (torch.cuda.memory_allocated()/2**30, torch.cuda.memory_reserved()/2**30), flush=True)
+    16	     with torch.inference_mode():
+    17	         generated = pipeline.inference(**inference_kwargs)
+    18	 
+    19	diff --git a/pipeline/causal_diffusion_inference.py b/pipeline/causal_diffusion_inference.py
+    20	index 375fb6a..02f1a2c 100644
+    21	--- a/pipeline/causal_diffusion_inference.py
+    22	+++ b/pipeline/causal_diffusion_inference.py
+    23	@@ -220,6 +220,25 @@ class CausalDiffusionInferencePipeline(torch.nn.Module):
+    24	         else:
+    25	             unconditional_dict = None
+    26	 
+    27	+        import os as _ll_os  # noqa: F401  (local handle keeps the block exec-safe)
+    28	+
+    29	+        if _ll_os.environ.get("LL_OFFLOAD_IDLE") == "1" and self.text_encoder is not None:
+    30	+            # LONGLIVE_IDLE_OFFLOAD_V1 (sm89 24GB edge: TE + VAE idle during denoise)
+    31	+            try:
+    32	+                self.text_encoder.to("cpu")
+    33	+            except Exception:
+    34	+                pass
+    35	+            try:
+    36	+                self.vae.to("cpu")
+    37	+            except Exception:
+    38	+                pass
+    39	+            torch.cuda.empty_cache()
+    40	+            print(
+    41	+                "[mem] idle-offload: TE+VAE -> cpu; alloc=%.2f GiB"
+    42	+                % (torch.cuda.memory_allocated() / 2**30),
+    43	+                flush=True,
+    44	+            )
+    45	+
+    46	         output = torch.zeros(
+    47	             [batch_size, num_output_frames, num_channels, height, width],
+    48	             device=noise.device,
+    49	@@ -227,7 +246,8 @@ class CausalDiffusionInferencePipeline(torch.nn.Module):
+    50	         )
+    51	 
+    52	         # Step 1: Initialize KV cache to all zeros
+    53	-        if self.kv_cache_pos is None:
+    54	+        if self.kv_cache_pos is None or bool(self.kv_cache_neg) != use_cfg:
+    55	+            self.clear_cache()  # release stale caches before reallocating
+    56	             self._initialize_kv_cache(
+    57	                 batch_size=batch_size,
+    58	                 dtype=noise.dtype,
+    59	@@ -540,7 +560,8 @@ class CausalDiffusionInferencePipeline(torch.nn.Module):
+    60	             # ignores the current conditional_dict.
+    61	             for block_index in range(self.num_transformer_blocks):
+    62	                 self.crossattn_cache_pos[block_index]["is_init"] = False
+    63	-                self.crossattn_cache_neg[block_index]["is_init"] = False
+    64	+                if use_cfg:
+    65	+                    self.crossattn_cache_neg[block_index]["is_init"] = False
+    66	 
+    67	             # Update RoPE phase offset on shot boundaries.
+    68	             is_shot_boundary = self._is_shot_boundary(raw_prompts, chunk_index)
+    69	@@ -768,6 +789,9 @@ class CausalDiffusionInferencePipeline(torch.nn.Module):
+    70	         """
+    71	         Initialize a Per-GPU KV cache for the Wan model.
+    72	         """
+    73	+        import gc as _gc
+    74	+        _gc.collect()
+    75	+        torch.cuda.empty_cache()   # reclaim cached blocks before the cache allocs (sm89 24GB edge)
+    76	         kv_cache_pos = []
+    77	         kv_cache_neg = []
+    78	         num_heads = wan_default_config[self.model_name]["num_heads"]
+    79	@@ -811,19 +835,20 @@ class CausalDiffusionInferencePipeline(torch.nn.Module):
+    80	                     "pinned_start": torch.tensor([-1], dtype=torch.long, device=device),
+    81	                     "pinned_len": torch.tensor([0], dtype=torch.long, device=device),
+    82	                 })
+    83	-                kv_cache_neg.append({
+    84	-                    "k": [clone_quantized_tensor(zero_qt) for _ in range(max_blocks)],
+    85	-                    "v": [clone_quantized_tensor(zero_qt) for _ in range(max_blocks)],
+    86	-                    "quantized": True,
+    87	-                    "block_token_size": block_token_size,
+    88	-                    "max_blocks": max_blocks,
+    89	-                    "num_heads": num_heads,
+    90	-                    "num_filled_blocks": 0,
+    91	-                    "global_end_index": torch.tensor([0], dtype=torch.long, device=device),
+    92	-                    "local_end_index": torch.tensor([0], dtype=torch.long, device=device),
+    93	-                    "pinned_start": torch.tensor([-1], dtype=torch.long, device=device),
+    94	-                    "pinned_len": torch.tensor([0], dtype=torch.long, device=device),
+    95	-                })
+    96	+                if self.guidance_scale != 1.0:  # LONGLIVE_CFG_CACHE_GUARD_V1
+    97	+                    kv_cache_neg.append({
+    98	+                        "k": [clone_quantized_tensor(zero_qt) for _ in range(max_blocks)],
+    99	+                        "v": [clone_quantized_tensor(zero_qt) for _ in range(max_blocks)],
+   100	+                        "quantized": True,
+   101	+                        "block_token_size": block_token_size,
+   102	+                        "max_blocks": max_blocks,
+   103	+                        "num_heads": num_heads,
+   104	+                        "num_filled_blocks": 0,
+   105	+                        "global_end_index": torch.tensor([0], dtype=torch.long, device=device),
+   106	+                        "local_end_index": torch.tensor([0], dtype=torch.long, device=device),
+   107	+                        "pinned_start": torch.tensor([-1], dtype=torch.long, device=device),
+   108	+                        "pinned_len": torch.tensor([0], dtype=torch.long, device=device),
+   109	+                    })
+   110	             else:
+   111	                 kv_cache_pos.append({
+   112	                     "k": torch.zeros([batch_size, kv_cache_size, num_heads, head_dim], dtype=dtype, device=device),
+   113	@@ -838,19 +863,20 @@ class CausalDiffusionInferencePipeline(torch.nn.Module):
+   114	                     "pinned_start": torch.tensor([-1], dtype=torch.long, device=device),
+   115	                     "pinned_len": torch.tensor([0], dtype=torch.long, device=device),
+   116	                 })
+   117	-                kv_cache_neg.append({
+   118	-                    "k": torch.zeros([batch_size, kv_cache_size, num_heads, head_dim], dtype=dtype, device=device),
+   119	-                    "v": torch.zeros([batch_size, kv_cache_size, num_heads, head_dim], dtype=dtype, device=device),
+   120	-                    "quantized": False,
+   121	-                    "block_token_size": block_token_size,
+   122	-                    "max_blocks": max_blocks,
+   123	-                    "num_heads": num_heads,
+   124	-                    "num_filled_blocks": 0,
+   125	-                    "global_end_index": torch.tensor([0], dtype=torch.long, device=device),
+   126	-                    "local_end_index": torch.tensor([0], dtype=torch.long, device=device),
+   127	-                    "pinned_start": torch.tensor([-1], dtype=torch.long, device=device),
+   128	-                    "pinned_len": torch.tensor([0], dtype=torch.long, device=device),
+   129	-                })
+   130	+                if self.guidance_scale != 1.0:  # LONGLIVE_CFG_CACHE_GUARD_V1
+   131	+                    kv_cache_neg.append({
+   132	+                        "k": torch.zeros([batch_size, kv_cache_size, num_heads, head_dim], dtype=dtype, device=device),
+   133	+                        "v": torch.zeros([batch_size, kv_cache_size, num_heads, head_dim], dtype=dtype, device=device),
+   134	+                        "quantized": False,
+   135	+                        "block_token_size": block_token_size,
+   136	+                        "max_blocks": max_blocks,
+   137	+                        "num_heads": num_heads,
+   138	+                        "num_filled_blocks": 0,
+   139	+                        "global_end_index": torch.tensor([0], dtype=torch.long, device=device),
+   140	+                        "local_end_index": torch.tensor([0], dtype=torch.long, device=device),
+   141	+                        "pinned_start": torch.tensor([-1], dtype=torch.long, device=device),
+   142	+                        "pinned_len": torch.tensor([0], dtype=torch.long, device=device),
+   143	+                    })
+   144	 
+   145	         self.kv_cache_pos = kv_cache_pos  # always store the clean cache
+   146	         self.kv_cache_neg = kv_cache_neg  # always store the clean cache
+   147	@@ -869,11 +895,12 @@ class CausalDiffusionInferencePipeline(torch.nn.Module):
+   148	                 "v": torch.zeros([batch_size, 512, num_heads, head_dim], dtype=dtype, device=device),
+   149	                 "is_init": False
+   150	             })
+   151	-            crossattn_cache_neg.append({
+   152	-                "k": torch.zeros([batch_size, 512, num_heads, head_dim], dtype=dtype, device=device),
+   153	-                "v": torch.zeros([batch_size, 512, num_heads, head_dim], dtype=dtype, device=device),
+   154	-                "is_init": False
+   155	-            })
+   156	+            if self.guidance_scale != 1.0:  # LONGLIVE_CFG_CACHE_GUARD_V1
+   157	+                crossattn_cache_neg.append({
+   158	+                    "k": torch.zeros([batch_size, 512, num_heads, head_dim], dtype=dtype, device=device),
+   159	+                    "v": torch.zeros([batch_size, 512, num_heads, head_dim], dtype=dtype, device=device),
+   160	+                    "is_init": False
+   161	+                })
+   162	 
+   163	         self.crossattn_cache_pos = crossattn_cache_pos  # always store the clean cache
+   164	         self.crossattn_cache_neg = crossattn_cache_neg  # always store the clean cache
+   165	diff --git a/utils/fp8.py b/utils/fp8.py
+   166	index d823ac3..384a198 100644
+   167	--- a/utils/fp8.py
+   168	+++ b/utils/fp8.py
+   169	@@ -39,7 +39,7 @@ def quantize_model_fp8(model: nn.Module, *, verbose: bool = False) -> int:
+   170	     try:
+   171	         from torchao.quantization import (
+   172	             Float8DynamicActivationFloat8WeightConfig,
+   173	-            PerRow,
+   174	+            PerTensor,
+   175	             quantize_,
+   176	         )
+   177	     except ImportError as exc:
+   178	@@ -67,12 +67,12 @@ def quantize_model_fp8(model: nn.Module, *, verbose: bool = False) -> int:
+   179	 
+   180	     quantize_(
+   181	         model,
+   182	-        Float8DynamicActivationFloat8WeightConfig(granularity=PerRow()),
+   183	+        Float8DynamicActivationFloat8WeightConfig(granularity=PerTensor()),
+   184	         filter_fn=filter_fn,
+   185	     )
+   186	     if verbose:
+   187	         print(
+   188	             f"[FP8] TorchAO W8A8 quantized {len(quantized_names)} linear layers "
+   189	-            f"with row-wise scaling; kept {len(skipped_names)} layers in BF16"
+   190	+            f"with per-tensor scaling; kept {len(skipped_names)} layers in BF16"
+   191	         )
+   192	     return len(quantized_names)
+     1	"""CPU regression on exact LongLive source; no weights/GPU/import side effects."""
+     2	import ast
+     3	import os
+     4	from pathlib import Path
+     5	from typing import List, Optional
+     6	import torch
+     7	
+     8	SOURCE = Path(os.environ['LL_PIPELINE_SOURCE'])
+     9	
+    10	def pipeline(scale):
+    11	    tree = ast.parse(SOURCE.read_text())
+    12	    original = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'CausalDiffusionInferencePipeline')
+    13	    names = {'_initialize_kv_cache', '_initialize_crossattn_cache', 'clear_cache', 'inference'}
+    14	    methods = [n for n in original.body if isinstance(n, ast.FunctionDef) and n.name in names]
+    15	    inference = next(n for n in methods if n.name == 'inference')
+    16	    stop = next(i for i, n in enumerate(inference.body) if isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'current_start_frame' for t in n.targets))
+    17	    inference.body = inference.body[:stop] + [ast.Return(value=ast.Name(id='output', ctx=ast.Load()))]
+    18	    cls = ast.ClassDef(name='CacheOnly', bases=[], keywords=[], body=methods, decorator_list=[])
+    19	    mod = ast.fix_missing_locations(ast.Module(body=[cls], type_ignores=[]))
+    20	    ns = dict(torch=torch, List=List, Optional=Optional, wan_default_config={'tiny': {'num_heads': 2, 'head_dim': 4}}, encode_prompt_blocks=lambda *args: ({}, []))
+    21	    exec(compile(mod, str(SOURCE), 'exec'), ns)
+    22	    p = ns['CacheOnly']()
+    23	    p.model_name = 'tiny'
+    24	    p.num_transformer_blocks = 2
+    25	    p.local_attn_size = 4
+    26	    p.frame_seq_length = 4
+    27	    p.num_frame_per_block = 2
+    28	    p.quantize_kv = False
+    29	    p.guidance_scale = scale
+    30	    p.negative_prompt = ''
+    31	    p.text_encoder = lambda **kwargs: {}
+    32	    p.independent_first_frame = False
+    33	    p.clear_cache()
+    34	    return p
+    35	
+    36	def allocate(p):
+    37	    return p.inference(torch.zeros(1, 4, 2, 4, 4), [['prompt']], return_latents=True)
+    38	
+    39	def test_no_cfg_has_no_negative_allocations():
+    40	    p = pipeline(1.0)
+    41	    allocate(p)
+    42	    assert p.kv_cache_neg == [], 'unused negative KV allocated with guidance disabled'
+    43	    assert p.crossattn_cache_neg == [], 'unused negative cross-attention allocated'
+    44	    assert len(p.kv_cache_pos) == p.num_transformer_blocks
+    45	
+    46	
+    47	def test_cfg_toggle_allocates_only_required_caches():
+    48	    p = pipeline(1.0)
+    49	    allocate(p)
+    50	    p.guidance_scale = 5.0
+    51	    allocate(p)
+    52	    assert len(p.kv_cache_neg) == p.num_transformer_blocks
+    53	    assert len(p.crossattn_cache_neg) == p.num_transformer_blocks
+    54	    p.guidance_scale = 1.0
+    55	    allocate(p)
+    56	    assert p.kv_cache_neg == [] and p.crossattn_cache_neg == []
+    57	
+    58	
+    59	def test_cfg_positive_cache_is_unchanged():
+    60	    a, b = pipeline(1.0), pipeline(5.0)
+    61	    allocate(a)
+    62	    allocate(b)
+    63	    assert len(b.kv_cache_neg) == b.num_transformer_blocks
+    64	    for cache_name in ('kv_cache_pos', 'crossattn_cache_pos'):
+    65	        for x, y in zip(getattr(a, cache_name), getattr(b, cache_name)):
+    66	            assert x.keys() == y.keys()
+    67	            for key in x:
+    68	                if torch.is_tensor(x[key]):
+    69	                    assert torch.equal(x[key], y[key])
+    70	                else:
+    71	                    assert x[key] == y[key]
+    72	
+    73	if __name__ == '__main__':
+    74	    test_no_cfg_has_no_negative_allocations()
+    75	    test_cfg_toggle_allocates_only_required_caches()
+    76	    test_cfg_positive_cache_is_unchanged()
+    77	    print('3 CPU cache regression checks passed')
+    78	
+     1	import ast
+     2	from test_longlive_cache_runtime import SOURCE, pipeline, allocate
+     3	
+     4	def test_chunk_prompt_reset():
+     5	    tree=ast.parse(SOURCE.read_text())
+     6	    fn=next(n for n in ast.walk(tree) if isinstance(n,ast.FunctionDef) and n.name=='_inference_inner')
+     7	    loop=next(n for n in ast.walk(fn) if isinstance(n,ast.For) and ast.unparse(n.iter)=='range(self.num_transformer_blocks)')
+     8	    code=compile(ast.Module(body=[loop], type_ignores=[]), str(SOURCE), 'exec')
+     9	    p=pipeline(1.0); allocate(p)
+    10	    exec(code, {'self':p, 'use_cfg':False})
+    11	
+    12	if __name__=='__main__':
+    13	    test_chunk_prompt_reset(); print('chunk-reset regression passed')
+
+exec
+/bin/zsh -lc 'nl -ba 01_apply_script.py && nl -ba 02_verify_script.py && nl -ba 03_corrected_region.txt' in /Users/slavaz/.hermes/cache/scratch/idle_offload_review
+ succeeded in 0ms:
+     1	"""Offload idle TE + VAE before denoise in pinned LongLive; fail closed on drift.
+     2	
+     3	sm89 24GB edge: `inference.py` leaves the text encoder (~11 GB bf16) and the VAE
+     4	on the card for the whole run, but both are idle once prompts are encoded
+     5	(decoded output is produced separately for latents-only streaming). The insert
+     6	goes AFTER the complete `use_cfg` if/else — never between `if use_cfg:` and its
+     7	`else:` (v1 did that: the else reattached to the inserted `if` and silently
+     8	unset `unconditional_dict` on the env=1 path; it compiled and passed naive
+     9	regressions, caught by region readback before the first run). Guarded by
+    10	LL_OFFLOAD_IDLE=1; _assert_structure() fails closed on else reattachment.
+    11	"""
+    12	import ast
+    13	import hashlib
+    14	import os
+    15	import sys
+    16	from pathlib import Path
+    17	
+    18	MARK = "# LONGLIVE_IDLE_OFFLOAD_V1"
+    19	
+    20	ANCHOR = (
+    21	    "        else:\n"
+    22	    "            unconditional_dict = None\n"
+    23	    "\n"
+    24	    "        output = torch.zeros(\n"
+    25	)
+    26	
+    27	INSERT = '''        import os as _ll_os  # noqa: F401  (local handle keeps the block exec-safe)
+    28	
+    29	        if _ll_os.environ.get("LL_OFFLOAD_IDLE") == "1" and self.text_encoder is not None:
+    30	            # LONGLIVE_IDLE_OFFLOAD_V1 (sm89 24GB edge: TE + VAE idle during denoise)
+    31	            try:
+    32	                self.text_encoder.to("cpu")
+    33	            except Exception:
+    34	                pass
+    35	            try:
+    36	                self.vae.to("cpu")
+    37	            except Exception:
+    38	                pass
+    39	            torch.cuda.empty_cache()
+    40	            print(
+    41	                "[mem] idle-offload: TE+VAE -> cpu; alloc=%.2f GiB"
+    42	                % (torch.cuda.memory_allocated() / 2**30),
+    43	                flush=True,
+    44	            )
+    45	
+    46	'''
+    47	
+    48	# Keep the whole if/else intact, then the offload block, then the next statement.
+    49	REPLACEMENT = (
+    50	    "        else:\n"
+    51	    "            unconditional_dict = None\n"
+    52	    "\n"
+    53	    + INSERT
+    54	    + "        output = torch.zeros(\n"
+    55	)
+    56	
+    57	
+    58	def _assert_structure(new_src: str) -> None:
+    59	    """Fail closed if the use_cfg if/else was split or the insert stole an else."""
+    60	    tree = ast.parse(new_src)
+    61	    cls = next(
+    62	        n for n in ast.walk(tree)
+    63	        if isinstance(n, ast.ClassDef) and n.name == "CausalDiffusionInferencePipeline"
+    64	    )
+    65	    fn = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == "inference")
+    66	    use_cfg_if = offload_if = None
+    67	    for st in fn.body:
+    68	        if isinstance(st, ast.If):
+    69	            t = ast.unparse(st.test)
+    70	            if t == "use_cfg":
+    71	                use_cfg_if = st
+    72	            if "LL_OFFLOAD_IDLE" in t:
+    73	                offload_if = st
+    74	    assert use_cfg_if is not None, "use_cfg if/else not found"
+    75	    assigns = [
+    76	        st for st in use_cfg_if.orelse
+    77	        if isinstance(st, ast.Assign)
+    78	        and any(isinstance(t, ast.Name) and t.id == "unconditional_dict" for t in st.targets)
+    79	    ]
+    80	    assert assigns, "use_cfg if/else lost its else (unconditional_dict = None)"
+    81	    assert offload_if is not None, "offload if not found"
+    82	    assert not offload_if.orelse, "offload if must NOT have an else clause"
+    83	    test = ast.unparse(offload_if.test)
+    84	    assert "LL_OFFLOAD_IDLE" in test and "text_encoder is not None" in test
+    85	    body_txt = ast.unparse(offload_if.body)
+    86	    assert "to('cpu')" in body_txt, "offload moves missing from body"
+    87	
+    88	
+    89	def main():
+    90	    src_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(
+    91	        "/root/LongLive/pipeline/causal_diffusion_inference.py"
+    92	    )
+    93	    src = src_path.read_text()
+    94	    if MARK in src:
+    95	        print("ALREADY PATCHED:", src_path)
+    96	        return 0
+    97	    count = src.count(ANCHOR)
+    98	    if count != 1:
+    99	        print(f"ANCHOR FAIL: expected 1, found {count} in {src_path}")
+   100	        return 2
+   101	    new = src.replace(ANCHOR, REPLACEMENT)
+   102	    _assert_structure(new)
+   103	    ast.parse(new)
+   104	    backup = Path(str(src_path) + ".before_idle")
+   105	    if not backup.exists():
+   106	        backup.write_text(src)
+   107	    tmp = Path(str(src_path) + ".tmp")
+   108	    tmp.write_text(new)
+   109	    os.replace(tmp, src_path)
+   110	    print("APPLIED", hashlib.sha256(new.encode()).hexdigest(), src_path)
+   111	    return 0
+   112	
+   113	
+   114	if __name__ == "__main__":
+   115	    sys.exit(main())
+     1	"""Verify the LL_OFFLOAD_IDLE insert in the pinned LongLive pipeline (AST-level).
+     2	
+     3	Checks the failure mode that compiled and passed naive regressions: the insert
+     4	must not sit between `if use_cfg:` and its `else:` (else-stealing), must keep
+     5	that else intact, and must itself carry no else clause.
+     6	"""
+     7	import ast
+     8	import sys
+     9	from pathlib import Path
+    10	
+    11	MARK = "# LONGLIVE_IDLE_OFFLOAD_V1"
+    12	
+    13	
+    14	def main():
+    15	    p = Path(sys.argv[1] if len(sys.argv) > 1 else "/root/LongLive/pipeline/causal_diffusion_inference.py")
+    16	    src = p.read_text()
+    17	    ok = True
+    18	
+    19	    def chk(cond, msg):
+    20	        nonlocal ok
+    21	        print(("PASS  " if cond else "FAIL  ") + msg)
+    22	        ok = ok and bool(cond)
+    23	
+    24	    chk(MARK in src, "marker present")
+    25	    tree = ast.parse(src)
+    26	    cls = next(
+    27	        n for n in ast.walk(tree)
+    28	        if isinstance(n, ast.ClassDef) and n.name == "CausalDiffusionInferencePipeline"
+    29	    )
+    30	    fn = next(n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name == "inference")
+    31	    use_cfg_if = offload_if = None
+    32	    for st in fn.body:
+    33	        if isinstance(st, ast.If):
+    34	            t = ast.unparse(st.test)
+    35	            if t == "use_cfg":
+    36	                use_cfg_if = st
+    37	            if "LL_OFFLOAD_IDLE" in t:
+    38	                offload_if = st
+    39	    chk(use_cfg_if is not None, "use_cfg if found")
+    40	    if use_cfg_if is not None:
+    41	        chk(
+    42	            any(
+    43	                isinstance(s, ast.Assign)
+    44	                and any(isinstance(tx, ast.Name) and tx.id == "unconditional_dict" for tx in s.targets)
+    45	                for s in use_cfg_if.orelse
+    46	            ),
+    47	            "use_cfg else assigns unconditional_dict = None (intact)",
+    48	        )
+    49	    chk(offload_if is not None, "offload if found")
+    50	    if offload_if is not None:
+    51	        chk(not offload_if.orelse, "offload if has NO else (else not stolen)")
+    52	        t = ast.unparse(offload_if.test)
+    53	        chk("LL_OFFLOAD_IDLE" in t and "text_encoder is not None" in t, "offload guard: env + TE not None")
+    54	        body = ast.unparse(offload_if.body)
+    55	        chk("to('cpu')" in body, "offload to cpu present")
+    56	        chk("self.vae.to('cpu')" in body, "VAE offload present")
+    57	        chk("empty_cache" in body, "empty_cache present")
+    58	    order_ok = False
+    59	    if use_cfg_if is not None and offload_if is not None:
+    60	        idx = {id(s): i for i, s in enumerate(fn.body)}
+    61	        order_ok = idx[id(use_cfg_if)] < idx[id(offload_if)]
+    62	    chk(order_ok, "offload ordered after use_cfg if/else")
+    63	
+    64	    print("ALL CHECKS PASS" if ok else "CHECKS FAILED")
+    65	    return 0 if ok else 1
+    66	
+    67	
+    68	if __name__ == "__main__":
+    69	    sys.exit(main())
+     1	        if use_cfg:
+     2	            unconditional_dict = self.text_encoder(
+     3	                text_prompts=[self.negative_prompt] * batch_size
+     4	            )
+     5	        else:
+     6	            unconditional_dict = None
+     7	
+     8	        import os as _ll_os  # noqa: F401  (local handle keeps the block exec-safe)
+     9	
+    10	        if _ll_os.environ.get("LL_OFFLOAD_IDLE") == "1" and self.text_encoder is not None:
+    11	            # LONGLIVE_IDLE_OFFLOAD_V1 (sm89 24GB edge: TE + VAE idle during denoise)
+    12	            try:
+    13	                self.text_encoder.to("cpu")
+    14	            except Exception:
+    15	                pass
+    16	            try:
+    17	                self.vae.to("cpu")
+    18	            except Exception:
+    19	                pass
+    20	            torch.cuda.empty_cache()
+    21	            print(
+    22	                "[mem] idle-offload: TE+VAE -> cpu; alloc=%.2f GiB"
+    23	                % (torch.cuda.memory_allocated() / 2**30),
+    24	                flush=True,
+    25	            )
+    26	
+    27	        output = torch.zeros(
+    28	            [batch_size, num_output_frames, num_channels, height, width],
+    29	            device=noise.device,
+    30	            dtype=noise.dtype
+    31	        )
+    32	
+    33	        # Step 1: Initialize KV cache to all zeros
+    34	        if self.kv_cache_pos is None or bool(self.kv_cache_neg) != use_cfg:
+    35	            self.clear_cache()  # release stale caches before reallocating
+    36	            self._initialize_kv_cache(
+    37	                batch_size=batch_size,
+    38	                dtype=noise.dtype,
+    39	                device=noise.device
+
+deprecated: `[features].codex_hooks` is deprecated. Use `[features].hooks` instead.
+Enable it with `--enable hooks` or `[features].hooks` in config.toml. See https://developers.openai.com/codex/config-basic#feature-flags for details.
+codex
+The corrected region keeps the CFG `if/else` intact. I found two concrete weaknesses: offload exceptions are swallowed despite the success message, and the patcher accepts an existing marker without validation. The packet omits the decode path and swap implementation, so I cannot verify their runtime behavior.
+codex
+Read all eight files. Static review only; nothing executed or modified.
+
+- **MAJOR — Failed offloads are reported as successful.** Both transfers catch and discard all ordinary exceptions, then print `TE+VAE -> cpu` unconditionally. Failed or partial transfers can leave insufficient GPU memory while concealing the cause. This proves defective failure reporting; it does not establish that transfers actually fail on the target. [03_corrected_region.txt:12](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/03_corrected_region.txt:12)
+
+- **MAJOR — Existing markers bypass validation.** The patcher returns success immediately when the marker appears anywhere, without parsing or checking the installed structure. An already-marked, broken installation therefore passes as “ALREADY PATCHED.” [01_apply_script.py:94](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/01_apply_script.py:94)
+
+- **MAJOR — “Fail closed” overstates the AST guarantees.** Both checkers accept materially incorrect guards, assignments, and transfer bodies; details below. [01_apply_script.py:74](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/01_apply_script.py:74), [02_verify_script.py:41](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/02_verify_script.py:41)
+
+- **MINOR — Regression coverage cannot establish offload correctness.** The harness truncates inference before denoising, disables quantized caches, substitutes a text-encoder lambda without `.to`, and provides no VAE. Transfer failures would be swallowed. It neither controls `LL_OFFLOAD_IDLE` nor checks conditioning dictionaries. The reset test executes an extracted loop only for CFG disabled and asserts no resulting reset values. No test-result receipts are supplied. [07_test_longlive_cache_runtime.py:16](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/07_test_longlive_cache_runtime.py:16), [08_test_longlive_reset.py:4](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/08_test_longlive_reset.py:4)
+
+1. **Four-way semantics matrix**
+
+   Using the context’s stated guidance-to-`use_cfg` mapping; its defining assignment is omitted:
+
+   | Guidance scale | Environment | `unconditional_dict` | Offload |
+   |---|---|---|---|
+   | `1.0` | `0` | `None` | Skipped |
+   | `1.0` | `1` | `None` | Attempted if encoder exists |
+   | `!= 1.0` | `0` | Negative-prompt encoding | Skipped |
+   | `!= 1.0` | `1` | Negative-prompt encoding | Attempted afterward if encoder exists |
+
+   **The shown CFG assignment behavior is preserved in all four cells.** The `else` belongs directly to `if use_cfg`; the import and offload conditional follow the complete branch. No reattachment is present. Residency changes intentionally when enabled; successful transfer is unproven. [03_corrected_region.txt:1](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/03_corrected_region.txt:1)
+
+2. **Text-encoder safety for the same process**
+
+   The shown post-encode accesses are the existence guard and `.to("cpu")`. No subsequent encoder forward appears in the supplied region or later diff hunks. However, another outer-loop iteration accesses `pipeline.text_encoder.parameters()` and calls `pipeline.inference()` again, potentially encoding again. No restoration is shown. **Cannot verify** whole-invocation or repeated-invocation safety because unchanged code and encoder implementation are absent. [04_pipeline_git_diff.txt:5](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/04_pipeline_git_diff.txt:5)
+
+3. **VAE safety and accidental decode**
+
+   Separate-process decoding makes offloading conceptually compatible with the stated latents-only goal. But the packet contains neither the decode branch nor the VAE implementation, so later VAE use **cannot verify**.
+
+   With `LL_OFFLOAD_IDLE=1`, `save_latents_only=False` receives the same offload attempt: the guard never checks that option. The requested precise decode trace—and whether execution errors, silently degrades, restores GPU residency, or works—**cannot verify**. Claiming a definite device-mismatch error would exceed the evidence. [03_corrected_region.txt:10](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/03_corrected_region.txt:10)
+
+4. **DynamicSwapInstaller interaction**
+
+   Ordinary module `.to("cpu")` behavior does not establish behavior under this wrapper. Its implementation, installation details, retained storage references, and attribute hooks are missing. Whether wrapped underlying storages move, GPU allocations are released, or later attribute access silently reloads weights **cannot verify**.
+
+5. **Patcher/verifier blind spots and other changes**
+
+   Both check assignment targets without verifying the value is `None`; guard substrings without enforcing `== "1"` and conjunction semantics; and a generic `to('cpu')` without requiring the encoder transfer. A VAE-only transfer can satisfy both checkers. `_assert_structure` checks no ordering; the standalone verifier checks only “after CFG,” allowing unreachable or excessively late placement. Duplicate matches overwrite earlier matches. Python optimization also removes the patcher’s `assert` checks. [02_verify_script.py:32](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/02_verify_script.py:32)
+
+   Other changes apply even with offload disabled: CFG-dependent cache allocation/reinitialization/reset, unconditional GC/cache clearing, and parameter-device probing. The probe catches only `StopIteration`; wrapper-triggered effects **cannot verify**. The allocator’s visible outer `else` retains correct indentation. [04_pipeline_git_diff.txt:53](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/04_pipeline_git_diff.txt:53)
+
+   **MINOR — Additional numerical change:** FP8 scaling changes from `PerRow` to `PerTensor`, independently of the offload flag. Whole-pipeline numerical equivalence therefore is not established; quality/performance effects **cannot verify**. [04_pipeline_git_diff.txt:169](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/04_pipeline_git_diff.txt:169)
+
+FAIL
+tokens used
+34,470
+Read all eight files. Static review only; nothing executed or modified.
+
+- **MAJOR — Failed offloads are reported as successful.** Both transfers catch and discard all ordinary exceptions, then print `TE+VAE -> cpu` unconditionally. Failed or partial transfers can leave insufficient GPU memory while concealing the cause. This proves defective failure reporting; it does not establish that transfers actually fail on the target. [03_corrected_region.txt:12](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/03_corrected_region.txt:12)
+
+- **MAJOR — Existing markers bypass validation.** The patcher returns success immediately when the marker appears anywhere, without parsing or checking the installed structure. An already-marked, broken installation therefore passes as “ALREADY PATCHED.” [01_apply_script.py:94](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/01_apply_script.py:94)
+
+- **MAJOR — “Fail closed” overstates the AST guarantees.** Both checkers accept materially incorrect guards, assignments, and transfer bodies; details below. [01_apply_script.py:74](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/01_apply_script.py:74), [02_verify_script.py:41](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/02_verify_script.py:41)
+
+- **MINOR — Regression coverage cannot establish offload correctness.** The harness truncates inference before denoising, disables quantized caches, substitutes a text-encoder lambda without `.to`, and provides no VAE. Transfer failures would be swallowed. It neither controls `LL_OFFLOAD_IDLE` nor checks conditioning dictionaries. The reset test executes an extracted loop only for CFG disabled and asserts no resulting reset values. No test-result receipts are supplied. [07_test_longlive_cache_runtime.py:16](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/07_test_longlive_cache_runtime.py:16), [08_test_longlive_reset.py:4](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/08_test_longlive_reset.py:4)
+
+1. **Four-way semantics matrix**
+
+   Using the context’s stated guidance-to-`use_cfg` mapping; its defining assignment is omitted:
+
+   | Guidance scale | Environment | `unconditional_dict` | Offload |
+   |---|---|---|---|
+   | `1.0` | `0` | `None` | Skipped |
+   | `1.0` | `1` | `None` | Attempted if encoder exists |
+   | `!= 1.0` | `0` | Negative-prompt encoding | Skipped |
+   | `!= 1.0` | `1` | Negative-prompt encoding | Attempted afterward if encoder exists |
+
+   **The shown CFG assignment behavior is preserved in all four cells.** The `else` belongs directly to `if use_cfg`; the import and offload conditional follow the complete branch. No reattachment is present. Residency changes intentionally when enabled; successful transfer is unproven. [03_corrected_region.txt:1](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/03_corrected_region.txt:1)
+
+2. **Text-encoder safety for the same process**
+
+   The shown post-encode accesses are the existence guard and `.to("cpu")`. No subsequent encoder forward appears in the supplied region or later diff hunks. However, another outer-loop iteration accesses `pipeline.text_encoder.parameters()` and calls `pipeline.inference()` again, potentially encoding again. No restoration is shown. **Cannot verify** whole-invocation or repeated-invocation safety because unchanged code and encoder implementation are absent. [04_pipeline_git_diff.txt:5](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/04_pipeline_git_diff.txt:5)
+
+3. **VAE safety and accidental decode**
+
+   Separate-process decoding makes offloading conceptually compatible with the stated latents-only goal. But the packet contains neither the decode branch nor the VAE implementation, so later VAE use **cannot verify**.
+
+   With `LL_OFFLOAD_IDLE=1`, `save_latents_only=False` receives the same offload attempt: the guard never checks that option. The requested precise decode trace—and whether execution errors, silently degrades, restores GPU residency, or works—**cannot verify**. Claiming a definite device-mismatch error would exceed the evidence. [03_corrected_region.txt:10](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/03_corrected_region.txt:10)
+
+4. **DynamicSwapInstaller interaction**
+
+   Ordinary module `.to("cpu")` behavior does not establish behavior under this wrapper. Its implementation, installation details, retained storage references, and attribute hooks are missing. Whether wrapped underlying storages move, GPU allocations are released, or later attribute access silently reloads weights **cannot verify**.
+
+5. **Patcher/verifier blind spots and other changes**
+
+   Both check assignment targets without verifying the value is `None`; guard substrings without enforcing `== "1"` and conjunction semantics; and a generic `to('cpu')` without requiring the encoder transfer. A VAE-only transfer can satisfy both checkers. `_assert_structure` checks no ordering; the standalone verifier checks only “after CFG,” allowing unreachable or excessively late placement. Duplicate matches overwrite earlier matches. Python optimization also removes the patcher’s `assert` checks. [02_verify_script.py:32](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/02_verify_script.py:32)
+
+   Other changes apply even with offload disabled: CFG-dependent cache allocation/reinitialization/reset, unconditional GC/cache clearing, and parameter-device probing. The probe catches only `StopIteration`; wrapper-triggered effects **cannot verify**. The allocator’s visible outer `else` retains correct indentation. [04_pipeline_git_diff.txt:53](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/04_pipeline_git_diff.txt:53)
+
+   **MINOR — Additional numerical change:** FP8 scaling changes from `PerRow` to `PerTensor`, independently of the offload flag. Whole-pipeline numerical equivalence therefore is not established; quality/performance effects **cannot verify**. [04_pipeline_git_diff.txt:169](/Users/slavaz/.hermes/cache/scratch/idle_offload_review/04_pipeline_git_diff.txt:169)
+
+FAIL
+EXIT=0
