@@ -511,6 +511,8 @@ def cmd_stream(a):
             extra["log_rows"] = len(log)
         return extra
 
+    _vf_n = 0
+    _vf_dir_made = False
     todo = max(0, a.stream_frames - gen) if a.checkpoint else a.stream_frames
     chunks = sess.generate(todo, chunk=a.chunk) if todo else iter(())
     # End of this invocation: flush the held-back lookahead latents (the true end of
@@ -528,6 +530,20 @@ def cmd_stream(a):
             frames = dec.push(chunk)
         else:
             frames = chunk
+        if frames is not None and a.video_out:
+            import os as _os
+            import numpy as _np
+            from PIL import Image as _Img
+            if not _vf_dir_made:
+                _os.makedirs(a.video_out, exist_ok=True)
+                _vf_dir_made = True
+            for _i in range(frames.shape[1]):
+                if _vf_n % a.video_stride == 0:
+                    _fr = frames[0, _i].detach().float().clamp(0, 1).cpu()
+                    _img = (_fr.permute(1, 2, 0) if _fr.shape[0] == 3 else _fr[0]).numpy()
+                    _Img.fromarray((_img * 255).astype("uint8")).save(
+                        _os.path.join(a.video_out, "%07d.jpg" % _vf_n), quality=92)
+                _vf_n += 1
         if chunk is not None:
             gen += chunk.shape[1]
         for i in range(frames.shape[1] if frames is not None else 0):
@@ -632,6 +648,10 @@ def main(argv=None):
                    help="save state after every chunk; resume from it if present and stop at "
                         "--stream-frames total (sliced jobs)")
     s.add_argument("--out", default="")
+    s.add_argument("--video-out", default="",
+                    help="dir for decoded jpg frames (demo render)")
+    s.add_argument("--video-stride", type=int, default=2,
+                    help="save every Nth frame")
     a = ap.parse_args(argv)
     return {"budget": cmd_budget, "memory": cmd_memory, "stream": cmd_stream}[a.cmd](a)
 
