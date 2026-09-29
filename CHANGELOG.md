@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.5.0
+
+Post-v1.4.0 mainline content, versioned so the trunk merge no longer answers to the v1.4.0 tag.
+
+### Wavefield phase 2: a decoded, resumable latent stream (PR #63)
+
+- Pretrained video-VAE latent path (LTX / Wan) with a decoded long-stream screen; `--vae-path` accepts pipeline repos/dirs as well as bare VAE dirs.
+- Every artifact is identity-bound and fails closed: VAE weights/config/normalization fingerprints on shards, checkpoints and training resumes; the encode journal is keyed by canonical source path; manifests carry content digests; decode and eval receipts carry the code that produced them; run identity covers the Wan text encoder and LongLive's VAE sources.
+- Resumable everywhere: encode resumes inside a long video; training resumes bind to the latent dataset; the stream rebuilds with its saved half-life bounds; index/shards/journals/configs are written atomically and a torn journal line is tolerated.
+- Decode uses the decoder's measured receptive field rather than a one-latent overlap; holdouts count full segments; the rollout horizon comes from the longest held-out shard.
+- The latent stream fits a 24 GB card (capped-size decoder probe, per-sample decode).
+- Receipts, recorded as measured: LONG_HORIZON 8.4 verdict — clean write PROVE, constant memory PASS, write gate fails; the SEQ arm now defaults to `--clean-write`.
+- The LongLive 2.0 minutes-long baseline runs on one RTX 4090 (`longlive_long.py`, `long_eval.py`, `run_longlive.sh`), re-checking identity and refusing stale outputs before any skip.
+
+### Long-horizon co-tenancy (PRs #61, #62)
+
+- Slice v2: VRAM pre-gate (ComfyUI `/free` + defer below 21 GiB) and OOM-rescue while the card is shared with another job; v2.1 defers while the ComfyUI queue is busy and never frees mid-job.
+- Auto-batch OOM retry depth extended 4->9 at all three sites (batch / eval eb / rollout chunk-seeds).
+
+### Research notes (PR #64)
+
+- Field notes on how Seedance, Open-Sora 2.0, Kling 3.0 and Veo 3.1 build long video, and DEPTH_AGENDA — the build-beyond-the-industry plan (closed-loop minute-scale training, multi-timescale state, state-native features).
+
+### CI
+
+- The suite workflows fetch full history so the released-version tripwire can actually fire (PR #66).
+
 ## v1.4.0
 
 Post-v1.3.0 mainline content, versioned so the trunk merge no longer answers to an existing tag.
