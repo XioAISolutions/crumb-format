@@ -396,6 +396,16 @@ def cmd_stream(a):
             if fp != vae.fingerprint:
                 raise SystemExit(f"--vae weights ({vae.fingerprint}) differ from {what} ({fp}): "
                                  "the stream would mix latent spaces")
+        if a.ckpt:
+            # the model's own dataset: held-out shards from another corpus (even one
+            # re-encoded at the same --latents path) are not this experiment's
+            data_fp = ck_cfg.get("data_fp")
+            if data_fp is None:
+                raise SystemExit(f"cannot verify which dataset {a.ckpt} was trained on (it "
+                                 "records no data_fp; trained before this version) -- retrain")
+            if data_fp != shards.fingerprint:
+                raise SystemExit(f"{a.ckpt} was trained on another latent dataset ({data_fp}) "
+                                 f"than --latents {a.latents} ({shards.fingerprint})")
         ctx = shards.batch(a.batch, a.frames, torch.Generator().manual_seed(70000), "eval")
         # The decoder's temporal receptive field, measured on these weights: every
         # chunk is decoded with that much history and lookahead, so the frames the

@@ -461,6 +461,21 @@ class VideoVAETests(unittest.TestCase):
                          "--vae", "ltx-tiny", "--vae-path", str(d / "vae"), "--frames", "2",
                          "--dim", "16", "--layers", "1", "--heads", "2", "--chunk", "2",
                          "--batch", "1", "--device", "cpu", "--stream-frames", "4"])
+            # same VAE, other dataset (the same videos segmented differently, i.e. a
+            # corpus re-encoded at another/the same path): the model is not this data's
+            encode_videos.main([x if x not in (str(d / "lat"), "33") else
+                                {str(d / "lat"): str(d / "lat4"), "33": "41"}[x] for x in args])
+            with self.assertRaisesRegex(SystemExit, "another latent dataset"):
+                stream(d / "lat4", d / "vae", "--stream-frames", "4")
+            saved = torch.load(d / "run" / "model_wave.pt", weights_only=True)
+            saved["config"].pop("data_fp")
+            torch.save(saved, d / "run" / "model_nodata.pt")
+            with self.assertRaisesRegex(SystemExit, "records no data_fp"):
+                lh.main(["stream", "--pole-param", "halflife", "--time-pos", "none",
+                         "--ckpt", str(d / "run" / "model_nodata.pt"), "--latents", str(d / "lat"),
+                         "--vae", "ltx-tiny", "--vae-path", str(d / "vae"), "--frames", "2",
+                         "--dim", "16", "--layers", "1", "--heads", "2", "--chunk", "2",
+                         "--batch", "1", "--device", "cpu", "--stream-frames", "4"])
             # a sliced screen (--checkpoint) equals an uninterrupted one
             whole = stream(d / "lat", d / "vae", "--stream-frames", "8")
             ck = str(d / "screen.state")

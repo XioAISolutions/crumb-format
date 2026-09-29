@@ -74,7 +74,10 @@ def model_config(a, data=None):
                grid=a.grid, kicks=a.kicks, collisions=a.collisions, radius=a.radius,
                speed=a.speed, n_balls=a.n_balls, data_source=a.data_source)
     if data is not None:        # vae (with its weights fingerprint) ties the model to a latent space
-        cfg.update(grid=data.h, grid_w=data.w, data_source="latents", vae=data.vae)
+        # data_fp ties the final model to its dataset: the stream refuses held-out
+        # shards from any other corpus, even at the same --latents path
+        cfg.update(grid=data.h, grid_w=data.w, data_source="latents", vae=data.vae,
+                   data_fp=data.fingerprint)
     return cfg
 
 
