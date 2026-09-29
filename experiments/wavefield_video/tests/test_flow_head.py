@@ -73,6 +73,14 @@ class FlowHeadTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             m.flow_loss(torch.rand(1, T, 3, H, W), torch.rand(1, T, 3, H, W))
 
+    def test_trainer_refuses_flow_with_self_rollout(self):
+        # rollout_sequence_loss supervises an MSE on the model's own feedback;
+        # it has no flow objective, so the combination must fail closed.
+        import train_long
+        with self.assertRaises(SystemExit):
+            train_long.main(["--head", "flow", "--rollout-k", "1", "--seq-frames", "8",
+                             "--chunk", "4", "--steps", "1", "--out", "unused.json"])
+
 
 if __name__ == "__main__":
     unittest.main()

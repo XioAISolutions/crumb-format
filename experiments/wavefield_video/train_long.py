@@ -126,11 +126,12 @@ def sequence_loss(m, clips, moving, a, scale=1.0):
     if getattr(a, "rollout_k", 0):
         return rollout_sequence_loss(m, clips, moving, a, scale)
     B, n_chunks, T = clips.shape[0], a.seq_frames // a.chunk, a.chunk
+    flow = getattr(a, "head", "residual") == "flow"
     states = [None] * len(m.blocks)
     group, total = 0.0, 0.0
     for c in range(n_chunks):
         x = clips[:, c * T:(c + 1) * T]
-        if a.head == "flow":
+        if flow:
             lc, states = m.flow_loss(x, clips[:, c * T + 1:(c + 1) * T + 1], states=states)
         elif a.dense:
             pred, states = m(x, states=states, dense=True)            # [B,T,3,H,W]
@@ -142,7 +143,7 @@ def sequence_loss(m, clips, moving, a, scale=1.0):
             pred, states = m(x, states=states)                         # [B,3,H,W]
             tgt, last = clips[:, (c + 1) * T], x[:, -1]
             mv = moving[:, (c + 1) * T - 1] if moving is not None else None
-        if a.head != "flow":
+        if not flow:
             pred = pred.float()
             if a.motion_loss:
                 lc = tc.motion_balanced_loss(pred, tgt, last, mv)
@@ -359,6 +360,8 @@ def main(argv=None):
     if a.head == "flow":
         if a.motion_loss:
             ap.error("--head flow trains a dense rectified-flow loss (no --motion-loss)")
+        if a.rollout_k:
+            ap.error("--head flow has no self-rollout objective yet (use --rollout-k 0)")
         a.dense = True                    # the flow loss is always dense (every position)
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
