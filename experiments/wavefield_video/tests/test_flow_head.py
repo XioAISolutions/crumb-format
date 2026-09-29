@@ -180,7 +180,16 @@ class FlowHeadTests(unittest.TestCase):
             torch.rand(17)
             train_long.main(base + ["--steps", "3", "--out", str(split),
                                     "--resume", str(split / "ckpt_wave.pt")])
+            # --micro-batch changes memory use, not which noise an example trains on
+            micro = Path(d) / "micro"
+            train_long.main(base + ["--steps", "3", "--micro-batch", "1", "--out", str(micro)])
             f = torch.load(full / "model_wave.pt", weights_only=True)
+            mb = torch.load(micro / "model_wave.pt", weights_only=True)
+            # (float accumulation order differs, amplified by Adam: <= ~3e-5 here; noise
+            # assigned per micro-batch instead moves weights by ~1e-2)
+            for k in f["state"]:
+                torch.testing.assert_close(f["state"][k], mb["state"][k], rtol=0, atol=2e-4,
+                                           msg=k)
             s = torch.load(split / "model_wave.pt", weights_only=True)
             self.assertTrue(any(k.startswith("flow.") for k in f["state"]))
             for k in f["state"]:
@@ -194,6 +203,8 @@ class FlowHeadTests(unittest.TestCase):
                     "--chunk", "4", "--batch", "1", "--device", "cpu"]
             r1, r2 = lh.main(args), lh.main(args)
             self.assertTrue(r1["trained"])
+            self.assertEqual((r1["head"], r1["flow_steps"]), ("flow", 2))
+            self.assertIn("flow_seed", r1)                  # the receipt names its trajectory
             # the resumable ckpt_wave.pt (args, no config) streams as a flow model too
             ck_args = [x if x != str(full / "model_wave.pt") else str(full / "ckpt_wave.pt")
                        for x in args]

@@ -55,11 +55,15 @@ class FlowHead(nn.Module):
         h = F.gelu(self.c2(h))
         return self.c3(h)
 
-    def loss(self, x1, c, generator=None):
-        """Rectified-flow loss for targets x1 [N,C,H,W] given features c [N,H,W,dim]."""
+    def loss(self, x1, c, generator=None, noise=None):
+        """Rectified-flow loss for targets x1 [N,C,H,W] given features c [N,H,W,dim].
+        ``noise`` = (unit Gaussian [N,C,H,W], tau [N]) replaces the draws."""
         N = x1.shape[0]
-        x0 = torch.randn(x1.shape, generator=generator, device=x1.device, dtype=x1.dtype) * self.sigma
-        tau = torch.rand(N, generator=generator, device=x1.device, dtype=x1.dtype)
+        if noise is None:
+            noise = (torch.randn(x1.shape, generator=generator, device=x1.device),
+                     torch.rand(N, generator=generator, device=x1.device))
+        x0 = noise[0].to(device=x1.device, dtype=x1.dtype) * self.sigma
+        tau = noise[1].to(device=x1.device, dtype=x1.dtype)
         xt = (1 - tau)[:, None, None, None] * x0 + tau[:, None, None, None] * x1
         return F.mse_loss(self.velocity(xt, tau, c), x1 - x0)
 

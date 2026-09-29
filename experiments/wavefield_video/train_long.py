@@ -119,7 +119,7 @@ def detach_states(states):
     return [s.detach() if torch.is_tensor(s) else s for s in states]
 
 
-def sequence_loss(m, clips, moving, a, scale=1.0, generator=None):
+def sequence_loss(m, clips, moving, a, scale=1.0, flow_noise=None):
     """Walk one [B, N+1, 3, H, W] batch in chunks with carried state. Returns the
     mean per-chunk loss (a float) after calling backward() every G chunks; the
     loss is multiplied by scale (micro-batch share of the full batch)."""
@@ -133,7 +133,8 @@ def sequence_loss(m, clips, moving, a, scale=1.0, generator=None):
         x = clips[:, c * T:(c + 1) * T]
         if flow:
             lc, states = m.flow_loss(x, clips[:, c * T + 1:(c + 1) * T + 1], states=states,
-                                     generator=generator)
+                                     noise=None if flow_noise is None else
+                                     (flow_noise[0][c], flow_noise[1][c]))
         elif a.dense:
             pred, states = m(x, states=states, dense=True)            # [B,T,3,H,W]
             tgt, last = clips[:, c * T + 1:(c + 1) * T + 1], x
@@ -487,14 +488,20 @@ def main(argv=None):
             clips, moving = gen if a.motion_loss else (gen, None)
         opt.zero_grad(set_to_none=True)
         loss, mb = 0.0, a.micro_batch or a.batch            # gradient accumulation
-        # flow noise keyed to (seed, step), not the global RNG: a run resumed from a
-        # checkpoint draws the same noise the uninterrupted run would have drawn
-        fgen = (torch.Generator(device=dev).manual_seed(a.seed * 1_000_003 + step)
-                if a.head == "flow" else None)
+        # flow noise for the WHOLE batch, keyed to (seed, step) rather than the global
+        # RNG, then sliced per micro-batch: a resumed run draws what the uninterrupted
+        # one would, and --micro-batch changes memory use, not which noise an example gets
+        fn = None
+        if a.head == "flow":
+            g = torch.Generator(device=dev).manual_seed(a.seed * 1_000_003 + step)
+            n_ch, B = a.seq_frames // a.chunk, clips.shape[0]
+            fn = (torch.randn(n_ch, B, a.chunk, *clips.shape[2:], generator=g, device=dev),
+                  torch.rand(n_ch, B, a.chunk, generator=g, device=dev))
         for i in range(0, a.batch, mb):
             loss += sequence_loss(m, clips[i:i + mb], moving[i:i + mb] if moving is not None
                                   else None, a, scale=clips[i:i + mb].shape[0] / a.batch,
-                                  generator=fgen)
+                                  flow_noise=None if fn is None else
+                                  (fn[0][:, i:i + mb], fn[1][:, i:i + mb]))
         torch.nn.utils.clip_grad_norm_(m.parameters(), 1.0)
         opt.step()
         if step % max(1, a.steps // 10) == 0 or step == a.steps:

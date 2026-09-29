@@ -620,6 +620,9 @@ def cmd_stream(a):
         res["collapse_latent_step"] = {k: latent_step(v) for k, v in mon.first.items()}
         res["latent_steps_generated"] = gen
     res["steps_generated"] = gen
+    res["head"] = head["head"]
+    if head["head"] == "flow":          # the sampled trajectory is a function of this seed
+        res.update(flow_seed=a.seed, flow_steps=head["flow_steps"])
     if a.out:
         with open(a.out, "w") as fh:
             json.dump(res, fh, indent=1)

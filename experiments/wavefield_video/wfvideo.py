@@ -818,7 +818,7 @@ class VideoPredictor(nn.Module):
         delta = self.head(feats).permute(0, 3, 1, 2)
         return base + delta if self.residual else delta
 
-    def flow_loss(self, frames, targets, states=None, generator=None):
+    def flow_loss(self, frames, targets, states=None, generator=None, noise=None):
         """Rectified-flow loss at every position: frames [B,T,C,H,W] -> targets
         [B,T,C,H,W] (= frames shifted by one). Returns loss, or (loss, states)."""
         if self.head_kind != "flow":
@@ -827,7 +827,9 @@ class VideoPredictor(nn.Module):
         B, T = frames.shape[:2]
         c = x.reshape(B * T, self.H, self.W, -1)
         x1 = (targets - frames).reshape(B * T, *frames.shape[2:]).to(c.dtype)
-        loss = self.flow.loss(x1, c, generator)
+        if noise is not None:           # (x0 [B,T,C,H,W], tau [B,T]) -> per-position rows
+            noise = (noise[0].reshape(B * T, *frames.shape[2:]), noise[1].reshape(B * T))
+        loss = self.flow.loss(x1, c, generator, noise)
         return loss if states is None else (loss, new_states)
 
     def forward(self, frames, states=None, dense=False):
