@@ -96,3 +96,5 @@ Three blockers hit on the box during the first fp8 rungs; clear them before any 
 3. **Run identity:** after any source/venv change, retry into a fresh `--out` (c01o → `runs_longlive_cfg16b`, c01p → `runs_longlive_cfg16c`).
 
 Status at 2026-09-29 13:35Z: both cache bugs fixed on the box (pipeline SHA `7873c583…`); flash-attn 2.7.4.post1 installed + GPU smoke passed; retry `c01p` (LENGTHS=10, fp8, window 16) queued. Receipts: `receipts/ll_fp8_20260929/`.
+
+**Update (~16:45Z):** `c01p` reached the denoise loop and OOMed there (peak 24.16 of 24.56 GiB — the text encoder and VAE stay resident although both are idle once prompts are encoded). Idle-offload patch added: `scripts/longlive_idle_offload_patch.py` (env-guarded `LL_OFFLOAD_IDLE=1`, fail-closed apply, exec-safe; CPU regressions pass) and applied on the box (pipeline SHA `ba72872b…`). Retry `c01q` (fresh `runs_longlive_cfg16d`, window 12 + offload) queued ahead of the v4 latent full run.
