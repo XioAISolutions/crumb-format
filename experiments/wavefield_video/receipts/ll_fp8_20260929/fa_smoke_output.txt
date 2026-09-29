@@ -1,0 +1,6 @@
+flash-attn GPU smoke — 2026-09-29 ~13:35Z, venv: /workspace/slava/venvs/longlive (torch 2.6.0+cu124, ABI=0)
+
+$ /workspace/slava/venvs/longlive/bin/python fa_smoke.py
+full-causal max|delta| vs sdpa: 0.0
+windowed(16,16) ran ok: (128, 8, 64)
+SMOKE-PASS

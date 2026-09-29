@@ -166,6 +166,137 @@ class StreamSessionTests(unittest.TestCase):
 
 
 class HealthMonitorTests(unittest.TestCase):
+    @staticmethod
+    def _structured(t, detail=0.02):
+        """Synthetic smooth landscape and a moving broad object, with fine detail."""
+        y, x = torch.meshgrid(torch.arange(32) / 32, torch.arange(48) / 48,
+                              indexing="ij")
+        scene = (0.50 + 0.15 * torch.cos(2 * math.pi * y)
+                 + 0.12 * torch.sin(2 * math.pi * x)
+                 + 0.2 * torch.exp(-((x - (0.5 + 0.15 * math.sin(t))) ** 2
+                                     + (y - 0.5) ** 2) / 0.025))
+        scene += detail * torch.cos(2 * math.pi * (17 * x + 11 * y) + t)
+        return scene[None, None].repeat(1, 3, 1, 1)
+
+    def _structured_ctx(self, detail=0.02, static=False):
+        return torch.stack([self._structured(0 if static else t * 0.4, detail)
+                            for t in range(8)], 1)
+
+    def _texture(self, ctx, t=0):
+        # Same per-channel mean/contrast as context; texture is not a fade/flatten.
+        y, x = torch.meshgrid(torch.arange(32), torch.arange(48), indexing="ij")
+        noise = torch.cos(2 * math.pi * (x / 3 + y / 4) + t)[None, None]
+        noise = noise / noise.std()
+        return (ctx.mean() + ctx.flatten(3).std(-1).mean() * noise).repeat(1, 3, 1, 1)
+
+    def test_structure_to_static_or_jittering_texture_is_flagged(self):
+        ctx = self._structured_ctx()
+        for jitter in (False, True):
+            with self.subTest(jitter=jitter):
+                mon = lh.HealthMonitor(patience=5).calibrate(ctx)
+                for t in range(4):
+                    mon.update(self._structured(t * 0.4))
+                for t in range(8):
+                    mon.update(self._texture(ctx, t * 1.7 if jitter else 0))
+                self.assertEqual(mon.first.get("texture_collapse"), 4)
+                self.assertNotIn("fade", mon.first)
+                self.assertNotIn("flatten", mon.first)
+                if jitter:
+                    self.assertNotIn("freeze", mon.first)
+
+    def test_structured_moving_static_and_high_detail_controls(self):
+        for static, detail in ((False, 0.02), (True, 0.02), (False, 0.22)):
+            with self.subTest(static=static, detail=detail):
+                ctx = self._structured_ctx(detail, static)
+                mon = lh.HealthMonitor(patience=5).calibrate(ctx)
+                for t in range(30):
+                    mon.update(self._structured(0 if static else t * 0.4, detail))
+                self.assertTrue(mon.healthy, mon.first)
+
+    def test_texture_uses_each_samples_own_structure_anchor(self):
+        strong = self._structured_ctx()
+        weak = 0.5 + 0.1 * (strong - 0.5)
+        mon = lh.HealthMonitor(patience=3).calibrate(torch.cat((weak, strong)))
+        # Identical detailed outputs preserve sample 0's weak coarse structure
+        # but lose sample 1's strong structure: a batch-wide anchor is incorrect.
+        for t in range(5):
+            f = weak[:, t] + self._texture(strong, t * 1.7) - strong.mean()
+            mon.update(f.repeat(2, 1, 1, 1))
+        self.assertEqual(mon.first["texture_collapse"], 0)
+        self.assertEqual(mon.first_sample["texture_collapse"], 1)
+        self.assertEqual(mon.runs["texture_collapse"].tolist(), [0, 5])
+
+    def test_texture_streaks_are_per_sample_and_resume_exactly(self):
+        ctx = self._structured_ctx()
+        clean, bad = self._structured(1), self._texture(ctx, 1)
+        # Alternate bad samples: no cross-sample accumulation. Then sample 1
+        # collapses, including a partial streak saved/restored before it fires.
+        frames = [torch.cat((bad, clean) if t % 2 else (clean, bad))
+                  for t in range(6)] + [torch.cat((clean, bad))] * 7
+        full = lh.HealthMonitor(patience=5).calibrate(ctx.repeat(2, 1, 1, 1, 1))
+        split = lh.HealthMonitor(patience=5).calibrate(ctx.repeat(2, 1, 1, 1, 1))
+        for f in frames:
+            full.update(f)
+        for f in frames[:9]:
+            split.update(f)
+        self.assertNotIn("texture_collapse", split.first)
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "texture-monitor.pt"
+            torch.save(split.state_dict(), p)
+            resumed = lh.HealthMonitor(patience=5).load_state_dict(
+                torch.load(p, weights_only=True))
+        for f in frames[9:]:
+            resumed.update(f)
+        self.assertEqual(full.first["texture_collapse"], 6)
+        self.assertEqual(full.first_sample["texture_collapse"], 1)
+        self.assertEqual(resumed.first, full.first)
+        self.assertEqual(resumed.first_sample, full.first_sample)
+        self.assertEqual(resumed.frame_index, full.frame_index)
+        for k in full.runs:
+            self.assertTrue(torch.equal(resumed.runs[k], full.runs[k]), k)
+        for k in full.ref:
+            self.assertTrue(torch.equal(resumed.ref[k], full.ref[k]), k)
+        for settings in ({"structure_ratio": 0.1}, {"high_fraction": 0.75}):
+            with self.assertRaises(SystemExit):
+                lh.HealthMonitor(patience=5, **settings).load_state_dict(split.state_dict())
+
+    def test_nonfinite_context_is_rejected_as_an_anchor(self):
+        for value in (float("nan"), float("inf"), -float("inf")):
+            with self.subTest(value=value):
+                ctx = self._structured_ctx()
+                ctx[0, 0, 0, 0, 0] = value
+                with self.assertRaisesRegex(ValueError, "finite"):
+                    lh.HealthMonitor().calibrate(ctx)
+
+    def test_nonfinite_frame_flags_immediately_and_breaks_texture_streak(self):
+        ctx = self._structured_ctx()
+        mon = lh.HealthMonitor(patience=3).calibrate(ctx)
+        bad = self._texture(ctx)
+        mon.update(bad)
+        mon.update(bad)
+        invalid = bad.clone()
+        invalid[0, 0, 0, 0] = float("nan")
+        mon.update(invalid)
+        self.assertEqual(mon.first, {"nonfinite": 2})
+        mon.update(bad)
+        mon.update(bad)
+        self.assertNotIn("texture_collapse", mon.first)
+        mon.update(bad)
+        self.assertEqual(mon.first["texture_collapse"], 3)
+
+    def test_tiny_flat_context_has_finite_stats_and_no_texture_claim(self):
+        mon = lh.HealthMonitor(patience=2).calibrate(torch.full((1, 2, 3, 1, 1), 0.5))
+        stats = mon.update(torch.full((1, 3, 1, 1), 0.5))
+        self.assertTrue(all(math.isfinite(v) for v in stats.values()), stats)
+        self.assertTrue(mon.healthy, mon.first)
+
+    def test_legacy_state_cannot_silently_skip_the_new_screen(self):
+        state = lh.HealthMonitor().calibrate(self._structured_ctx()).state_dict()
+        state.pop("config")
+        state["ref"].pop("coarse_power")
+        with self.assertRaisesRegex(SystemExit, "context.*start fresh"):
+            lh.HealthMonitor().load_state_dict(state)
+
     def test_state_round_trip_keeps_streaks_across_a_resume(self):
         """A freeze streak that straddles a save/load must fire at the same frame."""
         ctx = self._ctx()
