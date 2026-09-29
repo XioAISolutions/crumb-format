@@ -72,3 +72,32 @@ Our position: single 4090; wave/crumb model with an O(1) carried state; wheel al
 - VideoSSM — https://arxiv.org/abs/2512.04519 · Sana-WM — https://arxiv.org/abs/2605.15178
 - LongLive — https://arxiv.org/abs/2509.22622
 - Rolling Forcing — https://arxiv.org/abs/2509.25161
+
+---
+
+## 5. Round 2 — Open-Sora 2.0, Kling 3.0, Veo 3.1, Sora (added 2026-09-29)
+
+### Open-Sora 2.0 (arXiv 2503.09642) — "commercial-level for $200k"
+- **The cost-controlled recipe**, exactly our game at a bigger budget: (a) data curation first (shot-cut detection, aesthetic scoring, OCR filtering, motion scoring, bucketing); (b) multi-stage training — low-res video learning → image-conditioned motion training → high-res refinement; (c) systems (sequence parallelism, selective activation checkpointing, bucketing for throughput).
+- Fully open (code + weights + report) = the best reference implementation to mine line-by-line when we need specifics.
+- Code available on GitHub; report: stormcenter/open-sora-report.
+
+### Kling 3.0 (Kuaishou, Feb 2026)
+- Unified multimodal: text/image/audio/video in ONE model ("All-in-One" workflow — understanding + generation + editing).
+- DiT with joint spatio-temporal attention — vendor claims "significantly reduced flickering and texture boiling" (their words; our wave model's joint state does this natively = double down).
+- Native 4K 60fps, multi-shot storyboarding, motion control, 5-language lip sync. #1 on ELO video benchmark at launch.
+- Lesson: their long content = multi-shot PLANNING (storyboards), not single-pass minutes.
+
+### Veo 3.1 (Google DeepMind) — the Extend pattern
+- **Nobody at consumer quality generates long video in ONE pass.** Veo chains 7–8 s extensions (scene-aware v2v continuation preserving style/motion/narrative), up to **148 s total**, at 720p/24fps base.
+- "Ingredients to Video": reference images keep characters consistent across scenes (consistency anchoring).
+- Lesson for us: (1) chained autoregressive continuation = the product norm → our single-pass continuous stream is genuinely ahead of the norm IF it works; (2) build an "extend" UX as fallback/product pattern; (3) reference-anchoring = the user-visible version of our internal memory.
+
+### Sora (OpenAI)
+- Sora 1 (2024): spacetime latent patches as tokens (unifies images/videos), variable duration/resolution/aspect training at native sizes, **re-captioning** (descriptive captioner labels all training video; GPT expands user prompts), forward/backward video extension, emergent 3D consistency from scale. Sora 2 (2025): accurate physics, native synced audio, cameo identity anchoring.
+- Lesson: dense captions + prompt expansion = cheap high-leverage; extension is in the product from day one.
+
+### Cross-cutting conclusions for the 5-minute same-content push
+1. **Everyone chains**; nobody ships 5-min single-pass at quality. Our bet (constant-memory streaming that holds the same content) is contrarian and, if it works, genuinely differentiating (Veo's Extend re-encodes every 7–8 s and drifts across chains).
+2. Anti-drift toolkit is consistent across all: rollout/self-forcing training, memory write/read policies (§8.4/§8.5 = our version), anti-flicker joint spatiotemporal attention (native for us), multi-stage training + hard data curation, dense captions + prompt expansion, distillation for speed.
+3. Cost discipline works: Open-Sora proved $200k buys commercial quality with the right recipe — our 4090 + open weights can play the same game at smaller scale: data quality + staged training + systems first.
