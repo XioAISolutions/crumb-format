@@ -181,7 +181,9 @@ def evaluate(samples, encoder, window=30.0, batch=32):
                  luma=wmean(luma, w), contrast=wmean(con, w), motion=wmean(motion, w),
                  sat=wmean(sat, w))
         fails = []
-        if w >= 1 and r["drift_ratio"] < THRESH["drift"]:
+        # an undefined ratio (window 1 already has no positive similarity to window 0,
+        # or a non-finite value) is a drift failure, never a silent pass
+        if w >= 1 and not (math.isfinite(r["drift_ratio"]) and r["drift_ratio"] >= THRESH["drift"]):
             fails.append("drift")
         for k, key in (("luma", "luma"), ("contrast", "contrast"), ("sat", "sat")):
             # relative to window 0, floored so a zero baseline (a black or grayscale

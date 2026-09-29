@@ -130,6 +130,20 @@ def test_zero_saturation_baseline_still_bounds_colour():
     assert any("colour" in w["fails"] for w in bad["windows"]), bad["windows"]
 
 
+def test_undefined_drift_ratio_fails_instead_of_passing():
+    """Window 1 with non-positive similarity to window 0 makes the ratio undefined:
+    that must fail on drift (NaN < 0.9 is False, which used to pass silently)."""
+    class Flip(E.PixelEncoder):
+        def __call__(self, frames):
+            out = super().__call__(frames)
+            self.t = getattr(self, "t", 0) + len(frames)
+            return out if self.t <= 60 else -out          # after 30 s: anti-correlated features
+    r = E.evaluate(samples("stable"), Flip(), window=30)
+    assert r["windows"][1]["sim_to_first"] <= 0
+    assert all("drift" in w["fails"] for w in r["windows"][1:]), [w["fails"] for w in r["windows"]]
+    assert r["verdict"].startswith("FAIL")
+
+
 def test_black_opening_still_bounds_luma():
     def samples():
         for i in range(180):
