@@ -205,6 +205,18 @@ def test_generate_dry_run_writes_overlay(tmp_path):
     assert cfg["inference_iter"] == 1
 
 
+def test_generate_refuses_empty_prompts(tmp_path):
+    yaml = pytest.importorskip("yaml")
+    ll = tmp_path / "ll"
+    (ll / "configs" / "fp8").mkdir(parents=True)
+    (ll / "configs" / "fp8" / "inference_fp8.yaml").write_text(yaml.safe_dump(BASE))
+    empty = tmp_path / "p.txt"
+    empty.write_text("\n  \n")
+    with pytest.raises(SystemExit, match="no prompts"):
+        L.main(["generate", "--ll-root", str(ll), "--ckpt", "c.pt", "--prompts", str(empty),
+                "--minutes", "1", "--out", str(tmp_path / "run")])
+
+
 def test_expected_stems_txt_and_dir(tmp_path):
     t = tmp_path / "p.txt"
     t.write_text("a\n\n b \nc\n")

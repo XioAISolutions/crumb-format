@@ -439,6 +439,8 @@ def cmd_generate(a):
     out.mkdir(parents=True, exist_ok=True)
     prompts = Path(a.prompts).resolve()
     n_prompts = n_prompts_of(prompts)
+    if n_prompts < 1:               # else inference_iter=-1 and "all latents present" holds vacuously
+        raise SystemExit(f"no prompts in {prompts} (need non-empty lines, or caption subfolders)")
     cfg = build_overlay(base, latent_frames=lat, prompts=prompts, ckpt=Path(a.ckpt).resolve(),
                         out_dir=out.resolve(), window=a.window, sink=a.sink, seed=a.seed,
                         fp8=a.precision == "fp8", compile=a.compile)
