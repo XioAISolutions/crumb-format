@@ -16,7 +16,7 @@ Fields:
 
 Generation and FFTs run on CPU in float64, followed by one transfer to device.
 Explicit seeds use a local RNG and leave the global torch RNG untouched.
-The legacy ball-motion options (kicks, kick_every, kick_scale, collisions)
+The legacy ball-motion options (radius, kicks, kick_every, kick_scale, collisions)
 are accepted but have no effect on these deterministic PDEs. ``nb`` controls
 the number of random Fourier modes for wave/advection; vortex uses one cell
 lattice. Metadata contains PDE parameters/scales, not ball positions/colors;
@@ -133,7 +133,7 @@ def spectral_evolve(initial, T, *, field="wave", time_step=0.15, speed=SPEED,
 
 
 def make_clip_batch(bs, T, H, W, nb=3, device="cpu", seed=None, speed=SPEED,
-                    kicks=False, kick_every=20, kick_scale=None,
+                    radius=RADIUS, kicks=False, kick_every=20, kick_scale=None,
                     collisions=False, return_meta=False,
                     return_moving=False, move_thresh=MOVE_THRESH, *,
                     field="wave", time_step=0.15, velocity=None, viscosity=0.02):

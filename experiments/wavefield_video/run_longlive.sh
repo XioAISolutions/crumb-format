@@ -11,9 +11,11 @@
 # Default LENGTHS="10 30 180 300": a 10 s smoke, the 30 s reference clip (what
 # LongLive is known to do well), then 3 and 5 minutes.
 # Pre-registered read (LONGLIVE_4090.md, fixed before any run):
-#   PASS a length   long_eval verdict PASS (every 30 s window: drift_ratio >= 0.9,
-#                   luma/contrast/saturation within +-25 %, motion >= 25 % of window 0)
-#   The coherent horizon of the longest clip is the number to report, whatever it is.
+#   NO_FLAGS a length   long_eval reports no diagnostic flags (every 30 s window:
+#                   drift_ratio >= 0.9, luma/contrast/saturation within +-25 %,
+#                   motion >= 25 % of window 0) -- diagnostics only, NOT a
+#                   semantic-quality verdict; independent pixels review required
+#   The diagnostic horizon of the longest clip is the number to report, whatever it is.
 # Re-run until $OUT/status.txt reads DONE; finished lengths are skipped. LongLive has
 # no mid-video resume, so one length's generation is never cut by a slice budget.
 set -euo pipefail
