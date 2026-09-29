@@ -1,0 +1,81 @@
+     0s  sim 0.674  drift 1.000  luma 0.480  contrast 0.273  motion 0.1303  sat 0.312  
+    30s  sim 0.696  drift 1.032  luma 0.446  contrast 0.233  motion 0.0164  sat 0.257  freeze
+    60s  sim 0.617  drift 0.915  luma 0.444  contrast 0.225  motion 0.0120  sat 0.249  freeze
+    90s  sim 0.562  drift 0.833  luma 0.443  contrast 0.222  motion 0.0106  sat 0.246  drift freeze
+   120s  sim 0.521  drift 0.773  luma 0.442  contrast 0.220  motion 0.0082  sat 0.245  drift freeze
+   150s  sim 0.489  drift 0.725  luma 0.442  contrast 0.219  motion 0.0077  sat 0.245  drift freeze
+   180s  sim 0.461  drift 0.684  luma 0.442  contrast 0.218  motion 0.0076  sat 0.243  drift freeze
+   210s  sim 0.438  drift 0.650  luma 0.442  contrast 0.217  motion 0.0073  sat 0.242  drift freeze
+   240s  sim 0.418  drift 0.620  luma 0.442  contrast 0.216  motion 0.0074  sat 0.241  drift freeze
+   270s  sim 0.401  drift 0.595  luma 0.442  contrast 0.216  motion 0.0071  sat 0.241  drift freeze
+   300s  sim 0.385  drift 0.571  luma 0.442  contrast 0.215  motion 0.0069  sat 0.240  drift freeze
+   330s  sim 0.371  drift 0.551  luma 0.442  contrast 0.215  motion 0.0070  sat 0.240  drift freeze
+   360s  sim 0.359  drift 0.532  luma 0.442  contrast 0.214  motion 0.0060  sat 0.239  drift freeze
+   390s  sim 0.348  drift 0.515  luma 0.442  contrast 0.214  motion 0.0068  sat 0.239  drift freeze
+   420s  sim 0.337  drift 0.500  luma 0.442  contrast 0.214  motion 0.0067  sat 0.238  drift freeze
+   450s  sim 0.328  drift 0.486  luma 0.442  contrast 0.214  motion 0.0067  sat 0.238  drift freeze
+   480s  sim 0.318  drift 0.472  luma 0.442  contrast 0.214  motion 0.0070  sat 0.237  drift freeze
+   510s  sim 0.311  drift 0.461  luma 0.442  contrast 0.213  motion 0.0065  sat 0.237  drift freeze
+   540s  sim 0.303  drift 0.449  luma 0.443  contrast 0.213  motion 0.0064  sat 0.237  drift freeze
+   570s  sim 0.295  drift 0.438  luma 0.443  contrast 0.213  motion 0.0065  sat 0.237  drift freeze
+   600s  sim 0.289  drift 0.428  luma 0.443  contrast 0.213  motion 0.0069  sat 0.237  drift freeze
+   630s  sim 0.282  drift 0.419  luma 0.443  contrast 0.213  motion 0.0052  sat 0.236  drift freeze
+   660s  sim 0.277  drift 0.410  luma 0.443  contrast 0.213  motion 0.0064  sat 0.236  drift freeze
+   690s  sim 0.271  drift 0.401  luma 0.443  contrast 0.213  motion 0.0064  sat 0.236  drift freeze
+   720s  sim 0.266  drift 0.394  luma 0.443  contrast 0.213  motion 0.0067  sat 0.236  drift freeze
+   750s  sim 0.260  drift 0.386  luma 0.443  contrast 0.213  motion 0.0062  sat 0.236  drift freeze
+   780s  sim 0.255  drift 0.379  luma 0.443  contrast 0.213  motion 0.0062  sat 0.235  drift freeze
+   810s  sim 0.251  drift 0.372  luma 0.443  contrast 0.212  motion 0.0064  sat 0.235  drift freeze
+   840s  sim 0.246  drift 0.365  luma 0.443  contrast 0.212  motion 0.0064  sat 0.235  drift freeze
+   870s  sim 0.242  drift 0.359  luma 0.443  contrast 0.212  motion 0.0052  sat 0.235  drift freeze
+   900s  sim 0.239  drift 0.354  luma 0.443  contrast 0.212  motion 0.0062  sat 0.234  drift freeze
+   930s  sim 0.235  drift 0.348  luma 0.443  contrast 0.212  motion 0.0062  sat 0.234  drift freeze
+   960s  sim 0.231  drift 0.342  luma 0.443  contrast 0.212  motion 0.0062  sat 0.234  drift freeze
+   990s  sim 0.228  drift 0.337  luma 0.443  contrast 0.212  motion 0.0063  sat 0.234  drift freeze
+  1020s  sim 0.224  drift 0.333  luma 0.443  contrast 0.212  motion 0.0062  sat 0.234  drift freeze
+  1050s  sim 0.221  drift 0.327  luma 0.443  contrast 0.212  motion 0.0061  sat 0.234  drift freeze
+  1080s  sim 0.218  drift 0.323  luma 0.444  contrast 0.212  motion 0.0062  sat 0.233  drift colour freeze
+  1110s  sim 0.215  drift 0.318  luma 0.444  contrast 0.212  motion 0.0051  sat 0.233  drift colour freeze
+  1140s  sim 0.212  drift 0.315  luma 0.444  contrast 0.212  motion 0.0061  sat 0.233  drift colour freeze
+  1170s  sim 0.209  drift 0.311  luma 0.444  contrast 0.212  motion 0.0060  sat 0.232  drift colour freeze
+  1200s  sim 0.207  drift 0.307  luma 0.444  contrast 0.212  motion 0.0061  sat 0.233  drift colour freeze
+  1230s  sim 0.204  drift 0.303  luma 0.444  contrast 0.212  motion 0.0064  sat 0.233  drift colour freeze
+  1260s  sim 0.202  drift 0.299  luma 0.444  contrast 0.212  motion 0.0059  sat 0.233  drift colour freeze
+  1290s  sim 0.199  drift 0.296  luma 0.444  contrast 0.212  motion 0.0060  sat 0.233  drift colour freeze
+  1320s  sim 0.197  drift 0.292  luma 0.444  contrast 0.212  motion 0.0060  sat 0.232  drift colour freeze
+  1350s  sim 0.195  drift 0.288  luma 0.444  contrast 0.212  motion 0.0064  sat 0.232  drift colour freeze
+  1380s  sim 0.192  drift 0.285  luma 0.444  contrast 0.212  motion 0.0046  sat 0.232  drift colour freeze
+  1410s  sim 0.191  drift 0.282  luma 0.444  contrast 0.212  motion 0.0060  sat 0.232  drift colour freeze
+  1440s  sim 0.188  drift 0.279  luma 0.444  contrast 0.212  motion 0.0060  sat 0.232  drift colour freeze
+  1470s  sim 0.186  drift 0.276  luma 0.444  contrast 0.212  motion 0.0064  sat 0.232  drift colour freeze
+  1500s  sim 0.184  drift 0.273  luma 0.444  contrast 0.212  motion 0.0059  sat 0.232  drift colour freeze
+  1530s  sim 0.183  drift 0.271  luma 0.444  contrast 0.212  motion 0.0058  sat 0.232  drift colour freeze
+  1560s  sim 0.181  drift 0.268  luma 0.444  contrast 0.212  motion 0.0060  sat 0.232  drift colour freeze
+  1590s  sim 0.179  drift 0.265  luma 0.444  contrast 0.212  motion 0.0060  sat 0.231  drift colour freeze
+  1620s  sim 0.177  drift 0.263  luma 0.444  contrast 0.212  motion 0.0047  sat 0.231  drift colour freeze
+  1650s  sim 0.176  drift 0.260  luma 0.444  contrast 0.212  motion 0.0059  sat 0.231  drift colour freeze
+  1680s  sim 0.174  drift 0.258  luma 0.444  contrast 0.212  motion 0.0060  sat 0.231  drift colour freeze
+  1710s  sim 0.172  drift 0.256  luma 0.444  contrast 0.212  motion 0.0059  sat 0.230  drift colour freeze
+  1740s  sim 0.171  drift 0.253  luma 0.444  contrast 0.212  motion 0.0061  sat 0.231  drift colour freeze
+  1770s  sim 0.169  drift 0.251  luma 0.444  contrast 0.212  motion 0.0059  sat 0.231  drift colour freeze
+  1800s  sim 0.168  drift 0.249  luma 0.444  contrast 0.212  motion 0.0059  sat 0.231  drift colour freeze
+  1830s  sim 0.166  drift 0.247  luma 0.444  contrast 0.212  motion 0.0059  sat 0.230  drift colour freeze
+  1860s  sim 0.165  drift 0.245  luma 0.444  contrast 0.212  motion 0.0049  sat 0.230  drift colour freeze
+  1890s  sim 0.163  drift 0.242  luma 0.444  contrast 0.212  motion 0.0059  sat 0.231  drift colour freeze
+  1920s  sim 0.162  drift 0.241  luma 0.445  contrast 0.212  motion 0.0058  sat 0.230  drift colour freeze
+  1950s  sim 0.161  drift 0.239  luma 0.445  contrast 0.212  motion 0.0059  sat 0.230  drift colour freeze
+  1980s  sim 0.160  drift 0.237  luma 0.445  contrast 0.212  motion 0.0062  sat 0.230  drift colour freeze
+  2010s  sim 0.159  drift 0.235  luma 0.445  contrast 0.212  motion 0.0058  sat 0.230  drift colour freeze
+  2040s  sim 0.157  drift 0.233  luma 0.445  contrast 0.212  motion 0.0058  sat 0.230  drift colour freeze
+  2070s  sim 0.156  drift 0.232  luma 0.445  contrast 0.212  motion 0.0058  sat 0.230  drift colour freeze
+  2100s  sim 0.155  drift 0.230  luma 0.445  contrast 0.212  motion 0.0063  sat 0.230  drift colour freeze
+  2130s  sim 0.154  drift 0.228  luma 0.445  contrast 0.212  motion 0.0044  sat 0.230  drift colour freeze
+  2160s  sim 0.153  drift 0.227  luma 0.445  contrast 0.212  motion 0.0058  sat 0.230  drift colour freeze
+  2190s  sim 0.152  drift 0.225  luma 0.445  contrast 0.212  motion 0.0058  sat 0.229  drift colour freeze
+  2220s  sim 0.151  drift 0.223  luma 0.445  contrast 0.212  motion 0.0062  sat 0.230  drift colour freeze
+  2250s  sim 0.150  drift 0.222  luma 0.445  contrast 0.212  motion 0.0057  sat 0.229  drift colour freeze
+  2280s  sim 0.149  drift 0.220  luma 0.445  contrast 0.212  motion 0.0057  sat 0.229  drift colour freeze
+  2310s  sim 0.147  drift 0.219  luma 0.445  contrast 0.212  motion 0.0060  sat 0.229  drift colour freeze
+  2340s  sim 0.147  drift 0.217  luma 0.445  contrast 0.212  motion 0.0060  sat 0.229  drift colour freeze
+  2370s  sim 0.146  drift 0.216  luma 0.445  contrast 0.212  motion 0.0047  sat 0.229  drift colour freeze
+[long_eval] FAIL at 30s (diagnostic flags: freeze); diagnostic horizon 30s of 2395s (pixel); semantic quality unverified; independent pixels review required
