@@ -147,6 +147,9 @@ class FlowHeadTests(unittest.TestCase):
             torch.manual_seed(12345)
             r3 = lh.main(args + ["--checkpoint", cp])
             self.assertEqual(r1["log"][-1]["last"], r3["log"][-1]["last"])
+            # resuming that stream under another --seed would splice in another trajectory
+            with self.assertRaises(SystemExit):
+                lh.main(args + ["--checkpoint", cp, "--stream-frames", "12", "--seed", "1"])
             # render_rollout: the same command renders the same sampled video
             import render_rollout
             pngs = []

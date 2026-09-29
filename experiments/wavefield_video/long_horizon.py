@@ -464,6 +464,14 @@ def cmd_stream(a):
         elif old_fp != ctx_fp:
             raise SystemExit(f"{a.resume} continues a stream warmed on different context "
                              f"({old_fp} != {ctx_fp}: other --latents/--batch/--frames?)")
+        if head["head"] == "flow":
+            # the flow draws are keyed to --seed: another seed would splice a different
+            # stochastic trajectory into this stream's log
+            old_seed = (sess.extra or {}).get("flow_seed")
+            if old_seed != a.seed:
+                raise SystemExit(f"{a.resume} was sampled with flow seed {old_seed}; --seed "
+                                 f"{a.seed} would continue a different trajectory -- resume "
+                                 "with the same --seed, or start fresh")
         if sess.extra and "health" in sess.extra:
             mon.load_state_dict(sess.extra["health"])
         else:                       # older state file: flags start fresh, indices stay absolute
@@ -512,6 +520,8 @@ def cmd_stream(a):
 
     def extra_state():
         extra = {"health": mon.state_dict(), "generated": gen, "context_fp": ctx_fp}
+        if head["head"] == "flow":
+            extra["flow_seed"] = a.seed
         if vae is not None:
             extra.update(decoder=dec.state_dict())
         if a.checkpoint:
