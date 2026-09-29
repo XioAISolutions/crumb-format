@@ -365,10 +365,11 @@ def cmd_stream(a):
     from data import make_clip_batch
     torch.manual_seed(a.seed)
     dev = torch.device(a.device)
-    sd, ck_cfg = None, {}
+    sd, ck_cfg, ck_args = None, {}, {}
     if a.ckpt:
         saved = torch.load(a.ckpt, map_location=dev, weights_only=True)
         sd, ck_cfg = saved["state"], saved.get("config") or {}
+        ck_args = saved.get("args") or {}       # resumable train_long ckpt_*.pt: no config
         if a.ffn_mult is None:          # exact width from the weights, not a rounded JSON mult
             a.ffn_mult = sd["blocks.0.ffn.fc1.weight"].shape[0] / a.dim
         # half-life bounds are not state-dict tensors: hl_raw means a different
@@ -382,8 +383,12 @@ def cmd_stream(a):
     wg = sd is not None and any(k.endswith("mix.wg.weight") for k in sd)
     cw = sd is not None and "posemb.py" not in sd
     # a train_long.py --head flow checkpoint carries flow.* weights: rebuild that head
-    # (strict load would fail on a residual model) and sample it from --seed
-    head = {"head": ck_cfg.get("head") or "residual", "flow_steps": ck_cfg.get("flow_steps") or 16}
+    # (strict load would fail on a residual model) and sample it from --seed. The
+    # weights say which head; the step count comes from the final model's config or,
+    # for a resumable ckpt_*.pt, from its saved training args.
+    flow = sd is not None and any(k.startswith("flow.") for k in sd)
+    head = {"head": "flow" if flow else "residual",
+            "flow_steps": ck_cfg.get("flow_steps") or ck_args.get("flow_steps") or 16}
     vae = None
     if a.latents:
         # Latent mode (LONG_HORIZON.md phase 2): real latent context from held-out

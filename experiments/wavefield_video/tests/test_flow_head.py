@@ -194,6 +194,10 @@ class FlowHeadTests(unittest.TestCase):
                     "--chunk", "4", "--batch", "1", "--device", "cpu"]
             r1, r2 = lh.main(args), lh.main(args)
             self.assertTrue(r1["trained"])
+            # the resumable ckpt_wave.pt (args, no config) streams as a flow model too
+            ck_args = [x if x != str(full / "model_wave.pt") else str(full / "ckpt_wave.pt")
+                       for x in args]
+            self.assertTrue(lh.main(ck_args)["trained"])
             self.assertEqual([row["last"] for row in r1["log"]], [row["last"] for row in r2["log"]])
             # ... and a sliced stream (--checkpoint, resumed) samples what the
             # uninterrupted one did: the draw is keyed to the frame, not the RNG
