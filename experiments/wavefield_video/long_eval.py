@@ -1,11 +1,10 @@
-"""Minute-scale consistency of a generated video (LONGLIVE_4090.md).
+"""Sampled video consistency diagnostics; semantic quality remains unverified.
 
-Reads an mp4 as a stream (constant RAM at any length), samples ``--per-sec``
-frames per second, and measures four ways minutes-long generation is known to
-fail:
+Reads an mp4 incrementally, samples ``--per-sec`` frames per second, and
+reports heuristic risk flags:
 
-  drift     semantic similarity of each window to the first window falls off
-            (identity / scene drift). Frozen image features: DINOv2-small via
+  drift     feature similarity of each window to the first window falls off.
+            Frozen image features: DINOv2-small via
             transformers when available (``--encoder dinov2``), else ``pixel``
             (normalized 32x18 thumbnails, only for tests and smoke runs).
   fade      mean luma leaves the first window's band (fade to black / white)
@@ -13,18 +12,19 @@ fail:
   freeze    motion (mean |frame - previous sampled frame|) drops toward zero
   colour    mean saturation drifts (the slow over-saturation of long rollouts)
 
-Every metric is reported per ``--window`` seconds, relative to the first window,
-so a 30 s baseline clip and a 5-minute clip are judged on the same scale:
+Every metric is reported per ``--window`` seconds, relative to the first window:
 
     python long_eval.py video.mp4 --out report.json [--encoder dinov2]
 
-Pre-registered read (fixed in LONGLIVE_4090.md before any run):
-    drift_ratio(w) = sim(window w, window 0) / sim(window 1, window 0)
-    PASS  every window: drift_ratio >= 0.9, luma and contrast within +-25 % of
-          window 0, motion >= 25 % of window 0, saturation within +-25 %.
-          (+-25 % of max(window 0, 0.02), so a black or grayscale opening still
-          bounds later windows; a static opening has no motion baseline.)
-    The first failing window's start time is the clip's coherent horizon.
+The existing numerical thresholds are retained, with the drift denominator
+corrected to sim(window 0, window 0): a degraded window 1 cannot normalize itself
+to success. Flags: drift_ratio < 0.9, luma/contrast/saturation outside +-25 % of
+max(window 0, 0.02), or motion < 25 % of window 0 (no static-opening baseline).
+
+Window 0 is itself unverified and may already be degraded. NO_FLAGS means only
+that these sampled checks found no risk; it does not certify recognizable
+same-content video. Independent pixels review remains required. The legacy
+coherent_horizon_s field is only an alias for the diagnostic horizon.
 """
 import argparse
 import hashlib
@@ -134,7 +134,12 @@ def evaluate(samples, encoder, window=30.0, batch=32):
         if not buf:
             return
         arr = np.stack(buf)
-        feats.append(encoder(arr))
+        if not np.isfinite(arr).all():
+            raise ValueError("non-finite video frame")
+        features = encoder(arr)
+        if not np.isfinite(features).all():
+            raise ValueError("non-finite encoder features")
+        feats.append(features)
         l, c, s = frame_stats(arr)
         luma.extend(l.tolist()); con.extend(c.tolist()); sat.extend(s.tolist())
         for fr in arr:
@@ -172,17 +177,17 @@ def evaluate(samples, encoder, window=30.0, batch=32):
 
     base = dict(luma=wmean(luma, 0), contrast=wmean(con, 0), motion=wmean(motion, 0),
                 sat=wmean(sat, 0), self_sim=sim_to_ref(0))
-    s1 = sim_to_ref(1) if n_w > 1 else base["self_sim"]
+    reference_sim = base["self_sim"]
     rows, horizon = [], None
     for w in range(n_w):
         r = dict(start_s=w * window, sim_to_first=sim_to_ref(w),
-                 drift_ratio=sim_to_ref(w) / s1 if s1 > 0 else float("nan"),
+                 drift_ratio=sim_to_ref(w) / reference_sim if reference_sim > 0 else float("nan"),
                  sim_to_prev=float(cent[w] @ cent[w - 1]) if w else 1.0,
                  luma=wmean(luma, w), contrast=wmean(con, w), motion=wmean(motion, w),
                  sat=wmean(sat, w))
         fails = []
-        # an undefined ratio (window 1 already has no positive similarity to window 0,
-        # or a non-finite value) is a drift failure, never a silent pass
+        # Anchor to window 0 itself: an already degraded window 1 must never
+        # normalize its own failure away. Undefined ratios are drift flags.
         if w >= 1 and not (math.isfinite(r["drift_ratio"]) and r["drift_ratio"] >= THRESH["drift"]):
             fails.append("drift")
         for k, key in (("luma", "luma"), ("contrast", "contrast"), ("sat", "sat")):
@@ -197,10 +202,21 @@ def evaluate(samples, encoder, window=30.0, batch=32):
             horizon = w * window
         rows.append(r)
     dur = float(ts.max())
+    feature_scope = {"pixel": "normalized pixel thumbnails (appearance only)",
+                     "dinov2": "DINOv2 image features (similarity proxy)"}.get(
+                         encoder.name, f"{encoder.name} features")
     return dict(encoder=encoder.name, window_s=window, duration_s=dur, n_samples=int(len(ts)),
                 baseline=base, thresholds=THRESH, windows=rows,
+                reference="window_0_unverified", drift_reference="window_0_self_similarity",
+                diagnostic_scope=f"Sampled heuristic consistency checks using {feature_scope} and pixel statistics.",
+                semantic_quality="unverified", independent_pixels_review_required=True,
+                limitations=["Window 0 may already be degraded; it is not a trusted clean-context reference.",
+                             "Stable texture, wrong content, and defects between samples can escape these checks.",
+                             "Feature similarity and statistical stability do not certify recognizable same-content video; independent pixels review is required.",
+                             "coherent_horizon_s is a deprecated alias of diagnostic_horizon_s, not a coherence claim."],
+                diagnostic_horizon_s=dur if horizon is None else horizon,
                 coherent_horizon_s=dur if horizon is None else horizon,
-                verdict="PASS" if horizon is None else f"FAIL at {horizon:.0f}s ({','.join(rows[int(horizon // window)]['fails'])})")
+                verdict="NO_FLAGS" if horizon is None else f"FAIL at {horizon:.0f}s (diagnostic flags: {','.join(rows[int(horizon // window)]['fails'])})")
 
 
 def main(argv=None):
@@ -222,8 +238,9 @@ def main(argv=None):
         except (OSError, ValueError):
             old = {}
         if old.get("receipt") == receipt:
-            print(f"[long_eval] {old['verdict']}; coherent horizon {old['coherent_horizon_s']:.0f}s "
-                  f"of {old['duration_s']:.0f}s ({old['encoder']}) [receipt reused]")
+            print(f"[long_eval] {old['verdict']}; diagnostic horizon {old['diagnostic_horizon_s']:.0f}s "
+                  f"of {old['duration_s']:.0f}s ({old['encoder']}); semantic quality unverified; "
+                  "independent pixels review required [receipt reused]")
             return old
         print("[long_eval] existing receipt is stale (evaluator, arguments or video changed); "
               "recomputing", flush=True)
@@ -234,8 +251,9 @@ def main(argv=None):
         print(f"{r['start_s']:6.0f}s  sim {r['sim_to_first']:.3f}  drift {r['drift_ratio']:.3f}  "
               f"luma {r['luma']:.3f}  contrast {r['contrast']:.3f}  motion {r['motion']:.4f}  "
               f"sat {r['sat']:.3f}  {' '.join(r['fails'])}")
-    print(f"[long_eval] {rep['verdict']}; coherent horizon {rep['coherent_horizon_s']:.0f}s "
-          f"of {rep['duration_s']:.0f}s ({rep['encoder']})")
+    print(f"[long_eval] {rep['verdict']}; diagnostic horizon {rep['diagnostic_horizon_s']:.0f}s "
+          f"of {rep['duration_s']:.0f}s ({rep['encoder']}); semantic quality unverified; "
+          "independent pixels review required")
     if a.out:                                        # atomic: a receipt is complete or absent
         with open(a.out + ".tmp", "w") as f:
             json.dump(rep, f, indent=2)

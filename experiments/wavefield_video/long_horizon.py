@@ -119,17 +119,22 @@ class HealthMonitor:
       fade      mean intensity < fade_ratio x context mean   (latent 'fade to black')
       flatten   spatial std   < flat_ratio x context std     (contrast collapse)
       freeze    mean |f_t - f_(t-1)| < freeze_ratio x context motion (copy-last collapse)
+      texture_collapse coarse power < 25% of context AND >=50% high-band power
       nonfinite any NaN/Inf                                   (immediate)
 
     Ratios are measured against each sample's OWN context clip, and streaks are
     kept per batch sample, so one collapsed rollout cannot hide behind a healthy
     one in the batch average. ``first[k]`` is the earliest frame any sample
     collapsed; ``first_sample[k]`` says which. ``freeze`` is skipped for a sample
-    whose context is itself static."""
+    whose context is itself static. These are heuristic risk flags, NOT semantic
+    certification; no flags does not establish recognizable same-content video.
+    Independent pixels review is still required."""
     fade_ratio: float = 0.5
     flat_ratio: float = 0.5
     freeze_ratio: float = 0.1
     patience: int = 24
+    structure_ratio: float = 0.25
+    high_fraction: float = 0.5
     ref: dict = field(default_factory=dict)      # per-sample [B] tensors
     runs: dict = field(default_factory=dict)     # per-sample [B] streak counters
     first: dict = field(default_factory=dict)
@@ -139,17 +144,37 @@ class HealthMonitor:
 
     @staticmethod
     def _stats(f):                               # f: [B,C,H,W] -> per-sample [B]
-        return f.flatten(1).mean(1), f.flatten(2).std(-1).mean(1)
+        return f.flatten(1).mean(1), f.flatten(2).std(-1, correction=0).mean(1)
+
+    @staticmethod
+    def _spatial_power(f):
+        """Per-channel DC removed; full FFT counts both halves without weighting.
+
+        Fixed radial bands in cycles/pixel, not tuned on a generated clip:
+        coarse <=1/8, high >=1/4. Power sums average across channels per sample.
+        """
+        h, w = f.shape[-2:]
+        centered = f - f.mean((-2, -1), keepdim=True)
+        power = torch.fft.fft2(centered, norm="forward").abs().square().mean(1)
+        ky = torch.fft.fftfreq(h, device=f.device)[:, None]
+        kx = torch.fft.fftfreq(w, device=f.device)[None, :]
+        radius2 = ky.square() + kx.square()
+        coarse = power[:, radius2 <= (1 / 8) ** 2].sum(1)
+        high = power[:, radius2 >= (1 / 4) ** 2].sum(1)
+        return coarse, high / power.sum((-2, -1)).clamp_min(1e-12)
 
     def calibrate(self, context):
         """context: [B,T,C,H,W] frames the rollout starts from."""
         c = context.float()
+        if not torch.isfinite(c).all():
+            raise ValueError("health context must contain only finite values")
         B = c.shape[0]
         m, sd = self._stats(c.flatten(0, 1))
+        coarse, _ = self._spatial_power(c.flatten(0, 1))
         motion = ((c[:, 1:] - c[:, :-1]).abs().flatten(1).mean(1) if c.shape[1] > 1
                   else torch.zeros(B))
         self.ref = {"mean": m.view(B, -1).mean(1), "std": sd.view(B, -1).mean(1),
-                    "motion": motion}
+                    "motion": motion, "coarse_power": coarse.view(B, -1).mean(1)}
         self._prev = c[:, -1]
         return self
 
@@ -157,6 +182,7 @@ class HealthMonitor:
         """frame: [B,C,H,W]. Returns batch-mean stats for logging; flags are per sample."""
         f = frame.float()
         mean, std = self._stats(f)
+        coarse, high = self._spatial_power(f)
         motion = ((f - self._prev).abs().flatten(1).mean(1) if self._prev is not None
                   else torch.zeros(f.shape[0]))
         self._prev = f
@@ -164,6 +190,9 @@ class HealthMonitor:
             "fade": mean < self.fade_ratio * self.ref["mean"],
             "flatten": std < self.flat_ratio * self.ref["std"],
             "freeze": (self.ref["motion"] > 1e-6) & (motion < self.freeze_ratio * self.ref["motion"]),
+            "texture_collapse": ((self.ref["coarse_power"] > 1e-8)
+                                 & (coarse < self.structure_ratio * self.ref["coarse_power"])
+                                 & (high >= self.high_fraction)),
         }
         for k, bad in conds.items():
             run = self.runs.get(k, torch.zeros_like(bad, dtype=torch.long))
@@ -182,6 +211,7 @@ class HealthMonitor:
 
     @property
     def healthy(self):
+        """Legacy convenience: no heuristic flags; does not certify visual quality."""
         return not self.first
 
     def state_dict(self):
@@ -194,9 +224,13 @@ class HealthMonitor:
 
     def config(self):
         return {"fade_ratio": self.fade_ratio, "flat_ratio": self.flat_ratio,
-                "freeze_ratio": self.freeze_ratio, "patience": self.patience}
+                "freeze_ratio": self.freeze_ratio, "patience": self.patience,
+                "structure_ratio": self.structure_ratio, "high_fraction": self.high_fraction,
+                "screen_version": 2}
 
     def load_state_dict(self, d):
+        if "coarse_power" not in d["ref"]:
+            raise SystemExit("stream state lacks the context texture anchor; start fresh")
         # streak counters only mean something under the thresholds/patience that
         # produced them: a resumed screen with other settings would mix two screens
         if "config" in d and d["config"] != self.config():
