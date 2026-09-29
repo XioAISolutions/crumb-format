@@ -141,6 +141,30 @@ def latent_name(idx):
     return f"rank0-{idx}-0_regular.pt"
 
 
+def latent_complete(path, latent_frames, chw=(LATENT_CH, *LATENT_HW)):
+    """A latents file counts as generated only if it loads and has the expected
+    [T, C, h, w] (or [1, T, C, h, w]) shape -- C, h, w from the run's config:
+    LongLive saves with torch.save, not atomically, so an interrupted save leaves
+    a truncated file behind."""
+    import torch
+    path = Path(path)
+    if not path.exists():
+        return False
+    try:
+        z = torch.load(path, map_location="cpu", weights_only=True)
+    except Exception:
+        print(f"[generate] {path} is unreadable (interrupted save?); regenerating", flush=True)
+        return False
+    if torch.is_tensor(z) and z.dim() == 5 and z.shape[0] == 1:
+        z = z[0]
+    want = (int(latent_frames), *(int(x) for x in chw))
+    ok = torch.is_tensor(z) and tuple(z.shape) == want
+    if not ok:
+        print(f"[generate] {path} has shape {getattr(z, 'shape', None)}, expected {want}; "
+              "regenerating", flush=True)
+    return ok
+
+
 def n_prompts_of(prompts):
     """Samples LongLive's MultiTextConcatDataset yields: non-empty lines of a txt
     file, or caption subfolders of a directory."""
@@ -359,7 +383,7 @@ def _decoder_impl_digest(ll_root=None):
 
 
 def decode_file(latent_path, out_path, ll_root, vae_path=None, chunk=8, device="cuda",
-                dtype="bfloat16", fps=FPS, _vae=None, vae_digest=None):
+                dtype="bfloat16", fps=FPS, _vae=None, vae_digest=None, replace_stale=False):
     """Latents file -> mp4, written to a temp name and renamed when complete.
     ``<mp4>.provenance.json`` records what the mp4 was decoded from (latents and VAE
     digests, dtype, fps). An existing mp4 is kept only when that record matches;
@@ -377,9 +401,14 @@ def decode_file(latent_path, out_path, ll_root, vae_path=None, chunk=8, device="
         if old == prov:
             print(f"[decode] exists, same inputs, skipping: {out_path}")
             return None
-        raise SystemExit(f"{out_path} exists but was decoded from "
-                         f"{'other inputs' if old else 'unrecorded inputs'}; "
-                         "delete it or choose another --out")
+        if not replace_stale:
+            raise SystemExit(f"{out_path} exists but was decoded from "
+                             f"{'other inputs' if old else 'unrecorded inputs'}; "
+                             "delete it or choose another --out")
+        # generate(): the --out's run identity is verified, so a mismatch means these
+        # latents were regenerated -- the old mp4 is stale and is replaced
+        print(f"[decode] {out_path} was decoded from older latents; re-decoding", flush=True)
+        out_path.unlink()
     lat = torch.load(latent_path, map_location="cpu")
     if lat.dim() == 5:
         lat = lat[0]
@@ -451,7 +480,9 @@ def cmd_generate(a):
         ident = run_identity(cfg, Path(a.ckpt).resolve(), prompts, ll_root, vae, out=out)
         check_identity(out, ident)
     lat_dir = out / "latents"
-    have = [latent_name(i) for i in range(n_prompts) if (lat_dir / latent_name(i)).exists()]
+    chw = cfg["data"]["image_or_video_shape"][2:]
+    have = [latent_name(i) for i in range(n_prompts)
+            if latent_complete(lat_dir / latent_name(i), lat, chw)]
     if len(have) == n_prompts:
         print("[generate] all latents present, skipping generation")
     else:
@@ -472,7 +503,7 @@ def cmd_generate(a):
             raise SystemExit(f"LongLive did not write {f}")
         decode_file(f, out / (f.stem + ".mp4"), ll_root, a.vae_path, a.decode_chunk,
                     a.decode_device, "float32" if a.decode_device == "cpu" else "bfloat16",
-                    vae_digest=ident["vae"])
+                    vae_digest=ident["vae"], replace_stale=True)
 
 
 def cmd_decode(a):

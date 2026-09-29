@@ -205,6 +205,20 @@ def test_generate_dry_run_writes_overlay(tmp_path):
     assert cfg["inference_iter"] == 1
 
 
+def test_latent_complete_rejects_truncated_and_misshaped(tmp_path):
+    good = tmp_path / "good.pt"
+    torch.save(torch.zeros(16, L.LATENT_CH, *L.LATENT_HW, dtype=torch.bfloat16), good)
+    assert L.latent_complete(good, 16)
+    batched = tmp_path / "batched.pt"
+    torch.save(torch.zeros(1, 16, L.LATENT_CH, *L.LATENT_HW, dtype=torch.bfloat16), batched)
+    assert L.latent_complete(batched, 16)
+    assert not L.latent_complete(good, 24)                       # other length
+    cut = tmp_path / "cut.pt"
+    cut.write_bytes(good.read_bytes()[:1000])                    # interrupted save
+    assert not L.latent_complete(cut, 16)
+    assert not L.latent_complete(tmp_path / "missing.pt", 16)
+
+
 def test_generate_refuses_empty_prompts(tmp_path):
     yaml = pytest.importorskip("yaml")
     ll = tmp_path / "ll"
@@ -337,6 +351,9 @@ def test_decode_provenance_guard(tmp_path):
     torch.save(torch.randn(3, 6, 8, 8), f)                        # other latents, same path
     with pytest.raises(SystemExit, match="other inputs"):
         L.decode_file(f, out, **kw)
+    # inside generate() (identity verified) stale renders are replaced, not refused
+    assert L.decode_file(f, out, **kw, replace_stale=True) == 5
+    assert L.decode_file(f, out, **kw) is None                   # and now current
     (tmp_path / "v.mp4.provenance.json").unlink()
     with pytest.raises(SystemExit, match="unrecorded"):
         L.decode_file(f, out, **kw)
