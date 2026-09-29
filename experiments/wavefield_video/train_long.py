@@ -457,6 +457,11 @@ def main(argv=None):
             ap.error(f"--resume {a.resume} is already at step {start}; --steps {a.steps} "
                      "would report a less-trained run than the one saved (use --steps >= "
                      f"{start})")
+        # flow noise comes from a device-local generator, and CPU and CUDA draw
+        # different values for one seed: a cross-device resume would switch noise
+        if a.head == "flow" and ck.get("flow_noise_device", dev) != dev:
+            ap.error(f"--resume {a.resume} drew its flow noise on {ck['flow_noise_device']}; "
+                     f"resuming on {dev} would change the noise stream -- resume there")
         prior_sec = float(ck.get("train_sec", 0.0))
         print(f"RESUME <- {a.resume} at step={start} (of {a.steps})", flush=True)
 
@@ -466,6 +471,7 @@ def main(argv=None):
     def save_ckpt(step):        # atomic: a kill mid-write leaves the previous file intact
         _save_atomic({"state": m.state_dict(), "opt": opt.state_dict(), "step": step,
                       "train_sec": prior_sec + time.time() - t0, "args": train_args(a),
+                      **({"flow_noise_device": dev} if a.head == "flow" else {}),
                       **(resume_meta() if data is not None else {}), **extra}, ckpt_path)
 
     # A slice budget ends with SIGTERM (GNU timeout): finish the current step, save,

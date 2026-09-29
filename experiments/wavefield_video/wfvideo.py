@@ -790,13 +790,14 @@ class VideoPredictor(nn.Module):
         """stream_step draws: unit noise per sample keyed to (seed, absolute frame,
         logical sample index = flow_row0 + row). A resumed stream samples exactly
         what the uninterrupted one would, and a sample's noise does not depend on
-        how the batch was chunked."""
+        how the batch was chunked. Drawn on the CPU and moved: CPU and CUDA generators
+        give different values for one seed, and a stream may resume on another device."""
         rows = []
         for i in range(shape[0]):
             key = (self._flow_seed * 1_000_003 + int(t_index)) * 1_000_033 + self.flow_row0 + i
-            g = torch.Generator(device=device).manual_seed(key % (2 ** 63))
-            rows.append(torch.randn(shape[1:], generator=g, device=device))
-        return torch.stack(rows)
+            g = torch.Generator().manual_seed(key % (2 ** 63))
+            rows.append(torch.randn(shape[1:], generator=g))
+        return torch.stack(rows).to(device)
 
     def _gen(self, device):
         if self._flow_seed is None:

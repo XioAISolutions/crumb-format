@@ -64,6 +64,25 @@ class FlowHeadTests(unittest.TestCase):
             o, s = m.stream_step(fr[:, 0], s, 0)
         self.assertEqual(o.shape, (1, 3, H, W))
 
+    def test_keyed_noise_is_a_cpu_draw_for_every_device(self):
+        # CPU and CUDA generators differ for one seed; the keyed stream draw is
+        # defined as the CPU draw (then moved), so a resume on another device
+        # continues the same trajectory
+        m = _flow()
+        m.set_flow_sampler(seed=5)
+        m.flow_row0 = 2
+        got = m._keyed_noise((1, 3, H, W), "cpu", 7)
+        key = ((5 * 1_000_003 + 7) * 1_000_033 + 2) % (2 ** 63)
+        want = torch.randn((3, H, W), generator=torch.Generator().manual_seed(key))
+        self.assertTrue(torch.equal(got[0], want))
+        from unittest import mock
+        made = []
+        real = torch.Generator
+        with mock.patch.object(torch, "Generator", side_effect=lambda *a, **k: (made.append(k), real())[1]):
+            out = m._keyed_noise((2, 3, H, W), "meta", 7)     # a non-CPU target device
+        self.assertEqual(out.device.type, "meta")
+        self.assertTrue(made and all(k.get("device") in (None, "cpu") for k in made))
+
     def test_config_errors_and_residual_default(self):
         with self.assertRaises(ValueError):
             VideoPredictor(DIM, 1, 4, T, H, W, "wave", head="diffusion")
@@ -181,6 +200,14 @@ class FlowHeadTests(unittest.TestCase):
             torch.rand(17)
             train_long.main(base + ["--steps", "3", "--out", str(split),
                                     "--resume", str(split / "ckpt_wave.pt")])
+            # a checkpoint whose flow noise came from another device is refused
+            ck = torch.load(split / "ckpt_wave.pt", weights_only=True)
+            self.assertEqual(ck["flow_noise_device"], "cpu")
+            ck["flow_noise_device"] = "cuda"
+            torch.save(ck, Path(d) / "ckpt_cuda.pt")
+            with self.assertRaises(SystemExit):
+                train_long.main(base + ["--steps", "4", "--out", str(split),
+                                        "--resume", str(Path(d) / "ckpt_cuda.pt")])
             # --micro-batch changes memory use, not which noise an example trains on
             micro = Path(d) / "micro"
             train_long.main(base + ["--steps", "3", "--micro-batch", "1", "--out", str(micro)])
