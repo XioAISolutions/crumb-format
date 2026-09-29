@@ -1,0 +1,14 @@
+  2010s  sim 0.826  drift 0.924  luma 0.444  contrast 0.212  motion 0.0143  sat 0.234  colour
+  2040s  sim 0.827  drift 0.924  luma 0.444  contrast 0.212  motion 0.0144  sat 0.233  colour
+  2070s  sim 0.828  drift 0.925  luma 0.444  contrast 0.212  motion 0.0144  sat 0.233  colour
+  2100s  sim 0.829  drift 0.927  luma 0.444  contrast 0.212  motion 0.0143  sat 0.233  colour
+  2130s  sim 0.828  drift 0.926  luma 0.444  contrast 0.212  motion 0.0143  sat 0.233  colour
+  2160s  sim 0.828  drift 0.925  luma 0.444  contrast 0.212  motion 0.0143  sat 0.233  colour
+  2190s  sim 0.831  drift 0.929  luma 0.444  contrast 0.212  motion 0.0143  sat 0.233  colour
+  2220s  sim 0.831  drift 0.929  luma 0.444  contrast 0.212  motion 0.0143  sat 0.233  colour
+  2250s  sim 0.831  drift 0.929  luma 0.444  contrast 0.212  motion 0.0142  sat 0.232  colour
+  2280s  sim 0.831  drift 0.930  luma 0.444  contrast 0.212  motion 0.0143  sat 0.233  colour
+  2310s  sim 0.830  drift 0.928  luma 0.444  contrast 0.212  motion 0.0144  sat 0.232  colour
+  2340s  sim 0.831  drift 0.929  luma 0.444  contrast 0.212  motion 0.0143  sat 0.232  colour
+  2370s  sim 0.828  drift 0.926  luma 0.444  contrast 0.212  motion 0.0143  sat 0.232  colour
+[long_eval] FAIL at 300s (diagnostic flags: colour); diagnostic horizon 300s of 2400s (dinov2); semantic quality unverified; independent pixels review required

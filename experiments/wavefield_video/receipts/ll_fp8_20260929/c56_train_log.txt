@@ -1,0 +1,12 @@
+STEP {"step": 30, "loss": 0.508792, "st_s": 0.924}
+STEP {"step": 60, "loss": 0.538434, "st_s": 0.93}
+STEP {"step": 90, "loss": 0.695096, "st_s": 0.932}
+STEP {"step": 120, "loss": 0.466199, "st_s": 0.931}
+STEP {"step": 150, "loss": 0.691557, "st_s": 0.932}
+STEP {"step": 180, "loss": 0.57388, "st_s": 0.932}
+STEP {"step": 210, "loss": 0.722384, "st_s": 0.932}
+STEP {"step": 240, "loss": 0.479137, "st_s": 0.932}
+STEP {"step": 270, "loss": 0.47459, "st_s": 0.933}
+STEP {"step": 300, "loss": 0.886487, "st_s": 0.933}
+RESULT {"eval_mse_over_copylast": 0.9913, "copy_ratio": null, "divergence_horizon": null, "exit_direction_accuracy": null, "position_error_at_emergence": null}
+c56 rc=0 2026-09-29T13:27:28Z
