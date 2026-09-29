@@ -323,6 +323,15 @@ def load_wan22_vae(ll_root, vae_path=None, device="cuda", dtype="bfloat16"):
     return model, mean, std, vae.unpatchify
 
 
+def _decoder_impl_digest():
+    """The decode path's own code (stream decode, normalization stats, VAE loading,
+    mp4 writing): a fix to any of it invalidates videos decoded before."""
+    import inspect
+    src = "".join(inspect.getsource(f) for f in (stream_decode, wan22_vae_stats,
+                                                   load_wan22_vae, decode_file))
+    return hashlib.sha256(src.encode()).hexdigest()[:16]
+
+
 def decode_file(latent_path, out_path, ll_root, vae_path=None, chunk=8, device="cuda",
                 dtype="bfloat16", fps=FPS, _vae=None, vae_digest=None):
     """Latents file -> mp4, written to a temp name and renamed when complete.
@@ -334,7 +343,8 @@ def decode_file(latent_path, out_path, ll_root, vae_path=None, chunk=8, device="
     out_path = Path(out_path)
     if vae_digest is None:
         vae_digest = "injected" if _vae is not None else _file_digest(vae_weights_path(ll_root, vae_path))
-    prov = dict(latents=_file_digest(latent_path), vae=vae_digest, dtype=dtype, fps=fps)
+    prov = dict(latents=_file_digest(latent_path), vae=vae_digest, dtype=dtype, fps=fps,
+                decoder=_decoder_impl_digest())
     prov_path = out_path.with_name(out_path.name + ".provenance.json")
     old = json.loads(prov_path.read_text()) if prov_path.exists() else None
     if out_path.exists():

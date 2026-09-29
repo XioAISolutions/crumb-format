@@ -57,7 +57,12 @@ consistency, over this baseline at equal VRAM.
 
 ```bash
 cd experiments/wavefield_video
-# one-time: clone LongLive@6b36d20, pip install, download 10 GB + 34 GB weights
+# one-time: clone LongLive@6b36d20, pip install, download 10 GB + 34 GB weights.
+# Torch is installed first from TORCH_INDEX (default cu124, for CUDA 12.x drivers;
+# an unpinned install pulls cu13 wheels a 12.2 driver cannot run) and pinned with
+# TORCH_SPEC (default torch==2.6.0). Setup checks CUDA and the FP8 imports before
+# downloading; if torchao does not match that torch, set TORCHAO_SPEC or use
+# PRECISION=bf16 WINDOW=24.
 SETUP=1 PY=python LL=$HOME/LongLive OUT=runs_longlive bash run_longlive.sh
 # later runs: skips finished lengths; status in runs_longlive/status.txt
 PY=python LL=$HOME/LongLive OUT=runs_longlive bash run_longlive.sh

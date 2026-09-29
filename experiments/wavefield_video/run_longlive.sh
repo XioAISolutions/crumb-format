@@ -39,7 +39,29 @@ if [ "${SETUP:-0}" = "1" ]; then
         git clone --single-branch --branch main https://github.com/NVlabs/LongLive.git "$LL"
     fi
     git -C "$LL" checkout -q "$LL_COMMIT"
-    "$PY" -m pip install -r "$LL/requirements.txt" "torchao>=0.13" imageio-ffmpeg pyyaml
+    # Torch first, from the wheel index matching the box's CUDA driver, then pinned
+    # (-c) so LongLive's requirements cannot pull another build. The default index is
+    # cu124: a CUDA 12.2 driver runs 12.x wheels (minor-version compatibility) but
+    # not the cu13 builds that an unpinned install picks up.
+    TORCH_SPEC=${TORCH_SPEC:-torch==2.6.0}
+    TORCH_INDEX=${TORCH_INDEX:-https://download.pytorch.org/whl/cu124}
+    TORCHAO_SPEC=${TORCHAO_SPEC:-torchao}
+    "$PY" -m pip install "$TORCH_SPEC" --index-url "$TORCH_INDEX"
+    printf '%s\n' "$TORCH_SPEC" > "$OUT/torch_constraint.txt"
+    "$PY" -m pip install -c "$OUT/torch_constraint.txt" -r "$LL/requirements.txt" \
+        "$TORCHAO_SPEC" imageio-ffmpeg pyyaml
+    # fail fast, before 44 GB of downloads: CUDA must work, and the FP8 path import
+    "$PY" - "$PRECISION" <<'PYEOF' || failed "torch/CUDA/torchao check (set TORCH_SPEC, TORCH_INDEX, TORCHAO_SPEC; or PRECISION=bf16 WINDOW=24)"
+import sys, torch
+assert torch.cuda.is_available(), f"torch {torch.__version__} cannot see the GPU (driver/wheel CUDA mismatch?)"
+print("torch", torch.__version__, "cuda", torch.version.cuda, torch.cuda.get_device_name(0))
+if sys.argv[1] == "fp8":
+    assert torch.cuda.get_device_capability(0) >= (8, 9), "FP8 needs compute capability 8.9+"
+    import torchao
+    from torchao.quantization import (  # noqa: F401  (exactly what LongLive's utils/fp8.py imports)
+        Float8DynamicActivationFloat8WeightConfig, PerRow, quantize_)
+    print("torchao", torchao.__version__)
+PYEOF
     "$PY" - "$LL" <<'PYEOF'
 import sys
 from huggingface_hub import hf_hub_download, snapshot_download
@@ -93,11 +115,11 @@ for secs in $LENGTHS; do
     [ "$fresh" = 1 ] && echo "   wall $(( $(date +%s) - t0 )) s for ${secs}s of video; peak VRAM ${peak:-?} MiB" | tee -a "$OUT/progress.txt"
     for s in "${stems[@]}"; do
         v="$d/$s.mp4"
-        [ -f "$d/$s.eval.json" ] && continue
         [ -f "$v" ] || failed "missing $v after generate ${secs}s"
-        "$PY" long_eval.py "$v" --encoder "$ENCODER" --out "$d/$s.eval.json.tmp" \
+        # --reuse keeps a receipt only if the evaluator source, its arguments and
+        # the video bytes all match what produced it; otherwise it recomputes
+        "$PY" long_eval.py "$v" --encoder "$ENCODER" --out "$d/$s.eval.json" --reuse \
             >> "$OUT/log_${secs}s.txt" 2>&1 || failed "eval $v"
-        mv "$d/$s.eval.json.tmp" "$d/$s.eval.json"
         tail -n 1 "$OUT/log_${secs}s.txt" | tee -a "$OUT/progress.txt"
     done
 done

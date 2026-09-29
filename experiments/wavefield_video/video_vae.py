@@ -179,9 +179,13 @@ class VideoVAE(nn.Module):
                 h.update(f"{k}{tuple(v.shape)}{v.dtype}".encode())
                 h.update(v.detach().cpu().contiguous().view(-1).view(torch.uint8).numpy().tobytes())
             # config-only forward options (e.g. LTX encoder_causal) change the latents too
+            # ("_"-prefixed keys are loader metadata -- _name_or_path is the path the
+            # weights were loaded FROM, so the same weights via an HF id and a local
+            # snapshot would otherwise fingerprint differently)
             cfg = getattr(self.model, "config", None)
             if cfg is not None:
-                h.update(json.dumps(dict(cfg), sort_keys=True, default=str).encode())
+                pub = {k: v for k, v in dict(cfg).items() if not str(k).startswith("_")}
+                h.update(json.dumps(pub, sort_keys=True, default=str).encode())
             self._fp = h.hexdigest()[:16]
         return self._fp
 

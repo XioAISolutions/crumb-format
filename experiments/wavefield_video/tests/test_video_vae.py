@@ -165,6 +165,18 @@ class VideoVAETests(unittest.TestCase):
         c._fp = None
         self.assertNotEqual(a.fingerprint, c.fingerprint)
 
+    def test_fingerprint_is_independent_of_the_load_path(self):
+        """The same weights loaded from two places (an HF id vs its local snapshot,
+        in practice) are one latent space: loader metadata must not split them."""
+        import shutil
+        with tempfile.TemporaryDirectory() as d:
+            VideoVAE("ltx-tiny").save(Path(d) / "a")
+            shutil.copytree(Path(d) / "a", Path(d) / "b")
+            fa = VideoVAE("ltx-tiny", path=Path(d) / "a").fingerprint
+            fb = VideoVAE("ltx-tiny", path=Path(d) / "b").fingerprint
+            self.assertEqual(fa, fb)
+            self.assertEqual(fa, VideoVAE("ltx-tiny").fingerprint)     # in-memory, no path at all
+
     def test_bad_inputs(self):
         with self.assertRaises(ValueError):
             VideoVAE("sora")
@@ -270,6 +282,34 @@ class VideoVAETests(unittest.TestCase):
             b = torch.load(d / "cut" / "model_wave.pt", weights_only=True)["state"]
             for k in a:
                 self.assertTrue(torch.allclose(a[k], b[k], atol=1e-6), k)
+            # a resume under training-changing flags is refused, naming them
+            ck = str(d / "cut" / "ckpt_wave.pt")
+            def with_flag(flag, value):
+                args = list(common)
+                if flag in args:
+                    args[args.index(flag) + 1] = value
+                else:
+                    args += [flag] if value is None else [flag, value]
+                return args
+            for flag, value in (("--lr", "1e-3"), ("--dense", None), ("--tbptt-chunks", "2"),
+                                ("--batch", "4")):
+                err = io.StringIO()
+                with self.assertRaises(SystemExit), contextlib.redirect_stderr(err):
+                    train_long.main(with_flag(flag, value) + ["--steps", "6", "--resume", ck,
+                                                              "--out", str(d / "cut")])
+                self.assertIn(flag, err.getvalue())
+            # free flags (steps, eval knobs, save cadence) may change
+            train_long.main(with_flag("--eval-rollout", "1") + ["--steps", "5", "--save-every", "5",
+                                                               "--resume", ck, "--out", str(d / "cut")])
+            # checkpoints written before arguments were recorded cannot be verified
+            old = torch.load(ck, weights_only=True)
+            old.pop("args")
+            torch.save(old, d / "cut" / "ckpt_noargs.pt")
+            err = io.StringIO()
+            with self.assertRaises(SystemExit), contextlib.redirect_stderr(err):
+                train_long.main(common + ["--steps", "6", "--resume", str(d / "cut" / "ckpt_noargs.pt"),
+                                          "--out", str(d / "cut")])
+            self.assertIn("records no training arguments", err.getvalue())
     def test_encode_resumes_after_a_killed_slice(self):
         with tempfile.TemporaryDirectory() as d:
             d = Path(d)

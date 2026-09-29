@@ -219,6 +219,19 @@ def pixel_eval(m, a, dev):
     return single, stream_rollout_eval(m, a, dev)
 
 
+# Flags a --resume may change: the step target, where/how often it saves, exact
+# recompute (grad ckpt), eval-only knobs (the eval runs on the final model with the
+# flags it reports) and the --latents PATH (its content is checked by the dataset
+# fingerprint). Every other flag shapes training and must match.
+RESUME_FREE = {"steps", "resume", "out", "tag", "save_every", "save_every_sec", "grad_ckpt",
+               "eval_batch", "eval_rollout", "eval_seeds", "eval_chunk", "latents"}
+
+
+def train_args(a):
+    return json.loads(json.dumps({k: v for k, v in sorted(vars(a).items())
+                                  if k not in RESUME_FREE}))
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data-source", choices=["balls", "occlusion"], default="balls")
@@ -330,6 +343,15 @@ def main(argv=None):
             if ck["data_fp"] != data.fingerprint:
                 ap.error(f"--resume {a.resume} was trained on a different latent dataset "
                          f"({ck['data_fp']} != {data.fingerprint} for --latents {a.latents})")
+        if "args" not in ck:
+            ap.error(f"--resume {a.resume} records no training arguments (written before "
+                     "they were saved); cannot verify it continues this run, start fresh")
+        now = train_args(a)
+        diff = sorted(k for k in set(ck["args"]) | set(now) if ck["args"].get(k) != now.get(k))
+        if diff:
+            ap.error(f"--resume {a.resume} was trained with different " + ", ".join(
+                f"--{k.replace('_', '-')} ({ck['args'].get(k)!r} -> {now.get(k)!r})" for k in diff)
+                + f"; only {', '.join(sorted(RESUME_FREE))} may change on resume")
         m.load_state_dict(ck["state"])
         if data is not None and "dgen" in ck:            # continue the latent sample stream
             dgen.set_state(ck["dgen"].cpu())
@@ -343,7 +365,7 @@ def main(argv=None):
 
     def save_ckpt(step):        # atomic: a kill mid-write leaves the previous file intact
         _save_atomic({"state": m.state_dict(), "opt": opt.state_dict(), "step": step,
-                      "train_sec": prior_sec + time.time() - t0,
+                      "train_sec": prior_sec + time.time() - t0, "args": train_args(a),
                       **(resume_meta() if data is not None else {})}, ckpt_path)
 
     # A slice budget ends with SIGTERM (GNU timeout): finish the current step, save,

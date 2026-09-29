@@ -68,6 +68,29 @@ def test_reads_mp4_stream(tmp_path):
     rep = E.main([str(p), "--encoder", "pixel", "--out", str(tmp_path / "r.json")])
     assert rep["n_samples"] == 140 and len(rep["windows"]) == 3
     assert (tmp_path / "r.json").exists()
+    # --reuse: a matching receipt is kept; another video / argument / evaluator is not
+    args = [str(p), "--encoder", "pixel", "--out", str(tmp_path / "r.json"), "--reuse"]
+    calls = []
+    real = E.evaluate
+    E.evaluate = lambda *x, **k: calls.append(1) or real(*x, **k)
+    try:
+        E.main(args)
+        assert calls == []                                         # reused
+        E.main(args + ["--window", "20"])
+        assert calls == [1]                                        # other arguments: recomputed
+        E.main(args + ["--window", "20"])
+        assert calls == [1]                                        # and now reused
+        with open(p, "ab") as f:
+            f.write(b"\0")                                         # same name, other bytes
+        E.main(args + ["--window", "20"])
+        assert calls == [1, 1]
+        r = __import__("json").load(open(tmp_path / "r.json"))
+        r["receipt"]["evaluator"] = "older"                        # produced by another evaluator
+        __import__("json").dump(r, open(tmp_path / "r.json", "w"))
+        E.main(args + ["--window", "20"])
+        assert calls == [1, 1, 1]
+    finally:
+        E.evaluate = real
 
 
 def _flat_samples(colour_after, dur=90, per_sec=2):

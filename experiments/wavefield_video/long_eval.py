@@ -27,8 +27,10 @@ Pre-registered read (fixed in LONGLIVE_4090.md before any run):
     The first failing window's start time is the clip's coherent horizon.
 """
 import argparse
+import hashlib
 import json
 import math
+import os
 
 import numpy as np
 
@@ -202,19 +204,47 @@ def main(argv=None):
     ap.add_argument("--encoder", choices=["auto", "dinov2", "pixel"], default="auto")
     ap.add_argument("--per-sec", type=float, default=2.0)
     ap.add_argument("--window", type=float, default=30.0)
+    ap.add_argument("--reuse", action="store_true",
+                    help="keep an existing --out only if its receipt matches this evaluator "
+                         "(source), these arguments and this video's bytes; else recompute")
     a = ap.parse_args(argv)
+    receipt = receipt_for(a)
+    if a.reuse and a.out and os.path.exists(a.out):
+        try:
+            old = json.load(open(a.out))
+        except (OSError, ValueError):
+            old = {}
+        if old.get("receipt") == receipt:
+            print(f"[long_eval] {old['verdict']}; coherent horizon {old['coherent_horizon_s']:.0f}s "
+                  f"of {old['duration_s']:.0f}s ({old['encoder']}) [receipt reused]")
+            return old
+        print("[long_eval] existing receipt is stale (evaluator, arguments or video changed); "
+              "recomputing", flush=True)
     rep = evaluate(sample_video(a.video, a.per_sec), make_encoder(a.encoder), a.window)
     rep["video"] = str(a.video)
+    rep["receipt"] = receipt
     for r in rep["windows"]:
         print(f"{r['start_s']:6.0f}s  sim {r['sim_to_first']:.3f}  drift {r['drift_ratio']:.3f}  "
               f"luma {r['luma']:.3f}  contrast {r['contrast']:.3f}  motion {r['motion']:.4f}  "
               f"sat {r['sat']:.3f}  {' '.join(r['fails'])}")
     print(f"[long_eval] {rep['verdict']}; coherent horizon {rep['coherent_horizon_s']:.0f}s "
           f"of {rep['duration_s']:.0f}s ({rep['encoder']})")
-    if a.out:
-        with open(a.out, "w") as f:
+    if a.out:                                        # atomic: a receipt is complete or absent
+        with open(a.out + ".tmp", "w") as f:
             json.dump(rep, f, indent=2)
+        os.replace(a.out + ".tmp", a.out)
     return rep
+
+
+def receipt_for(a):
+    """What a verdict depends on: this evaluator's source, its arguments, the video."""
+    h = hashlib.sha256()
+    with open(a.video, "rb") as f:
+        for block in iter(lambda: f.read(1 << 22), b""):
+            h.update(block)
+    src = hashlib.sha256(open(os.path.abspath(__file__), "rb").read()).hexdigest()[:16]
+    return dict(evaluator=src, encoder=a.encoder, per_sec=a.per_sec, window=a.window,
+                video=h.hexdigest()[:16])
 
 
 if __name__ == "__main__":
