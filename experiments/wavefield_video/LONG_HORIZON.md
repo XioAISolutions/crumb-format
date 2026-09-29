@@ -287,8 +287,78 @@ halflife):** arms clean G=4, clean G=1, gate G=4, gate G=1.
 - **KILL:** all four arms < 0.5, so the background was not the (only) blocker
   at this budget.
 
-**Result: pending.** Running on CPU (clean G4/G1, gate G4/G1) when this section
-merged. The verdict is recorded here either way, in the next PR.
+**Result (seed 0, raw JSON in `results_long_horizon/write_8_4/`):**
+
+| arm | recall | argmax hit (chance 0.028) | s/step (shared CPU) |
+|---|---|---|---|
+| 8.1 baseline, as built (G=1 / G=4) | 0.119 / 0.118 | 0.039 / 0.035 | — |
+| clean write, G=4 | **0.998** | **1.000** | 4.42 |
+| clean write, G=1 | **0.993** | **1.000** | 0.89 |
+| write gate, G=4 | 0.119 | 0.039 | 1.37 |
+| write gate, G=1 | 0.119 | 0.035 | 0.94 |
+
+- **PROVE: the background was the blocker.** At the budget where every 8.1 arm
+  sat at chance, removing the per-frame constant write takes recall from 0.119
+  to 0.998. The step budget was never the limit.
+- **Constant memory: PASS.** Clean write with G=1 (gradient never crosses a
+  32-frame chunk; memory is constant in sequence length) reaches 0.993 on a
+  128-frame dependency. Carried-state training learns dependencies 4× longer
+  than any window it backpropagates through, once the write is clean.
+- **Write gate: fails.** Both G values stay at the baseline. A gate initialized
+  nearly open (sigmoid(2) ≈ 0.88) does not learn to close on constant content
+  in 1,000 steps. **This is the uncomfortable half.** Clean write works because
+  a blank frame writes exactly zero. Real video has no blank frames: a static
+  background is the same per-cell constant, and it is content, not a bias, so
+  clean write cannot remove it. Nothing here yet handles real static content.
+- **Runner default.** The ball scenes are effectively blank-background (median
+  pixel ≈ 7e-7), so `run_long_horizon.sh` now defaults the wave SEQ arm to
+  `WRITE=--clean-write`, tagged `W_half_seq_cw` so it never resumes or skips
+  on an as-built `W_half_seq` run. `WRITE=` restores the as-built write.
+- **Next (not run; to be pre-registered as 8.5 before any result):** write
+  temporal differences (x_t − x_{t−1}) into the wave state. A static
+  background then writes exactly zero on real video too, and events still
+  write. Cheaper alternatives are a gate initialized closed or a longer gate
+  budget. Either way the test is the same D=128 probe plus a static textured
+  background, where clean write alone must fail.
+
+## 9. Phase 2 — a pretrained video VAE under the wave model
+
+The home-made per-frame ConvAE fades to black in both arms and compresses no
+time. Production video VAEs compress time as well, so the predictor runs on
+latent steps: 5 minutes at 24 fps is 7,193 usable frames (1+8k) → **900 LTX
+latent steps**, inside the 1,024-step horizon already streamed.
+
+| piece | file | what it does |
+|---|---|---|
+| adapter | `video_vae.py` | `VideoVAE("ltx"\|"wan"\|"conv"\|"*-tiny")`: `encode` [B,T,3,H,W]→[B,Tl,C,h,w] (per-channel normalized), `decode`, strides, save/load; `LatentShards` windows over encoded shards with a held-out split |
+| offline encode | `encode_videos.py` | mp4 folder → resize/crop → resample fps → 1+t·k segments → `shard_*.pt` + `index.json`; `--synthetic N` writes moving-ball mp4s for smoke |
+| training | `train_long.py --latents DIR` | phase 1 carried-state trainer on latent sequences (`VideoPredictor(in_ch=C)`); eval = held-out next-latent MSE vs copy-last + an autoregressive latent rollout curve |
+| 5-minute screen | `long_horizon.py stream --latents DIR --vae ltx` | warm on real held-out latents, stream N latent steps, decode chunk by chunk, `HealthMonitor` on **decoded pixels** |
+| box runner | `run_latent.sh`, `queue_jobs/latent_2026-09-28/` | encode → train → decoded 900-step stream, sliced/resumable like `run_long_horizon.sh` |
+
+Verified here with tiny random LTX/Wan configs: shapes and strides (LTX 17→3
+steps, 32× spatial; Wan 17→5, 8×), save/load round trip, mp4 → shards →
+training → decoded stream (`tests/test_video_vae.py`), and a full
+`run_latent.sh` pass. **Not verified here:** anything about quality. Hugging
+Face is blocked in this container, so real LTX/Wan weights have only run on
+the box.
+
+Known limits: each chunk of generated latents is decoded with the previous
+latent prepended, and its duplicated first frame is dropped. That keeps the
+timeline continuous (N latents give stride·N frames), but the VAE's temporal
+context still restarts at every seam, so use a large `--chunk` for the screen.
+Collapse positions are reported both in decoded frames (`collapse`) and in
+generated latent steps (`collapse_latent_step`). The KILL rule reads the
+latter. Shards are loaded fully into memory, which is fine
+for hours of 256×448 latents (≈0.1 MB per latent step at fp16) but not for
+datasets far larger than that.
+
+Pre-registered box read (`run_latent.sh`): **KILL** if fade or flatten fires
+before latent step 256 on the held-out stream. That is 256 × 8 frames ÷ 24 fps
+≈ 85 s of LTX video; an earlier draft said ~34 s, which was an arithmetic error,
+and the threshold itself (step 256) is unchanged. **PASS** if nothing fires
+through 900 steps (5 minutes); then judge the decoded frames by eye before any
+claim.
 
 ## Pitch corrections
 

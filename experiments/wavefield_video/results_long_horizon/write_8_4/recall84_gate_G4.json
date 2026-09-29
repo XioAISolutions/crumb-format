@@ -1,0 +1,45 @@
+{
+ "args": {
+  "delays": [
+   128
+  ],
+  "pole_param": [
+   "halflife"
+  ],
+  "seeds": [
+   0
+  ],
+  "steps": 1000,
+  "batch": 16,
+  "lr": 0.003,
+  "grid": 6,
+  "dim": 32,
+  "layers": 2,
+  "heads": 4,
+  "hl_min": 2.0,
+  "hl_max": 4096.0,
+  "chunk": 32,
+  "tbptt_chunks": 4,
+  "write_gate": true,
+  "clean_write": false,
+  "out": "runs_long/recall84_gate_G4.json"
+ },
+ "rows": [
+  {
+   "pole_param": "halflife",
+   "delay": 128,
+   "seed": 0,
+   "steps": 1000,
+   "chunk": 32,
+   "tbptt_chunks": 4,
+   "write_gate": true,
+   "clean_write": false,
+   "recall": 0.1191,
+   "argmax_hit": 0.0391,
+   "mse": 0.017319,
+   "mse_forget": 0.01966,
+   "train_s": 1371.8,
+   "s_per_step": 1.3718
+  }
+ ]
+}
