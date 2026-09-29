@@ -224,8 +224,22 @@ def measure_temporal_rf(vae, C, h, w, n=40, max_n=320, tol=1e-4, probe_hw=8):
         m = n // 4                                  # causal decoders reach mostly forward in frames
         z2 = z.clone()
         z2[:, m] += 1.0
+        torch.cuda.empty_cache()
         with torch.no_grad():
-            a, b = vae.decode(z), vae.decode(z2)
+            a = vae.decode(z)
+            try:
+                b = vae.decode(z2)
+            except torch.cuda.OutOfMemoryError:
+                torch.cuda.empty_cache()
+                try:
+                    b = vae.decode(z2)
+                except torch.cuda.OutOfMemoryError:
+                    torch.cuda.empty_cache()
+                    if n > 40:
+                        n //= 2
+                        continue
+                    raise SystemExit(
+                        "temporal RF probe refused: CUDA OOM even at n=40 latents")
         d = (a - b).abs().flatten(2).amax(2)[0]                  # [frames]
         hit = (d > tol * max(float(a.abs().max()), 1e-6)).nonzero().flatten().tolist()
         if not hit:
