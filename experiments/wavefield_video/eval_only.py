@@ -23,6 +23,8 @@ def main(argv=None):
     ap.add_argument("--eval-rollout", type=rr.positive_int)
     ap.add_argument("--eval-chunk", type=rr.positive_int)
     ap.add_argument("--ae-ckpt", type=Path)
+    ap.add_argument("--flow-seed", type=int, default=12345,
+                    help="flow-head checkpoints: sampler seed (12345 = train_long's own eval)")
     cli = ap.parse_args(argv)
     config = json.loads(cli.config.read_text())
     args = rr.parser().parse_args([
@@ -36,6 +38,9 @@ def main(argv=None):
     else:
         model, config, *_ = rr.load_model(args, torch)
     model = model.float().to(dev).eval()
+    flow = config.get("head") == "flow"
+    if flow:
+        model.set_flow_sampler(seed=cli.flow_seed)   # same command -> same sampled metrics
     tc.DATA_SOURCE, tc.WAVE_FIELD = config["data_source"], config["field"]
     a = SimpleNamespace(
         # Preserve this utility's fp32 evaluation (FFT/complex paths need it),
@@ -59,6 +64,8 @@ def main(argv=None):
             out = train_long.stream_rollout_eval(model, a, dev)
     else:
         out = tc.rollout_eval(model, a, dev)
+    if flow:
+        out["flow_sampler_seed"] = cli.flow_seed
     if "semantic" in out:
         print(config["kind"] + " " + semantic_summary(out["semantic"]))
     print("RESULT " + json.dumps(out, allow_nan=False))

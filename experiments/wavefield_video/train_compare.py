@@ -370,6 +370,8 @@ def occlusion_rollout_eval(m, a, dev):
             tc_pred, tc_gt = [], []
             frame = win = None
             if streaming:
+                if hasattr(m, "flow_row0"):
+                    m.flow_row0 = c0             # flow draws keyed per sample, not per chunk
                 states = m.stream_init(cb, dev)
                 for t in range(a.frames):                    # warm state on visible context
                     with ac():
@@ -405,6 +407,8 @@ def occlusion_rollout_eval(m, a, dev):
                 prev, prev_gt = nxt, gt
             tc_pred_chunks.append(torch.stack(tc_pred, 0))                 # [R, cb, 2]
             tc_gt_chunks.append(torch.stack(tc_gt, 0))
+    if hasattr(m, "flow_row0"):
+        m.flow_row0 = 0
     dt = time.time() - t0
     tc_pred = torch.cat(tc_pred_chunks, 1)                                 # [R, S, 2]
     tc_gt = torch.cat(tc_gt_chunks, 1)

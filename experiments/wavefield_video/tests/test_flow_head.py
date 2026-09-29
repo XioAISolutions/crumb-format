@@ -138,6 +138,32 @@ class FlowHeadTests(unittest.TestCase):
         for k in ("std_ratio_curve", "blob_count_ok", "blob_count_ok_gt", "collapse"):
             self.assertEqual(whole[k], chunked[k], k)
 
+    def test_eval_only_is_seeded_and_occlusion_eval_is_chunk_invariant(self):
+        import tempfile
+        import eval_only
+        import train_long
+        with tempfile.TemporaryDirectory() as d:
+            train_long.main(["--head", "flow", "--flow-steps", "2", "--seq-frames", "16",
+                             "--chunk", "4", "--dim", "8", "--layers", "1", "--heads", "2",
+                             "--grid", "16", "--steps", "1", "--batch", "2",
+                             "--data-source", "occlusion", "--train-occ-start", "4",
+                             "--train-occ-end", "12", "--occ-start", "8", "--occ-end", "16",
+                             "--eval-rollout", "24", "--eval-seeds", "1", "--out", d])
+            ck, cfg = f"{d}/model_wave.pt", f"{d}/result_wave.json"
+            outs = []
+            for chunk in ("1", "2", "2"):
+                torch.manual_seed(len(outs))            # different ambient RNG each run
+                outs.append(eval_only.main([ck, cfg, "--eval-seeds", "2", "--eval-rollout", "24",
+                                            "--eval-chunk", chunk]))
+            self.assertEqual(outs[0]["flow_sampler_seed"], 12345)
+            keys = [k for k in outs[0] if isinstance(outs[0][k], (int, float, list))
+                    and "sec" not in k and "fps" not in k and "time" not in k
+                    and "bytes" not in k and "mem" not in k and k not in ("eval_chunk", "ms_per_frame")]
+            self.assertIn("exit_direction_accuracy", keys)
+            for k in keys:                              # repeatable, and chunking-independent
+                self.assertEqual(outs[1][k], outs[2][k], k)
+                self.assertEqual(outs[0][k], outs[1][k], k)
+
     def test_trainer_flow_resume_equals_uninterrupted_and_stream_loads_it(self):
         import tempfile
         import long_horizon as lh
