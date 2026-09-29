@@ -407,10 +407,15 @@ def cmd_stream(a):
             # the model's own dataset: held-out shards from another corpus (even one
             # re-encoded at the same --latents path) are not this experiment's
             data_fp = ck_cfg.get("data_fp")
-            if data_fp is None:
+            if data_fp is None and not a.unverified_data_ok:
                 raise SystemExit(f"cannot verify which dataset {a.ckpt} was trained on (it "
-                                 "records no data_fp; trained before this version) -- retrain")
-            if data_fp != shards.fingerprint:
+                                 "records no data_fp; trained before this version) -- retrain, "
+                                 "or pass --unverified-data-ok if you know it was --latents "
+                                 "(the result is then labelled data_fp_verified: false)")
+            if data_fp is None:
+                print(f"WARNING: {a.ckpt} records no data_fp; streaming it on {a.latents} "
+                      "UNVERIFIED (--unverified-data-ok)", flush=True)
+            elif data_fp != shards.fingerprint:
                 raise SystemExit(f"{a.ckpt} was trained on another latent dataset ({data_fp}) "
                                  f"than --latents {a.latents} ({shards.fingerprint})")
         ctx = shards.batch(a.batch, a.frames, torch.Generator().manual_seed(70000), "eval")
@@ -418,9 +423,9 @@ def cmd_stream(a):
         # chunk is decoded with that much history and lookahead, so the frames the
         # monitor judges are the ones a single decode of the whole stream would give,
         # not chunk-boundary resets (video_vae.StreamDecoder).
-        from video_vae import StreamDecoder, measure_temporal_rf
+        from video_vae import StreamDecoder, history_with_margin, measure_temporal_rf
         rf_back, rf_fwd = measure_temporal_rf(vae, shards.C, shards.h, shards.w)
-        dec = StreamDecoder(vae, history=rf_back + 1, lookahead=rf_fwd + 1)
+        dec = StreamDecoder(vae, history=history_with_margin(rf_back), lookahead=rf_fwd + 1)
         print(f"DECODER receptive field: {rf_back} back / {rf_fwd} forward latents -> "
               f"history {dec.H}, lookahead {dec.L}", flush=True)
         m = build_model(a, a.pole_param[0], write_gate=wg, clean_write=cw, in_ch=shards.C, H=shards.h, W=shards.w).to(dev)
@@ -555,6 +560,8 @@ def cmd_stream(a):
     res = {"mode": "long_horizon_stream", "pole_param": a.pole_param[0], "trained": bool(a.ckpt),
            "vae": vae.describe() if vae is not None else None, "latents": a.latents or None,
            "data_fp": shards.fingerprint if vae is not None else None,
+           "data_fp_verified": (vae is None or not a.ckpt
+                                or ck_cfg.get("data_fp") == shards.fingerprint),
            "frames": a.stream_frames,
            "grid": [shards.h, shards.w] if vae is not None else a.grid,   # latent h, w
            "context_ref": {k: v.tolist() for k, v in mon.ref.items()},
@@ -608,6 +615,9 @@ def main(argv=None):
     s.add_argument("--chunk", type=int, default=600)
     s.add_argument("--batch", type=int, default=2)
     s.add_argument("--patience", type=int, default=24)
+    s.add_argument("--unverified-data-ok", action="store_true",
+                   help="latent mode: stream a model that records no data_fp (trained before "
+                        "it was recorded); the result says data_fp_verified: false")
     s.add_argument("--ckpt", default="", help="train_compare.py model_*.pt (else untrained)")
     s.add_argument("--save-state", default="")
     s.add_argument("--latents", default="", help="encode_videos.py shard dir (latent mode)")

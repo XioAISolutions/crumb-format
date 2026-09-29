@@ -80,6 +80,10 @@ class StreamDecoderTests(unittest.TestCase):
         from video_vae import StreamDecoder, measure_temporal_rf
         v = VideoVAE(backend, device="cpu")
         back, fwd = measure_temporal_rf(v, v.channels, 2, 2)
+        # a large frame is probed at the capped size; that reach bounds the uncapped one
+        capped = measure_temporal_rf(v, v.channels, 64, 96)
+        self.assertEqual(capped, measure_temporal_rf(v, v.channels, 12, 12, probe_hw=12))
+        self.assertGreaterEqual(capped[0], back)
         g = torch.Generator().manual_seed(1)
         ctx = torch.randn(1, back + 2, v.channels, 2, 2, generator=g) * 0.5
         gen = torch.randn(1, 30, v.channels, 2, 2, generator=g) * 0.5
@@ -471,12 +475,22 @@ class VideoVAETests(unittest.TestCase):
             saved = torch.load(d / "run" / "model_wave.pt", weights_only=True)
             saved["config"].pop("data_fp")
             torch.save(saved, d / "run" / "model_nodata.pt")
+            nodata = ["stream", "--pole-param", "halflife", "--time-pos", "none",
+                      "--ckpt", str(d / "run" / "model_nodata.pt"), "--latents", str(d / "lat"),
+                      "--vae", "ltx-tiny", "--vae-path", str(d / "vae"), "--frames", "2",
+                      "--dim", "16", "--layers", "1", "--heads", "2", "--chunk", "2",
+                      "--batch", "1", "--device", "cpu", "--stream-frames", "4"]
             with self.assertRaisesRegex(SystemExit, "records no data_fp"):
-                lh.main(["stream", "--pole-param", "halflife", "--time-pos", "none",
-                         "--ckpt", str(d / "run" / "model_nodata.pt"), "--latents", str(d / "lat"),
-                         "--vae", "ltx-tiny", "--vae-path", str(d / "vae"), "--frames", "2",
-                         "--dim", "16", "--layers", "1", "--heads", "2", "--chunk", "2",
-                         "--batch", "1", "--device", "cpu", "--stream-frames", "4"])
+                lh.main(nodata)
+            # explicitly allowed, and labelled as unverified
+            with contextlib.redirect_stdout(io.StringIO()):
+                res = lh.main(nodata + ["--unverified-data-ok"])
+            self.assertFalse(res["data_fp_verified"])
+            self.assertEqual(res["latent_steps_generated"], 4)
+            with contextlib.redirect_stdout(io.StringIO()):
+                ok = lh.main([x if x != str(d / "run" / "model_nodata.pt")
+                              else str(d / "run" / "model_wave.pt") for x in nodata])
+            self.assertTrue(ok["data_fp_verified"])
             # a sliced screen (--checkpoint) equals an uninterrupted one
             whole = stream(d / "lat", d / "vae", "--stream-frames", "8")
             ck = str(d / "screen.state")

@@ -144,8 +144,10 @@ class VideoVAE(nn.Module):
         return (z.float() - self.mean) / self.std
 
     @torch.no_grad()
+    @torch.no_grad()
     def decode(self, z):
-        """normalized latents [B,Tl,C,h,w] -> frames [B,T,3,H,W] in [0,1]."""
+        """normalized latents [B,Tl,C,h,w] -> frames [B,T,3,H,W] in [0,1]. Inference
+        only: no autograd graph over the decoder's full-resolution activations."""
         z = (z.to(self.device).float() * self.std + self.mean).to(self.dtype)
         B, Tl = z.shape[:2]
         if self.base == "conv":
@@ -200,12 +202,22 @@ def _latent_of_frame(f, stride):
     return 0 if f == 0 else (f - 1) // stride + 1
 
 
-def measure_temporal_rf(vae, C, h, w, n=40, max_n=320, tol=1e-4):
+def measure_temporal_rf(vae, C, h, w, n=40, max_n=320, tol=1e-4, probe_hw=8):
     """(back, fwd): how many latents before / after latent i the decoded frames of
     latent i depend on (above tol x the output scale), measured on the actual
     weights by perturbing one latent of an n-latent probe. The probe doubles until
     the dependency fits inside it; one that still reaches the probe's ends at max_n
-    latents is refused (chunked decoding could not reproduce a single decode)."""
+    latents is refused (chunked decoding could not reproduce a single decode).
+
+    The probe runs at a capped spatial size (<= probe_hw latents a side): a full-size
+    320-latent decode would not fit a 24 GB card. Measured on the tiny configs:
+    LTX's reach is exact and size-independent, (9, 9) from 2x2 to 12x12 latents.
+    Wan's causal cache decays slowly, so its reach is a tolerance cutoff on a tail
+    that grows slightly with size (23 at 2x2, 25 at 4x4, 26 at 8x8 and 12x12,
+    saturated) -- hence the 8x8 cap, and the stream's history margin
+    (history_with_margin). A norm that pools over time would still show up here,
+    as a full-span dependency."""
+    h, w = min(h, probe_hw), min(w, probe_hw)
     while True:
         g = torch.Generator().manual_seed(0)
         z = torch.randn(1, n, C, h, w, generator=g) * 0.5
@@ -225,6 +237,12 @@ def measure_temporal_rf(vae, C, h, w, n=40, max_n=320, tol=1e-4):
             raise SystemExit(f"decoder temporal receptive field exceeds a {n}-latent probe; "
                              "chunked decoding cannot match a single decode")
         n *= 2
+
+
+def history_with_margin(back):
+    """History for a measured backward reach: +25 % (at least +1) covers the slow
+    tail a capped-size probe can under-read (see measure_temporal_rf)."""
+    return back + max(1, -(-back // 4)) + 1
 
 
 class StreamDecoder:
@@ -253,7 +271,9 @@ class StreamDecoder:
             return None
         w0 = max(self.start, self.emitted - self.H)
         win = self.buf[:, w0 - self.start:self.total - self.start]
-        x = self.vae.decode(win).cpu()
+        # one sample at a time: the window is chunk + history + lookahead latents, and
+        # the decoder's full-resolution activations are what fills a 24 GB card
+        x = torch.cat([self.vae.decode(win[i:i + 1]).cpu() for i in range(win.shape[0])], 0)
         s = self.vae.t_stride
         f0 = _frame_start(self.emitted - w0, s)
         f1 = _frame_start(upto - w0, s)
