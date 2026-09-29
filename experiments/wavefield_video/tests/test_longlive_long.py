@@ -232,6 +232,10 @@ def _ident(tmp_path, **over):
     ll.mkdir(exist_ok=True)
     if not (ll / "inference.py").exists():
         (ll / "inference.py").write_text("# LongLive\n")
+    t5 = ll / "wan_models" / "Wan2.2-TI2V-5B" / "models_t5_umt5-xxl-enc-bf16.pth"
+    if not t5.exists():
+        t5.parent.mkdir(parents=True)
+        t5.write_bytes(b"t5" * 50)
     return L.run_identity(cfg, ck, pr, ll, vae)
 
 
@@ -267,6 +271,19 @@ def test_identity_guard(tmp_path):
     with pytest.raises(SystemExit, match="longlive_src"):
         L.check_identity(out, _ident(tmp_path))
     (tmp_path / "ll" / "inference.py").write_text("# LongLive\n")
+    t5 = tmp_path / "ll" / "wan_models" / "Wan2.2-TI2V-5B" / "models_t5_umt5-xxl-enc-bf16.pth"
+    t5.write_bytes(b"T5" * 50)                                    # text encoder replaced in place
+    with pytest.raises(SystemExit, match="wan_models"):
+        L.check_identity(out, _ident(tmp_path))
+    t5.write_bytes(b"t5" * 50)
+    L.check_identity(out, _ident(tmp_path))
+    # decode provenance covers LongLive's own VAE sources, not just this module's code
+    ll = tmp_path / "ll"
+    (ll / "wan_5b" / "modules").mkdir(parents=True)
+    (ll / "wan_5b" / "modules" / "vae2_2.py").write_text("# vae\n")
+    a = L._decoder_impl_digest(ll)
+    (ll / "wan_5b" / "modules" / "vae2_2.py").write_text("# vae, patched\n")
+    assert L._decoder_impl_digest(ll) != a
     inside = tmp_path / "ll" / "run_inside"                       # an --out inside the checkout
     inside.mkdir()
     a = L._source_digest(tmp_path / "ll", exclude=[inside])

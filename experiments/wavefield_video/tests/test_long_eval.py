@@ -89,6 +89,21 @@ def test_reads_mp4_stream(tmp_path):
         __import__("json").dump(r, open(tmp_path / "r.json", "w"))
         E.main(args + ["--window", "20"])
         assert calls == [1, 1, 1]
+        # "auto" resolving to another encoder (DINO became available) is a new receipt
+        auto = [x if x != "pixel" else "auto" for x in args] + ["--window", "20"]
+        real_make = E.make_encoder
+        E.make_encoder = lambda name: E.PixelEncoder()           # auto fell back to pixel
+        E.main(auto)
+        n = len(calls)
+        E.main(auto)
+        assert len(calls) == n                                     # same effective encoder: reused
+
+        class OtherEncoder(E.PixelEncoder):
+            identity = "dinov2:facebook/dinov2-small:0123456789abcdef"
+        E.make_encoder = lambda name: OtherEncoder()
+        E.main(auto)
+        assert len(calls) == n + 1                                 # resolved differently: recomputed
+        E.make_encoder = real_make
     finally:
         E.evaluate = real
 

@@ -40,7 +40,7 @@ FLOOR = dict(luma=0.02, contrast=0.02, sat=0.02)   # [0,1] units; see the fade/f
 
 # ---------------------------------------------------------------- encoders
 class PixelEncoder:
-    name = "pixel"
+    name = identity = "pixel"
 
     def __call__(self, frames):                      # uint8 [n, H, W, 3]
         import torch
@@ -61,6 +61,10 @@ class Dinov2Encoder:
         self.model = AutoModel.from_pretrained(model_id).eval().to(self.device)
         self.mean = torch.tensor([0.485, 0.456, 0.406], device=self.device).view(1, 3, 1, 1)
         self.std = torch.tensor([0.229, 0.224, 0.225], device=self.device).view(1, 3, 1, 1)
+        h = hashlib.sha256(model_id.encode())
+        for k, v in sorted(self.model.state_dict().items()):
+            h.update(k.encode() + v.detach().float().cpu().contiguous().numpy().tobytes())
+        self.identity = f"dinov2:{model_id}:{h.hexdigest()[:16]}"   # the weights actually loaded
 
     def __call__(self, frames):
         import torch
@@ -208,7 +212,8 @@ def main(argv=None):
                     help="keep an existing --out only if its receipt matches this evaluator "
                          "(source), these arguments and this video's bytes; else recompute")
     a = ap.parse_args(argv)
-    receipt = receipt_for(a)
+    enc = make_encoder(a.encoder)          # resolved first: "auto" may have fallen back
+    receipt = receipt_for(a, enc)
     if a.reuse and a.out and os.path.exists(a.out):
         try:
             old = json.load(open(a.out))
@@ -220,7 +225,7 @@ def main(argv=None):
             return old
         print("[long_eval] existing receipt is stale (evaluator, arguments or video changed); "
               "recomputing", flush=True)
-    rep = evaluate(sample_video(a.video, a.per_sec), make_encoder(a.encoder), a.window)
+    rep = evaluate(sample_video(a.video, a.per_sec), enc, a.window)
     rep["video"] = str(a.video)
     rep["receipt"] = receipt
     for r in rep["windows"]:
@@ -236,14 +241,16 @@ def main(argv=None):
     return rep
 
 
-def receipt_for(a):
-    """What a verdict depends on: this evaluator's source, its arguments, the video."""
+def receipt_for(a, enc):
+    """What a verdict depends on: this evaluator's source, the encoder that actually
+    runs (resolved name + weights digest, not the requested "auto"), the arguments
+    and the video."""
     h = hashlib.sha256()
     with open(a.video, "rb") as f:
         for block in iter(lambda: f.read(1 << 22), b""):
             h.update(block)
     src = hashlib.sha256(open(os.path.abspath(__file__), "rb").read()).hexdigest()[:16]
-    return dict(evaluator=src, encoder=a.encoder, per_sec=a.per_sec, window=a.window,
+    return dict(evaluator=src, encoder=enc.identity, per_sec=a.per_sec, window=a.window,
                 video=h.hexdigest()[:16])
 
 

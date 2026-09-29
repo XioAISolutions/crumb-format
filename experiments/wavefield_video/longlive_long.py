@@ -210,11 +210,28 @@ def _source_digest(root, exclude=(), max_file=8 << 20):
     return h.hexdigest()[:16]
 
 
+def _tree_digest(root):
+    """Full-content sha256 of every file under ``root`` (paths included), or
+    "missing". For wan_models/Wan2.2-TI2V-5B: the T5 text encoder, its tokenizer,
+    the base DiT and configs -- everything that turns a prompt into conditioning.
+    ~45 GB, so a few minutes per generate call; cheap next to minutes of video."""
+    root = Path(root)
+    if not root.exists():
+        return "missing"
+    h = hashlib.sha256()
+    for f in sorted(p for p in root.rglob("*") if p.is_file()):
+        h.update(f.relative_to(root).as_posix().encode() + b"\0")
+        h.update(_file_digest(f).encode())
+    return h.hexdigest()[:16]
+
+
 def run_identity(cfg, ckpt, prompts, ll_root, vae=None, out=None):
     """Everything that determines the outputs: the effective overlay, full-content
-    digests of the generator checkpoint and the decoder VAE weights, the prompts
-    and the LongLive checkout."""
+    digests of the generator checkpoint, of the Wan model files (text encoder,
+    tokenizer, base DiT) and of the decoder VAE weights, the prompts and the
+    LongLive checkout."""
     ident = dict(overlay=cfg, ckpt=_file_digest(ckpt), prompts=_prompts_digest(prompts),
+                 wan_models=_tree_digest(Path(ll_root) / "wan_models" / "Wan2.2-TI2V-5B"),
                  longlive=_git_head(ll_root), longlive_src=_source_digest(ll_root, exclude=[out] if out else ()))
     if vae is not None:
         ident["vae"] = _file_digest(vae) if Path(vae).exists() else "missing"
@@ -323,13 +340,22 @@ def load_wan22_vae(ll_root, vae_path=None, device="cuda", dtype="bfloat16"):
     return model, mean, std, vae.unpatchify
 
 
-def _decoder_impl_digest():
-    """The decode path's own code (stream decode, normalization stats, VAE loading,
-    mp4 writing): a fix to any of it invalidates videos decoded before."""
+LL_DECODER_SOURCES = ("wan_5b/modules/vae2_2.py", "utils/wan_5b_wrapper.py")
+
+
+def _decoder_impl_digest(ll_root=None):
+    """The decode path's code: this module's stream decode, stats reading, VAE loading
+    and mp4 writing, plus the LongLive files they load (the Wan2.2 VAE module and the
+    wrapper holding the latent mean/std). A change to any of it invalidates videos
+    decoded before."""
     import inspect
-    src = "".join(inspect.getsource(f) for f in (stream_decode, wan22_vae_stats,
-                                                   load_wan22_vae, decode_file))
-    return hashlib.sha256(src.encode()).hexdigest()[:16]
+    h = hashlib.sha256("".join(inspect.getsource(f) for f in (
+        stream_decode, wan22_vae_stats, load_wan22_vae, decode_file)).encode())
+    if ll_root is not None:
+        for rel in LL_DECODER_SOURCES:
+            f = Path(ll_root) / rel
+            h.update(rel.encode() + b"\0" + (f.read_bytes() if f.exists() else b"<missing>"))
+    return h.hexdigest()[:16]
 
 
 def decode_file(latent_path, out_path, ll_root, vae_path=None, chunk=8, device="cuda",
@@ -344,7 +370,7 @@ def decode_file(latent_path, out_path, ll_root, vae_path=None, chunk=8, device="
     if vae_digest is None:
         vae_digest = "injected" if _vae is not None else _file_digest(vae_weights_path(ll_root, vae_path))
     prov = dict(latents=_file_digest(latent_path), vae=vae_digest, dtype=dtype, fps=fps,
-                decoder=_decoder_impl_digest())
+                decoder=_decoder_impl_digest(ll_root))
     prov_path = out_path.with_name(out_path.name + ".provenance.json")
     old = json.loads(prov_path.read_text()) if prov_path.exists() else None
     if out_path.exists():
