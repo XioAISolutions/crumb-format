@@ -279,7 +279,11 @@ class StreamDecoder:
         if (d["H"], d["L"]) != (self.H, self.L):
             raise SystemExit(f"stream state was decoded with history/lookahead {d['H']}/{d['L']}, "
                              f"this decoder measures {self.H}/{self.L}")
-        self.buf, self.start, self.emitted, self.total = d["buf"], d["start"], d["emitted"], d["total"]
+        # the buffer lives on the CPU (push() moves chunks there); a checkpoint loaded
+        # with map_location=cuda would otherwise hand back a CUDA buffer
+        buf = d["buf"]
+        self.buf = buf.detach().cpu().float() if buf is not None else None
+        self.start, self.emitted, self.total = int(d["start"]), int(d["emitted"]), int(d["total"])
 
 
 class LatentShards:

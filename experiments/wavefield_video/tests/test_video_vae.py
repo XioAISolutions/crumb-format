@@ -107,6 +107,36 @@ class StreamDecoderTests(unittest.TestCase):
         self.assertGreater(float((old - ref).abs().max()), 100 * tol)
         return back, fwd
 
+    def test_restored_buffer_is_moved_to_cpu(self):
+        """StreamSession.load() maps the checkpoint to the model device; a CUDA buffer
+        would then meet push()'s CPU chunk in torch.cat. load_state_dict must move it
+        (stand-in for a CUDA tensor on a CPU-only runner: records the .cpu() call)."""
+        from video_vae import StreamDecoder
+        v = VideoVAE("ltx-tiny", device="cpu")
+        d = StreamDecoder(v, 2, 1)
+        d.seed(torch.randn(1, 3, v.channels, 2, 2))
+        d.push(torch.randn(1, 4, v.channels, 2, 2))
+        st = d.state_dict()
+        moved = []
+
+        class OnDevice:
+            def __init__(self, t):
+                self.t = t
+
+            def detach(self):
+                return self
+
+            def cpu(self):
+                moved.append(True)
+                return self.t
+        st = {**st, "buf": OnDevice(st["buf"])}
+        d2 = StreamDecoder(v, 2, 1)
+        d2.load_state_dict(st)
+        self.assertEqual(moved, [True])
+        self.assertIsInstance(d2.buf, torch.Tensor)
+        self.assertEqual(d2.buf.device.type, "cpu")
+        self.assertIsNotNone(d2.push(torch.randn(1, 3, v.channels, 2, 2)))   # no device clash
+
     def test_ltx_tiny_matches_single_decode(self):
         back, fwd = self._check("ltx-tiny", 1e-5)
         self.assertGreater(fwd, 0)                                    # LTX decoder looks ahead
