@@ -441,7 +441,16 @@ class VideoVAETests(unittest.TestCase):
             encode_videos.main(args)                             # restore a complete index
             train_long.main(["--latents", str(d / "lat"), "--seq-frames", "4", "--chunk", "2",
                              "--dim", "16", "--layers", "1", "--heads", "2", "--steps", "1",
-                             "--batch", "2", "--eval-rollout", "2", "--out", str(d / "run")])
+                             "--batch", "2", "--eval-rollout", "2", "--save-every", "1",
+                             "--out", str(d / "run")])
+            # the resumable ckpt_wave.pt (vae/data_fp at top level, no config) streams too
+            self.assertTrue(lh.main(["stream", "--pole-param", "halflife", "--time-pos", "none",
+                                     "--ckpt", str(d / "run" / "ckpt_wave.pt"),
+                                     "--latents", str(d / "lat"), "--vae", "ltx-tiny",
+                                     "--vae-path", str(d / "vae"), "--frames", "2", "--dim", "16",
+                                     "--layers", "1", "--heads", "2", "--chunk", "2",
+                                     "--batch", "1", "--device", "cpu",
+                                     "--stream-frames", "4"])["trained"])
             def stream(lat, vae, *extra):
                 return lh.main(["stream", "--pole-param", "halflife", "--time-pos", "none",
                                 "--ckpt", str(d / "run" / "model_wave.pt"), "--latents", str(lat),

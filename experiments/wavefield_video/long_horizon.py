@@ -370,6 +370,14 @@ def cmd_stream(a):
         saved = torch.load(a.ckpt, map_location=dev, weights_only=True)
         sd, ck_cfg = saved["state"], saved.get("config") or {}
         ck_args = saved.get("args") or {}       # resumable train_long ckpt_*.pt: no config
+        if not ck_cfg and ck_args:
+            # a resumable checkpoint keeps what the final model's config would say at
+            # its top level (vae, data_fp) and in its training args (bounds, steps)
+            ck_cfg = {k: v for k, v in {"vae": saved.get("vae"), "data_fp": saved.get("data_fp"),
+                                        "hl_min": ck_args.get("hl_min"),
+                                        "hl_max": ck_args.get("hl_max"),
+                                        "flow_steps": ck_args.get("flow_steps")}.items()
+                      if v is not None}
         if a.ffn_mult is None:          # exact width from the weights, not a rounded JSON mult
             a.ffn_mult = sd["blocks.0.ffn.fc1.weight"].shape[0] / a.dim
         # half-life bounds are not state-dict tensors: hl_raw means a different
