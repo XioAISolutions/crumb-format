@@ -189,9 +189,20 @@ class HealthMonitor:
         a streak that spans the checkpoint keeps counting and earlier flags stay."""
         return {"ref": dict(self.ref), "runs": dict(self.runs), "first": dict(self.first),
                 "first_sample": dict(self.first_sample), "frame_index": self.frame_index,
-                "prev": None if self._prev is None else self._prev.detach().clone()}
+                "prev": None if self._prev is None else self._prev.detach().clone(),
+                "config": self.config()}
+
+    def config(self):
+        return {"fade_ratio": self.fade_ratio, "flat_ratio": self.flat_ratio,
+                "freeze_ratio": self.freeze_ratio, "patience": self.patience}
 
     def load_state_dict(self, d):
+        # streak counters only mean something under the thresholds/patience that
+        # produced them: a resumed screen with other settings would mix two screens
+        if "config" in d and d["config"] != self.config():
+            raise SystemExit(f"stream state was monitored with {d['config']}, this run uses "
+                             f"{self.config()} (--patience?); resume with the same settings "
+                             "or start fresh")
         # The monitor always works on CPU (generate() yields CPU chunks), but a
         # session loaded with map_location=cuda remaps these tensors too.
         cpu = lambda v: v.cpu() if torch.is_tensor(v) else v

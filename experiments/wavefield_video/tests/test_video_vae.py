@@ -328,6 +328,11 @@ class VideoVAETests(unittest.TestCase):
                     train_long.main(with_flag(flag, value) + ["--steps", "6", "--resume", ck,
                                                               "--out", str(d / "cut")])
                 self.assertIn(flag, err.getvalue())
+            # a target below the saved step would report a less-trained run
+            err = io.StringIO()
+            with self.assertRaises(SystemExit), contextlib.redirect_stderr(err):
+                train_long.main(common + ["--steps", "1", "--resume", ck, "--out", str(d / "cut")])
+            self.assertIn("already at step", err.getvalue())
             # free flags (steps, eval knobs, save cadence) may change
             train_long.main(with_flag("--eval-rollout", "1") + ["--steps", "5", "--save-every", "5",
                                                                "--resume", ck, "--out", str(d / "cut")])
@@ -475,6 +480,9 @@ class VideoVAETests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "different context"):     # other stream
                 stream(d / "lat", d / "vae", "--stream-frames", "8", "--checkpoint", ck,
                        "--batch", "2")
+            with self.assertRaisesRegex(SystemExit, "monitored with"):        # other patience
+                stream(d / "lat", d / "vae", "--stream-frames", "8", "--checkpoint", ck,
+                       "--patience", "5")
             # a training resume onto shards from another VAE is refused
             common = ["--seq-frames", "4", "--chunk", "2", "--dim", "16", "--layers", "1",
                       "--heads", "2", "--batch", "2", "--eval-rollout", "2"]

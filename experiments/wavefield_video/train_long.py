@@ -357,6 +357,10 @@ def main(argv=None):
             dgen.set_state(ck["dgen"].cpu())
         opt.load_state_dict(ck["opt"])
         start = int(ck["step"])
+        if a.steps < start:          # extending is fine; a lower target would mislabel the model
+            ap.error(f"--resume {a.resume} is already at step {start}; --steps {a.steps} "
+                     "would report a less-trained run than the one saved (use --steps >= "
+                     f"{start})")
         prior_sec = float(ck.get("train_sec", 0.0))
         print(f"RESUME <- {a.resume} at step={start} (of {a.steps})", flush=True)
 
