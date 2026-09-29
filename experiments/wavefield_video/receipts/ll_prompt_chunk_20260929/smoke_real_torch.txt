@@ -1,0 +1,9 @@
+# longlive venv: Python 3.10.12 | 2026-09-29T22:12:56Z
+PASS  default call sizes [16,16,8]
+PASS  single-call sizes [40]
+PASS  chunk-7 sizes [7x5,5]
+PASS  default == single-call
+PASS  chunk-7 == single-call
+PASS  order = prompt order
+REAL-TORCH SMOKE OK
+rc=0
