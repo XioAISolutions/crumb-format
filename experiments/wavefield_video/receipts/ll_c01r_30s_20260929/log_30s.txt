@@ -1,0 +1,164 @@
+[plan] 184 latent frames = 733 frames = 0.51 min; est. VRAM 11.9 GiB of 23.6
+[generate] /workspace/slava/venvs/longlive/bin/python inference.py --config_path /workspace/slava/exp/pr63/runs_longlive_cfg16e/len_30s/longlive_overlay.yaml (cwd /root/LongLive)
+Free VRAM 23.24053955078125 GB
+KV inference with 8 frames per block (kv_quant=False, vae_decode=batch)
+Loading generator from /root/LongLive/LongLive-2.0-5B/model_bf16.pt
+[FP8] TorchAO W8A8 quantized 300 linear layers with per-tensor scaling; kept 6 layers in BF16
+[data] data_path=/workspace/slava/exp/pr63/prompts_long.txt, mode=txt, num_blocks=23
+Number of prompts: 1
+0it [00:00, ?it/s]sampled_noise.device cuda:0
+prompts [['A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.']]
+sampled_noise.shape torch.Size([1, 184, 48, 44, 80]) prompts [['A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.']]
+[mem] pre: alloc=16.69 reserved=23.13
+[mem] te dev: cuda:0
+[mem] post-clear: alloc=16.69 reserved=16.73
+[mem] idle-offload: TE+VAE -> cpu; alloc=4.90 GiB
+[inference] local_attn_size set on model: 12
+[inference] sink_size set to: 8, multi_shot_sink enabled (pinned position)
+[inference] auto_global_sink_size set to: 8 (first 8 frames permanently anchored)
+[inference] rope_method=linear, original_seq_len=None
+[inference] use_relative_rope enabled
+[inference] multi_shot_rope_offset=8 (multi-shot RoPE offset enabled)
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:02<00:06,  2.25s/it][A
+ 50%|█████     | 2/4 [00:02<00:02,  1.30s/it][A
+ 75%|███████▌  | 3/4 [00:03<00:01,  1.06s/it][A
+100%|██████████| 4/4 [00:04<00:00,  1.11it/s][A100%|██████████| 4/4 [00:04<00:00,  1.08s/it]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.43it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.43it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.43it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.43it/s][A100%|██████████| 4/4 [00:02<00:00,  1.43it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.43it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.43it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.43it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.43it/s][A100%|██████████| 4/4 [00:02<00:00,  1.43it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.43it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.43it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.43it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.43it/s][A100%|██████████| 4/4 [00:02<00:00,  1.43it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.43it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.43it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.43it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.43it/s][A100%|██████████| 4/4 [00:02<00:00,  1.43it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.43it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.43it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.43it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.43it/s][A100%|██████████| 4/4 [00:02<00:00,  1.43it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.43it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.43it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.43it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.43it/s][A100%|██████████| 4/4 [00:02<00:00,  1.43it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.42it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.42it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.42it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.43it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.42it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.42it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.42it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.42it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.42it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.42it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.42it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.42it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.42it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.42it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.42it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+
+  0%|          | 0/4 [00:00<?, ?it/s][A
+ 25%|██▌       | 1/4 [00:00<00:02,  1.42it/s][A
+ 50%|█████     | 2/4 [00:01<00:01,  1.42it/s][A
+ 75%|███████▌  | 3/4 [00:02<00:00,  1.42it/s][A
+100%|██████████| 4/4 [00:02<00:00,  1.42it/s][A100%|██████████| 4/4 [00:02<00:00,  1.42it/s]
+0it [01:30, ?it/s]
+[decode] runs_longlive_cfg16e/len_30s/latents/rank0-0-0_regular.pt -> runs_longlive_cfg16e/len_30s/rank0-0-0_regular.mp4: 733 frames, 30.5 s
+     0s  sim 0.979  drift 1.000  luma 0.382  contrast 0.241  motion 0.0860  sat 0.319  
+    30s  sim 0.977  drift 0.998  luma 0.363  contrast 0.248  motion 0.0786  sat 0.321  
+[long_eval] NO_FLAGS; diagnostic horizon 30s of 30s (dinov2); semantic quality unverified; independent pixels review required
