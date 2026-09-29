@@ -671,6 +671,8 @@ def render(args):
     if device == "cuda" and not torch.cuda.is_available():
         raise ValueError("CUDA requested but unavailable")
     model = model.float().to(device)
+    if config.get("head") == "flow":
+        model.set_flow_sampler(seed=args.seed)   # same command -> same sampled video
     context_frames = config["frames"]
     clip, cols, pos, truth_method = make_latent_truth(config, context_frames + args.frames, args.seed, torch)
     context = clip[:, :context_frames].clone().to(device)
@@ -778,6 +780,7 @@ def render(args):
         "schema_version": 1, "status": "encoding", "created_utc": datetime.now(timezone.utc).isoformat(),
         "config": configuration,
         "rollout": {"frames": args.frames, "seed": args.seed, "mode": mode, "batch_size": 1,
+                    "flow_sampler_seed": args.seed if config.get("head") == "flow" else None,
                     "device": device, "dtype": "float32", "fps": args.fps, "scale": args.scale,
                     "first_target_index": context_frames, "teacher_forcing": False,
                     "truth_generation": truth_method, "temporal_embedding": "clamp at context_frames-1" if mode == "recurrent" else "reset window positions"},

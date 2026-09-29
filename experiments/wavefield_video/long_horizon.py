@@ -324,14 +324,16 @@ def _fmt_bytes(n):
         n /= 1024
 
 
-def build_model(a, pole_param, write_gate=False, clean_write=False, in_ch=3, H=None, W=None):
+def build_model(a, pole_param, write_gate=False, clean_write=False, in_ch=3, H=None, W=None,
+                head="residual", flow_steps=16):
     return VideoPredictor(a.dim, a.layers, a.heads, a.frames, H or a.grid, W or a.grid, "wave",
                           causal=True, ffn_mult=4.0 if a.ffn_mult is None else a.ffn_mult,
                           kernel_version="dispersion",
                           linear_pad=True, fuse=getattr(a, "fuse", "none"),
                           pole_param=pole_param, hl_min=a.hl_min, hl_max=a.hl_max,
                           time_pos=getattr(a, "time_pos", "table"),
-                          write_gate=write_gate, clean_write=clean_write, in_ch=in_ch)
+                          write_gate=write_gate, clean_write=clean_write, in_ch=in_ch,
+                          head=head, flow_steps=flow_steps)
 
 
 def cmd_budget(a):
@@ -379,6 +381,9 @@ def cmd_stream(a):
     # Write-path options are read off the checkpoint itself (LONG_HORIZON.md 8.4).
     wg = sd is not None and any(k.endswith("mix.wg.weight") for k in sd)
     cw = sd is not None and "posemb.py" not in sd
+    # a train_long.py --head flow checkpoint carries flow.* weights: rebuild that head
+    # (strict load would fail on a residual model) and sample it from --seed
+    head = {"head": ck_cfg.get("head") or "residual", "flow_steps": ck_cfg.get("flow_steps") or 16}
     vae = None
     if a.latents:
         # Latent mode (LONG_HORIZON.md phase 2): real latent context from held-out
@@ -428,13 +433,15 @@ def cmd_stream(a):
         dec = StreamDecoder(vae, history=history_with_margin(rf_back), lookahead=rf_fwd + 1)
         print(f"DECODER receptive field: {rf_back} back / {rf_fwd} forward latents -> "
               f"history {dec.H}, lookahead {dec.L}", flush=True)
-        m = build_model(a, a.pole_param[0], write_gate=wg, clean_write=cw, in_ch=shards.C, H=shards.h, W=shards.w).to(dev)
+        m = build_model(a, a.pole_param[0], write_gate=wg, clean_write=cw, in_ch=shards.C, H=shards.h, W=shards.w, **head).to(dev)
     else:
-        m = build_model(a, a.pole_param[0], write_gate=wg, clean_write=cw).to(dev)
+        m = build_model(a, a.pole_param[0], write_gate=wg, clean_write=cw, **head).to(dev)
         # Context stays on CPU for the monitor; warm() moves it to the model's device.
         ctx = make_clip_batch(a.batch, a.frames, a.grid, a.grid, seed=70000)[:, :a.frames]
     if a.ckpt:
         m.load_state_dict(sd)
+    if head["head"] == "flow":
+        m.set_flow_sampler(seed=a.seed)     # per-frame keyed: resumes sample identically
     view = (lambda z: vae.decode(z).cpu()) if vae is not None else (lambda x: x)
     mon = HealthMonitor(patience=a.patience).calibrate(view(ctx))
     sess = StreamSession(m, clamp=None if vae is not None else (0.0, 1.0))

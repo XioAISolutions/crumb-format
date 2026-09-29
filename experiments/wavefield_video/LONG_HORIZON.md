@@ -412,6 +412,11 @@ touch the flow head or `stochastic_eval`):**
   (its 1-step error is still worse than copying), and the kicks toy may not
   branch enough to make the mean blurry. A fair re-test needs a run where the
   MSE arm is shown to flatten first; otherwise there is nothing for flow to fix.
+- **Reproducing it.** These numbers were drawn from the global RNG. Flow noise is
+  now keyed to (seed, step) in training and to (seed, frame) when streaming, so a
+  sliced or resumed run matches an uninterrupted one. A rerun of this toy is
+  therefore a fresh draw of the same experiment, not a bit-exact replay of the
+  JSON above.
 
 ## Pitch corrections
 

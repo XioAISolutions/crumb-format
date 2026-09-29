@@ -684,6 +684,9 @@ class VideoPredictor(nn.Module):
             raise ValueError(f"unknown head {head!r} (want residual | flow)")
         if head == "flow" and not residual:
             raise ValueError("head='flow' models next - last; it needs residual=True")
+        if head == "flow" and int(flow_steps) < 1:
+            raise ValueError(f"flow_steps must be >= 1 (got {flow_steps}): zero Euler steps "
+                             "would return the raw noise as the prediction")
         self.head_kind, self.flow_steps = head, flow_steps
         self._flow_seed, self._flow_gen = None, None
         self.kind = kind
@@ -777,21 +780,28 @@ class VideoPredictor(nn.Module):
     def set_flow_sampler(self, n_steps=None, seed=None):
         """Euler steps per frame and a seed for reproducible sampling (None = global RNG)."""
         if n_steps is not None:
+            if int(n_steps) < 1:
+                raise ValueError(f"flow_steps must be >= 1 (got {n_steps})")
             self.flow_steps = n_steps
         self._flow_seed, self._flow_gen = seed, None
 
-    def _gen(self, device):
+    def _gen(self, device, t_index=None):
         if self._flow_seed is None:
             return None
+        if t_index is not None:
+            # stream_step: noise keyed to (seed, absolute frame), so a stream resumed
+            # from a saved state samples exactly what the uninterrupted stream would
+            return torch.Generator(device=device).manual_seed(
+                (self._flow_seed * 1_000_003 + int(t_index)) % (2 ** 63))
         if self._flow_gen is None or self._flow_gen.device != torch.device(device):
             self._flow_gen = torch.Generator(device=device).manual_seed(self._flow_seed)
         return self._flow_gen
 
-    def _readout(self, feats, base):
+    def _readout(self, feats, base, t_index=None):
         """feats [N,H,W,D] per-frame features, base [N,C,H,W] the frame they follow ->
         next frame [N,C,H,W]: residual head (mean) or a flow-head sample."""
         if self.head_kind == "flow":
-            d = self.flow.sample(feats, base.shape, self.flow_steps, self._gen(base.device))
+            d = self.flow.sample(feats, base.shape, self.flow_steps, self._gen(base.device, t_index))
             return base + d.to(base.dtype)
         delta = self.head(feats).permute(0, 3, 1, 2)
         return base + delta if self.residual else delta
@@ -917,7 +927,7 @@ class VideoPredictor(nn.Module):
             x = x + blk.ffn(blk.n2(x))
         x = self.norm(x)
         if self.head_kind == "flow":
-            return self._readout(x.reshape(B, self.H, self.W, -1), frame), states
+            return self._readout(x.reshape(B, self.H, self.W, -1), frame, t_index), states
         delta = self.head(x).reshape(B, self.H, self.W, self.in_ch).permute(0, 3, 1, 2)
         nxt = frame + delta if self.residual else delta
         return nxt, states
