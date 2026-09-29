@@ -1,0 +1,2984 @@
+{
+ "mode": "long_horizon_stream",
+ "pole_param": "halflife",
+ "trained": true,
+ "vae": {
+  "backend": "ltx",
+  "t_stride": 8,
+  "s_stride": 32,
+  "channels": 128,
+  "fingerprint": "53ae5bf00cb2bd8b"
+ },
+ "latents": "runs_latent3/latents",
+ "frames": 7200,
+ "grid": [
+  8,
+  14
+ ],
+ "context_ref": {
+  "mean": [
+   0.5039125084877014,
+   0.5213264226913452
+  ],
+  "std": [
+   0.17130263149738312,
+   0.1826312094926834
+  ],
+  "motion": [
+   0.018884202465415,
+   0.01358941663056612
+  ]
+ },
+ "collapse_sample": {},
+ "state_bytes_constant": true,
+ "collapse": {},
+ "log": [
+  {
+   "frame": 48,
+   "decoded_frames": 72,
+   "fps": 15.0,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.52672,
+    "std": 0.34642,
+    "motion": 0.01508
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 80,
+   "decoded_frames": 328,
+   "fps": 7.0,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44283,
+    "std": 0.2845,
+    "motion": 0.01133
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 112,
+   "decoded_frames": 584,
+   "fps": 6.7,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44491,
+    "std": 0.24557,
+    "motion": 0.01243
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 144,
+   "decoded_frames": 840,
+   "fps": 6.6,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44642,
+    "std": 0.23456,
+    "motion": 0.01304
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 176,
+   "decoded_frames": 1096,
+   "fps": 6.6,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44704,
+    "std": 0.22932,
+    "motion": 0.01335
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 208,
+   "decoded_frames": 1352,
+   "fps": 6.5,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44732,
+    "std": 0.22616,
+    "motion": 0.01353
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 240,
+   "decoded_frames": 1608,
+   "fps": 6.5,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44746,
+    "std": 0.22398,
+    "motion": 0.01364
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 272,
+   "decoded_frames": 1864,
+   "fps": 6.5,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44754,
+    "std": 0.22236,
+    "motion": 0.01371
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 304,
+   "decoded_frames": 2120,
+   "fps": 6.5,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44759,
+    "std": 0.2211,
+    "motion": 0.01376
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 336,
+   "decoded_frames": 2376,
+   "fps": 6.5,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44763,
+    "std": 0.22009,
+    "motion": 0.0138
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 368,
+   "decoded_frames": 2632,
+   "fps": 6.5,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44766,
+    "std": 0.21926,
+    "motion": 0.01383
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 400,
+   "decoded_frames": 2888,
+   "fps": 6.5,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44768,
+    "std": 0.21856,
+    "motion": 0.01385
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 432,
+   "decoded_frames": 3144,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4477,
+    "std": 0.21796,
+    "motion": 0.01387
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 464,
+   "decoded_frames": 3400,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44771,
+    "std": 0.21745,
+    "motion": 0.01389
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 496,
+   "decoded_frames": 3656,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44773,
+    "std": 0.21701,
+    "motion": 0.0139
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 528,
+   "decoded_frames": 3912,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44774,
+    "std": 0.21663,
+    "motion": 0.01391
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 560,
+   "decoded_frames": 4168,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44776,
+    "std": 0.21628,
+    "motion": 0.01393
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 592,
+   "decoded_frames": 4424,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44777,
+    "std": 0.21598,
+    "motion": 0.01394
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 624,
+   "decoded_frames": 4680,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44778,
+    "std": 0.21571,
+    "motion": 0.01395
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 656,
+   "decoded_frames": 4936,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4478,
+    "std": 0.21548,
+    "motion": 0.01396
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 688,
+   "decoded_frames": 5192,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44781,
+    "std": 0.21526,
+    "motion": 0.01397
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 720,
+   "decoded_frames": 5448,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44782,
+    "std": 0.21507,
+    "motion": 0.01398
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 752,
+   "decoded_frames": 5704,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44783,
+    "std": 0.2149,
+    "motion": 0.01399
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 784,
+   "decoded_frames": 5960,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44785,
+    "std": 0.21474,
+    "motion": 0.01399
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 816,
+   "decoded_frames": 6216,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44786,
+    "std": 0.2146,
+    "motion": 0.014
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 848,
+   "decoded_frames": 6472,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44787,
+    "std": 0.21448,
+    "motion": 0.01401
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 880,
+   "decoded_frames": 6728,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44789,
+    "std": 0.21437,
+    "motion": 0.01402
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 912,
+   "decoded_frames": 6984,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4479,
+    "std": 0.21427,
+    "motion": 0.01403
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 944,
+   "decoded_frames": 7240,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44791,
+    "std": 0.21418,
+    "motion": 0.01403
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 976,
+   "decoded_frames": 7496,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44793,
+    "std": 0.2141,
+    "motion": 0.01404
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1008,
+   "decoded_frames": 7752,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44794,
+    "std": 0.21403,
+    "motion": 0.01405
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1040,
+   "decoded_frames": 8008,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44795,
+    "std": 0.21396,
+    "motion": 0.01405
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1072,
+   "decoded_frames": 8264,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44796,
+    "std": 0.2139,
+    "motion": 0.01406
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1104,
+   "decoded_frames": 8520,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44797,
+    "std": 0.21385,
+    "motion": 0.01406
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1136,
+   "decoded_frames": 8776,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44799,
+    "std": 0.2138,
+    "motion": 0.01407
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1168,
+   "decoded_frames": 9032,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.448,
+    "std": 0.21376,
+    "motion": 0.01407
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1200,
+   "decoded_frames": 9288,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44801,
+    "std": 0.21373,
+    "motion": 0.01408
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1232,
+   "decoded_frames": 9544,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44802,
+    "std": 0.21369,
+    "motion": 0.01408
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1264,
+   "decoded_frames": 9800,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44803,
+    "std": 0.21366,
+    "motion": 0.01409
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1296,
+   "decoded_frames": 10056,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44804,
+    "std": 0.21364,
+    "motion": 0.01409
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1328,
+   "decoded_frames": 10312,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44805,
+    "std": 0.21362,
+    "motion": 0.0141
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1360,
+   "decoded_frames": 10568,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44806,
+    "std": 0.2136,
+    "motion": 0.0141
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1392,
+   "decoded_frames": 10824,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44807,
+    "std": 0.21358,
+    "motion": 0.01411
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1424,
+   "decoded_frames": 11080,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44808,
+    "std": 0.21356,
+    "motion": 0.01411
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1456,
+   "decoded_frames": 11336,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44809,
+    "std": 0.21355,
+    "motion": 0.01411
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1488,
+   "decoded_frames": 11592,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4481,
+    "std": 0.21354,
+    "motion": 0.01412
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1520,
+   "decoded_frames": 11848,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44811,
+    "std": 0.21353,
+    "motion": 0.01412
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1552,
+   "decoded_frames": 12104,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44812,
+    "std": 0.21353,
+    "motion": 0.01412
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1584,
+   "decoded_frames": 12360,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44813,
+    "std": 0.21352,
+    "motion": 0.01413
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1616,
+   "decoded_frames": 12616,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44814,
+    "std": 0.21352,
+    "motion": 0.01413
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1648,
+   "decoded_frames": 12872,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44815,
+    "std": 0.21352,
+    "motion": 0.01413
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1680,
+   "decoded_frames": 13128,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44815,
+    "std": 0.21352,
+    "motion": 0.01414
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1712,
+   "decoded_frames": 13384,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44816,
+    "std": 0.21352,
+    "motion": 0.01414
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1744,
+   "decoded_frames": 13640,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44817,
+    "std": 0.21353,
+    "motion": 0.01414
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1776,
+   "decoded_frames": 13896,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44818,
+    "std": 0.21353,
+    "motion": 0.01415
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1808,
+   "decoded_frames": 14152,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44818,
+    "std": 0.21354,
+    "motion": 0.01415
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1840,
+   "decoded_frames": 14408,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44819,
+    "std": 0.21355,
+    "motion": 0.01415
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1872,
+   "decoded_frames": 14664,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4482,
+    "std": 0.21356,
+    "motion": 0.01415
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1904,
+   "decoded_frames": 14920,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44821,
+    "std": 0.21357,
+    "motion": 0.01416
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1936,
+   "decoded_frames": 15176,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44822,
+    "std": 0.21358,
+    "motion": 0.01416
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 1968,
+   "decoded_frames": 15432,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44822,
+    "std": 0.21359,
+    "motion": 0.01416
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2000,
+   "decoded_frames": 15688,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44823,
+    "std": 0.2136,
+    "motion": 0.01417
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2032,
+   "decoded_frames": 15944,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44824,
+    "std": 0.21361,
+    "motion": 0.01417
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2064,
+   "decoded_frames": 16200,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44825,
+    "std": 0.21363,
+    "motion": 0.01417
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2096,
+   "decoded_frames": 16456,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44825,
+    "std": 0.21364,
+    "motion": 0.01417
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2128,
+   "decoded_frames": 16712,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44826,
+    "std": 0.21365,
+    "motion": 0.01418
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2160,
+   "decoded_frames": 16968,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44826,
+    "std": 0.21367,
+    "motion": 0.01418
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2192,
+   "decoded_frames": 17224,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44827,
+    "std": 0.21368,
+    "motion": 0.01418
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2224,
+   "decoded_frames": 17480,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44827,
+    "std": 0.2137,
+    "motion": 0.01418
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2256,
+   "decoded_frames": 17736,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44828,
+    "std": 0.21372,
+    "motion": 0.01419
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2288,
+   "decoded_frames": 17992,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44829,
+    "std": 0.21373,
+    "motion": 0.01419
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2320,
+   "decoded_frames": 18248,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44829,
+    "std": 0.21375,
+    "motion": 0.01419
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2352,
+   "decoded_frames": 18504,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4483,
+    "std": 0.21377,
+    "motion": 0.01419
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2384,
+   "decoded_frames": 18760,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44831,
+    "std": 0.21379,
+    "motion": 0.01419
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2416,
+   "decoded_frames": 19016,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44831,
+    "std": 0.2138,
+    "motion": 0.0142
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2448,
+   "decoded_frames": 19272,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44832,
+    "std": 0.21382,
+    "motion": 0.0142
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2480,
+   "decoded_frames": 19528,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44832,
+    "std": 0.21384,
+    "motion": 0.0142
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2512,
+   "decoded_frames": 19784,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44833,
+    "std": 0.21386,
+    "motion": 0.0142
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2544,
+   "decoded_frames": 20040,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44833,
+    "std": 0.21388,
+    "motion": 0.0142
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2576,
+   "decoded_frames": 20296,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44834,
+    "std": 0.2139,
+    "motion": 0.01421
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2608,
+   "decoded_frames": 20552,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44835,
+    "std": 0.21392,
+    "motion": 0.01421
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2640,
+   "decoded_frames": 20808,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44835,
+    "std": 0.21394,
+    "motion": 0.01421
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2672,
+   "decoded_frames": 21064,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44836,
+    "std": 0.21396,
+    "motion": 0.01421
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2704,
+   "decoded_frames": 21320,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44836,
+    "std": 0.21398,
+    "motion": 0.01421
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2736,
+   "decoded_frames": 21576,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44837,
+    "std": 0.214,
+    "motion": 0.01422
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2768,
+   "decoded_frames": 21832,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44837,
+    "std": 0.21402,
+    "motion": 0.01422
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2800,
+   "decoded_frames": 22088,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44838,
+    "std": 0.21404,
+    "motion": 0.01422
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2832,
+   "decoded_frames": 22344,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44839,
+    "std": 0.21406,
+    "motion": 0.01422
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2864,
+   "decoded_frames": 22600,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44839,
+    "std": 0.21408,
+    "motion": 0.01422
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2896,
+   "decoded_frames": 22856,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44839,
+    "std": 0.21411,
+    "motion": 0.01423
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2928,
+   "decoded_frames": 23112,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4484,
+    "std": 0.21413,
+    "motion": 0.01423
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2960,
+   "decoded_frames": 23368,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44841,
+    "std": 0.21415,
+    "motion": 0.01423
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 2992,
+   "decoded_frames": 23624,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44841,
+    "std": 0.21417,
+    "motion": 0.01423
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3024,
+   "decoded_frames": 23880,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44841,
+    "std": 0.21419,
+    "motion": 0.01423
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3056,
+   "decoded_frames": 24136,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44842,
+    "std": 0.21421,
+    "motion": 0.01423
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3088,
+   "decoded_frames": 24392,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44843,
+    "std": 0.21423,
+    "motion": 0.01424
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3120,
+   "decoded_frames": 24648,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44843,
+    "std": 0.21425,
+    "motion": 0.01424
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3152,
+   "decoded_frames": 24904,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44844,
+    "std": 0.21427,
+    "motion": 0.01424
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3184,
+   "decoded_frames": 25160,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44844,
+    "std": 0.2143,
+    "motion": 0.01424
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3216,
+   "decoded_frames": 25416,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44845,
+    "std": 0.21432,
+    "motion": 0.01424
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3248,
+   "decoded_frames": 25672,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44845,
+    "std": 0.21434,
+    "motion": 0.01424
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3280,
+   "decoded_frames": 25928,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44846,
+    "std": 0.21436,
+    "motion": 0.01425
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3312,
+   "decoded_frames": 26184,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44846,
+    "std": 0.21438,
+    "motion": 0.01425
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3344,
+   "decoded_frames": 26440,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44847,
+    "std": 0.2144,
+    "motion": 0.01425
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3376,
+   "decoded_frames": 26696,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44847,
+    "std": 0.21443,
+    "motion": 0.01425
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3408,
+   "decoded_frames": 26952,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44848,
+    "std": 0.21445,
+    "motion": 0.01425
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3440,
+   "decoded_frames": 27208,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44849,
+    "std": 0.21447,
+    "motion": 0.01425
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3472,
+   "decoded_frames": 27464,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44848,
+    "std": 0.21449,
+    "motion": 0.01425
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3504,
+   "decoded_frames": 27720,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44849,
+    "std": 0.21451,
+    "motion": 0.01425
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3536,
+   "decoded_frames": 27976,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4485,
+    "std": 0.21453,
+    "motion": 0.01426
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3568,
+   "decoded_frames": 28232,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4485,
+    "std": 0.21455,
+    "motion": 0.01426
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3600,
+   "decoded_frames": 28488,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44851,
+    "std": 0.21458,
+    "motion": 0.01426
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3632,
+   "decoded_frames": 28744,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44851,
+    "std": 0.2146,
+    "motion": 0.01426
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3664,
+   "decoded_frames": 29000,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44852,
+    "std": 0.21462,
+    "motion": 0.01426
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3696,
+   "decoded_frames": 29256,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44852,
+    "std": 0.21464,
+    "motion": 0.01426
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3728,
+   "decoded_frames": 29512,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44853,
+    "std": 0.21466,
+    "motion": 0.01426
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3760,
+   "decoded_frames": 29768,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44853,
+    "std": 0.21468,
+    "motion": 0.01426
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3792,
+   "decoded_frames": 30024,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44853,
+    "std": 0.2147,
+    "motion": 0.01427
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3824,
+   "decoded_frames": 30280,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44854,
+    "std": 0.21473,
+    "motion": 0.01427
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3856,
+   "decoded_frames": 30536,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44854,
+    "std": 0.21475,
+    "motion": 0.01427
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3888,
+   "decoded_frames": 30792,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44854,
+    "std": 0.21477,
+    "motion": 0.01427
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3920,
+   "decoded_frames": 31048,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44855,
+    "std": 0.21479,
+    "motion": 0.01427
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3952,
+   "decoded_frames": 31304,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44855,
+    "std": 0.21481,
+    "motion": 0.01427
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 3984,
+   "decoded_frames": 31560,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44856,
+    "std": 0.21483,
+    "motion": 0.01427
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4016,
+   "decoded_frames": 31816,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44856,
+    "std": 0.21485,
+    "motion": 0.01427
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4048,
+   "decoded_frames": 32072,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44857,
+    "std": 0.21488,
+    "motion": 0.01427
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4080,
+   "decoded_frames": 32328,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44857,
+    "std": 0.2149,
+    "motion": 0.01428
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4112,
+   "decoded_frames": 32584,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44858,
+    "std": 0.21492,
+    "motion": 0.01428
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4144,
+   "decoded_frames": 32840,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44858,
+    "std": 0.21494,
+    "motion": 0.01428
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4176,
+   "decoded_frames": 33096,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44859,
+    "std": 0.21496,
+    "motion": 0.01428
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4208,
+   "decoded_frames": 33352,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44859,
+    "std": 0.21498,
+    "motion": 0.01428
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4240,
+   "decoded_frames": 33608,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44859,
+    "std": 0.215,
+    "motion": 0.01428
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4272,
+   "decoded_frames": 33864,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4486,
+    "std": 0.21502,
+    "motion": 0.01428
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4304,
+   "decoded_frames": 34120,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4486,
+    "std": 0.21504,
+    "motion": 0.01428
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4336,
+   "decoded_frames": 34376,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44861,
+    "std": 0.21506,
+    "motion": 0.01428
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4368,
+   "decoded_frames": 34632,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44861,
+    "std": 0.21508,
+    "motion": 0.01428
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4400,
+   "decoded_frames": 34888,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44861,
+    "std": 0.2151,
+    "motion": 0.01429
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4432,
+   "decoded_frames": 35144,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44862,
+    "std": 0.21512,
+    "motion": 0.01429
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4464,
+   "decoded_frames": 35400,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44862,
+    "std": 0.21514,
+    "motion": 0.01429
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4496,
+   "decoded_frames": 35656,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44863,
+    "std": 0.21516,
+    "motion": 0.01429
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4528,
+   "decoded_frames": 35912,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44863,
+    "std": 0.21518,
+    "motion": 0.01429
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4560,
+   "decoded_frames": 36168,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44864,
+    "std": 0.2152,
+    "motion": 0.01429
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4592,
+   "decoded_frames": 36424,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44864,
+    "std": 0.21522,
+    "motion": 0.01429
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4624,
+   "decoded_frames": 36680,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44864,
+    "std": 0.21524,
+    "motion": 0.01429
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4656,
+   "decoded_frames": 36936,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44865,
+    "std": 0.21526,
+    "motion": 0.01429
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4688,
+   "decoded_frames": 37192,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44865,
+    "std": 0.21528,
+    "motion": 0.01429
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4720,
+   "decoded_frames": 37448,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44865,
+    "std": 0.2153,
+    "motion": 0.0143
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4752,
+   "decoded_frames": 37704,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44866,
+    "std": 0.21532,
+    "motion": 0.0143
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4784,
+   "decoded_frames": 37960,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44866,
+    "std": 0.21534,
+    "motion": 0.0143
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4816,
+   "decoded_frames": 38216,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44867,
+    "std": 0.21536,
+    "motion": 0.0143
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4848,
+   "decoded_frames": 38472,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44867,
+    "std": 0.21538,
+    "motion": 0.0143
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4880,
+   "decoded_frames": 38728,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44867,
+    "std": 0.2154,
+    "motion": 0.0143
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4912,
+   "decoded_frames": 38984,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44868,
+    "std": 0.21542,
+    "motion": 0.0143
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4944,
+   "decoded_frames": 39240,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44868,
+    "std": 0.21544,
+    "motion": 0.0143
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 4976,
+   "decoded_frames": 39496,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44869,
+    "std": 0.21545,
+    "motion": 0.0143
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5008,
+   "decoded_frames": 39752,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44869,
+    "std": 0.21547,
+    "motion": 0.0143
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5040,
+   "decoded_frames": 40008,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44869,
+    "std": 0.21549,
+    "motion": 0.0143
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5072,
+   "decoded_frames": 40264,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4487,
+    "std": 0.21551,
+    "motion": 0.0143
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5104,
+   "decoded_frames": 40520,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4487,
+    "std": 0.21553,
+    "motion": 0.01431
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5136,
+   "decoded_frames": 40776,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4487,
+    "std": 0.21555,
+    "motion": 0.01431
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5168,
+   "decoded_frames": 41032,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44871,
+    "std": 0.21557,
+    "motion": 0.01431
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5200,
+   "decoded_frames": 41288,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44871,
+    "std": 0.21559,
+    "motion": 0.01431
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5232,
+   "decoded_frames": 41544,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44871,
+    "std": 0.2156,
+    "motion": 0.01431
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5264,
+   "decoded_frames": 41800,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44872,
+    "std": 0.21562,
+    "motion": 0.01431
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5296,
+   "decoded_frames": 42056,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44872,
+    "std": 0.21564,
+    "motion": 0.01431
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5328,
+   "decoded_frames": 42312,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44872,
+    "std": 0.21566,
+    "motion": 0.01431
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5360,
+   "decoded_frames": 42568,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44873,
+    "std": 0.21568,
+    "motion": 0.01431
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5392,
+   "decoded_frames": 42824,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44873,
+    "std": 0.2157,
+    "motion": 0.01431
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5424,
+   "decoded_frames": 43080,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44873,
+    "std": 0.21571,
+    "motion": 0.01431
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5456,
+   "decoded_frames": 43336,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44873,
+    "std": 0.21573,
+    "motion": 0.01431
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5488,
+   "decoded_frames": 43592,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44874,
+    "std": 0.21575,
+    "motion": 0.01431
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5520,
+   "decoded_frames": 43848,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44874,
+    "std": 0.21577,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5552,
+   "decoded_frames": 44104,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44875,
+    "std": 0.21578,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5584,
+   "decoded_frames": 44360,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44875,
+    "std": 0.2158,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5616,
+   "decoded_frames": 44616,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44875,
+    "std": 0.21582,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5648,
+   "decoded_frames": 44872,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44876,
+    "std": 0.21584,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5680,
+   "decoded_frames": 45128,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44876,
+    "std": 0.21586,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5712,
+   "decoded_frames": 45384,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44876,
+    "std": 0.21587,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5744,
+   "decoded_frames": 45640,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44876,
+    "std": 0.21589,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5776,
+   "decoded_frames": 45896,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44877,
+    "std": 0.21591,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5808,
+   "decoded_frames": 46152,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44877,
+    "std": 0.21592,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5840,
+   "decoded_frames": 46408,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44877,
+    "std": 0.21594,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5872,
+   "decoded_frames": 46664,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44878,
+    "std": 0.21596,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5904,
+   "decoded_frames": 46920,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44878,
+    "std": 0.21598,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5936,
+   "decoded_frames": 47176,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44878,
+    "std": 0.21599,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 5968,
+   "decoded_frames": 47432,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44879,
+    "std": 0.21601,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6000,
+   "decoded_frames": 47688,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44879,
+    "std": 0.21603,
+    "motion": 0.01432
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6032,
+   "decoded_frames": 47944,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44879,
+    "std": 0.21604,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6064,
+   "decoded_frames": 48200,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44879,
+    "std": 0.21606,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6096,
+   "decoded_frames": 48456,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4488,
+    "std": 0.21608,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6128,
+   "decoded_frames": 48712,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4488,
+    "std": 0.2161,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6160,
+   "decoded_frames": 48968,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.4488,
+    "std": 0.21611,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6192,
+   "decoded_frames": 49224,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44881,
+    "std": 0.21613,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6224,
+   "decoded_frames": 49480,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44881,
+    "std": 0.21614,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6256,
+   "decoded_frames": 49736,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44881,
+    "std": 0.21616,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6288,
+   "decoded_frames": 49992,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44882,
+    "std": 0.21618,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6320,
+   "decoded_frames": 50248,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44882,
+    "std": 0.21619,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6352,
+   "decoded_frames": 50504,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44882,
+    "std": 0.21621,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6384,
+   "decoded_frames": 50760,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44882,
+    "std": 0.21623,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6416,
+   "decoded_frames": 51016,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44882,
+    "std": 0.21624,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6448,
+   "decoded_frames": 51272,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44883,
+    "std": 0.21626,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6480,
+   "decoded_frames": 51528,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44883,
+    "std": 0.21627,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6512,
+   "decoded_frames": 51784,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44883,
+    "std": 0.21629,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6544,
+   "decoded_frames": 52040,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44883,
+    "std": 0.2163,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6576,
+   "decoded_frames": 52296,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44883,
+    "std": 0.21632,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6608,
+   "decoded_frames": 52552,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44884,
+    "std": 0.21633,
+    "motion": 0.01433
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6640,
+   "decoded_frames": 52808,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44884,
+    "std": 0.21635,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6672,
+   "decoded_frames": 53064,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44885,
+    "std": 0.21637,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6704,
+   "decoded_frames": 53320,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44885,
+    "std": 0.21638,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6736,
+   "decoded_frames": 53576,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44885,
+    "std": 0.2164,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6768,
+   "decoded_frames": 53832,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44886,
+    "std": 0.21641,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6800,
+   "decoded_frames": 54088,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44886,
+    "std": 0.21643,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6832,
+   "decoded_frames": 54344,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44886,
+    "std": 0.21644,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6864,
+   "decoded_frames": 54600,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44886,
+    "std": 0.21646,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6896,
+   "decoded_frames": 54856,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44886,
+    "std": 0.21647,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6928,
+   "decoded_frames": 55112,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44887,
+    "std": 0.21649,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6960,
+   "decoded_frames": 55368,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44887,
+    "std": 0.2165,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 6992,
+   "decoded_frames": 55624,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44887,
+    "std": 0.21652,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 7024,
+   "decoded_frames": 55880,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44887,
+    "std": 0.21653,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 7056,
+   "decoded_frames": 56136,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44888,
+    "std": 0.21655,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 7088,
+   "decoded_frames": 56392,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44888,
+    "std": 0.21656,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 7120,
+   "decoded_frames": 56648,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44888,
+    "std": 0.21658,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 7152,
+   "decoded_frames": 56904,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44888,
+    "std": 0.21659,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 7184,
+   "decoded_frames": 57160,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44888,
+    "std": 0.21661,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 7216,
+   "decoded_frames": 57416,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.44889,
+    "std": 0.21662,
+    "motion": 0.01434
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  },
+  {
+   "frame": 7216,
+   "decoded_frames": 57600,
+   "fps": 6.4,
+   "state_bytes": 33144832,
+   "last": {
+    "mean": 0.46107,
+    "std": 0.2188,
+    "motion": 0.01598
+   },
+   "flags": {},
+   "flags_latent_step": {}
+  }
+ ],
+ "decoder_rf": {
+  "back": 22,
+  "fwd": 22,
+  "history": 23,
+  "lookahead": 23
+ },
+ "collapse_latent_step": {},
+ "latent_steps_generated": 7200,
+ "steps_generated": 7200
+}
