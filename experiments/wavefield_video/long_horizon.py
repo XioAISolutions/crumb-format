@@ -470,6 +470,10 @@ def cmd_stream(a):
     # the end of the stream.
     ex = sess.extra or {}
     gen = int(ex.get("generated", 0))                # steps generated so far
+    if a.checkpoint and gen > a.stream_frames:       # extend or finish, never relabel shorter
+        raise SystemExit(f"{a.checkpoint} already holds {gen} generated steps; "
+                         f"--stream-frames {a.stream_frames} would report a shorter stream "
+                         f"(use --stream-frames >= {gen})")
     if vae is not None:
         if a.resume:
             if "decoder" not in ex:
@@ -485,9 +489,10 @@ def cmd_stream(a):
     if log_path and a.resume and os.path.exists(log_path):
         rows = open(log_path).read().splitlines()[:int(ex.get("log_rows", 0))]
         log = [json.loads(r) for r in rows]
-    if log_path:                     # drop rows written after the last checkpoint
-        with open(log_path, "w") as fh:
-            fh.writelines(json.dumps(r) + "\n" for r in log)
+    if log_path:                     # drop rows written after the last checkpoint --
+        with open(log_path + ".tmp", "w") as fh:     # atomically: a kill mid-rewrite keeps
+            fh.writelines(json.dumps(r) + "\n" for r in log)    # the old, valid sidecar
+        os.replace(log_path + ".tmp", log_path)
     stride = vae.t_stride if vae is not None else 1
 
     def latent_step(d):          # decoded frame -> generated latent step (O(1))

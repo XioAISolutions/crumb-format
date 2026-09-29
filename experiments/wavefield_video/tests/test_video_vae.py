@@ -8,6 +8,7 @@ import contextlib
 import importlib.util
 import io
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -498,6 +499,9 @@ class VideoVAETests(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "monitored with"):        # other patience
                 stream(d / "lat", d / "vae", "--stream-frames", "8", "--checkpoint", ck,
                        "--patience", "5")
+            with self.assertRaisesRegex(SystemExit, "shorter stream"):        # 8 already made
+                stream(d / "lat", d / "vae", "--stream-frames", "4", "--checkpoint", ck)
+            self.assertFalse(os.path.exists(ck + ".log.jsonl.tmp"))           # atomic sidecar
             # a training resume onto shards from another VAE is refused
             common = ["--seq-frames", "4", "--chunk", "2", "--dim", "16", "--layers", "1",
                       "--heads", "2", "--batch", "2", "--eval-rollout", "2"]
