@@ -413,8 +413,9 @@ touch the flow head or `stochastic_eval`):**
   branch enough to make the mean blurry. A fair re-test needs a run where the
   MSE arm is shown to flatten first; otherwise there is nothing for flow to fix.
 - **Reproducing it.** These numbers were drawn from the global RNG. Flow noise is
-  now keyed to (seed, step) in training and to (seed, frame) when streaming, so a
-  sliced or resumed run matches an uninterrupted one. A rerun of this toy is
+  now keyed to (seed, step) in training and to (seed, frame, sample) when
+  streaming, so a sliced or resumed run matches an uninterrupted one and the
+  metrics do not depend on how the eval batch is chunked. A rerun of this toy is
   therefore a fresh draw of the same experiment, not a bit-exact replay of the
   JSON above.
 

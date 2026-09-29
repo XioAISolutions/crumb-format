@@ -64,9 +64,12 @@ class FlowHead(nn.Module):
         return F.mse_loss(self.velocity(xt, tau, c), x1 - x0)
 
     @torch.no_grad()
-    def sample(self, c, shape, n_steps=16, generator=None):
-        """Euler-integrate from noise: -> x1 sample [N,C,H,W]."""
-        x = torch.randn(shape, generator=generator, device=c.device, dtype=c.dtype) * self.sigma
+    def sample(self, c, shape, n_steps=16, generator=None, noise=None):
+        """Euler-integrate from noise: -> x1 sample [N,C,H,W]. ``noise`` (unit
+        Gaussian, [N,C,H,W]) replaces the draw from ``generator``."""
+        if noise is None:
+            noise = torch.randn(shape, generator=generator, device=c.device, dtype=c.dtype)
+        x = noise.to(device=c.device, dtype=c.dtype) * self.sigma
         N = shape[0]
         for k in range(n_steps):
             tau = torch.full((N,), k / n_steps, device=c.device, dtype=c.dtype)

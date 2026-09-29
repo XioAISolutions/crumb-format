@@ -689,6 +689,7 @@ class VideoPredictor(nn.Module):
                              "would return the raw noise as the prediction")
         self.head_kind, self.flow_steps = head, flow_steps
         self._flow_seed, self._flow_gen = None, None
+        self.flow_row0 = 0          # logical index of this batch's first sample (keyed draws)
         self.kind = kind
         if time_pos not in ("table", "none"):
             raise ValueError(f"unknown time_pos {time_pos!r} (want table | none)")
@@ -785,14 +786,21 @@ class VideoPredictor(nn.Module):
             self.flow_steps = n_steps
         self._flow_seed, self._flow_gen = seed, None
 
-    def _gen(self, device, t_index=None):
+    def _keyed_noise(self, shape, device, t_index):
+        """stream_step draws: unit noise per sample keyed to (seed, absolute frame,
+        logical sample index = flow_row0 + row). A resumed stream samples exactly
+        what the uninterrupted one would, and a sample's noise does not depend on
+        how the batch was chunked."""
+        rows = []
+        for i in range(shape[0]):
+            key = (self._flow_seed * 1_000_003 + int(t_index)) * 1_000_033 + self.flow_row0 + i
+            g = torch.Generator(device=device).manual_seed(key % (2 ** 63))
+            rows.append(torch.randn(shape[1:], generator=g, device=device))
+        return torch.stack(rows)
+
+    def _gen(self, device):
         if self._flow_seed is None:
             return None
-        if t_index is not None:
-            # stream_step: noise keyed to (seed, absolute frame), so a stream resumed
-            # from a saved state samples exactly what the uninterrupted stream would
-            return torch.Generator(device=device).manual_seed(
-                (self._flow_seed * 1_000_003 + int(t_index)) % (2 ** 63))
         if self._flow_gen is None or self._flow_gen.device != torch.device(device):
             self._flow_gen = torch.Generator(device=device).manual_seed(self._flow_seed)
         return self._flow_gen
@@ -801,7 +809,11 @@ class VideoPredictor(nn.Module):
         """feats [N,H,W,D] per-frame features, base [N,C,H,W] the frame they follow ->
         next frame [N,C,H,W]: residual head (mean) or a flow-head sample."""
         if self.head_kind == "flow":
-            d = self.flow.sample(feats, base.shape, self.flow_steps, self._gen(base.device, t_index))
+            if t_index is not None and self._flow_seed is not None:
+                d = self.flow.sample(feats, base.shape, self.flow_steps,
+                                     noise=self._keyed_noise(base.shape, base.device, t_index))
+            else:
+                d = self.flow.sample(feats, base.shape, self.flow_steps, self._gen(base.device))
             return base + d.to(base.dtype)
         delta = self.head(feats).permute(0, 3, 1, 2)
         return base + delta if self.residual else delta

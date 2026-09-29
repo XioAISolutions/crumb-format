@@ -177,6 +177,7 @@ def stream_rollout_eval(m, a, dev):
             c1 = min(S, c0 + max(1, a.eval_chunk))
             cb = c1 - c0
             st, f = m.stream_init(cb, dev), None
+            m.flow_row0 = c0                     # flow draws keyed per sample, not per chunk
             for t in range(a.frames):
                 f, st = m.stream_step(clip[c0:c1, t], st, t)
             ce = []
@@ -189,6 +190,7 @@ def stream_rollout_eval(m, a, dev):
                 ce.append((pc - meta["pos"][c0:c1, a.frames + k]).norm(dim=-1))
                 f, st = m.stream_step(f, st, a.frames + k)
             cerrs.append(torch.stack(ce, 0))                         # [R, cb, nb]
+    m.flow_row0 = 0
     mse = [x / S for x in mse]
     persist = [x / S for x in persist]
     cerr = torch.cat(cerrs, 1)
@@ -204,33 +206,45 @@ def stream_rollout_eval(m, a, dev):
             "divergence_horizon": tc.divergence_horizon(med, a.radius, tc.DIV_CONSEC)}
 
 
-def stochastic_eval(m, a, dev, R=64, S=16):
+def stochastic_eval(m, a, dev):
     """Autoregressive rollouts from held-out context, scored on what MSE blur
     destroys: per-frame spatial-std ratio vs GT (1 = as sharp as real, -> 0 =
     smeared/flat), blob count == n_balls (semantic_metrics.detect_blobs, with the
-    same detector's GT rate as a ceiling), and HealthMonitor's first collapse."""
+    same detector's GT rate as a ceiling), and HealthMonitor's first collapse.
+    R = --stoch-rollout frames on S = --stoch-seeds clips (64 x 16 = the 10.1
+    protocol), rolled --eval-chunk clips at a time; the metrics do not depend on
+    the chunking (per-sample keyed flow noise; the monitor sees whole frames)."""
     from long_horizon import HealthMonitor
     from semantic_metrics import detect_blobs
+    R, S = a.stoch_rollout, a.stoch_seeds
     clip = tc.make_clip_batch(S, a.chunk + R - 1, a.grid, a.grid, device=dev, seed=91000,
                               kicks=a.kicks, collisions=a.collisions, radius=a.radius,
                               speed=a.speed, nb=a.n_balls)
     ctx = clip[:, :a.chunk]
     mon = HealthMonitor(patience=8).calibrate(ctx.cpu())
-    ratios, ok, ok_gt = [], 0, 0
+    ratio_sum, ok, ok_gt = [0.0] * R, 0, 0
+    frames = torch.empty(R, S, *clip.shape[2:])               # CPU, for the monitor
     with torch.no_grad():
-        st, f = m.stream_init(S, dev), None
-        for t in range(a.chunk):
-            f, st = m.stream_step(ctx[:, t], st, t)
-        for k in range(R):
-            f = f.float().clamp(0, 1)
-            gt = clip[:, a.chunk + k]
-            ratios.append((f.flatten(1).std(1) / (gt.flatten(1).std(1) + 1e-9)).mean().item())
-            mon.update(f.cpu())
-            ok += sum(len(d) == a.n_balls for d in detect_blobs(f.cpu(), radius=a.radius))
-            ok_gt += sum(len(d) == a.n_balls for d in detect_blobs(gt.cpu(), radius=a.radius))
-            f, st = m.stream_step(f, st, a.chunk + k)
+        for c0 in range(0, S, max(1, a.eval_chunk)):
+            c1 = min(S, c0 + max(1, a.eval_chunk))
+            m.flow_row0 = c0
+            st, f = m.stream_init(c1 - c0, dev), None
+            for t in range(a.chunk):
+                f, st = m.stream_step(ctx[c0:c1, t], st, t)
+            for k in range(R):
+                f = f.float().clamp(0, 1)
+                gt = clip[c0:c1, a.chunk + k]
+                ratio_sum[k] += (f.flatten(1).std(1) / (gt.flatten(1).std(1) + 1e-9)).sum().item()
+                frames[k, c0:c1] = f.cpu()
+                ok += sum(len(d) == a.n_balls for d in detect_blobs(f.cpu(), radius=a.radius))
+                ok_gt += sum(len(d) == a.n_balls for d in detect_blobs(gt.cpu(), radius=a.radius))
+                f, st = m.stream_step(f, st, a.chunk + k)
+    m.flow_row0 = 0
+    for k in range(R):
+        mon.update(frames[k])
+    ratios = [r / S for r in ratio_sum]
     n = R * S
-    return {"stoch_rollout": R, "std_ratio_mean": round(sum(ratios) / R, 4),
+    return {"stoch_rollout": R, "stoch_seeds": S, "std_ratio_mean": round(sum(ratios) / R, 4),
             "std_ratio_last": round(ratios[-1], 4), "std_ratio_curve": [round(r, 4) for r in ratios],
             "blob_count_ok": round(ok / n, 4), "blob_count_ok_gt": round(ok_gt / n, 4),
             "collapse": dict(mon.first)}
@@ -268,7 +282,8 @@ def pixel_eval(m, a, dev):
 # flags it reports) and the --latents PATH (its content is checked by the dataset
 # fingerprint). Every other flag shapes training and must match.
 RESUME_FREE = {"steps", "resume", "out", "tag", "save_every", "save_every_sec", "grad_ckpt",
-               "eval_batch", "eval_rollout", "eval_seeds", "eval_chunk", "latents"}
+               "eval_batch", "eval_rollout", "eval_seeds", "eval_chunk", "latents",
+               "stoch_rollout", "stoch_seeds"}
 
 
 def train_args(a):
@@ -324,6 +339,10 @@ def main(argv=None):
     ap.add_argument("--eval-rollout", type=int, default=64)
     ap.add_argument("--eval-seeds", type=int, default=16)
     ap.add_argument("--eval-chunk", type=int, default=4)
+    ap.add_argument("--stoch-rollout", type=int, default=64,
+                    help="balls: sharpness/blob rollout length (64 = LONG_HORIZON 10.1; 0 = skip)")
+    ap.add_argument("--stoch-seeds", type=int, default=16,
+                    help="balls: clips in that rollout, rolled --eval-chunk at a time (0 = skip)")
     ap.add_argument("--eval-batch", type=int, default=8,
                     help="single-step eval batch (8 x 8 batches); keep small on the GPU box")
     ap.add_argument("--save-every", type=int, default=0)
@@ -358,6 +377,8 @@ def main(argv=None):
         ap.error("--seq-frames must be a multiple of --chunk")
     if a.tbptt_chunks < 1:
         ap.error("--tbptt-chunks must be >= 1")
+    if a.stoch_rollout < 0 or a.stoch_seeds < 0:
+        ap.error("--stoch-rollout/--stoch-seeds must be >= 0 (0 skips that eval)")
     if a.head == "flow":
         if a.motion_loss:
             ap.error("--head flow trains a dense rectified-flow loss (no --motion-loss)")
@@ -502,7 +523,7 @@ def main(argv=None):
         single, roll = latent_eval(m, data, a), {}
     else:
         single, roll = pixel_eval(m, a, dev)
-        if a.data_source == "balls":
+        if a.data_source == "balls" and a.stoch_rollout and a.stoch_seeds:
             roll = {**roll, **stochastic_eval(m, a, dev)}
     cfg = model_config(a, data)
     res = {**cfg, "pole_param": a.pole_param if a.kind == "wave" else None,

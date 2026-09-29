@@ -107,6 +107,37 @@ class FlowHeadTests(unittest.TestCase):
         self.assertTrue(torch.equal(a, b))
         self.assertFalse(torch.equal(a, c))
 
+    def test_keyed_draws_do_not_depend_on_batch_chunking(self):
+        # one batch of 2 == two batches of 1 at logical rows 0 and 1
+        m = _flow().eval()
+        m.set_flow_sampler(seed=3)
+        fr = torch.rand(1, 3, H, W).repeat(2, 1, 1, 1)     # same input: only noise differs
+        with torch.no_grad():
+            both, _ = m.stream_step(fr, m.stream_init(2, "cpu"), 4)
+            parts = []
+            for i in range(2):
+                m.flow_row0 = i
+                parts.append(m.stream_step(fr[i:i + 1], m.stream_init(1, "cpu"), 4)[0])
+            m.flow_row0 = 0
+        torch.testing.assert_close(both, torch.cat(parts), rtol=1e-5, atol=1e-6)
+        self.assertFalse(torch.allclose(parts[0], parts[1]))
+
+    def test_stochastic_eval_honours_limits_and_chunking(self):
+        import argparse
+        import train_long
+        torch.manual_seed(0)
+        m = VideoPredictor(DIM, 2, 4, T, 6, 6, "wave", causal=True, kernel_version="dispersion",
+                           linear_pad=True, time_pos="none", head="flow", flow_steps=4).eval()
+        m.set_flow_sampler(seed=12345)
+        base = dict(chunk=T, grid=6, kicks=True, collisions=False, radius=1.0, speed=0.5,
+                    n_balls=1, stoch_rollout=3, stoch_seeds=4)
+        whole = train_long.stochastic_eval(m, argparse.Namespace(eval_chunk=4, **base), "cpu")
+        chunked = train_long.stochastic_eval(m, argparse.Namespace(eval_chunk=1, **base), "cpu")
+        self.assertEqual((whole["stoch_rollout"], whole["stoch_seeds"]), (3, 4))
+        self.assertEqual(len(whole["std_ratio_curve"]), 3)
+        for k in ("std_ratio_curve", "blob_count_ok", "blob_count_ok_gt", "collapse"):
+            self.assertEqual(whole[k], chunked[k], k)
+
     def test_trainer_flow_resume_equals_uninterrupted_and_stream_loads_it(self):
         import tempfile
         import long_horizon as lh
