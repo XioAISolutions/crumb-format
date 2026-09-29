@@ -2,6 +2,7 @@
 
 LONG_HORIZON.md phase 3: rectified-flow head on the causal backbone."""
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -192,6 +193,8 @@ class FlowHeadTests(unittest.TestCase):
                                            msg=k)
             s = torch.load(split / "model_wave.pt", weights_only=True)
             self.assertTrue(any(k.startswith("flow.") for k in f["state"]))
+            res = json.loads((full / "result_wave.json").read_text())
+            self.assertEqual(res["flow_sampler_seed"], 12345)   # receipt names its eval sampler
             for k in f["state"]:
                 self.assertTrue(torch.equal(f["state"][k], s["state"][k]), k)
             # the long-horizon stream rebuilds the flow head from the checkpoint

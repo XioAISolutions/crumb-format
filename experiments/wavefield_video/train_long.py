@@ -524,8 +524,9 @@ def main(argv=None):
 
     m.eval()
     a.frames = a.chunk                                   # eval context = one chunk
+    FLOW_EVAL_SEED = 12345                               # eval_only.py --flow-seed default
     if a.head == "flow":
-        m.set_flow_sampler(seed=12345)                   # reproducible sampled evals
+        m.set_flow_sampler(seed=FLOW_EVAL_SEED)          # reproducible sampled evals
     if data is not None:
         single, roll = latent_eval(m, data, a), {}
     else:
@@ -537,7 +538,8 @@ def main(argv=None):
            "seq_frames": a.seq_frames, "chunk": a.chunk, "tbptt_chunks": a.tbptt_chunks,
            "dense": a.dense, "time_pos": "none", "write_gate": a.write_gate,
            "clean_write": a.clean_write,
-           "flow_steps": a.flow_steps if a.head == "flow" else None, "steps": a.steps, "seed": a.seed,
+           "flow_steps": a.flow_steps if a.head == "flow" else None,
+           "flow_sampler_seed": FLOW_EVAL_SEED if a.head == "flow" else None, "steps": a.steps, "seed": a.seed,
            "params": sum(p.numel() for p in m.parameters()), "dim": a.dim, "layers": a.layers,
            "heads": a.heads, "batch": a.batch, "micro_batch": a.micro_batch or a.batch,
            "grad_ckpt": a.grad_ckpt,
