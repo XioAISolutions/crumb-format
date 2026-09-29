@@ -18,7 +18,12 @@ jobs:
         python-version: ["3.10", "3.11", "3.12"]
 
     steps:
+      # fetch-depth: 0 keeps the tags: scripts/release_check.py skips its
+      # released-version check silently when a shallow clone has none — which
+      # is how the v1.3.0 drift stayed invisible in CI. ~13 MB repo; cheap.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5

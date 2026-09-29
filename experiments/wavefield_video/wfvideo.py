@@ -668,10 +668,15 @@ class VideoPredictor(nn.Module):
                  gate=False, local_fuse=False, fuse="none",
                  q_mix=False, quat_color=False,
                  pole_param="softplus", hl_min=2.0, hl_max=4096.0, time_pos="table",
-                 write_gate=False, clean_write=False):
+                 write_gate=False, clean_write=False, in_ch=3):
         super().__init__()
         self.T, self.H, self.W = T, H, W
         self.grad_ckpt = False       # train_long.py --grad-ckpt (stateful path only)
+        # in_ch: channels per frame -- 3 for pixels, or a video VAE's latent
+        # channels (LONG_HORIZON.md phase 2); the head predicts the same channels.
+        if quat_color and in_ch != 3:
+            raise ValueError("--quat-color embeds RGB; it needs in_ch=3")
+        self.in_ch = in_ch
         self.kind = kind
         if time_pos not in ("table", "none"):
             raise ValueError(f"unknown time_pos {time_pos!r} (want table | none)")
@@ -697,7 +702,7 @@ class VideoPredictor(nn.Module):
             from wfvideo_quat import QuatEmbed
             self.embed = QuatEmbed(dim)
         else:
-            self.embed = nn.Conv2d(3, dim, 3, padding=1, bias=not clean_write)
+            self.embed = nn.Conv2d(in_ch, dim, 3, padding=1, bias=not clean_write)
         # clean_write (LONG_HORIZON.md 8.4): a blank frame must write exactly zero --
         # no spatial table, no embed bias, no wave input bias.
         if (write_gate or clean_write) and not (kind == "wave" and kernel_version == "dispersion"
@@ -750,7 +755,7 @@ class VideoPredictor(nn.Module):
             blocks.append(Block(mix, dim, ffn_mult=ffn_mult, bias=not clean_write))
         self.blocks = nn.ModuleList(blocks)
         self.norm = RMSNorm(dim)
-        self.head = nn.Linear(dim, 3)
+        self.head = nn.Linear(dim, in_ch)
         if residual:
             nn.init.zeros_(self.head.weight)
             nn.init.zeros_(self.head.bias)
@@ -792,11 +797,11 @@ class VideoPredictor(nn.Module):
                     x = blk(x)
         x = self.norm(x)
         if dense:
-            delta = self.head(x).reshape(B, T, self.H, self.W, 3).permute(0, 1, 4, 2, 3)
+            delta = self.head(x).reshape(B, T, self.H, self.W, self.in_ch).permute(0, 1, 4, 2, 3)
             pred = frames + delta if self.residual else delta         # [B,T,3,H,W]
         else:
             last = x[:, (self.T - 1) * self.H * self.W: self.T * self.H * self.W]  # [B, HW, D]
-            delta = self.head(last).reshape(B, self.H, self.W, 3).permute(0, 3, 1, 2)  # [B,3,H,W]
+            delta = self.head(last).reshape(B, self.H, self.W, self.in_ch).permute(0, 3, 1, 2)  # [B,C,H,W]
             pred = frames[:, -1] + delta if self.residual else delta
         return pred if states is None else (pred, new_states)
 
@@ -850,6 +855,6 @@ class VideoPredictor(nn.Module):
             x = x + m
             x = x + blk.ffn(blk.n2(x))
         x = self.norm(x)
-        delta = self.head(x).reshape(B, self.H, self.W, 3).permute(0, 3, 1, 2)
+        delta = self.head(x).reshape(B, self.H, self.W, self.in_ch).permute(0, 3, 1, 2)
         nxt = frame + delta if self.residual else delta
         return nxt, states

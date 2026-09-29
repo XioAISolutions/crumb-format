@@ -25,7 +25,9 @@ context. Result JSON keeps train_compare's field names.
 """
 import argparse
 import json
+import os
 import pathlib
+import signal
 import time
 
 import torch
@@ -34,14 +36,21 @@ import torch.nn.functional as F
 import data_occlusion as _occ
 import train_compare as tc
 from data import MOVE_THRESH, N_BALLS, RADIUS, SPEED
+from video_vae import LatentShards
 from wfvideo import VideoPredictor
 from rollout_training import check_resume_objective, rollout_sequence_loss, training_objective
 
 
-def arch_kwargs(a):
+def _save_atomic(obj, path):
+    tmp = pathlib.Path(str(path) + ".tmp")
+    torch.save(obj, tmp)
+    os.replace(tmp, path)
+
+
+def arch_kwargs(a, in_ch=3):
     """VideoPredictor keyword arguments; also saved as checkpoint metadata so
     render_rollout.load_model / eval_only.py rebuild the same model."""
-    kw = dict(causal=True, residual=True, ffn_mult=a.ffn_mult, time_pos="none")
+    kw = dict(causal=True, residual=True, ffn_mult=a.ffn_mult, time_pos="none", in_ch=in_ch)
     if a.kind == "wave":
         kw.update(kernel_version="dispersion", linear_pad=True, pole_param=a.pole_param,
                   hl_min=a.hl_min, hl_max=a.hl_max, write_gate=a.write_gate,
@@ -51,18 +60,58 @@ def arch_kwargs(a):
     return kw
 
 
-def build(a):
-    return VideoPredictor(a.dim, a.layers, a.heads, a.chunk, a.grid, a.grid, a.kind, **arch_kwargs(a))
+def build(a, in_ch=3, H=None, W=None):
+    return VideoPredictor(a.dim, a.layers, a.heads, a.chunk, H or a.grid, W or a.grid, a.kind,
+                          **arch_kwargs(a, in_ch))
 
 
-def model_config(a):
-    """render_rollout-compatible config: frames is the chunk (the model's T)."""
+def model_config(a, data=None):
+    """render_rollout-compatible config: frames is the chunk (the model's T).
+    Latent runs record in_ch, the latent grid and data_source="latents"; the pixel
+    renderer refuses those (long_horizon.py stream --latents decodes them)."""
     cfg = dict(kernel_version="separable", linear_pad=False, gate=False, local_fuse=False)
-    cfg.update(arch_kwargs(a))
+    cfg.update(arch_kwargs(a, data.C if data is not None else 3))
     cfg.update(kind=a.kind, dim=a.dim, layers=a.layers, heads=a.heads, frames=a.chunk,
                grid=a.grid, kicks=a.kicks, collisions=a.collisions, radius=a.radius,
                speed=a.speed, n_balls=a.n_balls, data_source=a.data_source)
+    if data is not None:        # vae (with its weights fingerprint) ties the model to a latent space
+        # data_fp ties the final model to its dataset: the stream refuses held-out
+        # shards from any other corpus, even at the same --latents path
+        cfg.update(grid=data.h, grid_w=data.w, data_source="latents", vae=data.vae,
+                   data_fp=data.fingerprint)
     return cfg
+
+
+def latent_eval(m, data, a):
+    """Teacher-forced next-latent MSE vs copy-last on held-out shards, plus an
+    autoregressive rollout (stream_step from one chunk of real context)."""
+    gen = torch.Generator().manual_seed(90000)
+    # the longest held-out shard sets the horizon: batch() samples only shards long
+    # enough for the requested window, so one short tail must not cap it
+    R = min(a.eval_rollout, max(z.shape[0] for z in data.eval) - a.chunk)
+    with torch.no_grad():
+        x = data.batch(a.eval_batch, a.chunk + 1, gen, "eval")
+        p = m(x[:, :a.chunk], states=[None] * len(m.blocks))[0].float()   # exact kernel
+        se, cb = F.mse_loss(p, x[:, -1]).item(), F.mse_loss(x[:, -2], x[:, -1]).item()
+        out = {"eval_mse": round(se, 6), "eval_mse_over_copylast": round(se / (cb + 1e-9), 4),
+               "latent_rollout_steps": max(R, 0)}
+        if R >= 1:
+            clip = data.batch(a.eval_batch, a.chunk + R, gen, "eval")
+            st = m.stream_init(clip.shape[0], clip.device)
+            f = None
+            for t in range(a.chunk):
+                f, st = m.stream_step(clip[:, t], st, t)
+            curve, copy = [], []
+            for k in range(R):
+                gt = clip[:, a.chunk + k] if a.chunk + k < clip.shape[1] else None
+                if gt is None:
+                    break
+                curve.append(F.mse_loss(f.float(), gt).item())
+                copy.append(F.mse_loss(clip[:, a.chunk - 1], gt).item())
+                f, st = m.stream_step(f, st, a.chunk + k)
+            out.update(latent_rollout_mse=[round(v, 5) for v in curve],
+                       latent_rollout_copy_mse=[round(v, 5) for v in copy])
+    return out
 
 
 def detach_states(states):
@@ -149,9 +198,50 @@ def stream_rollout_eval(m, a, dev):
             "divergence_horizon": tc.divergence_horizon(med, a.radius, tc.DIV_CONSEC)}
 
 
+def pixel_eval(m, a, dev):
+    """Single-step eval + copy-last baseline (train_compare.main()'s definitions),
+    then train_compare's rollout / occlusion eval."""
+    if a.data_source == "occlusion":
+        # eval window (starts after the context and its target frame), so the
+        # single-step target is ordinary motion, as in train_compare's arms
+        _occ.OCC_START, _occ.OCC_END = a.occ_start, a.occ_end
+    with torch.no_grad():
+        se = cb = cr = 0.0
+        n_eval = 8
+        for i in range(n_eval):
+            clips = tc.make_clip_batch(a.eval_batch, a.frames, a.grid, a.grid, device=dev, seed=90000 + i,
+                                       kicks=a.kicks, collisions=a.collisions, radius=a.radius,
+                                       speed=a.speed, nb=a.n_balls)
+            ctx, tgt = clips[:, :a.frames], clips[:, a.frames]
+            # stateful path with a zero state = the exact truncated kernel training uses
+            p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+            se += F.mse_loss(p, tgt).item()
+            cb += F.mse_loss(last, tgt).item()
+            cr += ((p - last).norm() / ((tgt - last).norm() + 1e-9)).item()
+    single = {"eval_mse": round(se / n_eval, 6), "eval_mse_over_copylast": round(se / (cb + 1e-9), 4),
+              "copy_ratio": round(cr / n_eval, 4)}
+    if a.data_source == "occlusion":
+        return single, tc.occlusion_rollout_eval(m, a, dev)
+    return single, stream_rollout_eval(m, a, dev)
+
+
+# Flags a --resume may change: the step target, where/how often it saves, exact
+# recompute (grad ckpt), eval-only knobs (the eval runs on the final model with the
+# flags it reports) and the --latents PATH (its content is checked by the dataset
+# fingerprint). Every other flag shapes training and must match.
+RESUME_FREE = {"steps", "resume", "out", "tag", "save_every", "save_every_sec", "grad_ckpt",
+               "eval_batch", "eval_rollout", "eval_seeds", "eval_chunk", "latents"}
+
+
+def train_args(a):
+    return json.loads(json.dumps({k: v for k, v in sorted(vars(a).items())
+                                  if k not in RESUME_FREE}))
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--data-source", choices=["balls", "occlusion"], default="balls")
+    ap.add_argument("--latents", default="", help="encode_videos.py shard dir: train on video latents")
     ap.add_argument("--kind", choices=["wave", "ssm"], default="wave")
     ap.add_argument("--pole-param", choices=["softplus", "halflife"], default="halflife")
     ap.add_argument("--hl-min", type=float, default=2.0)
@@ -196,6 +286,9 @@ def main(argv=None):
     ap.add_argument("--eval-batch", type=int, default=8,
                     help="single-step eval batch (8 x 8 batches); keep small on the GPU box")
     ap.add_argument("--save-every", type=int, default=0)
+    ap.add_argument("--save-every-sec", type=float, default=0,
+                    help="also checkpoint when this many seconds passed since the last save "
+                         "(sliced jobs: keep it well under the slice budget)")
     ap.add_argument("--resume", default="")
     ap.add_argument("--out", default="runs_long")
     ap.add_argument("--tag", default="")
@@ -236,7 +329,15 @@ def main(argv=None):
                      f"{a.seq_frames}-frame sequence with the ball re-emerging by its last frame; "
                      "set --train-occ-start/--train-occ-end")
         _occ.OCC_START, _occ.OCC_END = a.train_occ_start, a.train_occ_end
-    m = build(a).to(dev)
+    data = None
+    if a.latents:
+        if a.motion_loss:
+            ap.error("--motion-loss uses a pixel moving mask; latents train with plain MSE")
+        data = LatentShards(a.latents, a.seq_frames + 1, device=dev)
+        m = build(a, in_ch=data.C, H=data.h, W=data.w).to(dev)
+        dgen = torch.Generator().manual_seed(1000 + 100_000 * a.seed)
+    else:
+        m = build(a).to(dev)
     m.grad_ckpt = a.grad_ckpt
     opt = torch.optim.AdamW(m.parameters(), lr=a.lr, weight_decay=0.0)
     base = pathlib.Path(a.out)
@@ -255,21 +356,65 @@ def main(argv=None):
             check_resume_objective(ck, a)
         except ValueError as exc:
             ap.error(str(exc))
+        if data is not None:        # same latent space and dataset, or refuse (fail closed)
+            fp_ck = (ck.get("vae") or {}).get("fingerprint")
+            fp_now = (data.vae or {}).get("fingerprint")
+            if fp_ck is None or ck.get("data_fp") is None or fp_now is None:
+                ap.error(f"--resume {a.resume} / --latents {a.latents}: missing VAE or dataset "
+                         "fingerprint (written before fingerprints); cannot verify, start fresh")
+            if fp_ck != fp_now:
+                ap.error(f"--resume {a.resume} was trained on VAE {fp_ck}; --latents {a.latents} "
+                         f"was encoded with {fp_now}")
+            if ck["data_fp"] != data.fingerprint:
+                ap.error(f"--resume {a.resume} was trained on a different latent dataset "
+                         f"({ck['data_fp']} != {data.fingerprint} for --latents {a.latents})")
+        if "args" not in ck:
+            ap.error(f"--resume {a.resume} records no training arguments (written before "
+                     "they were saved); cannot verify it continues this run, start fresh")
+        now = train_args(a)
+        diff = sorted(k for k in set(ck["args"]) | set(now) if ck["args"].get(k) != now.get(k))
+        if diff:
+            ap.error(f"--resume {a.resume} was trained with different " + ", ".join(
+                f"--{k.replace('_', '-')} ({ck['args'].get(k)!r} -> {now.get(k)!r})" for k in diff)
+                + f"; only {', '.join(sorted(RESUME_FREE))} may change on resume")
         m.load_state_dict(ck["state"])
+        if data is not None and "dgen" in ck:            # continue the latent sample stream
+            dgen.set_state(ck["dgen"].cpu())
         opt.load_state_dict(ck["opt"])
         start = int(ck["step"])
+        if a.steps < start:          # extending is fine; a lower target would mislabel the model
+            ap.error(f"--resume {a.resume} is already at step {start}; --steps {a.steps} "
+                     "would report a less-trained run than the one saved (use --steps >= "
+                     f"{start})")
         prior_sec = float(ck.get("train_sec", 0.0))
         print(f"RESUME <- {a.resume} at step={start} (of {a.steps})", flush=True)
 
+    def resume_meta():          # latent runs: sampler position + what it samples from
+        return {"dgen": dgen.get_state(), "vae": data.vae, "data_fp": data.fingerprint}
+
+    def save_ckpt(step):        # atomic: a kill mid-write leaves the previous file intact
+        _save_atomic({"state": m.state_dict(), "opt": opt.state_dict(), "step": step,
+                      "train_sec": prior_sec + time.time() - t0, "args": train_args(a),
+                      **(resume_meta() if data is not None else {}), **extra}, ckpt_path)
+
+    # A slice budget ends with SIGTERM (GNU timeout): finish the current step, save,
+    # exit 143 so the runner reports SLICED and the next slice resumes from here.
+    stop = []
+    if a.save_every or a.save_every_sec:
+        signal.signal(signal.SIGTERM, lambda *_: stop.append(1))
     m.train()
     log, t0 = [], time.time()
+    last_save = t0
     for step in range(start + 1, a.steps + 1):
-        gen = tc.make_clip_batch(a.batch, a.seq_frames, a.grid, a.grid, device=dev,
-                                 seed=1000 + step + 100_000 * a.seed, kicks=a.kicks,
-                                 collisions=a.collisions, radius=a.radius, speed=a.speed,
-                                 nb=a.n_balls, return_moving=a.motion_loss,
-                                 move_thresh=MOVE_THRESH)
-        clips, moving = gen if a.motion_loss else (gen, None)
+        if data is not None:
+            clips, moving = data.batch(a.batch, a.seq_frames + 1, dgen), None
+        else:
+            gen = tc.make_clip_batch(a.batch, a.seq_frames, a.grid, a.grid, device=dev,
+                                     seed=1000 + step + 100_000 * a.seed, kicks=a.kicks,
+                                     collisions=a.collisions, radius=a.radius, speed=a.speed,
+                                     nb=a.n_balls, return_moving=a.motion_loss,
+                                     move_thresh=MOVE_THRESH)
+            clips, moving = gen if a.motion_loss else (gen, None)
         opt.zero_grad(set_to_none=True)
         loss, mb = 0.0, a.micro_batch or a.batch            # gradient accumulation
         for i in range(0, a.batch, mb):
@@ -282,55 +427,45 @@ def main(argv=None):
                    "st_s": round((step - start) / max(time.time() - t0, 1e-9), 3)}
             log.append(row)
             print("STEP", json.dumps(row), flush=True)
-        if a.save_every and step % a.save_every == 0:
-            torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": step,
-                        "train_sec": prior_sec + time.time() - t0, **extra}, ckpt_path)
+        due = (a.save_every and step % a.save_every == 0) or \
+              (a.save_every_sec and time.time() - last_save >= a.save_every_sec)
+        if due or stop:
+            save_ckpt(step)
+            last_save = time.time()
+        if stop:
+            print(f"SIGTERM: saved step {step} to {ckpt_path}; exiting to resume", flush=True)
+            raise SystemExit(143)
     train_sec = prior_sec + time.time() - t0              # cumulative across resumed slices
-    if a.save_every:
-        torch.save({"state": m.state_dict(), "opt": opt.state_dict(), "step": a.steps,
-                    "train_sec": train_sec, **extra}, ckpt_path)
+    signal.signal(signal.SIGTERM, signal.SIG_DFL)         # evaluation: plain termination
+    if a.save_every or a.save_every_sec:
+        save_ckpt(a.steps)
 
     m.eval()
     a.frames = a.chunk                                   # eval context = one chunk
-    if a.data_source == "occlusion":
-        # eval window (starts after the context and its target frame), so the
-        # single-step target is ordinary motion, as in train_compare's arms
-        _occ.OCC_START, _occ.OCC_END = a.occ_start, a.occ_end
-    # Single-step eval + copy-last baseline, same definitions as train_compare.main().
-    with torch.no_grad():
-        se = cb = cr = 0.0
-        n_eval = 8
-        for i in range(n_eval):
-            clips = tc.make_clip_batch(a.eval_batch, a.frames, a.grid, a.grid, device=dev,
-                                       seed=90000 + i,
-                                       kicks=a.kicks, collisions=a.collisions, radius=a.radius,
-                                       speed=a.speed, nb=a.n_balls)
-            ctx, tgt = clips[:, :a.frames], clips[:, a.frames]
-            # stateful path with a zero state = the exact truncated kernel training uses
-            p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
-            se += F.mse_loss(p, tgt).item()
-            cb += F.mse_loss(last, tgt).item()
-            cr += ((p - last).norm() / ((tgt - last).norm() + 1e-9)).item()
-    single = {"eval_mse": round(se / n_eval, 6), "eval_mse_over_copylast": round(se / (cb + 1e-9), 4),
-              "copy_ratio": round(cr / n_eval, 4)}
-    if a.data_source == "occlusion":
-        roll = tc.occlusion_rollout_eval(m, a, dev)
+    if data is not None:
+        single, roll = latent_eval(m, data, a), {}
     else:
-        roll = stream_rollout_eval(m, a, dev)
-    res = {**model_config(a), "pole_param": a.pole_param if a.kind == "wave" else None,
+        single, roll = pixel_eval(m, a, dev)
+    cfg = model_config(a, data)
+    res = {**cfg, "pole_param": a.pole_param if a.kind == "wave" else None,
            "seq_frames": a.seq_frames, "chunk": a.chunk, "tbptt_chunks": a.tbptt_chunks,
            "dense": a.dense, "time_pos": "none", "write_gate": a.write_gate,
            "clean_write": a.clean_write, "steps": a.steps, "seed": a.seed,
            "params": sum(p.numel() for p in m.parameters()), "dim": a.dim, "layers": a.layers,
-           "heads": a.heads, "grid": a.grid, "batch": a.batch, "micro_batch": a.micro_batch or a.batch,
-           "grad_ckpt": a.grad_ckpt, "data_source": a.data_source,
+           "heads": a.heads, "batch": a.batch, "micro_batch": a.micro_batch or a.batch,
+           "grad_ckpt": a.grad_ckpt,
+           "latents": a.latents or None, "vae": data.vae if data is not None else None,
+           "latents_fp": data.fingerprint if data is not None else None,
            "motion_loss": a.motion_loss, "train_occ_start": a.train_occ_start,
            "train_occ_end": a.train_occ_end, "occ_start": a.occ_start, "occ_end": a.occ_end,
            "persistent_state_bytes": m.persistent_state_bytes(), "train_sec": round(train_sec, 1),
            "log_tail": log[-3:], **single, **roll, **extra}
-    (base / f"result_{a.kind}{a.tag}.json").write_text(json.dumps(res, indent=1))
-    torch.save({"state": m.state_dict(), "config": model_config(a), **extra},
-               base / f"model_{a.kind}{a.tag}.pt")
+    # model before result, both atomic: "both files exist" (the runners' done test)
+    # then always means both are complete
+    _save_atomic({"state": m.state_dict(), "config": cfg, **extra}, base / f"model_{a.kind}{a.tag}.pt")
+    tmp = base / f"result_{a.kind}{a.tag}.json.tmp"
+    tmp.write_text(json.dumps(res, indent=1))
+    os.replace(tmp, base / f"result_{a.kind}{a.tag}.json")
     keys = ("eval_mse_over_copylast", "copy_ratio", "divergence_horizon", "exit_direction_accuracy",
             "position_error_at_emergence")
     print("RESULT", json.dumps({k: res.get(k) for k in keys}), flush=True)
