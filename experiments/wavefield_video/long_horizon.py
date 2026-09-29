@@ -369,6 +369,13 @@ def cmd_stream(a):
         sd, ck_cfg = saved["state"], saved.get("config") or {}
         if a.ffn_mult is None:          # exact width from the weights, not a rounded JSON mult
             a.ffn_mult = sd["blocks.0.ffn.fc1.weight"].shape[0] / a.dim
+        # half-life bounds are not state-dict tensors: hl_raw means a different
+        # half-life under other bounds, so rebuild with the ones it was trained with
+        for k in ("hl_min", "hl_max"):
+            if k in ck_cfg and float(ck_cfg[k]) != float(getattr(a, k)):
+                print(f"NOTE: {a.ckpt} was trained with --{k.replace('_', '-')} {ck_cfg[k]}; "
+                      f"using it (the command line had {getattr(a, k)})", flush=True)
+                setattr(a, k, float(ck_cfg[k]))
     # Write-path options are read off the checkpoint itself (LONG_HORIZON.md 8.4).
     wg = sd is not None and any(k.endswith("mix.wg.weight") for k in sd)
     cw = sd is not None and "posemb.py" not in sd
@@ -542,6 +549,7 @@ def cmd_stream(a):
         sess.save(a.save_state, extra=pre_flush if pre_flush is not None else extra_state())
     res = {"mode": "long_horizon_stream", "pole_param": a.pole_param[0], "trained": bool(a.ckpt),
            "vae": vae.describe() if vae is not None else None, "latents": a.latents or None,
+           "data_fp": shards.fingerprint if vae is not None else None,
            "frames": a.stream_frames,
            "grid": [shards.h, shards.w] if vae is not None else a.grid,   # latent h, w
            "context_ref": {k: v.tolist() for k, v in mon.ref.items()},

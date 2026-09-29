@@ -63,8 +63,34 @@ echo "== encode $(date -u +%FT%TZ)" | tee -a "$OUT/progress.txt"
 run encode "$PY" encode_videos.py --videos "$VIDEOS" "${vae_args[@]}" --height "$HEIGHT" \
     --width "$WIDTH" --fps "$FPS" --max-frames "$MAX_FRAMES" --out "$LATENTS"
 
-# 2. train (result + model both present = done; else resume from ckpt)
+# Outputs already in OUT must belong to THIS latent corpus. LATENTS re-encoded at the
+# same path (the documented recovery) leaves run_config.txt unchanged, so the skips
+# below would otherwise report the old corpus's model/stream as this run's.
 tag="_latent_s${SEED}"
+if ! "$PY" - "$LATENTS" "$OUT/model_wave${tag}.pt" "$OUT/stream${tag}_${STREAM_STEPS}.json" \
+        2> "$OUT/log_verify.txt" <<'PYEOF'
+import hashlib, json, os, sys
+import torch
+lat, model, stream = sys.argv[1:]
+fp = hashlib.sha256(open(os.path.join(lat, "index.json")).read().encode()).hexdigest()[:16]
+bad = []
+if os.path.exists(model):
+    got = (torch.load(model, map_location="cpu", weights_only=True).get("config") or {}).get("data_fp")
+    if got != fp:
+        bad.append(f"{model}: data_fp {got} != current {fp}")
+if os.path.exists(stream):
+    got = json.load(open(stream)).get("data_fp")
+    if got != fp:
+        bad.append(f"{stream}: data_fp {got} != current {fp}")
+if bad:
+    print("\n".join(bad), file=sys.stderr)
+    sys.exit(1)
+PYEOF
+then
+    failed "OUT $OUT holds results for another latent corpus (see $OUT/log_verify.txt); use a new OUT"
+fi
+
+# 2. train (result + model both present = done; else resume from ckpt)
 if ! { [ -f "$OUT/result_wave${tag}.json" ] && [ -f "$OUT/model_wave${tag}.pt" ]; }; then
     resume=(); [ -f "$OUT/ckpt_wave${tag}.pt" ] && resume=(--resume "$OUT/ckpt_wave${tag}.pt")
     echo "== train $(date -u +%FT%TZ) ${resume[*]:-fresh}" | tee -a "$OUT/progress.txt"

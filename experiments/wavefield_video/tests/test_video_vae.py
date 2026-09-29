@@ -545,5 +545,35 @@ class VideoVAETests(unittest.TestCase):
             self.assertEqual(second.returncode, 2)
             self.assertIn("different settings", second.stderr)
 
+    def test_run_latent_refuses_results_from_a_reencoded_corpus(self):
+        """LATENTS deleted and re-encoded at the same path (the documented recovery)
+        with other videos: the finished model/stream belong to the old corpus, so
+        the runner must fail instead of reporting them as DONE."""
+        import os
+        import shutil
+        import subprocess
+        here = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as d:
+            d = Path(d)
+            VideoVAE("ltx-tiny").save(d / "vae")
+            encode_videos.write_synthetic(d / "mp4", 2, frames=65, size=64)
+            env = dict(os.environ, PY=sys.executable, VIDEOS=str(d / "mp4"), VAE="ltx-tiny",
+                       VAE_PATH=str(d / "vae"), HEIGHT="64", WIDTH="64", MAX_FRAMES="33",
+                       SEQ="4", CHUNK="2", DIM="16", LAYERS="1", HEADS="2", BATCH="2",
+                       STEPS="2", STREAM_STEPS="8", OUT=str(d / "run"))
+            first = subprocess.run(["bash", str(here / "run_latent.sh")], env=env,
+                                   capture_output=True, text=True)
+            self.assertEqual(first.returncode, 0, first.stdout[-2000:] + first.stderr[-2000:])
+            self.assertEqual((d / "run" / "status.txt").read_text().strip(), "DONE")
+            # same settings, same paths -- another corpus
+            encode_videos.write_synthetic(d / "mp4_extra", 1, frames=65, size=64)
+            for f in (d / "mp4_extra").glob("*.mp4"):
+                shutil.copy(f, d / "mp4" / ("extra_" + f.name))
+            shutil.rmtree(d / "run" / "latents")
+            again = subprocess.run(["bash", str(here / "run_latent.sh")], env=env,
+                                   capture_output=True, text=True)
+            self.assertEqual(again.returncode, 1, again.stdout[-2000:] + again.stderr[-2000:])
+            self.assertIn("another latent corpus", (d / "run" / "status.txt").read_text())
+
 if __name__ == "__main__":
     unittest.main()
