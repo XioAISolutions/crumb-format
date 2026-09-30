@@ -1,0 +1,5 @@
+--config_path configs/inference_longlive_original.yaml
+--data_path /workspace/slava/opsd_prompts.txt
+--output_folder /workspace/slava/opsd_out_orig
+--num_output_frames 243 --seed_list 1 --per_prompt_seed
+--use_lmdb_pipeline --lmdb_cache_update_source generated --lmdb_use_relative_sink
