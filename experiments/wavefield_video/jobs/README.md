@@ -12,4 +12,7 @@ PATH has no plain `python`; scripts without the pin die rc=2 in 0 s.
 - `c01v_5_fastprompt.sh` — brisk-travel prompt variant
 - `c01w_1_i2v.sh` — I2V anchor-continuation (c01q frame 0), harness `I2V=1`
 - `c01x_1_opsdorig.sh` / `c01x_2_opsd.sh` — OPSD-V stack A/B (LongLive-1.3B,
-  original vs OPSD post-trained lora; repo `/root/opsd-v`, venv `venvs/opsd`)
+  original vs OPSD post-trained lora; repo `/root/opsd-v`, venv `venvs/opsd`).
+  These launchers read their CLI args from `opsd_args_orig.txt` / `opsd_args_opsd.txt`
+  (small compressor-safe writes; long single-line exec commands have been
+  corrupted by the Hermes compressor — always read back after writing).
