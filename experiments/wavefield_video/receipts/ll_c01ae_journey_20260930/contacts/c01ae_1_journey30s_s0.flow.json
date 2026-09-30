@@ -1,0 +1,16 @@
+{
+ "frames": 733,
+ "flow_med_median_px": 0.853,
+ "flow_med_p10": 0.529,
+ "flow_med_p90": 1.339,
+ "dx_median_px": -0.0,
+ "dx_sign_frac_neg": 0.613,
+ "net_dx_sum_px": -2.8,
+ "rmse_median": 17.05,
+ "rmse_p90_over_median": 1.32,
+ "intra8_med": 0.861,
+ "bound8_med": 0.83,
+ "bound_over_intra": 0.96,
+ "flow_first_half": 0.823,
+ "flow_second_half": 0.912
+}

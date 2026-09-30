@@ -1,0 +1,55 @@
+{
+  "encoder": "dinov2",
+  "window_s": 30.0,
+  "duration_s": 10.5,
+  "n_samples": 22,
+  "baseline": {
+    "luma": 0.41190736266699707,
+    "contrast": 0.21097765930674292,
+    "motion": 0.15894543627897897,
+    "sat": 0.32350927184928546,
+    "self_sim": 0.9536710977554321
+  },
+  "thresholds": {
+    "drift": 0.9,
+    "luma": 0.25,
+    "contrast": 0.25,
+    "motion": 0.25,
+    "sat": 0.25
+  },
+  "windows": [
+    {
+      "start_s": 0.0,
+      "sim_to_first": 0.9536710977554321,
+      "drift_ratio": 1.0,
+      "sim_to_prev": 1.0,
+      "luma": 0.41190736266699707,
+      "contrast": 0.21097765930674292,
+      "motion": 0.15894543627897897,
+      "sat": 0.32350927184928546,
+      "fails": []
+    }
+  ],
+  "reference": "window_0_unverified",
+  "drift_reference": "window_0_self_similarity",
+  "diagnostic_scope": "Sampled heuristic consistency checks using DINOv2 image features (similarity proxy) and pixel statistics.",
+  "semantic_quality": "unverified",
+  "independent_pixels_review_required": true,
+  "limitations": [
+    "Window 0 may already be degraded; it is not a trusted clean-context reference.",
+    "Stable texture, wrong content, and defects between samples can escape these checks.",
+    "Feature similarity and statistical stability do not certify recognizable same-content video; independent pixels review is required.",
+    "coherent_horizon_s is a deprecated alias of diagnostic_horizon_s, not a coherence claim."
+  ],
+  "diagnostic_horizon_s": 10.5,
+  "coherent_horizon_s": 10.5,
+  "verdict": "NO_FLAGS",
+  "video": "runs_probe_journey10s_s0/len_10s/rank0-0-0_regular.mp4",
+  "receipt": {
+    "evaluator": "24778fdb8f0a6021",
+    "encoder": "dinov2:facebook/dinov2-small:7493e5b9adf216d5",
+    "per_sec": 2.0,
+    "window": 30.0,
+    "video": "da06efe4435d366d"
+  }
+}
