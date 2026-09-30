@@ -805,7 +805,8 @@ def render(args):
                        "torch_version": torch.__version__, "python_version": platform.python_version(),
                        "source_sha256": {name: sha256_file(Path(__file__).parent / name) for name in
                                          ("render_rollout.py", "wfvideo.py", "data.py", "data_waves.py", "ssm_lite.py", "semantic_metrics.py") +
-                                         (("v1_backup/wfvideo.py",) if config["architecture"] == "v1" else ())}},
+                                         (("v1_backup/wfvideo.py",) if config["architecture"] == "v1" else ()) +
+                                         (("flow_head.py",) if config.get("head") == "flow" else ())}},
         "claim_boundary": claim, "notes": notes,
     }
 

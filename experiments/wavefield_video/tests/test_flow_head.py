@@ -271,6 +271,9 @@ class FlowHeadTests(unittest.TestCase):
                 pngs.append([p.read_bytes() for p in sorted((out / "prediction").glob("*.png"))])
             self.assertTrue(pngs[0])
             self.assertEqual(pngs[0], pngs[1])
+            # the render's provenance names the flow-head source that produced it
+            meta = json.loads((Path(d) / "render0" / "metrics.json").read_text())
+            self.assertIn("flow_head.py", meta["provenance"]["source_sha256"])
 
 
 if __name__ == "__main__":
