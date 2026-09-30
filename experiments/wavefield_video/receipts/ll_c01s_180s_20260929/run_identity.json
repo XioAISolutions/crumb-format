@@ -1,0 +1,60 @@
+{
+  "ckpt": "9999853030:ec9063a44ea3c91e",
+  "longlive": "6b36d20ec6f7958d29d11a704dfa64611a9f2572",
+  "longlive_src": "90cd2996a10fc62e",
+  "overlay": {
+    "checkpoints": {
+      "generator_ckpt": "/root/LongLive/LongLive-2.0-5B/model_bf16.pt"
+    },
+    "data": {
+      "data_path": "/workspace/slava/exp/pr63/prompts_long.txt",
+      "image_or_video_shape": [
+        1,
+        1088,
+        48,
+        44,
+        80
+      ]
+    },
+    "fp8_quant": true,
+    "inference": {
+      "async_vae": false,
+      "guidance_scale": 1.0,
+      "multi_shot_rope_offset": 8,
+      "multi_shot_sink": true,
+      "sampling_steps": 4,
+      "save_latents_only": true,
+      "sink_size": 8,
+      "streaming_vae": false,
+      "vae_type": "wan"
+    },
+    "inference_iter": 0,
+    "logging": {
+      "seed": 0
+    },
+    "model_kwargs": {
+      "local_attn_size": 12,
+      "model_name": "Wan2.2-TI2V-5B",
+      "num_frame_per_block": 8,
+      "timestep_shift": 5.0
+    },
+    "num_output_frames": 1088,
+    "num_samples": 1,
+    "output_folder": "/workspace/slava/exp/pr63/runs_longlive_cfg16i/len_180s/latents",
+    "save_latents_only": false,
+    "save_with_index": true,
+    "torch_compile": false,
+    "torch_compile_backend": "inductor",
+    "torch_compile_dynamic": false,
+    "torch_compile_fullgraph": false,
+    "torch_compile_min_samples": 3,
+    "torch_compile_mode": "max-autotune-no-cudagraphs",
+    "torch_compile_suppress_errors": false,
+    "torch_compile_target": "generator_model",
+    "use_ema": false,
+    "use_relative_rope": true
+  },
+  "prompts": "4623fc15dd98cf0d",
+  "vae": "2818839170:20eb789667fa5e60",
+  "wan_models": "3130e60e9144248e"
+}

@@ -1,0 +1,165 @@
+{
+  "encoder": "dinov2",
+  "window_s": 30.0,
+  "duration_s": 301.0,
+  "n_samples": 603,
+  "baseline": {
+    "luma": 0.3826667214433352,
+    "contrast": 0.23963228066762288,
+    "motion": 0.08446641525222083,
+    "sat": 0.3081780488292376,
+    "self_sim": 0.9770284295082092
+  },
+  "thresholds": {
+    "drift": 0.9,
+    "luma": 0.25,
+    "contrast": 0.25,
+    "motion": 0.25,
+    "sat": 0.25
+  },
+  "windows": [
+    {
+      "start_s": 0.0,
+      "sim_to_first": 0.9770284295082092,
+      "drift_ratio": 1.0,
+      "sim_to_prev": 1.0,
+      "luma": 0.3826667214433352,
+      "contrast": 0.23963228066762288,
+      "motion": 0.08446641525222083,
+      "sat": 0.3081780488292376,
+      "fails": []
+    },
+    {
+      "start_s": 30.0,
+      "sim_to_first": 0.9769066572189331,
+      "drift_ratio": 0.9998753646407839,
+      "sim_to_prev": 0.9996851682662964,
+      "luma": 0.37825154811143874,
+      "contrast": 0.23970245222250622,
+      "motion": 0.08323776939262946,
+      "sat": 0.3091038520137469,
+      "fails": []
+    },
+    {
+      "start_s": 60.0,
+      "sim_to_first": 0.9781968593597412,
+      "drift_ratio": 1.0011959015891894,
+      "sim_to_prev": 0.999640166759491,
+      "luma": 0.37796463469664254,
+      "contrast": 0.23809315413236617,
+      "motion": 0.08465207166348894,
+      "sat": 0.31029365758101146,
+      "fails": []
+    },
+    {
+      "start_s": 90.0,
+      "sim_to_first": 0.9717133045196533,
+      "drift_ratio": 0.9945599075441118,
+      "sim_to_prev": 0.9993740916252136,
+      "luma": 0.37601150621970497,
+      "contrast": 0.2378832258284092,
+      "motion": 0.08672985980908075,
+      "sat": 0.3111191769440969,
+      "fails": []
+    },
+    {
+      "start_s": 120.0,
+      "sim_to_first": 0.9764702916145325,
+      "drift_ratio": 0.9994287393520803,
+      "sim_to_prev": 0.9992626905441284,
+      "luma": 0.37855757226546605,
+      "contrast": 0.2389705742398898,
+      "motion": 0.08968198044846455,
+      "sat": 0.30856760988632836,
+      "fails": []
+    },
+    {
+      "start_s": 150.0,
+      "sim_to_first": 0.9773197174072266,
+      "drift_ratio": 1.0002981365641161,
+      "sim_to_prev": 0.9995722770690918,
+      "luma": 0.3768817260861397,
+      "contrast": 0.2389580140511195,
+      "motion": 0.08385934395094713,
+      "sat": 0.3121386577685674,
+      "fails": []
+    },
+    {
+      "start_s": 180.0,
+      "sim_to_first": 0.9781842827796936,
+      "drift_ratio": 1.0011830293127357,
+      "sim_to_prev": 0.9994406700134277,
+      "luma": 0.37596765806277593,
+      "contrast": 0.23932264496882757,
+      "motion": 0.07986056208610534,
+      "sat": 0.31101269125938413,
+      "fails": []
+    },
+    {
+      "start_s": 210.0,
+      "sim_to_first": 0.9732093811035156,
+      "drift_ratio": 0.9960911593876384,
+      "sim_to_prev": 0.9989089965820312,
+      "luma": 0.3730109954873721,
+      "contrast": 0.23889556676149368,
+      "motion": 0.08456023242324591,
+      "sat": 0.31318351477384565,
+      "fails": []
+    },
+    {
+      "start_s": 240.0,
+      "sim_to_first": 0.9776066541671753,
+      "drift_ratio": 1.0005918196866155,
+      "sim_to_prev": 0.9988242387771606,
+      "luma": 0.38224584311246873,
+      "contrast": 0.23816116650899252,
+      "motion": 0.08228046260774136,
+      "sat": 0.3092804407080015,
+      "fails": []
+    },
+    {
+      "start_s": 270.0,
+      "sim_to_first": 0.9751783609390259,
+      "drift_ratio": 0.9981064332282382,
+      "sim_to_prev": 0.9993592500686646,
+      "luma": 0.3824624329805374,
+      "contrast": 0.23774550929665567,
+      "motion": 0.08494937103241681,
+      "sat": 0.3050117259224256,
+      "fails": []
+    },
+    {
+      "start_s": 300.0,
+      "sim_to_first": 0.9799908399581909,
+      "drift_ratio": 1.0030320616683313,
+      "sim_to_prev": 0.9963273406028748,
+      "luma": 0.39105308055877686,
+      "contrast": 0.2434240529934565,
+      "motion": 0.09038802981376648,
+      "sat": 0.3168259859085083,
+      "fails": []
+    }
+  ],
+  "reference": "window_0_unverified",
+  "drift_reference": "window_0_self_similarity",
+  "diagnostic_scope": "Sampled heuristic consistency checks using DINOv2 image features (similarity proxy) and pixel statistics.",
+  "semantic_quality": "unverified",
+  "independent_pixels_review_required": true,
+  "limitations": [
+    "Window 0 may already be degraded; it is not a trusted clean-context reference.",
+    "Stable texture, wrong content, and defects between samples can escape these checks.",
+    "Feature similarity and statistical stability do not certify recognizable same-content video; independent pixels review is required.",
+    "coherent_horizon_s is a deprecated alias of diagnostic_horizon_s, not a coherence claim."
+  ],
+  "diagnostic_horizon_s": 301.0,
+  "coherent_horizon_s": 301.0,
+  "verdict": "NO_FLAGS",
+  "video": "runs_longlive_cfg16j/len_300s/rank0-0-0_regular.mp4",
+  "receipt": {
+    "evaluator": "24778fdb8f0a6021",
+    "encoder": "dinov2:facebook/dinov2-small:7493e5b9adf216d5",
+    "per_sec": 2.0,
+    "window": 30.0,
+    "video": "350bd473a39da7b2"
+  }
+}
