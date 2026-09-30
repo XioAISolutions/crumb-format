@@ -6,12 +6,10 @@ B=root@161.184.224.50; P=41400
 for n in orig opsd; do
   H=$S/clip_harvest/opsd_$n; mkdir -p "$H"
   D=/workspace/slava/opsd_out_$n/seed_1
-  if ! scp -q -P $P "$B:$D/rank0-0-0_regular.mp4" "$H/" 2>/dev/null; then
-    scp -q -P $P "$B:$D/"'*.mp4' "$H/" 2>/dev/null || { echo "$n: fetch failed"; continue; }
-    mv "$H"/rank0-0-0_regular.mp4 "$H"/x.mp4 2>/dev/null || true
-    f=$(ls "$H"/*.mp4 2>/dev/null | grep -v x.mp4 | head -1)
-    [ -n "$f" ] && mv "$f" "$H/rank0-0-0_regular.mp4"
-  fi
+  scp -q -P $P "$B:$D/"'*.mp4' "$H/" 2>/dev/null || D=/workspace/slava/opsd_out_$n
+  scp -q -P $P "$B:$D/"'*.mp4' "$H/" 2>/dev/null || { echo "$n: fetch failed"; continue; }
+  f=$(ls "$H"/*.mp4 2>/dev/null | head -1)
+  [ -n "$f" ] && [ "$f" != "$H/rank0-0-0_regular.mp4" ] && mv "$f" "$H/rank0-0-0_regular.mp4"
   bash "$S/harvest_clip.sh" "opsd_$n" >/dev/null 2>&1 || echo "$n: score failed"
 done
 echo "=== OPSD A/B (median px/frame @640w) ==="
