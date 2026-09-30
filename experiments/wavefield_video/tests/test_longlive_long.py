@@ -61,6 +61,9 @@ def test_overlay_sets_every_blocker_fix(tmp_path):
     assert cfg["num_output_frames"] == lat
     assert cfg["data"]["image_or_video_shape"] == [1, lat, 48, 44, 80]
     assert cfg["use_relative_rope"] is True
+    assert L.build_overlay(BASE, latent_frames=lat, prompts="p.txt", ckpt="c.pt",
+                           out_dir=tmp_path, window=24, sink=4, seed=3,
+                           relative_rope=False)["use_relative_rope"] is False
     inf = cfg["inference"]
     assert inf["save_latents_only"] is True and inf["streaming_vae"] is False
     assert "vae_device" not in inf

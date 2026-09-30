@@ -1,0 +1,6 @@
+2026-09-29T20:38:42Z FINISHED gpuq_job_9k_1503_2_tpl_seq_cont.sh rc=0 dur=4204s
+2026-09-29T20:39:22Z RUNNING  gpuq_job_974zzzzzz_c01s_180s.sh
+2026-09-29T20:41:41Z FINISHED gpuq_job_974zzzzzz_c01s_180s.sh rc=1 dur=138s
+2026-09-29T20:42:21Z RUNNING  gpuq_job_974zzzzzz_c01t_300s.sh
+2026-09-29T20:44:35Z FINISHED gpuq_job_974zzzzzz_c01t_300s.sh rc=1 dur=134s
+2026-09-29T20:45:15Z RUNNING  gpuq_job_9k_1600_0_tpl_latent.sh (chain resumed)

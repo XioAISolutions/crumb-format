@@ -29,6 +29,7 @@ PROMPTS=${PROMPTS:-$PWD/prompts_long.txt}
 OUT=${OUT:-runs_longlive}
 LENGTHS=${LENGTHS:-10 30 180 300}
 PRECISION=${PRECISION:-fp8}; WINDOW=${WINDOW:-32}; SINK=${SINK:-8}; SEED=${SEED:-0}
+RELATIVE_ROPE=${RELATIVE_ROPE:-on}
 ENCODER=${ENCODER:-dinov2}; DECODE_DEVICE=${DECODE_DEVICE:-cuda}
 BASE_CONFIG=${BASE_CONFIG:-}        # empty: LongLive's configs/fp8 (or bf16) inference yaml
 base_args=(); [ -n "$BASE_CONFIG" ] && base_args=(--base-config "$BASE_CONFIG")
@@ -112,7 +113,7 @@ for secs in $LENGTHS; do
     # refuses an --out that holds a different one (run_identity.json)
     "$PY" longlive_long.py generate --ll-root "$LL" --ckpt "$CKPT" --prompts "$PROMPTS" \
         --minutes "$mins" --out "$d" --precision "$PRECISION" --window "$WINDOW" \
-        --sink "$SINK" --seed "$SEED" --decode-device "$DECODE_DEVICE" ${base_args[@]+"${base_args[@]}"} >> "$OUT/log_${secs}s.txt" 2>&1 || failed "generate ${secs}s (see $OUT/log_${secs}s.txt)"
+        --sink "$SINK" --seed "$SEED" --decode-device "$DECODE_DEVICE" --relative-rope "$RELATIVE_ROPE" ${base_args[@]+"${base_args[@]}"} >> "$OUT/log_${secs}s.txt" 2>&1 || failed "generate ${secs}s (see $OUT/log_${secs}s.txt)"
     [ -n "$vram_pid" ] && kill "$vram_pid" 2>/dev/null || true
     vram_pid=
     peak=$( { sort -n "$OUT/vram_${secs}s.csv" 2>/dev/null || true; } | tail -n 1)
