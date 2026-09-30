@@ -1,0 +1,63 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>BrainsNN Studio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;font:16px/1.5 -apple-system,system-ui,sans-serif;background:#0b0d10;color:#e8eaed}
+main{max-width:820px;margin:0 auto;padding:28px 20px 80px}
+h1{font-size:22px;font-weight:650;margin:0 0 4px}
+.sub{color:#9aa0a6;font-size:14px;margin-bottom:22px}
+.card{background:#16191d;border:1px solid #23272c;border-radius:14px;padding:18px;margin-bottom:14px}
+textarea{width:100%;min-height:110px;background:#0f1114;color:#e8eaed;border:1px solid #2b3036;border-radius:10px;padding:12px;font:15px/1.45 inherit;resize:vertical}
+.row{display:flex;gap:12px;margin-top:12px;flex-wrap:wrap;align-items:center}
+label{font-size:13px;color:#9aa0a6}
+select,input[type=number]{background:#0f1114;color:#e8eaed;border:1px solid #2b3036;border-radius:8px;padding:8px 10px;font-size:14px}
+button{background:#2f6fed;color:#fff;border:0;border-radius:10px;padding:11px 22px;font-size:15px;font-weight:600;cursor:pointer}
+button:disabled{opacity:.5;cursor:default}
+.note{font-size:12.5px;color:#8a9096;margin-top:10px}
+video{width:100%;margin-top:10px;border-radius:10px;background:#000}
+</style></head><body><main>
+<h1>BrainsNN Studio</h1>
+<div class="sub">Type a scene, pick a length, press Generate. The 4090 renders it and the video appears below. Five-minute clips take around 35 minutes to render.</div>
+<div class="card">
+<textarea id="p" placeholder="Describe the video..."></textarea>
+<div class="row">
+<label>Length <select id="len"></select></label>
+<label>Seed <input type="number" id="seed" value="0" style="width:80px"></label>
+<button id="go" onclick="gen()">Generate</button>
+<span id="msg" class="note"></span>
+</div>
+</div>
+<div id="jobs"></div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+for(const m of [10,30,60,180,300]){const o=document.createElement('option');o.value=m;o.textContent=m<60?m+' sec':m/60+' min';$('len').appendChild(o)}
+$('len').value=300;
+async function gen(){
+  const prompt=$('p').value.trim(), minutes=+$('len').value, seed=+$('seed').value||0;
+  if(!prompt){$('msg').textContent='write a scene first';return}
+  $('go').disabled=true;$('msg').textContent='submitting...';
+  const r=await fetch('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt,minutes,seed})});
+  $('msg').textContent=r.ok?'submitted — queued on the GPU':'error: '+await r.text();
+  $('go').disabled=false;refresh();
+}
+async function refresh(){
+  const jobs=await (await fetch('/api/jobs')).json();
+  const el=$('jobs');el.innerHTML='';
+  for(const j of jobs){
+    const d=document.createElement('div');d.className='card';
+    const st=j.status;
+    const icon=st==='done'?'done':(st.includes('fail')?'failed':'working');
+    d.innerHTML='<b>'+icon+'</b> — '+j.minutes+'s clip, seed '+j.seed+'<div class="note">'+j.prompt.slice(0,200)+'</div>'+(j.error?'<div class="note">'+j.error+'</div>':'');
+    if(st==='done'&&j.video){
+      const v=document.createElement('video');v.controls=true;v.src=j.video;d.appendChild(v);
+      const a=document.createElement('a');a.href='/raw/'+j.id;a.textContent='download full quality mp4';a.style.display='block';a.style.marginTop='8px';d.appendChild(a);
+    }
+    el.appendChild(d);
+  }
+}
+setInterval(refresh,5000);refresh();
+</script>
+</body></html>
