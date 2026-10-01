@@ -1,0 +1,19 @@
+Free VRAM 23.24053955078125 GB
+KV inference with 3 frames per block
+Loading base generator checkpoint: checkpoints/longlive_base.pt (use_ema=False)
+Loaded base generator checkpoint key: generator
+LoRA enabled with config: {'type': 'lora', 'rank': 256, 'alpha': 256, 'dropout': 0.0, 'dtype': 'bfloat16', 'verbose': False}
+Applying LoRA to generator (inference)...
+LoRA target modules for generator: 300 Linear layers
+peft_config LoraConfig(task_type=None, peft_type=<PeftType.LORA: 'LORA'>, auto_mapping=None, peft_version='0.21.1', base_model_name_or_path=None, revision=None, inference_mode=False, r=256, target_modules={'q', 'k', 'o', 'ffn.0', 'ffn.2', 'v'}, exclude_modules=None, lora_alpha=256, lora_dropout=0.0, fan_in_fan_out=False, bias='none', use_rslora=False, modules_to_save=None, init_lora_weights=True, layers_to_transform=None, layers_pattern=None, rank_pattern={}, alpha_pattern={}, megatron_config=None, megatron_core='megatron.core', trainable_token_indices=None, loftq_config={}, eva_config=None, corda_config=None, lora_ga_config=None, use_dora=False, velora_config=None, alora_invocation_tokens=None, use_qalora=False, qalora_group_size=16, monteclora_config=None, layer_replication=None, runtime_config=LoraRuntimeConfig(ephemeral_gpu_offload=False), lora_bias=False, target_parameters=None, use_bdlora=None, arrow_config=None, kasa_config=None, ensure_weight_tying=False)
+trainable params: 349,962,240 || all params: 1,768,959,040 || trainable%: 19.7835
+Loading LoRA checkpoint: checkpoints/opsdv_longlive_lora.pt (use_lora_ema=False)
+LoRA checkpoint branch: generator_lora
+LoRA weights loaded for generator
+Number of prompts: 1
+Running inference for seeds: [1]
+Start seed=1, output=/workspace/slava/opsd_out_opsd
+seed=1: 0it [00:00, ?it/s]seed=1: 1it [02:10, 130.54s/it]seed=1: 1it [02:10, 130.54s/it]
+Moving DynamicSwap_WanTextEncoder to cuda:0 with preserved memory: 14.01011037826538 GB
+kv_cache_size: 18720 (policy: int->local, size=12, frame_seq_length: 1560, num_output_frames: 159)
+[inference] local_attn_size set on model: 12
