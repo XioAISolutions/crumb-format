@@ -147,7 +147,7 @@ for seed in $SEEDS; do
                 --heads "$HEADS" --motion-loss --dense --seq-frames "$SEQ_FRAMES" --chunk "$frames" \
                 --grad-ckpt --micro-batch "$SEQ_MICRO" \
                 --tbptt-chunks "$TBPTT" "${occ[@]}" --eval-rollout "$EVAL_ROLLOUT" \
-                --eval-seeds "$EVAL_SEEDS" --eval-chunk 1 --save-every 250 \
+                --eval-seeds "$EVAL_SEEDS" --eval-chunk 1 --eval-batch 1 --save-every 250 \
                 ${extra_args[@]+"${extra_args[@]}"} ${resume[@]+"${resume[@]}"} \
                 --kind "$kind" --seed "$seed" --steps "$STEPS" \
                 --out "$OUT" --tag "$tag" >> "$OUT/log${tag}.txt" 2>&1 || rc=$?

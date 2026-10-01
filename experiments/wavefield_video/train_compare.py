@@ -901,7 +901,7 @@ def main():
     t0 = time.time()
     for step in range(start_step + 1, a.steps + 1):
         K = k_at(step)                       # constant, or ramped 3->8 in the 2nd half
-        for attempt in range(9):             # 1 try + up to 8 OOM retries
+        for attempt in range(4):             # 1 try + up to 3 OOM retries
             try:
                 gen = make_clip_batch(cur_batch, gen_frames, a.grid, a.grid, device=dev,
                                       seed=1000 + step + seed_off, kicks=a.kicks, collisions=a.collisions,
@@ -992,7 +992,7 @@ def main():
                 break
             except RuntimeError as e:
                 oom = "out of memory" in str(e).lower()
-                if not (a.auto_batch and dev == "cuda" and oom) or attempt == 8:
+                if not (a.auto_batch and dev == "cuda" and oom) or attempt == 3:
                     raise
                 opt.zero_grad(set_to_none=True)
                 clips = ctx = loss = None
@@ -1021,7 +1021,7 @@ def main():
         se = zb = cb = vb = cr = 0.0
         eb = 64                               # eval sub-batch, halved on OOM
         for i in range(a.eval_batches):
-            for attempt in range(9):
+            for attempt in range(4):
                 try:
                     clips = make_clip_batch(eb, a.frames, a.grid, a.grid, device=dev,
                                             seed=90000 + i, kicks=a.kicks, collisions=a.collisions,
@@ -1039,7 +1039,7 @@ def main():
                     zb += z; cb += c; vb += v
                     break
                 except RuntimeError as e:
-                    if not (a.auto_batch and dev == "cuda" and "out of memory" in str(e).lower()) or attempt == 8:
+                    if not (a.auto_batch and dev == "cuda" and "out of memory" in str(e).lower()) or attempt == 3:
                         raise
                     clips = ctx = tgt = pred = None
                     torch.cuda.empty_cache()
@@ -1057,12 +1057,12 @@ def main():
         roll_fn = occlusion_rollout_eval if a.data_source == "occlusion" else rollout_eval
         if a.data_source == "occlusion":
             _occ.OCC_START, _occ.OCC_END = a.occ_start, a.occ_end
-        for attempt in range(9):              # rollout eval also OOM-hardened
+        for attempt in range(4):              # rollout eval also OOM-hardened
             try:
                 roll = roll_fn(m, a, dev)
                 break
             except RuntimeError as e:
-                if not (a.auto_batch and dev == "cuda" and "out of memory" in str(e).lower()) or attempt == 8:
+                if not (a.auto_batch and dev == "cuda" and "out of memory" in str(e).lower()) or attempt == 3:
                     raise
                 torch.cuda.empty_cache()
                 # Shrink the seed sub-batch first (bounds memory, keeps all seeds ->
