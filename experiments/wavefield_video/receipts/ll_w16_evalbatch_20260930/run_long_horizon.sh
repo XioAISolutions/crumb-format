@@ -22,7 +22,7 @@
 #           carries memory past a gap longer than any it trained on.
 #
 # Pre-registered read (fixed before any result):
-#   SEQ=1 adds W_half_seq[_cw|_wg] / S_ssm_seq (train_long.py): SEQ_FRAMES=512 sequences
+#   SEQ=1 adds W_half_seq / S_ssm_seq (train_long.py): SEQ_FRAMES=512 sequences
 #           in T_LONG chunks with carried state and a SEQ_GAP=256 gap mid-sequence.
 #           PROVE (seq): W_half_seq exit-direction accuracy >= 0.8 on >= 2/3 seeds
 #           with TBPTT=1 -> constant-memory training bridges gaps > one chunk.
@@ -31,6 +31,8 @@
 #   KILL   halflife arms <= W_soft on exit-direction accuracy on >= 2/3 seeds ->
 #          long poles are not what limits memory; stop the pole line.
 # Not yet run on GPU: do a preflight first (STEPS=20 SEEDS=0) to size batch/VRAM.
+# 2026-09-30 (pump): --eval-batch 1 on both eval paths -- final evals OOMed at
+# the auto-batch floor (fft +8 GiB on ~22 GiB in-use; eb=1 passes, see PR #63).
 set -euo pipefail
 cd "$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -54,7 +56,7 @@ BASE=(--data-source occlusion --grid "$GRID" --n-balls 6 --batch "$BATCH"
       --dim "$DIM" --layers "$LAYERS" --heads "$HEADS" --ckpt
       --motion-loss --rollout-loss 1 --const-lr
       --eval-rollout "$EVAL_ROLLOUT" --eval-seeds "$EVAL_SEEDS" --eval-chunk 1
-      --auto-batch --save-every 250)
+      --eval-batch 1 --auto-batch --save-every 250)
 
 ARMS=(
     "W_soft|wave|$T_LONG|--kernel-version dispersion --pole-param softplus"
@@ -73,11 +75,9 @@ fi
 # LONG_HORIZON.md 8.2 measured it better on 2/2 seeds (-3..-4% MSE/copy-last,
 # 2x copy-ratio), though below the 10% bar that would make it a default.
 SEQ_FRAMES=${SEQ_FRAMES:-512}; SEQ_GAP=${SEQ_GAP:-256}; TBPTT=${TBPTT:-1}
-# WRITE (LONG_HORIZON.md 8.4): extra flags for the wave SEQ arm's write path.
-# Default --clean-write: 8.4 measured D=128 recall 0.119 -> 0.993 at G=1 with it,
-# and the ball scenes are blank-background. WRITE= (empty) = as built;
-# WRITE=--write-gate failed 8.4 (0.119) and is kept only for comparison.
-WRITE=${WRITE---clean-write}
+# WRITE (LONG_HORIZON.md 8.4): extra flags for the wave SEQ arm's write path,
+# e.g. WRITE="--write-gate" or WRITE="--clean-write"; empty = as built.
+WRITE=${WRITE:-}
 # SEQ memory: chunk 128 x grid 32 x dim 128 wave training measured (CPU peak,
 # per batch element) ~5.8 GB + 3.4 GB/extra layer without checkpointing, i.e.
 # ~16 GB/sample at 4 layers -- BATCH=4 cannot fit 24 GB. --grad-ckpt keeps one
@@ -93,12 +93,7 @@ if [ "$EVAL_ROLLOUT" -lt "$need" ]; then
 fi
 if [ "${SEQ:-0}" = "only" ]; then ARMS=(); SEQ=1; fi    # SEQ=only: carried-state arms alone
 if [ "${SEQ:-0}" = "1" ]; then
-    # The write path changes the architecture, so it is part of the arm's identity:
-    # W_half_seq_cw (clean write), _wg (gate); plain W_half_seq = as built. An OUT
-    # from an older as-built run is never resumed into / mistaken for another.
-    wtag=""; case " $WRITE " in *" --clean-write "*) wtag+="_cw";; esac
-    case " $WRITE " in *" --write-gate "*) wtag+="_wg";; esac
-    ARMS+=("W_half_seq${wtag}|wave|$T_LONG|--pole-param halflife $WRITE|long"
+    ARMS+=("W_half_seq|wave|$T_LONG|--pole-param halflife $WRITE|long"
            "S_ssm_seq|ssm|$T_LONG||long")
 fi
 

@@ -100,7 +100,7 @@ def plan(minutes, precision="fp8", window=32, sink=8):
 
 # ---------------------------------------------------------------- overlay
 def build_overlay(base, *, latent_frames, prompts, ckpt, out_dir, window=32, sink=8,
-                  seed=0, fp8=True, compile=False, relative_rope=True):
+                  seed=0, fp8=True, compile=False, relative_rope=True, i2v=False):
     """Return a copy of a LongLive inference config (a plain dict, as loaded by
     yaml) set up for one long latents-only run. Keys go where the release code
     reads them: grouped sections are flattened by ``normalize_config``, so a key
@@ -135,6 +135,16 @@ def build_overlay(base, *, latent_frames, prompts, ckpt, out_dir, window=32, sin
         cfg["torch_compile"] = False
     if fp8:
         cfg.pop("model_quant", None)
+    # [zeph 2026-09-30] Self-contained released checkpoint: drop the upstream
+    # lora placeholder so the bf16 path never loads /path/to/longlive2/...
+    cfg.pop("adapter", None)
+    cfg.setdefault("checkpoints", {}).pop("lora_ckpt", None)
+    if i2v:
+        cfg["i2v"] = True
+        cfg.setdefault("algorithm", {})["i2v"] = True
+        cfg.setdefault("inference", {})["independent_first_frame"] = True
+        cfg.pop("adapter", None)
+        cfg.setdefault("checkpoints", {}).pop("lora_ckpt", None)
     return cfg
 
 
@@ -173,6 +183,11 @@ def n_prompts_of(prompts):
     prompts = Path(prompts)
     if prompts.is_file():
         return sum(1 for line in prompts.read_text(encoding="utf-8").splitlines() if line.strip())
+    img_dir = prompts / "images" if (prompts / "images").is_dir() else prompts
+    exts = {".png", ".jpg", ".jpeg", ".webp"}
+    imgs = [p for p in img_dir.iterdir() if p.is_file() and p.suffix.lower() in exts]
+    if imgs:
+        return len(imgs)
     cap = prompts / "caption" if (prompts / "caption").is_dir() else prompts
     return sum(1 for d in cap.iterdir() if d.is_dir())
 
@@ -475,7 +490,7 @@ def cmd_generate(a):
     cfg = build_overlay(base, latent_frames=lat, prompts=prompts, ckpt=Path(a.ckpt).resolve(),
                         out_dir=out.resolve(), window=a.window, sink=a.sink, seed=a.seed,
                         fp8=a.precision == "fp8", compile=a.compile,
-                        relative_rope=(a.relative_rope == "on"))
+                        relative_rope=(a.relative_rope == "on"), i2v=a.i2v)
     cfg["inference_iter"] = n_prompts - 1
     ident = None
     if not a.dry_run:
@@ -536,6 +551,8 @@ def main(argv=None):
             s.add_argument("--no-decode", action="store_true")
             s.add_argument("--dry-run", action="store_true", help="write the overlay only")
             s.add_argument("--force", action="store_true")
+            s.add_argument("--i2v", action="store_true",
+                           help="i2v: --prompts is an images/ data dir")
             s.add_argument("--relative-rope", choices=["on", "off"], default="on",
                            help="store raw K in cache / window-relative RoPE (default on)")
             s.add_argument("--compile", action="store_true",

@@ -32,7 +32,10 @@ PRECISION=${PRECISION:-fp8}; WINDOW=${WINDOW:-32}; SINK=${SINK:-8}; SEED=${SEED:
 RELATIVE_ROPE=${RELATIVE_ROPE:-on}
 ENCODER=${ENCODER:-dinov2}; DECODE_DEVICE=${DECODE_DEVICE:-cuda}
 BASE_CONFIG=${BASE_CONFIG:-}        # empty: LongLive's configs/fp8 (or bf16) inference yaml
+I2V=${I2V:-0}
+[ "$I2V" = "1" ] && [ -z "$BASE_CONFIG" ] && BASE_CONFIG="$LL/configs/inference_i2v.yaml"
 base_args=(); [ -n "$BASE_CONFIG" ] && base_args=(--base-config "$BASE_CONFIG")
+i2v_args=(); [ "$I2V" = "1" ] && i2v_args=(--i2v)
 mkdir -p "$OUT"
 command -v "$PY" >/dev/null 2>&1 || { echo "Python not executable: $PY" >&2; exit 2; }
 vram_pid=
@@ -77,9 +80,13 @@ PYEOF
 fi
 [ -f "$CKPT" ] || { echo "no checkpoint at $CKPT (run with SETUP=1)" >&2; exit 2; }
 [ -f "$LL/wan_models/Wan2.2-TI2V-5B/Wan2.2_VAE.pth" ] || { echo "no Wan2.2 weights under $LL/wan_models (SETUP=1)" >&2; exit 2; }
-[ -f "$PROMPTS" ] || { echo "no prompts file $PROMPTS" >&2; exit 2; }
+if [ "$I2V" = "1" ]; then
+    [ -d "$PROMPTS" ] || { echo "no i2v data dir $PROMPTS" >&2; exit 2; }
+else
+    [ -f "$PROMPTS" ] || { echo "no prompts file $PROMPTS" >&2; exit 2; }
+fi
 
-cfg="LL_COMMIT=$(git -C "$LL" rev-parse --short HEAD 2>/dev/null || echo ?) CKPT=$CKPT PROMPTS=$PROMPTS PRECISION=$PRECISION WINDOW=$WINDOW SINK=$SINK SEED=$SEED ENCODER=$ENCODER BASE_CONFIG=$BASE_CONFIG"
+cfg="LL_COMMIT=$(git -C "$LL" rev-parse --short HEAD 2>/dev/null || echo ?) CKPT=$CKPT PROMPTS=$PROMPTS PRECISION=$PRECISION WINDOW=$WINDOW SINK=$SINK SEED=$SEED ENCODER=$ENCODER BASE_CONFIG=$BASE_CONFIG I2V=$I2V"
 if [ -f "$OUT/run_config.txt" ] && [ "$(cat "$OUT/run_config.txt")" != "$cfg" ]; then
     echo "$OUT holds a run with different settings:" >&2
     diff <(tr ' ' '\n' < "$OUT/run_config.txt") <(tr ' ' '\n' <<< "$cfg") >&2 || true
@@ -113,7 +120,7 @@ for secs in $LENGTHS; do
     # refuses an --out that holds a different one (run_identity.json)
     "$PY" longlive_long.py generate --ll-root "$LL" --ckpt "$CKPT" --prompts "$PROMPTS" \
         --minutes "$mins" --out "$d" --precision "$PRECISION" --window "$WINDOW" \
-        --sink "$SINK" --seed "$SEED" --decode-device "$DECODE_DEVICE" --relative-rope "$RELATIVE_ROPE" ${base_args[@]+"${base_args[@]}"} >> "$OUT/log_${secs}s.txt" 2>&1 || failed "generate ${secs}s (see $OUT/log_${secs}s.txt)"
+        --sink "$SINK" --seed "$SEED" --decode-device "$DECODE_DEVICE" --relative-rope "$RELATIVE_ROPE" ${i2v_args[@]+"${i2v_args[@]}"} ${base_args[@]+"${base_args[@]}"} >> "$OUT/log_${secs}s.txt" 2>&1 || failed "generate ${secs}s (see $OUT/log_${secs}s.txt)"
     [ -n "$vram_pid" ] && kill "$vram_pid" 2>/dev/null || true
     vram_pid=
     peak=$( { sort -n "$OUT/vram_${secs}s.csv" 2>/dev/null || true; } | tail -n 1)
@@ -125,6 +132,13 @@ for secs in $LENGTHS; do
         # the video bytes all match what produced it; otherwise it recomputes
         "$PY" long_eval.py "$v" --encoder "$ENCODER" --out "$d/$s.eval.json" --reuse \
             >> "$OUT/log_${secs}s.txt" 2>&1 || failed "eval $v"
+        # Seam audit (additive; never blocks a run): boundary-wobble detector from the
+        # 2026-09-30 owner review (STITCH_FINDINGS_20260930). WINDOW<24 shows a jump at
+        # every 8-latent block join; this writes the receipt next to each eval.json.
+        if [ -f seam_score.py ] && command -v /usr/bin/python3 >/dev/null 2>&1; then
+            /usr/bin/python3 seam_score.py "$v" --json "$d/$s.seam_score.json" \
+                >> "$OUT/log_${secs}s.txt" 2>&1 || true
+        fi
         tail -n 1 "$OUT/log_${secs}s.txt" | tee -a "$OUT/progress.txt"
     done
 done

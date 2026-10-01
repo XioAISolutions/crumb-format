@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.6.0
+
+Unreleased trunk version bump: unblocks receipt-batch merges while v1.5.0 stays the published tag.
+
 ## v1.5.0
 
 Post-v1.4.0 mainline content, versioned so the trunk merge no longer answers to the v1.4.0 tag.

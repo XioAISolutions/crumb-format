@@ -639,6 +639,10 @@ def main():
     ap.add_argument("--ffn-mult", type=float, default=4.0)
     ap.add_argument("--target-params", type=int, default=0, help="auto-match ffn_mult to this")
     ap.add_argument("--eval-batches", type=int, default=16)
+    ap.add_argument("--eval-batch", type=int, default=64,
+                    help="initial single-step eval sub-batch (halved on CUDA OOM when "
+                         "--auto-batch is set); 1 = minimum memory for long-horizon FFT evals "
+                         "(final evals OOMed at the auto-batch floor 8; see 2026-09-30 fix)")
     ap.add_argument("--out", default=".")
     ap.add_argument("--tag", default="")
     ap.add_argument("--ckpt", action="store_true")
@@ -1019,7 +1023,7 @@ def main():
     m.eval()
     with torch.no_grad():
         se = zb = cb = vb = cr = 0.0
-        eb = 64                               # eval sub-batch, halved on OOM
+        eb = a.eval_batch                     # eval sub-batch, halved on OOM
         for i in range(a.eval_batches):
             for attempt in range(4):
                 try:
