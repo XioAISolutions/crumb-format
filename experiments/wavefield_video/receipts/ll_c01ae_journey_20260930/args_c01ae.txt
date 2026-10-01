@@ -1,0 +1,70 @@
+=== c01ae job scripts (2026-09-30) ===
+
+--- c01ae_1_journey30s_s0.sh
+#!/bin/bash
+set -e
+cd /workspace/slava/exp/pr63
+exec > /workspace/slava/logs/gpuq_c01ae_1_journey30s_s0.log 2>&1
+export PY=/workspace/slava/venvs/longlive/bin/python
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True LL_PROMPT_CHUNK=16 LL_OFFLOAD_IDLE=1 LL=/root/LongLive
+export JOB_ID=c01ae_1_journey30s_s0 OUT=runs_probe_journey30s_s0 LENGTHS=30 PRECISION=fp8 WINDOW=12 SINK=8 SEED=0 RELATIVE_ROPE=on
+export PROMPTS=/workspace/slava/exp/pr63/prompts_journey.txt
+exec /usr/bin/timeout 3600 bash run_longlive.sh
+
+--- c01ae_2_journey10s_s0.sh
+#!/bin/bash
+set -e
+cd /workspace/slava/exp/pr63
+exec > /workspace/slava/logs/gpuq_c01ae_2_journey10s_s0.log 2>&1
+export PY=/workspace/slava/venvs/longlive/bin/python
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True LL_PROMPT_CHUNK=16 LL_OFFLOAD_IDLE=1 LL=/root/LongLive
+export JOB_ID=c01ae_2_journey10s_s0 OUT=runs_probe_journey10s_s0 LENGTHS=10 PRECISION=fp8 WINDOW=12 SINK=8 SEED=0 RELATIVE_ROPE=on
+export PROMPTS=/workspace/slava/exp/pr63/prompts_journey2.txt
+exec /usr/bin/timeout 2400 bash run_longlive.sh
+
+--- c01ae_3_nofollow10s_s0.sh
+#!/bin/bash
+set -e
+cd /workspace/slava/exp/pr63
+exec > /workspace/slava/logs/gpuq_c01ae_3_nofollow10s_s0.log 2>&1
+export PY=/workspace/slava/venvs/longlive/bin/python
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True LL_PROMPT_CHUNK=16 LL_OFFLOAD_IDLE=1 LL=/root/LongLive
+export JOB_ID=c01ae_3_nofollow10s_s0 OUT=runs_probe_nofollow10s_s0 LENGTHS=10 PRECISION=fp8 WINDOW=12 SINK=8 SEED=0 RELATIVE_ROPE=on
+export PROMPTS=/workspace/slava/exp/pr63/prompts_nofollow.txt
+exec /usr/bin/timeout 2400 bash run_longlive.sh
+
+--- c01ae_4_bf16journey30s.sh
+#!/bin/bash
+set -e
+cd /workspace/slava/exp/pr63
+exec > /workspace/slava/logs/gpuq_c01ae_4_bf16journey30s.log 2>&1
+export PY=/workspace/slava/venvs/longlive/bin/python
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True LL_PROMPT_CHUNK=16 LL_OFFLOAD_IDLE=1 LL=/root/LongLive
+export JOB_ID=c01ae_4_bf16journey30s OUT=runs_probe_journey30s_bf16 LENGTHS=30 PRECISION=bf16 WINDOW=12 SINK=8 SEED=0 RELATIVE_ROPE=on
+export PROMPTS=/workspace/slava/exp/pr63/prompts_journey.txt
+exec /usr/bin/timeout 3600 bash run_longlive.sh
+
+=== prompts ===
+--- prompts_journey.txt
+A brisk forward walk through an old European town, bright daylight. The camera advances steadily and quickly at eye level: down a narrow cobblestone alley with buildings and doorways gliding past on both sides, the alley opening into a sunlit plaza with a stone fountain, then past cafe tables onto a broad street with shops and a church tower ahead. Continuous fast forward dolly motion throughout. Realistic colours, consistent weather and time of day throughout.
+
+--- prompts_journey2.txt
+A brisk forward walk down a narrow cobblestone alley in an old European town, bright daylight. The camera advances steadily and quickly at eye level, buildings and doorways gliding past on both sides, the alley opening into a sunlit plaza with a stone fountain. Continuous fast forward dolly motion. Realistic colours, consistent time of day.
+
+--- prompts_nofollow.txt
+A brisk forward walk down a narrow cobblestone alley in an old European town, bright daylight. The camera advances steadily and quickly at eye level, old wooden doors and shuttered windows gliding past on both sides, then out into a sunlit square. Continuous fast forward dolly motion through the street. Realistic colours, consistent time of day.
+
+
+=== run_config (box) ===
+--- runs_probe_journey30s_s0
+LL_COMMIT=6b36d20 CKPT=/root/LongLive/LongLive-2.0-5B/model_bf16.pt PROMPTS=/workspace/slava/exp/pr63/prompts_journey.txt PRECISION=fp8 WINDOW=12 SINK=8 SEED=0 ENCODER=dinov2 BASE_CONFIG= I2V=0
+
+--- runs_probe_journey10s_s0
+LL_COMMIT=6b36d20 CKPT=/root/LongLive/LongLive-2.0-5B/model_bf16.pt PROMPTS=/workspace/slava/exp/pr63/prompts_journey2.txt PRECISION=fp8 WINDOW=12 SINK=8 SEED=0 ENCODER=dinov2 BASE_CONFIG= I2V=0
+
+--- runs_probe_nofollow10s_s0
+LL_COMMIT=6b36d20 CKPT=/root/LongLive/LongLive-2.0-5B/model_bf16.pt PROMPTS=/workspace/slava/exp/pr63/prompts_nofollow.txt PRECISION=fp8 WINDOW=12 SINK=8 SEED=0 ENCODER=dinov2 BASE_CONFIG= I2V=0
+
+--- runs_probe_journey30s_bf16
+LL_COMMIT=6b36d20 CKPT=/root/LongLive/LongLive-2.0-5B/model_bf16.pt PROMPTS=/workspace/slava/exp/pr63/prompts_journey.txt PRECISION=bf16 WINDOW=12 SINK=8 SEED=0 ENCODER=dinov2 BASE_CONFIG= I2V=0
+

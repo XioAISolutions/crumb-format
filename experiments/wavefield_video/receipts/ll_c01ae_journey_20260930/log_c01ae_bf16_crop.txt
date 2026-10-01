@@ -1,0 +1,47 @@
+[c01ae_4 bf16 30s — failure log crop; full       56-line log on box: /workspace/slava/exp/pr63/runs_probe_journey30s_bf16/log_30s.txt]
+
+[plan] 184 latent frames = 733 frames = 0.51 min; est. VRAM 16.1 GiB of 23.6
+[generate] /workspace/slava/venvs/longlive/bin/python inference.py --config_path /workspace/slava/exp/pr63/runs_probe_journey30s_bf16/len_30s/longlive_overlay.yaml (cwd /root/LongLive)
+Free VRAM 23.24053955078125 GB
+KV inference with 8 frames per block (kv_quant=False, vae_decode=batch)
+Loading generator from /root/LongLive/LongLive-2.0-5B/model_bf16.pt
+[data] data_path=/workspace/slava/exp/pr63/prompts_journey.txt, mode=txt, num_blocks=23
+
+... [prompt echo + first traceback omitted] ...
+
+  File "/workspace/slava/venvs/longlive/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/LongLive/wan_5b/modules/t5.py", line 173, in forward
+    x = fp16_clamp(x + self.attn(self.norm1(x), mask=mask, pos_bias=e))
+  File "/workspace/slava/venvs/longlive/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/venvs/longlive/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/LongLive/wan_5b/modules/t5.py", line 112, in forward
+    attn = torch.einsum('binc,bjnc->bnij', q, k) + attn_bias
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 512.00 MiB. GPU 0 has a total capacity of 23.65 GiB of which 510.31 MiB is free. Process 2569586 has 23.12 GiB memory in use. Of the allocated memory 22.62 GiB is allocated by PyTorch, and 50.54 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/longlive_long.py", line 575, in <module>
+
+... [traceback tail] ...
+
+    return forward_call(*args, **kwargs)
+  File "/root/LongLive/wan_5b/modules/t5.py", line 173, in forward
+    x = fp16_clamp(x + self.attn(self.norm1(x), mask=mask, pos_bias=e))
+  File "/workspace/slava/venvs/longlive/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/venvs/longlive/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/LongLive/wan_5b/modules/t5.py", line 112, in forward
+    attn = torch.einsum('binc,bjnc->bnij', q, k) + attn_bias
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 512.00 MiB. GPU 0 has a total capacity of 23.65 GiB of which 510.31 MiB is free. Process 2569586 has 23.12 GiB memory in use. Of the allocated memory 22.62 GiB is allocated by PyTorch, and 50.54 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/longlive_long.py", line 575, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/longlive_long.py", line 570, in main
+    {"plan": cmd_plan, "generate": cmd_generate, "decode": cmd_decode,
+  File "/workspace/slava/exp/pr63/longlive_long.py", line 515, in cmd_generate
+    subprocess.run(cmd, cwd=ll_root, check=True)
+  File "/usr/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/workspace/slava/venvs/longlive/bin/python', 'inference.py', '--config_path', '/workspace/slava/exp/pr63/runs_probe_journey30s_bf16/len_30s/longlive_overlay.yaml']' returned non-zero exit status 1.

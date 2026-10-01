@@ -1,0 +1,27 @@
+=== gpuq job logs ===
+
+--- logs/gpuq_c01ae_1_journey30s_s0.log
+NVIDIA GeForce RTX 4090, 24564 MiB
+== generate 30s 2026-09-30T12:51:17Z
+   wall 335 s for 30s of video; peak VRAM 22101 MiB
+[long_eval] NO_FLAGS; diagnostic horizon 30s of 30s (dinov2); semantic quality unverified; independent pixels review required
+runs_probe_journey30s_s0/len_30s/rank0-0-0_regular.eval.json: 30s  NO_FLAGS  horizon 30s
+
+--- logs/gpuq_c01ae_2_journey10s_s0.log
+NVIDIA GeForce RTX 4090, 24564 MiB
+== generate 10s 2026-09-30T12:57:38Z
+   wall 206 s for 10s of video; peak VRAM 24165 MiB
+[long_eval] NO_FLAGS; diagnostic horizon 10s of 10s (dinov2); semantic quality unverified; independent pixels review required
+runs_probe_journey10s_s0/len_10s/rank0-0-0_regular.eval.json: 10s  NO_FLAGS  horizon 10s
+
+--- logs/gpuq_c01ae_3_nofollow10s_s0.log
+NVIDIA GeForce RTX 4090, 24564 MiB
+== generate 10s 2026-09-30T13:01:49Z
+   wall 213 s for 10s of video; peak VRAM 24163 MiB
+[long_eval] NO_FLAGS; diagnostic horizon 10s of 10s (dinov2); semantic quality unverified; independent pixels review required
+runs_probe_nofollow10s_s0/len_10s/rank0-0-0_regular.eval.json: 10s  NO_FLAGS  horizon 10s
+
+--- logs/gpuq_c01ae_4_bf16journey30s.log
+NVIDIA GeForce RTX 4090, 24564 MiB
+== generate 30s 2026-09-30T13:06:07Z
+FAILED generate 30s (see runs_probe_journey30s_bf16/log_30s.txt)
