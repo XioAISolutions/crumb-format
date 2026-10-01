@@ -1,0 +1,70 @@
+== run_args.yaml ==
+config_path: configs/inference_longlive.yaml
+command: inference.py --config_path configs/inference_longlive.yaml --data_path /workspace/slava/opsd_prompts.txt
+  --output_folder /workspace/slava/opsd_out_633 --num_output_frames 633 --seed_list
+  1 --per_prompt_seed --use_lmdb_pipeline --lmdb_cache_update_source generated --lmdb_use_relative_sink
+cli_args:
+  config_path: configs/inference_longlive.yaml
+  checkpoint_path: ''
+  data_path: /workspace/slava/opsd_prompts.txt
+  output_folder: /workspace/slava/opsd_out_633
+  num_output_frames: 633
+  use_ema: false
+  use_lora_ema: false
+  seed: 0
+  seed_list: '1'
+  per_prompt_seed: true
+  per_prompt_seed_stride: 100000
+  use_lmdb: false
+  use_lmdb_pipeline: true
+  lmdb_cache_update_source: generated
+  lmdb_use_gt_first_chunk: false
+  lmdb_start_gt_chunk: 0
+  lmdb_replace_latest_chunk_with_gt: false
+  lmdb_use_relative_sink: true
+  lmdb_relative_sink_gt_blend_alpha: 0.0
+  lmdb_history_only_after_first_gt: false
+  lmdb_use_future_gt_context: false
+  lmdb_future_gt_num_chunks: 1
+  enable_fixed_gt_window_after_gt: true
+
+== resolved_config.yaml ==
+independent_first_frame: false
+same_step_across_blocks: true
+last_step_only: false
+context_noise: 0
+causal: true
+streaming_training: true
+slice_last_frames: 21
+max_grad_norm_generator: 10.0
+generator_ckpt: checkpoints/longlive_base.pt
+lora_ckpt: checkpoints/opsdv_longlive_lora.pt
+denoising_step_list:
+- 1000
+- 750
+- 500
+- 250
+warp_denoising_step: true
+num_frame_per_block: 3
+model_name: Wan2.1-T2V-1.3B
+model_kwargs:
+  model_root: checkpoints/Wan2.1-T2V-1.3B
+  local_attn_size: 12
+  timestep_shift: 5.0
+  sink_size: 3
+use_ema: false
+adapter:
+  type: lora
+  rank: 256
+  alpha: 256
+  dropout: 0.0
+  dtype: bfloat16
+  verbose: false
+
+== job script ==
+#!/bin/bash
+set -e
+cd /root/opsd-v
+exec > /workspace/slava/logs/gpuq_c01ad_1_opsd633.log 2>&1
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+exec /usr/bin/timeout 7200 /workspace/slava/venvs/opsd/bin/python inference.py $(tr '\n' ' ' < /workspace/slava/opsd_args_633.txt)
