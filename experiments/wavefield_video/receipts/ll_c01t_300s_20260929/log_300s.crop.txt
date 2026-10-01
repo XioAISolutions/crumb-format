@@ -1,0 +1,36 @@
+[plan] 1808 latent frames = 7229 frames = 5.02 min; est. VRAM 11.9 GiB of 23.6
+[generate] /workspace/slava/venvs/longlive/bin/python inference.py --config_path /workspace/slava/exp/pr63/runs_longlive_cfg16j/len_300s/longlive_overlay.yaml (cwd /root/LongLive)
+Free VRAM 23.24053955078125 GB
+KV inference with 8 frames per block (kv_quant=False, vae_decode=batch)
+Loading generator from /root/LongLive/LongLive-2.0-5B/model_bf16.pt
+[FP8] TorchAO W8A8 quantized 300 linear layers with per-tensor scaling; kept 6 layers in BF16
+[data] data_path=/workspace/slava/exp/pr63/prompts_long.txt, mode=txt, num_blocks=226
+Number of prompts: 1
+prompts [['A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters 
+sampled_noise.shape torch.Size([1, 1808, 48, 44, 80]) prompts [['A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel building facades, flower boxes, closed wooden shutters and a few parked bicycles. The camera moves forward at a constant walking pace, passing shop windows, a small fountain and a stone archway, then continues down the same street. Realistic, natural colours, gentle shadows, consistent weather and time of day throughout.', 'A slow steadicam walk along a quiet cobblestone street in an old European town at golden hour. Warm light falls across pastel b
+[mem] pre: alloc=17.21 reserved=23.13
+[mem] te dev: cuda:0
+[mem] post-clear: alloc=17.21 reserved=17.22
+[mem] idle-offload: TE+VAE -> cpu; alloc=6.20 GiB
+[inference] local_attn_size set on model: 12
+[inference] sink_size set to: 8, multi_shot_sink enabled (pinned position)
+[inference] auto_global_sink_size set to: 8 (first 8 frames permanently anchored)
+[inference] rope_method=linear, original_seq_len=None
+[inference] use_relative_rope enabled
+[inference] multi_shot_rope_offset=8 (multi-shot RoPE offset enabled)
+ 25%|██▌       | 1/4 [00:02<00:06,  2.22s/it][A
+ 50%|█████     | 2/4 [00:02<00:02,  1.29s/it][A
+ 75%|███████▌  | 3/4 [00:03<00:01,  1.06s/it][A
+[decode] runs_longlive_cfg16j/len_300s/latents/rank0-0-0_regular.pt -> runs_longlive_cfg16j/len_300s/rank0-0-0_regular.mp4: 7229 frames, 301.2 s
+     0s  sim 0.977  drift 1.000  luma 0.383  contrast 0.240  motion 0.0845  sat 0.308  
+    30s  sim 0.977  drift 1.000  luma 0.378  contrast 0.240  motion 0.0832  sat 0.309  
+    60s  sim 0.978  drift 1.001  luma 0.378  contrast 0.238  motion 0.0847  sat 0.310  
+    90s  sim 0.972  drift 0.995  luma 0.376  contrast 0.238  motion 0.0867  sat 0.311  
+   120s  sim 0.976  drift 0.999  luma 0.379  contrast 0.239  motion 0.0897  sat 0.309  
+   150s  sim 0.977  drift 1.000  luma 0.377  contrast 0.239  motion 0.0839  sat 0.312  
+   180s  sim 0.978  drift 1.001  luma 0.376  contrast 0.239  motion 0.0799  sat 0.311  
+   210s  sim 0.973  drift 0.996  luma 0.373  contrast 0.239  motion 0.0846  sat 0.313  
+   240s  sim 0.978  drift 1.001  luma 0.382  contrast 0.238  motion 0.0823  sat 0.309  
+   270s  sim 0.975  drift 0.998  luma 0.382  contrast 0.238  motion 0.0849  sat 0.305  
+   300s  sim 0.980  drift 1.003  luma 0.391  contrast 0.243  motion 0.0904  sat 0.317  
+[long_eval] NO_FLAGS; diagnostic horizon 301s of 301s (dinov2); semantic quality unverified; independent pixels review required

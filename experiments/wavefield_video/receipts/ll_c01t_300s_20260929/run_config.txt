@@ -1,0 +1,1 @@
+LL_COMMIT=6b36d20 CKPT=/root/LongLive/LongLive-2.0-5B/model_bf16.pt PROMPTS=/workspace/slava/exp/pr63/prompts_long.txt PRECISION=fp8 WINDOW=12 SINK=8 SEED=0 ENCODER=dinov2 BASE_CONFIG=
