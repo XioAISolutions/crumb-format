@@ -126,6 +126,8 @@ def build_overlay(base, *, latent_frames, prompts, ckpt, out_dir, window=32, sin
         inf["sampling_steps"] = int(os.environ["SAMPLING_STEPS"])
     if os.environ.get("GUIDANCE_SCALE"):
         inf["guidance_scale"] = float(os.environ["GUIDANCE_SCALE"])
+    if os.environ.get("BREADCRUMB_EVERY"):
+        inf["breadcrumb_every"] = int(os.environ["BREADCRUMB_EVERY"])
     # sm89 OOM fix: int8 KV cache (the repo's nvfp4 config uses the same
     # switches). Halves/eighths the cache init that OOMs a 24 GB card.
     cfg["use_relative_rope"] = bool(relative_rope)                     # blocker 1
@@ -142,6 +144,19 @@ def build_overlay(base, *, latent_frames, prompts, ckpt, out_dir, window=32, sin
         cfg["torch_compile"] = False
     if fp8:
         cfg.pop("model_quant", None)
+    # [zeph 2026-10-02] M4 OOM fix: the fp8 path leaves kv_quant=False (bf16 KV),
+    # which eats ~7.5 GB at W24 and OOMs sampling steps >= 5. kv_quant opts in to
+    # nvfp4 KV. Default ON; KV_QUANT=0 opts out.
+    if os.environ.get("KV_QUANT", "0") == "1":
+        cfg["kv_quant"] = True
+    # [zeph 2026-10-02] kv backend fix: LL 6b36d20's fp8 base yaml ships
+    # kv_quant: true + backend cuda, but the cuda backend requires Blackwell
+    # (sm89 fails is_available) and transformer_engine is absent. pytorch
+    # backend + static_6 proven on sm89 (box probe 22:3xZ); mse/abs_max hit an
+    # fp8 torch.where bug in the pytorch reference impl.
+    if cfg.get("kv_quant"):
+        cfg["kv_quant_backend"] = "pytorch"
+        cfg["kv_quant_scale_rule"] = "static_6"
     # [zeph 2026-09-30] Self-contained released checkpoint: drop the upstream
     # lora placeholder so the bf16 path never loads /path/to/longlive2/...
     cfg.pop("adapter", None)
