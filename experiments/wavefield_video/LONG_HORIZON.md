@@ -360,6 +360,65 @@ and the threshold itself (step 256) is unchanged. **PASS** if nothing fires
 through 900 steps (5 minutes); then judge the decoded frames by eye before any
 claim.
 
+## 10. Phase 3 — a generative head, so uncertainty doesn't turn into blur
+
+An MSE head predicts the conditional mean of the next frame. When the future
+branches (a random kick, an occluded ball's exit side, any real video), the
+mean is a blend of futures: blobs smear, and feeding the smear back compounds
+it into the fade/flatten collapse. `flow_head.py` adds a rectified-flow head.
+It is a small per-frame conv velocity net conditioned on the backbone's causal
+feature for that frame, so backbone, carried state and streaming are
+unchanged. It samples `next − last` from noise in N Euler steps
+(`VideoPredictor(head="flow")`, `train_long.py --head flow`).
+
+### 10.1 Pre-registered toy
+
+Balls with `--kicks` (random velocity kicks), grid 16, halflife wave backbone,
+equal steps and seeds; residual (MSE) vs flow. Exact run: seq 16, chunk 16,
+dim 64, 2 layers, 600 steps, seeds 0 and 1, both arms trained with the dense
+loss (flow is always dense, so the residual arm gets `--dense` to match). Scoring comes from
+`stochastic_eval`, identical for both heads: 64-step autoregressive rollouts
+from held-out context. Metrics: spatial-std ratio vs GT (1 = as sharp as real),
+the fraction of frames where `detect_blobs` finds exactly `n_balls` (next to
+the same detector's rate on GT), and the first HealthMonitor collapse.
+
+- **PROVE:** flow keeps mean std ratio ≥ 0.8 and blob-count accuracy ≥ 70% of
+  the GT rate, while the MSE arm's std ratio falls below 0.5 or `flatten`
+  fires.
+- **KILL:** flow's blob-count accuracy is no better than MSE's, so sampling
+  buys nothing at this scale, and the head stays opt-in pending a larger run.
+
+**Result (raw JSON in `results_long_horizon/flow_10_1/`; 600 steps, CPU; the run
+used the phase 3 code before the later train_long plumbing fixes, which do not
+touch the flow head or `stochastic_eval`):**
+
+| arm | std ratio mean / last (GT = 1) | blob count OK (GT 1.00) | 1-step MSE / copy-last | collapse |
+|---|---|---|---|---|
+| residual (MSE), s0 | 1.67 / 2.50 | 0.115 | 0.851 | none |
+| residual (MSE), s1 | 1.79 / 2.08 | 0.065 | 0.814 | none |
+| flow, s0 | 1.64 / 2.18 | 0.043 | 1.547 | none |
+| flow, s1 | 1.30 / 1.64 | 0.056 | 1.530 | none |
+
+- **KILL.** Flow's blob-count accuracy (0.043, 0.056) is no better than MSE's
+  (0.115, 0.065) on either seed, and its single-step error is 1.5× copy-last
+  against 0.8× for MSE. At this scale sampling buys nothing; the head stays
+  opt-in.
+- **The premise did not show up either.** The pre-registered story was "MSE
+  blurs toward the mean, flow stays sharp". Neither head flattened: both roll out
+  *too* much spatial variance (std ratio 1.3–2.5), i.e. they drift and sharpen
+  noise rather than fade. So this toy never tested blur. It tested drift, and on
+  drift the flow head is not better.
+- **What it does not show.** 600 steps is little for a rectified-flow head
+  (its 1-step error is still worse than copying), and the kicks toy may not
+  branch enough to make the mean blurry. A fair re-test needs a run where the
+  MSE arm is shown to flatten first; otherwise there is nothing for flow to fix.
+- **Reproducing it.** These numbers were drawn from the global RNG. Flow noise is
+  now keyed to (seed, step) in training and to (seed, frame, sample) when
+  streaming, so a sliced or resumed run matches an uninterrupted one and the
+  metrics do not depend on how the eval batch is chunked. A rerun of this toy is
+  therefore a fresh draw of the same experiment, not a bit-exact replay of the
+  JSON above.
+
 ## Pitch corrections
 
 - "At 16k moments one step takes ~1.5 s": the *ratio* survives a fair re-measure

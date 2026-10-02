@@ -358,14 +358,16 @@ def _fmt_bytes(n):
         n /= 1024
 
 
-def build_model(a, pole_param, write_gate=False, clean_write=False, in_ch=3, H=None, W=None):
+def build_model(a, pole_param, write_gate=False, clean_write=False, in_ch=3, H=None, W=None,
+                head="residual", flow_steps=16):
     return VideoPredictor(a.dim, a.layers, a.heads, a.frames, H or a.grid, W or a.grid, "wave",
                           causal=True, ffn_mult=4.0 if a.ffn_mult is None else a.ffn_mult,
                           kernel_version="dispersion",
                           linear_pad=True, fuse=getattr(a, "fuse", "none"),
                           pole_param=pole_param, hl_min=a.hl_min, hl_max=a.hl_max,
                           time_pos=getattr(a, "time_pos", "table"),
-                          write_gate=write_gate, clean_write=clean_write, in_ch=in_ch)
+                          write_gate=write_gate, clean_write=clean_write, in_ch=in_ch,
+                          head=head, flow_steps=flow_steps)
 
 
 def cmd_budget(a):
@@ -397,10 +399,19 @@ def cmd_stream(a):
     from data import make_clip_batch
     torch.manual_seed(a.seed)
     dev = torch.device(a.device)
-    sd, ck_cfg = None, {}
+    sd, ck_cfg, ck_args = None, {}, {}
     if a.ckpt:
         saved = torch.load(a.ckpt, map_location=dev, weights_only=True)
         sd, ck_cfg = saved["state"], saved.get("config") or {}
+        ck_args = saved.get("args") or {}       # resumable train_long ckpt_*.pt: no config
+        if not ck_cfg and ck_args:
+            # a resumable checkpoint keeps what the final model's config would say at
+            # its top level (vae, data_fp) and in its training args (bounds, steps)
+            ck_cfg = {k: v for k, v in {"vae": saved.get("vae"), "data_fp": saved.get("data_fp"),
+                                        "hl_min": ck_args.get("hl_min"),
+                                        "hl_max": ck_args.get("hl_max"),
+                                        "flow_steps": ck_args.get("flow_steps")}.items()
+                      if v is not None}
         if a.ffn_mult is None:          # exact width from the weights, not a rounded JSON mult
             a.ffn_mult = sd["blocks.0.ffn.fc1.weight"].shape[0] / a.dim
         # half-life bounds are not state-dict tensors: hl_raw means a different
@@ -413,6 +424,13 @@ def cmd_stream(a):
     # Write-path options are read off the checkpoint itself (LONG_HORIZON.md 8.4).
     wg = sd is not None and any(k.endswith("mix.wg.weight") for k in sd)
     cw = sd is not None and "posemb.py" not in sd
+    # a train_long.py --head flow checkpoint carries flow.* weights: rebuild that head
+    # (strict load would fail on a residual model) and sample it from --seed. The
+    # weights say which head; the step count comes from the final model's config or,
+    # for a resumable ckpt_*.pt, from its saved training args.
+    flow = sd is not None and any(k.startswith("flow.") for k in sd)
+    head = {"head": "flow" if flow else "residual",
+            "flow_steps": ck_cfg.get("flow_steps") or ck_args.get("flow_steps") or 16}
     vae = None
     if a.latents:
         # Latent mode (LONG_HORIZON.md phase 2): real latent context from held-out
@@ -462,13 +480,15 @@ def cmd_stream(a):
         dec = StreamDecoder(vae, history=history_with_margin(rf_back), lookahead=rf_fwd + 1)
         print(f"DECODER receptive field: {rf_back} back / {rf_fwd} forward latents -> "
               f"history {dec.H}, lookahead {dec.L}", flush=True)
-        m = build_model(a, a.pole_param[0], write_gate=wg, clean_write=cw, in_ch=shards.C, H=shards.h, W=shards.w).to(dev)
+        m = build_model(a, a.pole_param[0], write_gate=wg, clean_write=cw, in_ch=shards.C, H=shards.h, W=shards.w, **head).to(dev)
     else:
-        m = build_model(a, a.pole_param[0], write_gate=wg, clean_write=cw).to(dev)
+        m = build_model(a, a.pole_param[0], write_gate=wg, clean_write=cw, **head).to(dev)
         # Context stays on CPU for the monitor; warm() moves it to the model's device.
         ctx = make_clip_batch(a.batch, a.frames, a.grid, a.grid, seed=70000)[:, :a.frames]
     if a.ckpt:
         m.load_state_dict(sd)
+    if head["head"] == "flow":
+        m.set_flow_sampler(seed=a.seed)     # per-frame keyed: resumes sample identically
     view = (lambda z: vae.decode(z).cpu()) if vae is not None else (lambda x: x)
     mon = HealthMonitor(patience=a.patience).calibrate(view(ctx))
     sess = StreamSession(m, clamp=None if vae is not None else (0.0, 1.0))
@@ -491,6 +511,20 @@ def cmd_stream(a):
         elif old_fp != ctx_fp:
             raise SystemExit(f"{a.resume} continues a stream warmed on different context "
                              f"({old_fp} != {ctx_fp}: other --latents/--batch/--frames?)")
+        if head["head"] == "flow":
+            # the flow draws are keyed to --seed: another seed would splice a different
+            # stochastic trajectory into this stream's log
+            old_seed = (sess.extra or {}).get("flow_seed")
+            if old_seed != a.seed:
+                raise SystemExit(f"{a.resume} was sampled with flow seed {old_seed}; --seed "
+                                 f"{a.seed} would continue a different trajectory -- resume "
+                                 "with the same --seed, or start fresh")
+            # the Euler step count is not a weight, so the model fingerprint misses it
+            old_steps = (sess.extra or {}).get("flow_steps")
+            if old_steps != head["flow_steps"]:
+                raise SystemExit(f"{a.resume} was sampled with {old_steps} Euler steps; this "
+                                 f"checkpoint samples with {head['flow_steps']} -- the rollout "
+                                 "would change integration mid-trajectory; start fresh")
         if sess.extra and "health" in sess.extra:
             mon.load_state_dict(sess.extra["health"])
         else:                       # older state file: flags start fresh, indices stay absolute
@@ -539,6 +573,8 @@ def cmd_stream(a):
 
     def extra_state():
         extra = {"health": mon.state_dict(), "generated": gen, "context_fp": ctx_fp}
+        if head["head"] == "flow":
+            extra.update(flow_seed=a.seed, flow_steps=head["flow_steps"])
         if vae is not None:
             extra.update(decoder=dec.state_dict())
         if a.checkpoint:
@@ -624,6 +660,9 @@ def cmd_stream(a):
         res["collapse_latent_step"] = {k: latent_step(v) for k, v in mon.first.items()}
         res["latent_steps_generated"] = gen
     res["steps_generated"] = gen
+    res["head"] = head["head"]
+    if head["head"] == "flow":          # the sampled trajectory is a function of this seed
+        res.update(flow_seed=a.seed, flow_steps=head["flow_steps"])
     if a.out:
         with open(a.out, "w") as fh:
             json.dump(res, fh, indent=1)

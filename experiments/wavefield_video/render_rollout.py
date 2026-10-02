@@ -218,7 +218,7 @@ def load_model(args, torch):
         if time_pos == "table" and "posemb.pt" not in state:
             raise ValueError("checkpoint has no v2 positional embeddings; use the matching legacy result or explicit architecture='v1' config")
         # train_long.py (LONG_HORIZON.md phase 1) options; absent keys keep the v2 defaults.
-        extra = {k: config[k] for k in ("pole_param", "hl_min", "hl_max", "write_gate", "clean_write")
+        extra = {k: config[k] for k in ("pole_param", "hl_min", "hl_max", "write_gate", "clean_write", "head", "flow_steps")
                  if config.get(k) is not None}
         model = VideoPredictor(*dimensions, time_pos=time_pos, **extra,
                                **{k: config[k] for k in ("causal", "residual", "ffn_mult", "kernel_version",
@@ -671,6 +671,8 @@ def render(args):
     if device == "cuda" and not torch.cuda.is_available():
         raise ValueError("CUDA requested but unavailable")
     model = model.float().to(device)
+    if config.get("head") == "flow":
+        model.set_flow_sampler(seed=args.seed)   # same command -> same sampled video
     context_frames = config["frames"]
     clip, cols, pos, truth_method = make_latent_truth(config, context_frames + args.frames, args.seed, torch)
     context = clip[:, :context_frames].clone().to(device)
@@ -778,6 +780,7 @@ def render(args):
         "schema_version": 1, "status": "encoding", "created_utc": datetime.now(timezone.utc).isoformat(),
         "config": configuration,
         "rollout": {"frames": args.frames, "seed": args.seed, "mode": mode, "batch_size": 1,
+                    "flow_sampler_seed": args.seed if config.get("head") == "flow" else None,
                     "device": device, "dtype": "float32", "fps": args.fps, "scale": args.scale,
                     "first_target_index": context_frames, "teacher_forcing": False,
                     "truth_generation": truth_method, "temporal_embedding": "clamp at context_frames-1" if mode == "recurrent" else "reset window positions"},
@@ -802,7 +805,8 @@ def render(args):
                        "torch_version": torch.__version__, "python_version": platform.python_version(),
                        "source_sha256": {name: sha256_file(Path(__file__).parent / name) for name in
                                          ("render_rollout.py", "wfvideo.py", "data.py", "data_waves.py", "ssm_lite.py", "semantic_metrics.py") +
-                                         (("v1_backup/wfvideo.py",) if config["architecture"] == "v1" else ())}},
+                                         (("v1_backup/wfvideo.py",) if config["architecture"] == "v1" else ()) +
+                                         (("flow_head.py",) if config.get("head") == "flow" else ())}},
         "claim_boundary": claim, "notes": notes,
     }
 

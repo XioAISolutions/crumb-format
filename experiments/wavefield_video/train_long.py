@@ -50,7 +50,8 @@ def _save_atomic(obj, path):
 def arch_kwargs(a, in_ch=3):
     """VideoPredictor keyword arguments; also saved as checkpoint metadata so
     render_rollout.load_model / eval_only.py rebuild the same model."""
-    kw = dict(causal=True, residual=True, ffn_mult=a.ffn_mult, time_pos="none", in_ch=in_ch)
+    kw = dict(causal=True, residual=True, ffn_mult=a.ffn_mult, time_pos="none", in_ch=in_ch,
+              head=a.head, flow_steps=a.flow_steps)
     if a.kind == "wave":
         kw.update(kernel_version="dispersion", linear_pad=True, pole_param=a.pole_param,
                   hl_min=a.hl_min, hl_max=a.hl_max, write_gate=a.write_gate,
@@ -118,18 +119,23 @@ def detach_states(states):
     return [s.detach() if torch.is_tensor(s) else s for s in states]
 
 
-def sequence_loss(m, clips, moving, a, scale=1.0):
+def sequence_loss(m, clips, moving, a, scale=1.0, flow_noise=None):
     """Walk one [B, N+1, 3, H, W] batch in chunks with carried state. Returns the
     mean per-chunk loss (a float) after calling backward() every G chunks; the
     loss is multiplied by scale (micro-batch share of the full batch)."""
     if getattr(a, "rollout_k", 0):
         return rollout_sequence_loss(m, clips, moving, a, scale)
     B, n_chunks, T = clips.shape[0], a.seq_frames // a.chunk, a.chunk
+    flow = getattr(a, "head", "residual") == "flow"
     states = [None] * len(m.blocks)
     group, total = 0.0, 0.0
     for c in range(n_chunks):
         x = clips[:, c * T:(c + 1) * T]
-        if a.dense:
+        if flow:
+            lc, states = m.flow_loss(x, clips[:, c * T + 1:(c + 1) * T + 1], states=states,
+                                     noise=None if flow_noise is None else
+                                     (flow_noise[0][c], flow_noise[1][c]))
+        elif a.dense:
             pred, states = m(x, states=states, dense=True)            # [B,T,3,H,W]
             tgt, last = clips[:, c * T + 1:(c + 1) * T + 1], x
             mv = moving[:, c * T:(c + 1) * T] if moving is not None else None
@@ -139,11 +145,12 @@ def sequence_loss(m, clips, moving, a, scale=1.0):
             pred, states = m(x, states=states)                         # [B,3,H,W]
             tgt, last = clips[:, (c + 1) * T], x[:, -1]
             mv = moving[:, (c + 1) * T - 1] if moving is not None else None
-        pred = pred.float()
-        if a.motion_loss:
-            lc = tc.motion_balanced_loss(pred, tgt, last, mv)
-        else:
-            lc = F.mse_loss(pred, tgt)
+        if not flow:
+            pred = pred.float()
+            if a.motion_loss:
+                lc = tc.motion_balanced_loss(pred, tgt, last, mv)
+            else:
+                lc = F.mse_loss(pred, tgt)
         group = group + lc * (scale / n_chunks)
         if (c + 1) % a.tbptt_chunks == 0 or c == n_chunks - 1:
             group.backward()
@@ -171,6 +178,7 @@ def stream_rollout_eval(m, a, dev):
             c1 = min(S, c0 + max(1, a.eval_chunk))
             cb = c1 - c0
             st, f = m.stream_init(cb, dev), None
+            m.flow_row0 = c0                     # flow draws keyed per sample, not per chunk
             for t in range(a.frames):
                 f, st = m.stream_step(clip[c0:c1, t], st, t)
             ce = []
@@ -183,6 +191,7 @@ def stream_rollout_eval(m, a, dev):
                 ce.append((pc - meta["pos"][c0:c1, a.frames + k]).norm(dim=-1))
                 f, st = m.stream_step(f, st, a.frames + k)
             cerrs.append(torch.stack(ce, 0))                         # [R, cb, nb]
+    m.flow_row0 = 0
     mse = [x / S for x in mse]
     persist = [x / S for x in persist]
     cerr = torch.cat(cerrs, 1)
@@ -196,6 +205,50 @@ def stream_rollout_eval(m, a, dev):
             "final_centroid_err": round(cerr[-1].mean().item(), 3),
             "identity_survival": round((cerr[-1] < 2.0 * a.radius).float().mean().item(), 3),
             "divergence_horizon": tc.divergence_horizon(med, a.radius, tc.DIV_CONSEC)}
+
+
+def stochastic_eval(m, a, dev):
+    """Autoregressive rollouts from held-out context, scored on what MSE blur
+    destroys: per-frame spatial-std ratio vs GT (1 = as sharp as real, -> 0 =
+    smeared/flat), blob count == n_balls (semantic_metrics.detect_blobs, with the
+    same detector's GT rate as a ceiling), and HealthMonitor's first collapse.
+    R = --stoch-rollout frames on S = --stoch-seeds clips (64 x 16 = the 10.1
+    protocol), rolled --eval-chunk clips at a time; the metrics do not depend on
+    the chunking (per-sample keyed flow noise; the monitor sees whole frames)."""
+    from long_horizon import HealthMonitor
+    from semantic_metrics import detect_blobs
+    R, S = a.stoch_rollout, a.stoch_seeds
+    clip = tc.make_clip_batch(S, a.chunk + R - 1, a.grid, a.grid, device=dev, seed=91000,
+                              kicks=a.kicks, collisions=a.collisions, radius=a.radius,
+                              speed=a.speed, nb=a.n_balls)
+    ctx = clip[:, :a.chunk]
+    mon = HealthMonitor(patience=8).calibrate(ctx.cpu())
+    ratio_sum, ok, ok_gt = [0.0] * R, 0, 0
+    frames = torch.empty(R, S, *clip.shape[2:])               # CPU, for the monitor
+    with torch.no_grad():
+        for c0 in range(0, S, max(1, a.eval_chunk)):
+            c1 = min(S, c0 + max(1, a.eval_chunk))
+            m.flow_row0 = c0
+            st, f = m.stream_init(c1 - c0, dev), None
+            for t in range(a.chunk):
+                f, st = m.stream_step(ctx[c0:c1, t], st, t)
+            for k in range(R):
+                f = f.float().clamp(0, 1)
+                gt = clip[c0:c1, a.chunk + k]
+                ratio_sum[k] += (f.flatten(1).std(1) / (gt.flatten(1).std(1) + 1e-9)).sum().item()
+                frames[k, c0:c1] = f.cpu()
+                ok += sum(len(d) == a.n_balls for d in detect_blobs(f.cpu(), radius=a.radius))
+                ok_gt += sum(len(d) == a.n_balls for d in detect_blobs(gt.cpu(), radius=a.radius))
+                f, st = m.stream_step(f, st, a.chunk + k)
+    m.flow_row0 = 0
+    for k in range(R):
+        mon.update(frames[k])
+    ratios = [r / S for r in ratio_sum]
+    n = R * S
+    return {"stoch_rollout": R, "stoch_seeds": S, "std_ratio_mean": round(sum(ratios) / R, 4),
+            "std_ratio_last": round(ratios[-1], 4), "std_ratio_curve": [round(r, 4) for r in ratios],
+            "blob_count_ok": round(ok / n, 4), "blob_count_ok_gt": round(ok_gt / n, 4),
+            "collapse": dict(mon.first)}
 
 
 def pixel_eval(m, a, dev):
@@ -230,7 +283,8 @@ def pixel_eval(m, a, dev):
 # flags it reports) and the --latents PATH (its content is checked by the dataset
 # fingerprint). Every other flag shapes training and must match.
 RESUME_FREE = {"steps", "resume", "out", "tag", "save_every", "save_every_sec", "grad_ckpt",
-               "eval_batch", "eval_rollout", "eval_seeds", "eval_chunk", "latents"}
+               "eval_batch", "eval_rollout", "eval_seeds", "eval_chunk", "latents",
+               "stoch_rollout", "stoch_seeds"}
 
 
 def train_args(a):
@@ -262,6 +316,9 @@ def main(argv=None):
                     help="learned gate on what enters the wave state (LONG_HORIZON.md 8.4)")
     ap.add_argument("--clean-write", action="store_true",
                     help="blank input writes nothing: no spatial table, no embed/pi bias")
+    ap.add_argument("--head", choices=["residual", "flow"], default="residual",
+                    help="residual = MSE mean (default); flow = rectified-flow sampler (phase 3)")
+    ap.add_argument("--flow-steps", type=int, default=16, help="Euler steps per sampled frame")
     ap.add_argument("--grid", type=int, default=16)
     ap.add_argument("--n-balls", type=int, default=N_BALLS)
     ap.add_argument("--radius", type=float, default=RADIUS)
@@ -283,6 +340,10 @@ def main(argv=None):
     ap.add_argument("--eval-rollout", type=int, default=64)
     ap.add_argument("--eval-seeds", type=int, default=16)
     ap.add_argument("--eval-chunk", type=int, default=4)
+    ap.add_argument("--stoch-rollout", type=int, default=64,
+                    help="balls: sharpness/blob rollout length (64 = LONG_HORIZON 10.1; 0 = skip)")
+    ap.add_argument("--stoch-seeds", type=int, default=16,
+                    help="balls: clips in that rollout, rolled --eval-chunk at a time (0 = skip)")
     ap.add_argument("--eval-batch", type=int, default=8,
                     help="single-step eval batch (8 x 8 batches); keep small on the GPU box")
     ap.add_argument("--save-every", type=int, default=0)
@@ -317,6 +378,16 @@ def main(argv=None):
         ap.error("--seq-frames must be a multiple of --chunk")
     if a.tbptt_chunks < 1:
         ap.error("--tbptt-chunks must be >= 1")
+    if a.stoch_rollout < 0 or a.stoch_seeds < 0:
+        ap.error("--stoch-rollout/--stoch-seeds must be >= 0 (0 skips that eval)")
+    if a.head == "flow":
+        if a.motion_loss:
+            ap.error("--head flow trains a dense rectified-flow loss (no --motion-loss)")
+        if a.rollout_k:
+            ap.error("--head flow has no self-rollout objective yet (use --rollout-k 0)")
+        if a.flow_steps < 1:
+            ap.error("--flow-steps must be >= 1 (0 Euler steps returns the raw noise)")
+        a.dense = True                    # the flow loss is always dense (every position)
 
     dev = "cuda" if torch.cuda.is_available() else "cpu"
     torch.manual_seed(a.seed)
@@ -386,6 +457,11 @@ def main(argv=None):
             ap.error(f"--resume {a.resume} is already at step {start}; --steps {a.steps} "
                      "would report a less-trained run than the one saved (use --steps >= "
                      f"{start})")
+        # flow noise comes from a device-local generator, and CPU and CUDA draw
+        # different values for one seed: a cross-device resume would switch noise
+        if a.head == "flow" and ck.get("flow_noise_device", dev) != dev:
+            ap.error(f"--resume {a.resume} drew its flow noise on {ck['flow_noise_device']}; "
+                     f"resuming on {dev} would change the noise stream -- resume there")
         prior_sec = float(ck.get("train_sec", 0.0))
         print(f"RESUME <- {a.resume} at step={start} (of {a.steps})", flush=True)
 
@@ -395,6 +471,7 @@ def main(argv=None):
     def save_ckpt(step):        # atomic: a kill mid-write leaves the previous file intact
         _save_atomic({"state": m.state_dict(), "opt": opt.state_dict(), "step": step,
                       "train_sec": prior_sec + time.time() - t0, "args": train_args(a),
+                      **({"flow_noise_device": dev} if a.head == "flow" else {}),
                       **(resume_meta() if data is not None else {}), **extra}, ckpt_path)
 
     # A slice budget ends with SIGTERM (GNU timeout): finish the current step, save,
@@ -417,9 +494,20 @@ def main(argv=None):
             clips, moving = gen if a.motion_loss else (gen, None)
         opt.zero_grad(set_to_none=True)
         loss, mb = 0.0, a.micro_batch or a.batch            # gradient accumulation
+        # flow noise for the WHOLE batch, keyed to (seed, step) rather than the global
+        # RNG, then sliced per micro-batch: a resumed run draws what the uninterrupted
+        # one would, and --micro-batch changes memory use, not which noise an example gets
+        fn = None
+        if a.head == "flow":
+            g = torch.Generator(device=dev).manual_seed(a.seed * 1_000_003 + step)
+            n_ch, B = a.seq_frames // a.chunk, clips.shape[0]
+            fn = (torch.randn(n_ch, B, a.chunk, *clips.shape[2:], generator=g, device=dev),
+                  torch.rand(n_ch, B, a.chunk, generator=g, device=dev))
         for i in range(0, a.batch, mb):
             loss += sequence_loss(m, clips[i:i + mb], moving[i:i + mb] if moving is not None
-                                  else None, a, scale=clips[i:i + mb].shape[0] / a.batch)
+                                  else None, a, scale=clips[i:i + mb].shape[0] / a.batch,
+                                  flow_noise=None if fn is None else
+                                  (fn[0][:, i:i + mb], fn[1][:, i:i + mb]))
         torch.nn.utils.clip_grad_norm_(m.parameters(), 1.0)
         opt.step()
         if step % max(1, a.steps // 10) == 0 or step == a.steps:
@@ -442,15 +530,22 @@ def main(argv=None):
 
     m.eval()
     a.frames = a.chunk                                   # eval context = one chunk
+    FLOW_EVAL_SEED = 12345                               # eval_only.py --flow-seed default
+    if a.head == "flow":
+        m.set_flow_sampler(seed=FLOW_EVAL_SEED)          # reproducible sampled evals
     if data is not None:
         single, roll = latent_eval(m, data, a), {}
     else:
         single, roll = pixel_eval(m, a, dev)
+        if a.data_source == "balls" and a.stoch_rollout and a.stoch_seeds:
+            roll = {**roll, **stochastic_eval(m, a, dev)}
     cfg = model_config(a, data)
     res = {**cfg, "pole_param": a.pole_param if a.kind == "wave" else None,
            "seq_frames": a.seq_frames, "chunk": a.chunk, "tbptt_chunks": a.tbptt_chunks,
            "dense": a.dense, "time_pos": "none", "write_gate": a.write_gate,
-           "clean_write": a.clean_write, "steps": a.steps, "seed": a.seed,
+           "clean_write": a.clean_write,
+           "flow_steps": a.flow_steps if a.head == "flow" else None,
+           "flow_sampler_seed": FLOW_EVAL_SEED if a.head == "flow" else None, "steps": a.steps, "seed": a.seed,
            "params": sum(p.numel() for p in m.parameters()), "dim": a.dim, "layers": a.layers,
            "heads": a.heads, "batch": a.batch, "micro_batch": a.micro_batch or a.batch,
            "grad_ckpt": a.grad_ckpt,
