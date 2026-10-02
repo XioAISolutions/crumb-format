@@ -1,0 +1,15 @@
+STEP {"step": 400, "loss": 0.008176, "st_s": 0.473}
+SIGTERM: saved step 539 to runs_long_horizon_seq/ckpt_ssm_S_ssm_seq_s2.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_ssm_S_ssm_seq_s2.pt at step=539 (of 4000)
+STEP {"step": 800, "loss": 0.006877, "st_s": 0.474}
+STEP {"step": 1200, "loss": 0.006887, "st_s": 0.473}
+STEP {"step": 1600, "loss": 0.005943, "st_s": 0.474}
+STEP {"step": 2000, "loss": 0.00695, "st_s": 0.474}
+STEP {"step": 2400, "loss": 0.006571, "st_s": 0.474}
+SIGTERM: saved step 2530 to runs_long_horizon_seq/ckpt_ssm_S_ssm_seq_s2.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_ssm_S_ssm_seq_s2.pt at step=2530 (of 4000)
+STEP {"step": 2800, "loss": 0.006058, "st_s": 0.474}
+STEP {"step": 3200, "loss": 0.005682, "st_s": 0.474}
+STEP {"step": 3600, "loss": 0.005528, "st_s": 0.474}
+STEP {"step": 4000, "loss": 0.005765, "st_s": 0.474}
+RESULT {"eval_mse_over_copylast": 1.3609, "copy_ratio": 0.9109, "divergence_horizon": 1, "exit_direction_accuracy": 0.25, "position_error_at_emergence": 5.894}

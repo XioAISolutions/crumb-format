@@ -1,0 +1,12 @@
+STREAM t=   728 state=96.0 MB fps=332.1 mean=0.2940 std=0.4359 motion=0.00011 flags={'freeze': 302}
+STREAM t=  1328 state=96.0 MB fps=334.0 mean=0.3072 std=0.4523 motion=0.00003 flags={'freeze': 302}
+STREAM t=  1928 state=96.0 MB fps=334.5 mean=0.3080 std=0.4539 motion=0.00003 flags={'freeze': 302}
+STREAM t=  2528 state=96.0 MB fps=334.9 mean=0.3085 std=0.4549 motion=0.00001 flags={'freeze': 302}
+STREAM t=  3128 state=96.0 MB fps=335.2 mean=0.3088 std=0.4550 motion=0.00002 flags={'freeze': 302}
+STREAM t=  3728 state=96.0 MB fps=335.4 mean=0.3076 std=0.4548 motion=0.00002 flags={'freeze': 302}
+STREAM t=  4328 state=96.0 MB fps=335.5 mean=0.3057 std=0.4541 motion=0.00003 flags={'freeze': 302}
+STREAM t=  4928 state=96.0 MB fps=335.7 mean=0.3060 std=0.4547 motion=0.00003 flags={'freeze': 302}
+STREAM t=  5528 state=96.0 MB fps=335.8 mean=0.3076 std=0.4559 motion=0.00003 flags={'freeze': 302}
+STREAM t=  6128 state=96.0 MB fps=335.9 mean=0.3048 std=0.4553 motion=0.00002 flags={'freeze': 302}
+STREAM t=  6728 state=96.0 MB fps=335.9 mean=0.3056 std=0.4555 motion=0.00002 flags={'freeze': 302}
+STREAM t=  7328 state=96.0 MB fps=336.0 mean=0.3063 std=0.4563 motion=0.00002 flags={'freeze': 302}

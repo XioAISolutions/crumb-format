@@ -1,0 +1,11 @@
+PARAM-MATCH kind=wave target=1600000 ffn_mult=11.018 achieved=1599723 off=0.0%
+STREAM WARN: step() covers the pure dispersion path; --gate (non-causal global pool) and --local-fuse are NOT threaded through streaming.
+STREAM wave_streamw frame=  128 peak_gb=0.207 seg_fps=1550.6 cum_fps=1550.6
+STREAM wave_streamw frame=  256 peak_gb=0.207 seg_fps=2623.1 cum_fps=1949.1
+STREAM wave_streamw frame=  384 peak_gb=0.207 seg_fps=2627.3 cum_fps=2132.6
+STREAM wave_streamw frame=  512 peak_gb=0.207 seg_fps=2629.6 cum_fps=2238.3
+STREAM wave_streamw frame=  640 peak_gb=0.207 seg_fps=2633.7 cum_fps=2307.6
+STREAM wave_streamw frame=  768 peak_gb=0.207 seg_fps=2638.0 cum_fps=2356.8
+STREAM wave_streamw frame=  896 peak_gb=0.207 seg_fps=2625.6 cum_fps=2391.8
+STREAM wave_streamw frame= 1024 peak_gb=0.207 seg_fps=2639.0 cum_fps=2420.1
+STREAM-DONE {"mode": "stream_test", "kind": "wave", "tag": "_streamw", "path": "step()", "window_T": 16, "stream_frames": 1024, "stream_batch": 8, "grid": 16, "kernel_version": "dispersion", "checkpoints": [{"frame": 128, "peak_gb": 0.207, "seg_fps": 1550.6, "cum_fps": 1550.6}, {"frame": 256, "peak_gb": 0.207, "seg_fps": 2623.1, "cum_fps": 1949.1}, {"frame": 384, "peak_gb": 0.207, "seg_fps": 2627.3, "cum_fps": 2132.6}, {"frame": 512, "peak_gb": 0.207, "seg_fps": 2629.6, "cum_fps": 2238.3}, {"frame": 640, "peak_gb": 0.207, "seg_fps": 2633.7, "cum_fps": 2307.6}, {"frame": 768, "peak_gb": 0.207, "seg_fps": 2638.0, "cum_fps": 2356.8}, {"frame": 896, "peak_gb": 0.207, "seg_fps": 2625.6, "cum_fps": 2391.8}, {"frame": 1024, "peak_gb": 0.207, "seg_fps": 2639.0, "cum_fps": 2420.1}]}

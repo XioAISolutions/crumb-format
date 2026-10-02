@@ -1,0 +1,27 @@
+SIGTERM: saved step 16 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt at step=16 (of 4000)
+STEP {"step": 400, "loss": 0.008355, "st_s": 0.122}
+SIGTERM: saved step 531 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt at step=531 (of 4000)
+STEP {"step": 800, "loss": 0.007574, "st_s": 0.123}
+SIGTERM: saved step 1047 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt at step=1047 (of 4000)
+STEP {"step": 1200, "loss": 0.007917, "st_s": 0.123}
+SIGTERM: saved step 1563 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt at step=1563 (of 4000)
+STEP {"step": 1600, "loss": 0.006715, "st_s": 0.123}
+STEP {"step": 2000, "loss": 0.005945, "st_s": 0.123}
+SIGTERM: saved step 2079 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt at step=2079 (of 4000)
+STEP {"step": 2400, "loss": 0.005952, "st_s": 0.123}
+SIGTERM: saved step 2595 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt at step=2595 (of 4000)
+STEP {"step": 2800, "loss": 0.005552, "st_s": 0.123}
+SIGTERM: saved step 3111 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt at step=3111 (of 4000)
+STEP {"step": 3200, "loss": 0.004861, "st_s": 0.123}
+STEP {"step": 3600, "loss": 0.004495, "st_s": 0.123}
+SIGTERM: saved step 3627 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt at step=3627 (of 4000)
+STEP {"step": 4000, "loss": 0.004486, "st_s": 0.123}
+RESULT {"eval_mse_over_copylast": 0.8317, "copy_ratio": 0.6822, "divergence_horizon": 1, "exit_direction_accuracy": 0.25, "position_error_at_emergence": 6.328}

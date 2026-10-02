@@ -1,0 +1,209 @@
+== _W_half_seq_cw_s0 2026-09-28T21:32:46Z fresh
+SLICED _W_half_seq_cw_s0 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s0 2026-09-28T22:43:31Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+SLICED _W_half_seq_cw_s0 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s0 2026-09-28T23:57:52Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+SLICED _W_half_seq_cw_s0 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s0 2026-09-29T03:36:07Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T03:36:49Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T03:37:31Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T03:38:13Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T03:38:55Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T03:39:37Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T03:40:19Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T03:41:01Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T03:41:43Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T06:34:01Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T06:36:44Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T07:02:09Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T07:05:11Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T07:32:11Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T07:35:13Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T08:02:25Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T08:05:08Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T08:32:16Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T08:35:18Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T09:02:06Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T09:05:08Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T09:32:16Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T09:35:19Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T10:02:06Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T10:05:09Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T10:32:16Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T10:35:19Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T11:02:07Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T11:05:09Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T11:32:17Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T11:35:19Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T12:02:07Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T12:05:09Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=2 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-29T12:50:59Z fresh
+SLICED _W_half_seq_cw_s0 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s0 2026-09-29T13:32:20Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+SLICED _W_half_seq_cw_s0 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s0 2026-09-29T14:47:18Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+SLICED _W_half_seq_cw_s0 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s0 2026-09-29T15:59:20Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+SLICED _W_half_seq_cw_s0 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s0 2026-09-29T18:10:00Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+SLICED _W_half_seq_cw_s0 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s0 2026-09-29T19:28:38Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+SLICED _W_half_seq_cw_s0 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s0 2026-09-29T20:46:35Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+SLICED _W_half_seq_cw_s0 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s0 2026-09-29T21:58:43Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+SLICED _W_half_seq_cw_s0 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s0 2026-09-30T00:31:29Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T04:12:12Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T04:14:16Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T04:16:19Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T04:33:59Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T04:36:02Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T05:04:07Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T05:06:10Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T05:34:10Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T05:36:13Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T06:01:33Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T06:04:37Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T06:31:45Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T06:34:28Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T07:01:36Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T07:04:39Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T07:31:27Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T07:34:30Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T08:01:39Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T08:04:22Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T08:31:30Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T08:34:33Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T09:01:41Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T09:04:24Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T09:31:32Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T09:34:35Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T10:01:44Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T10:04:27Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T10:31:35Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T10:34:38Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T11:01:26Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T11:04:29Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T11:31:37Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T11:34:41Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T12:01:29Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T12:04:32Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+FAIL _W_half_seq_cw_s0 exit=1 (see runs_long_horizon_seq/log_W_half_seq_cw_s0.txt)
+== _W_half_seq_cw_s0 2026-09-30T12:09:15Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt
+== _S_ssm_seq_s0 2026-09-30T12:09:39Z fresh
+SLICED _S_ssm_seq_s0 at the 2400s slice budget -- re-queue to continue
+== _S_ssm_seq_s0 2026-09-30T17:02:27Z --resume runs_long_horizon_seq/ckpt_ssm_S_ssm_seq_s0.pt
+SLICED _S_ssm_seq_s0 at the 4200s slice budget -- re-queue to continue
+== _S_ssm_seq_s0 2026-10-01T05:01:35Z --resume runs_long_horizon_seq/ckpt_ssm_S_ssm_seq_s0.pt
+== _W_half_seq_cw_s1 2026-10-01T05:30:42Z fresh
+SLICED _W_half_seq_cw_s1 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s1 2026-10-01T06:13:40Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s1.pt
+SLICED _W_half_seq_cw_s1 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s1 2026-10-01T11:28:03Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s1.pt
+SLICED _W_half_seq_cw_s1 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s1 2026-10-01T12:40:11Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s1.pt
+SLICED _W_half_seq_cw_s1 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s1 2026-10-01T13:52:16Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s1.pt
+SLICED _W_half_seq_cw_s1 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s1 2026-10-01T15:04:19Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s1.pt
+SLICED _W_half_seq_cw_s1 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s1 2026-10-01T16:19:32Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s1.pt
+== _W_half_seq_cw_s1 2026-10-01T21:09:33Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s1.pt
+SLICED _W_half_seq_cw_s1 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s1 2026-10-01T22:21:40Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s1.pt
+== _S_ssm_seq_s1 2026-10-01T23:27:38Z fresh
+SLICED _S_ssm_seq_s1 at the 4200s slice budget -- re-queue to continue
+== _S_ssm_seq_s1 2026-10-01T23:33:42Z --resume runs_long_horizon_seq/ckpt_ssm_S_ssm_seq_s1.pt
+SLICED _S_ssm_seq_s1 at the 4200s slice budget -- re-queue to continue
+== _S_ssm_seq_s1 2026-10-02T00:45:43Z --resume runs_long_horizon_seq/ckpt_ssm_S_ssm_seq_s1.pt
+== _W_half_seq_cw_s2 2026-10-02T01:53:37Z fresh
+SLICED _W_half_seq_cw_s2 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s2 2026-10-02T01:57:50Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt
+SLICED _W_half_seq_cw_s2 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s2 2026-10-02T03:09:57Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt
+SLICED _W_half_seq_cw_s2 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s2 2026-10-02T04:21:58Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt
+SLICED _W_half_seq_cw_s2 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s2 2026-10-02T05:34:04Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt
+SLICED _W_half_seq_cw_s2 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s2 2026-10-02T06:46:10Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt
+SLICED _W_half_seq_cw_s2 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s2 2026-10-02T07:58:17Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt
+SLICED _W_half_seq_cw_s2 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s2 2026-10-02T09:10:24Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt
+SLICED _W_half_seq_cw_s2 at the 4200s slice budget -- re-queue to continue
+== _W_half_seq_cw_s2 2026-10-02T10:22:27Z --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s2.pt
+== _S_ssm_seq_s2 2026-10-02T11:13:28Z fresh
+SLICED _S_ssm_seq_s2 at the 4200s slice budget -- re-queue to continue
+== _S_ssm_seq_s2 2026-10-02T11:34:29Z --resume runs_long_horizon_seq/ckpt_ssm_S_ssm_seq_s2.pt
+SLICED _S_ssm_seq_s2 at the 4200s slice budget -- re-queue to continue
+== _S_ssm_seq_s2 2026-10-02T12:46:32Z --resume runs_long_horizon_seq/ckpt_ssm_S_ssm_seq_s2.pt

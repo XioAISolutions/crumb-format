@@ -1,0 +1,223 @@
+{
+ "mode": "long_horizon_stream",
+ "pole_param": "halflife",
+ "trained": true,
+ "vae": null,
+ "latents": null,
+ "frames": 7200,
+ "grid": 32,
+ "context_ref": {
+  "mean": [
+   0.02026115544140339,
+   0.02149602770805359
+  ],
+  "std": [
+   0.08464126288890839,
+   0.08547097444534302
+  ],
+  "motion": [
+   0.010591008700430393,
+   0.008745015598833561
+  ]
+ },
+ "collapse_sample": {
+  "freeze": 0,
+  "fade": 0,
+  "flatten": 0
+ },
+ "state_bytes_constant": true,
+ "collapse": {
+  "freeze": 829,
+  "fade": 1781,
+  "flatten": 1811
+ },
+ "log": [
+  {
+   "frame": 728,
+   "decoded_frames": null,
+   "fps": 272.1,
+   "state_bytes": 100687872,
+   "last": {
+    "mean": 0.57711,
+    "std": 0.43796,
+    "motion": 0.00156
+   },
+   "flags": {}
+  },
+  {
+   "frame": 1328,
+   "decoded_frames": null,
+   "fps": 273.0,
+   "state_bytes": 100687872,
+   "last": {
+    "mean": 0.27476,
+    "std": 0.42226,
+    "motion": 0.00059
+   },
+   "flags": {
+    "freeze": 829
+   }
+  },
+  {
+   "frame": 1928,
+   "decoded_frames": null,
+   "fps": 273.3,
+   "state_bytes": 100687872,
+   "last": {
+    "mean": 0.00074,
+    "std": 0.00887,
+    "motion": 1e-05
+   },
+   "flags": {
+    "freeze": 829,
+    "fade": 1781,
+    "flatten": 1811
+   }
+  },
+  {
+   "frame": 2528,
+   "decoded_frames": null,
+   "fps": 273.5,
+   "state_bytes": 100687872,
+   "last": {
+    "mean": 0.0,
+    "std": 0.0,
+    "motion": 0.0
+   },
+   "flags": {
+    "freeze": 829,
+    "fade": 1781,
+    "flatten": 1811
+   }
+  },
+  {
+   "frame": 3128,
+   "decoded_frames": null,
+   "fps": 273.6,
+   "state_bytes": 100687872,
+   "last": {
+    "mean": 0.0,
+    "std": 0.0,
+    "motion": 0.0
+   },
+   "flags": {
+    "freeze": 829,
+    "fade": 1781,
+    "flatten": 1811
+   }
+  },
+  {
+   "frame": 3728,
+   "decoded_frames": null,
+   "fps": 273.6,
+   "state_bytes": 100687872,
+   "last": {
+    "mean": 0.0,
+    "std": 0.0,
+    "motion": 0.0
+   },
+   "flags": {
+    "freeze": 829,
+    "fade": 1781,
+    "flatten": 1811
+   }
+  },
+  {
+   "frame": 4328,
+   "decoded_frames": null,
+   "fps": 273.8,
+   "state_bytes": 100687872,
+   "last": {
+    "mean": 0.0,
+    "std": 0.0,
+    "motion": 0.0
+   },
+   "flags": {
+    "freeze": 829,
+    "fade": 1781,
+    "flatten": 1811
+   }
+  },
+  {
+   "frame": 4928,
+   "decoded_frames": null,
+   "fps": 274.1,
+   "state_bytes": 100687872,
+   "last": {
+    "mean": 0.0,
+    "std": 0.0,
+    "motion": 0.0
+   },
+   "flags": {
+    "freeze": 829,
+    "fade": 1781,
+    "flatten": 1811
+   }
+  },
+  {
+   "frame": 5528,
+   "decoded_frames": null,
+   "fps": 274.3,
+   "state_bytes": 100687872,
+   "last": {
+    "mean": 0.0,
+    "std": 0.0,
+    "motion": 0.0
+   },
+   "flags": {
+    "freeze": 829,
+    "fade": 1781,
+    "flatten": 1811
+   }
+  },
+  {
+   "frame": 6128,
+   "decoded_frames": null,
+   "fps": 274.5,
+   "state_bytes": 100687872,
+   "last": {
+    "mean": 0.0,
+    "std": 0.0,
+    "motion": 0.0
+   },
+   "flags": {
+    "freeze": 829,
+    "fade": 1781,
+    "flatten": 1811
+   }
+  },
+  {
+   "frame": 6728,
+   "decoded_frames": null,
+   "fps": 274.6,
+   "state_bytes": 100687872,
+   "last": {
+    "mean": 0.0,
+    "std": 0.0,
+    "motion": 0.0
+   },
+   "flags": {
+    "freeze": 829,
+    "fade": 1781,
+    "flatten": 1811
+   }
+  },
+  {
+   "frame": 7328,
+   "decoded_frames": null,
+   "fps": 274.8,
+   "state_bytes": 100687872,
+   "last": {
+    "mean": 0.00091,
+    "std": 0.01468,
+    "motion": 2e-05
+   },
+   "flags": {
+    "freeze": 829,
+    "fade": 1781,
+    "flatten": 1811
+   }
+  }
+ ],
+ "steps_generated": 7200
+}

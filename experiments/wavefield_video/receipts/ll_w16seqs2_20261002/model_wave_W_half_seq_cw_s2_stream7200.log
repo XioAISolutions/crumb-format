@@ -1,0 +1,12 @@
+STREAM t=   728 state=96.0 MB fps=278.8 mean=0.6178 std=0.4307 motion=0.00114 flags={'freeze': 502}
+STREAM t=  1328 state=96.0 MB fps=280.4 mean=1.0000 std=0.0000 motion=0.00000 flags={'freeze': 502, 'flatten': 1146}
+STREAM t=  1928 state=96.0 MB fps=280.8 mean=1.0000 std=0.0000 motion=0.00000 flags={'freeze': 502, 'flatten': 1146}
+STREAM t=  2528 state=96.0 MB fps=281.0 mean=0.9983 std=0.0285 motion=0.00001 flags={'freeze': 502, 'flatten': 1146}
+STREAM t=  3128 state=96.0 MB fps=281.3 mean=0.9603 std=0.1402 motion=0.00021 flags={'freeze': 502, 'flatten': 1146}
+STREAM t=  3728 state=96.0 MB fps=281.5 mean=0.6734 std=0.3286 motion=0.00068 flags={'freeze': 502, 'flatten': 1146}
+STREAM t=  4328 state=96.0 MB fps=281.7 mean=0.3272 std=0.2751 motion=0.00035 flags={'freeze': 502, 'flatten': 1146}
+STREAM t=  4928 state=96.0 MB fps=281.9 mean=0.1745 std=0.1956 motion=0.00034 flags={'freeze': 502, 'flatten': 1146}
+STREAM t=  5528 state=96.0 MB fps=281.9 mean=0.1340 std=0.1978 motion=0.00023 flags={'freeze': 502, 'flatten': 1146}
+STREAM t=  6128 state=96.0 MB fps=282.0 mean=0.1092 std=0.2059 motion=0.00020 flags={'freeze': 502, 'flatten': 1146}
+STREAM t=  6728 state=96.0 MB fps=282.1 mean=0.0238 std=0.0781 motion=0.00005 flags={'freeze': 502, 'flatten': 1146}
+STREAM t=  7328 state=96.0 MB fps=282.1 mean=0.0041 std=0.0287 motion=0.00002 flags={'freeze': 502, 'flatten': 1146, 'fade': 6807}
