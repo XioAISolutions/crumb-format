@@ -1,39 +1,34 @@
-# Receipt: W16 seq-suite s1 harvest — _W_half_seq_cw_s1 closed
+# Receipt: W16 seq-suite s1 COMPLETE — _S_ssm_seq_s1 closed (both s1 arms)
 
-Continues receipts/ll_w16_seqs0_20261001/receipt.md (s0 harvest). The s1 wave
-arm finished on the box; _S_ssm_seq_s1 is still mid-training (resumed 23:33Z,
-4200s slices).
+Continues the first version of this receipt (@ 1c7c450, wave arm only). _S_ssm_seq_s1 finished on the box at ~01:53Z Oct 2 (the slice job moved on to _W_half_seq_cw_s2 at 01:53:37Z).
 
 ## What happened
-- _W_half_seq_cw_s1 completed 4000/4000 + final eval (RESULT line in log).
-  result JSON + model_wave export written on the box.
-- SEQ mode (seq_frames=512, eval_rollout=512) — same protocol as s0, so the
-  s0↔s1 comparison is apples-to-apples.
+- _S_ssm_seq_s1 completed 4000/4000 + final eval; result JSON + model_ssm export written on the box.
+- Same SEQ protocol as the s0/s1 wave arms (seq_frames=512, eval_rollout=512, TBPTT=1, dense) — apples-to-apples.
 
-## Numbers (seed 1 vs seed 0)
-- eval_mse: 0.002763 vs 0.002476 (+11.6%)
-- eval_mse_over_copylast: 1.2038 vs 1.0789 (s1 above the copy-last baseline)
-- copy_ratio: 0.9852 vs 0.9459 (s1 copies harder)
-- exit_direction_accuracy: 0.250 vs 0.250
-- divergence_horizon: 1 vs 1; emergence_frame: 288 vs 288; div_consec: 8 vs 8
-- position_error_at_emergence: 6.891 vs 4.538
-- final_target_centroid_err: 7.656 vs 5.538
-- Read: s1 seed is clearly worse on every magnitude metric (consistent with
-  the known seed-sensitivity pattern); divergence profile identical. Neither
-  seed moves the PROVE/KILL gate.
+## SSM s1 numbers (vs wave s1 / s0)
+- eval_mse: 0.002290 vs 0.002763 / 0.002476 — SSM best raw MSE of the three
+- eval_mse_over_copylast: 0.9977 vs 1.2038 / 1.0789 — SSM sits at the copy-last baseline
+- copy_ratio: 0.033 vs 0.9852 / 0.9459 — SSM does NOT copy-last; different predictor, same MSE
+- exit_direction_accuracy: 0.500 vs 0.250 / 0.250 — SSM at chance, wave below chance
+- final_target_centroid_err: 4.627 vs 7.656 / 5.538 — SSM best tracking
+- position_error_at_emergence: 5.977 vs 6.891 / 4.538
+- target_identity_survival 0.209; motion_preservation 0.038
+- divergence_horizon 1 / emergence 288 — same profile as wave
+- params 690691; persistent_state_bytes 64 MiB; rollout 428.5 fps (2.33 ms/frame)
+- Read: no PROVE/KILL movement (0.5 << 0.8) — but SSM is the first arm to abandon copy-last at copylast-equal MSE and beats wave on exit acc + tracking. Seed 2 in flight.
 
-## Artifacts (box: /workspace/slava/exp/pr63/runs_long_horizon_seq/)
-- result_wave_W_half_seq_cw_s1.json  md5 51ca72bf31703e2fd4a6feccbb7c6776
-- log_W_half_seq_cw_s1.txt          md5 3bf3ad11cadb95886c6a97c482b51509
-- model_wave_W_half_seq_cw_s1.pt on disk (not md5-claimed in this dir)
+## Artifacts (box /workspace/slava/exp/pr63/runs_long_horizon_seq/)
+- result_ssm_S_ssm_seq_s1.json  md5 a7d888052b3291ee4252743d9bcebf0e
+- log_S_ssm_seq_s1.txt          md5 aa8f608e522f6163f4c0697259b8f439
+- model_ssm_S_ssm_seq_s1.pt on disk (not md5-claimed in this dir)
+- wave s1 files (51ca72bf... / 3bf3ad11...) as in the first version
 
-## Box health at write (~00:20Z Oct 2)
-- GPU 100%, ~249W — _S_ssm_seq_s1 live (resumed 23:33Z, 4200s slice budget).
-- Queue 10 pending, keeper auto-topping-up; no PAUSE. _A_attn_s2 continuation
-  covered by 9k_2230_3/4/5 (v2.3 lh_slice, pre-flight verified); seq cont
-  2230_6/7/8 re-checked this pass (PY + alloc-conf + timeout 4500 OK).
+## Box health at write (~02:15Z Oct 2)
+- _W_half_seq_cw_s2 running (slice resumed 01:57:50Z, SLICE_S=4200, timeout 4500); S_ssm_seq_s2 fresh next. seq_cont auto-top-up: keeper hourly tpl batch + 2230_6/7/8 staged.
+- Old-suite _A_attn_s2 (runs_long_horizon) still SLICED since 10:06Z Oct 1; continuation staged = 9k_2230_3/4/5 lh_slice v2.3, fires after the 0200 tpl batch. ComfyUI unreachable counts as not-busy (v2.2); free-mem gate applies.
+- runs_latent "FAILED encode" brief line confirmed stale (progress mtime Sep 28).
 
 ## Proof boundary
-- Claimed: s1 wave arm at 4000/4000 with final eval; JSONs md5-verified
-  box↔dir.
-- Not claimed: _S_ssm_seq_s1 (running); owner-side pixel review; stream stage.
+- Claimed: SSM s1 closed at 4000/4000 + final eval; JSON/log md5-verified box↔dir.
+- Not claimed: seed 2 results; stream stage; owner pixel review.
