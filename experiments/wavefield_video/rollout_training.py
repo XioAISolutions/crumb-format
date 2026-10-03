@@ -17,11 +17,21 @@ def training_objective(a):
     identity = dict(version='supervised_self_rollout_v1', rollout_k=a.rollout_k,
                     seq_frames=a.seq_frames, chunk=a.chunk, tbptt_chunks=a.tbptt_chunks,
                     dense=a.dense, motion_loss=a.motion_loss, feedback='clamp_0_1')
+    if getattr(a, 'latents', None):
+        # Signed VAE latents share the unclamped domain used by latent_eval and
+        # long_horizon's latent streamer. Refuse old pixel-clamped latent resumes.
+        identity.update(version='supervised_self_rollout_v2',
+                        representation='vae_latents', feedback='unclamped_float32')
     if a.motion_loss:
         # The moving/static means pool per micro-batch; changing that partition
         # changes the objective (unlike plain MSE's exact accumulation).
         identity.update(batch=a.batch, micro_batch=min(a.micro_batch or a.batch, a.batch))
     return identity
+
+
+def _feedback(prediction, a):
+    frame = prediction.float()
+    return frame if getattr(a, 'latents', None) else frame.clamp(0, 1)
 
 
 def check_resume_objective(checkpoint_data, a):
@@ -70,14 +80,14 @@ def rollout_sequence_loss(m, clips, moving, a, scale=1.0):
         start = c * T
         if c < context_chunks:
             pred, states = m(clips[:, start:start + T], states=states, dense=a.dense)
-            frame = (pred[:, -1] if a.dense else pred).float().clamp(0, 1)
+            frame = _feedback(pred[:, -1] if a.dense else pred, a)
         else:
             generated = []
             for j in range(T):
                 pred, states = _step(m, frame, states, start + j)
                 # Only this feedback operation conditions the next frame. Never
                 # replace it with clips[:, start+j+1] (the mutation test kills that).
-                frame = pred.float().clamp(0, 1)
+                frame = _feedback(pred, a)
                 if a.dense:
                     generated.append(pred)
             if a.dense:
@@ -92,7 +102,7 @@ def rollout_sequence_loss(m, clips, moving, a, scale=1.0):
         else:
             tgt, last = clips[:, start + T], clips[:, start + T - 1]
             mv = moving[:, start + T - 1] if moving is not None else None
-        pred = pred.float()  # raw prediction is supervised, clamp is feedback only
+        pred = pred.float()  # raw prediction is supervised; domain applies to feedback only
         lc = tc.motion_balanced_loss(pred, tgt, last, mv) if a.motion_loss else F.mse_loss(pred, tgt)
         group = group + lc * (scale / n_chunks)
         if (c + 1) % a.tbptt_chunks == 0 or c == n_chunks - 1:

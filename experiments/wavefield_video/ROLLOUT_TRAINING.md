@@ -3,8 +3,9 @@
 This is the training-objective half of the carried-state experiment, not a
 quality result or a reproduction of diffusion Self-Forcing++. The ground-truth
 prefix guides context, and the true continuation supervises predictions. There
-is no frozen video teacher, DMD, preference signal, noise schedule, or latent
-VAE path here. Those require separate work, not stronger labels for this code.
+is no frozen video teacher, DMD, preference signal, or noise schedule.
+Encoded VAE-shard training is supported, with no diffusion objective or learned
+decoder change. Those require separate work, not stronger labels for this code.
 
 References read: `RESEARCH_VIDEO_RECIPES.md` on `zeph/research-notes`
 (6f39060a), especially the rollout/self-forcing section; `LONG_HORIZON.md`
@@ -23,8 +24,10 @@ verdict. This PR neither imports that branch nor changes its write policy.
   the warm-up predicts frame 16. It then consumes its own predictions for input
   frames 16..31, predicting targets 17..32. Context losses already cover targets
   1..16 in dense mode: there is no duplicated/missing boundary target.
-- Every generated input is the preceding prediction clamped to [0,1], matching
-  pixel streaming evaluation. The recurrent state is carried, never reset at a
+- Every generated pixel input is the preceding prediction clamped to [0,1], matching
+  pixel streaming evaluation. With `--latents`, feedback is the raw float32
+  prediction: VAE latents are signed and have no pixel interval, matching the
+  unclamped latent evaluator and streamer. The recurrent state is carried, never reset at a
   rollout boundary. Future truth is used ONLY for loss targets/motion masks.
 - `--dense` supervises every position; otherwise only the final prediction of
   each chunk contributes loss. Chunk losses have the SAME mean/scale as before.
@@ -42,6 +45,12 @@ verdict. This PR neither imports that branch nor changes its write policy.
   dense/motion-loss settings, or motion-loss batch partition. Legacy resumes
   remain valid with K=0. Changing teacher forcing to rollout is not a resume;
   this prototype deliberately does not implement a warm-start transfer flag.
+- The existing pixel objective remains `supervised_self_rollout_v1` with
+  `clamp_0_1`; signed latent rollout records `supervised_self_rollout_v2`,
+  representation `vae_latents`, feedback `unclamped_float32`. Existing dataset
+  and VAE fingerprints still guard latent resume. Old latent rollout checkpoints
+  that used the pixel clamp are rejected; use a fresh output and fresh training.
+  Previously completed teacher-forced latent checkpoints are unaffected.
 
 ## CPU or single-4090 execution smoke
 
@@ -149,3 +158,12 @@ isolated in `rollout_training.py`; its small trainer hook/resume metadata still
 needs reconciliation when branches meet. Tensor-state wave/SSM paths on main
 are tested; future structured change-write states and #63's latent path are not
 claimed compatible. Every changed source/doc lives under this experiment tree.
+
+Signed latent feedback repair (2026-10-03): six new behavioral cases first failed
+on the old pixel-clamped implementation. With representation-aware feedback,
+69 focused rollout/stateful/video-VAE tests plus 15 subtests pass on local CPU;
+the three existing dispatch/teacher-leak/state-reset mutants are still killed.
+Signed values below zero and above one match an independent recurrent loss and
+gradient calculation, and a real synthetic-shard CLI resume matches an
+uninterrupted run bitwise. This proves the conditioning and checkpoint contract,
+not improvement of a trained video. No new CUDA experiment is included here.

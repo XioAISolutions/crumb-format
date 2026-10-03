@@ -256,7 +256,9 @@ def main(argv=None):
                          "copy-ratio on 2/2 seeds, below the pre-registered 10%% bar")
     ap.add_argument("--rollout-k", type=int, default=0,
                     help="self-generate the final K chunks after a ground-truth prefix; "
-                         "0 preserves teacher forcing. Feedback and state detach at TBPTT boundaries")
+                         "0 preserves teacher forcing. Pixel feedback clamps to [0,1]; "
+                         "--latents feedback stays signed/unclamped. Feedback and state detach "
+                         "at TBPTT boundaries")
     ap.add_argument("--motion-loss", action="store_true")
     ap.add_argument("--write-gate", action="store_true",
                     help="learned gate on what enters the wave state (LONG_HORIZON.md 8.4)")

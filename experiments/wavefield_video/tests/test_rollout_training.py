@@ -5,6 +5,8 @@ rollout and teacher-leaking feedback mutants. Nonzero heads avoid copy-init.
 """
 import argparse
 import copy
+import hashlib
+import json
 import sys
 from pathlib import Path
 from unittest import mock
@@ -275,5 +277,90 @@ def test_real_cli_resume_equals_uninterrupted_and_guard_runs(tmp_path, capsys):
         with pytest.raises(SystemExit) as error:
             tl.main(base + ['--rollout-k', k, '--steps', '4', '--out', str(split),
                             '--resume', str(ck)])
+        assert error.value.code == 2
+        assert 'resume training objective mismatch' in capsys.readouterr().err
+
+
+@pytest.mark.parametrize('value', [-2.0, 2.0])
+@pytest.mark.parametrize('dense', [False, True])
+def test_signed_latent_feedback_matches_unclamped_recurrence_and_gradient(value, dense):
+    data, a = clips() + value, args(latents='signed-shards', dense=dense)
+    m = Recorder()
+    actual = tl.sequence_loss(m, data, None, a)
+    w = torch.tensor(0.07, requires_grad=True)
+    state, frame, loss, total = torch.zeros_like(data[:, 0]), None, 0.0, 0.0
+    for t in range(8):
+        x = data[:, t] if t < 4 else frame
+        state = state * 0.5 + x * 0.1 + 0.01 * w
+        prediction = x + w + state * 0.2
+        frame = prediction  # A VAE latent is signed and has no pixel interval.
+        if dense or t % 2 == 1:
+            loss = loss + (prediction - data[:, t + 1]).square().mean() / (8 if dense else 4)
+        if (t + 1) % 2 == 0:
+            loss.backward()
+            total += loss.detach().item()
+            loss = 0.0
+            state, frame = state.detach(), frame.detach()
+    for i, call in enumerate(m.calls[4:], start=4):
+        torch.testing.assert_close(call['x'], m.calls[i - 1]['pred'], rtol=0, atol=0)
+        assert (call['x'] < 0).all() if value < 0 else (call['x'] > 1).all()
+    assert actual == pytest.approx(total, abs=1e-6)
+    torch.testing.assert_close(m.weight.grad, w.grad, atol=1e-6, rtol=1e-5)
+
+
+def test_latent_feedback_identity_rejects_pixel_and_old_clamped_objectives():
+    from rollout_training import check_resume_objective, training_objective
+    pixel = training_objective(args())
+    assert pixel == dict(version='supervised_self_rollout_v1', rollout_k=2,
+                         seq_frames=8, chunk=2, tbptt_chunks=1, dense=True,
+                         motion_loss=False, feedback='clamp_0_1')
+    latent_args = args(latents='signed-shards')
+    latent = training_objective(latent_args)
+    assert latent['representation'] == 'vae_latents'
+    assert latent['feedback'] == 'unclamped_float32'
+    assert latent['version'] != pixel['version']
+    check_resume_objective({'training_objective': latent}, latent_args)
+    for checkpoint, current in [(pixel, latent_args), (latent, args())]:
+        with pytest.raises(ValueError, match='resume training objective mismatch'):
+            check_resume_objective({'training_objective': checkpoint}, current)
+
+
+def test_real_signed_latent_cli_saves_policy_and_resumes_exactly(tmp_path, capsys):
+    root = tmp_path / 'latents'
+    root.mkdir()
+    index = []
+    for i in range(2):
+        z = torch.randn(12, 2, 4, 4, generator=torch.Generator().manual_seed(i)) * 2
+        torch.save({'latents': z}, root / f's{i}.pt')
+        index.append(dict(file=f's{i}.pt', src=f'clip{i}.mp4', latent_steps=12,
+                          vae={'backend': 'test', 'fingerprint': 'signed-test-vae'},
+                          sha256=hashlib.sha256(z.contiguous().view(torch.uint8).numpy().tobytes()).hexdigest()[:16]))
+    (root / 'index.json').write_text(json.dumps(index))
+    base = ['--latents', str(root), '--seq-frames', '8', '--chunk', '2', '--dim', '8',
+            '--layers', '1', '--heads', '2', '--batch', '2', '--micro-batch', '1',
+            '--dense', '--grad-ckpt', '--eval-rollout', '4', '--eval-batch', '1',
+            '--save-every', '1', '--rollout-k', '2']
+    full, split = tmp_path / 'full', tmp_path / 'split'
+    with mock.patch.object(torch.cuda, 'is_available', return_value=False):
+        tl.main(base + ['--steps', '3', '--out', str(full)])
+        tl.main(base + ['--steps', '1', '--out', str(split)])
+        ck_path = split / 'ckpt_wave.pt'
+        tl.main(base + ['--steps', '3', '--out', str(split), '--resume', str(ck_path)])
+        f = torch.load(full / 'model_wave.pt', weights_only=True)
+        s = torch.load(split / 'model_wave.pt', weights_only=True)
+        ck = torch.load(ck_path, weights_only=True)
+        result = json.loads((split / 'result_wave.json').read_text())
+        assert f['training_objective'] == s['training_objective'] == ck['training_objective'] == result['training_objective']
+        assert s['training_objective']['feedback'] == 'unclamped_float32'
+        assert s['config']['data_fp'] == ck['data_fp'] == result['latents_fp']
+        assert s['config']['vae']['fingerprint'] == ck['vae']['fingerprint'] == 'signed-test-vae'
+        assert all(torch.equal(f['state'][k], s['state'][k]) for k in f['state'])
+        assert all(torch.isfinite(v).all() for v in s['state'].values())
+        # The previously accepted latent/clamped objective must never silently resume.
+        from rollout_training import training_objective
+        ck['training_objective'] = training_objective(args())
+        torch.save(ck, ck_path)
+        with pytest.raises(SystemExit) as error:
+            tl.main(base + ['--steps', '4', '--out', str(split), '--resume', str(ck_path)])
         assert error.value.code == 2
         assert 'resume training objective mismatch' in capsys.readouterr().err
