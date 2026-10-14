@@ -1,0 +1,22 @@
+{
+  "publisher_url": "https://huggingface.co/api/models/Lightricks/LTX-Video/revision/8984fa25007f376c1a299016d0957a37a2f797bb?blobs=true",
+  "repository": "Lightricks/LTX-Video",
+  "revision": "8984fa25007f376c1a299016d0957a37a2f797bb",
+  "vae_files": {
+    "vae/config.json": {
+      "rfilename": "vae/config.json",
+      "blobId": "3a9d81963b21d0c4cfba102fff93676852b52588",
+      "size": 501
+    },
+    "vae/diffusion_pytorch_model.safetensors": {
+      "rfilename": "vae/diffusion_pytorch_model.safetensors",
+      "blobId": "b54a6cc983dc813ed65d6a6168e95e8fa11c5036",
+      "size": 1676798532,
+      "lfs": {
+        "sha256": "265ca87cb5dff5e37f924286e957324e282fe7710a952a7dafc0df43883e2010",
+        "size": 1676798532,
+        "pointerSize": 135
+      }
+    }
+  }
+}

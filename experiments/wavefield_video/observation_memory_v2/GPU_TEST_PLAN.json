@@ -1,0 +1,84 @@
+{
+  "status": "staged_not_submitted",
+  "hypothesis": "Repaired observed-only innovations may enable learned delayed cue recovery; natural-video benefit unproven",
+  "command_argv": [
+    "python",
+    "-B",
+    "train.py",
+    "--updates",
+    "1000",
+    "--seconds",
+    "3600",
+    "--out",
+    "receipts/NEW_UNIQUE_GPU_RUN"
+  ],
+  "required_launch_context": "Isolated source copy under existing sole conductor; source /workspace/slava/preflight.sh and use verified PY; no second controller",
+  "outer_hard_timeout_seconds": 3660,
+  "outer_kill_grace_seconds": 30,
+  "cooperative_inner_deadline_seconds": 3600,
+  "initialization_seeds": [
+    0,
+    1,
+    2
+  ],
+  "raw_hidden_gap": 256,
+  "observed_input_frames_per_arm": 288,
+  "training_world_seeds": [
+    980000,
+    980001,
+    980002,
+    980003,
+    980004,
+    980005,
+    980006,
+    980007,
+    980008,
+    980009,
+    980010,
+    980011,
+    980012,
+    980013,
+    980014,
+    980015
+  ],
+  "positive_heldout_world_seeds": [
+    990000,
+    990001,
+    990002,
+    990003,
+    990004,
+    990005,
+    990006,
+    990007,
+    990008,
+    990009,
+    990010,
+    990011,
+    990012,
+    990013,
+    990014,
+    990015
+  ],
+  "static_heldout_world_seeds": [
+    990100,
+    990101
+  ],
+  "balanced_condition_family": true,
+  "memory_interventions": "At boundary32 erase real state or replace with opposite-cue donor, then ingest same recipient tail; keep recipient appearance/pose",
+  "quality_claim_allowed": false,
+  "architecture_superiority_claim_allowed": false,
+  "generated_video_claim_allowed": false,
+  "required_before_launch": [
+    "Fresh SSH/NVML/CUDA allocation health",
+    "Reconcile existing owner/job; no competing lane or hold removal",
+    "Verify source/checkpoint identity and sufficient disk space",
+    "Use existing conductor/preflight contract and outer hard cap",
+    "Fresh output identity; retain partial/failure receipts"
+  ],
+  "required_after_integration": [
+    "Stronger sink/reference and factorized attention baselines",
+    "Matched write/bias/resource comparisons",
+    "Pretrained VAE future-poison/context test",
+    "Decoded native-resolution independent footage and blind human review"
+  ]
+}

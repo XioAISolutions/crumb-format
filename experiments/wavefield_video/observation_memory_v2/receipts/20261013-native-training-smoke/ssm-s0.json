@@ -1,0 +1,43 @@
+{
+  "kind": "ssm",
+  "initialization_seed": 0,
+  "requested_updates": 1,
+  "completed_updates": 1,
+  "completed": true,
+  "training_wall_seconds": 0.004624624969437718,
+  "parameter_count": 4227,
+  "changed_state_tensors": [
+    "native.embed.weight",
+    "native.embed.bias",
+    "native.posemb.py",
+    "native.posemb.px",
+    "native.blocks.0.n1.w",
+    "native.blocks.0.mix.a_log",
+    "native.blocks.0.mix.a_im",
+    "native.blocks.0.mix.B",
+    "native.blocks.0.mix.C",
+    "native.blocks.0.mix.D",
+    "native.blocks.0.mix.pi.weight",
+    "native.blocks.0.mix.pi.bias",
+    "native.blocks.0.mix.po.weight",
+    "native.blocks.0.mix.po.bias",
+    "native.blocks.0.n2.w",
+    "native.blocks.0.ffn.fc1.weight",
+    "native.blocks.0.ffn.fc1.bias",
+    "native.blocks.0.ffn.fc2.weight",
+    "native.blocks.0.ffn.fc2.bias",
+    "native.norm.w",
+    "native.head.weight",
+    "native.head.bias"
+  ],
+  "last_loss": 0.1189715787768364,
+  "context_frames_seen": 40,
+  "bounded_attention_window": null,
+  "native_variant": "native_bias_spatial_embed",
+  "metrics": {
+    "full_mse": 0.09484987705945969,
+    "joint_hit": 0.0,
+    "memory_delta_skill": -115.75024534820179,
+    "memory_delta_joint_hit": 0.0
+  }
+}

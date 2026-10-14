@@ -1,0 +1,38 @@
+{
+  "kind": "wave",
+  "initialization_seed": 0,
+  "requested_updates": 1,
+  "completed_updates": 1,
+  "completed": true,
+  "training_wall_seconds": 0.03033174993470311,
+  "parameter_count": 3133,
+  "changed_state_tensors": [
+    "native.embed.weight",
+    "native.blocks.0.n1.w",
+    "native.blocks.0.mix.hl_raw",
+    "native.blocks.0.mix.visc",
+    "native.blocks.0.mix.vx",
+    "native.blocks.0.mix.vy",
+    "native.blocks.0.mix.beta",
+    "native.blocks.0.mix.Bg",
+    "native.blocks.0.mix.Cg",
+    "native.blocks.0.mix.pi.weight",
+    "native.blocks.0.mix.po.weight",
+    "native.blocks.0.n2.w",
+    "native.blocks.0.ffn.fc1.weight",
+    "native.blocks.0.ffn.fc2.weight",
+    "native.norm.w",
+    "native.head.weight",
+    "native.head.bias"
+  ],
+  "last_loss": 0.4056665003299713,
+  "context_frames_seen": 40,
+  "bounded_attention_window": null,
+  "native_variant": "halflife_clean_write",
+  "metrics": {
+    "full_mse": 0.3266873136162758,
+    "joint_hit": 0.0,
+    "memory_delta_skill": -403.2025126586799,
+    "memory_delta_joint_hit": 0.0
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "wall_seconds": 12.72263020905666,
+  "cpu_seconds": 12.717307,
+  "peak_process_rss_bytes": 217595904,
+  "torch": "2.12.0",
+  "device": "cpu",
+  "threads": 1,
+  "source_hashes_unchanged": true,
+  "source_sha256": {
+    "observation.py": "e8b9f75a2f39307684d874d9fde13c888f9fa158d68854afa4427382a1d685c9",
+    "run.py": "24151a2bce9f7c5a7aac0a3af75e0c2fb30245ab7258ab10a91d10f7f8ac8720",
+    "test_protocol.py": "c353fb5ebd49d2bdeec19c6032db2ba57abdafe6f9fedbcc79b28efcae8ac4df",
+    "test_observation.py": "d9da6b5867c54682b6f358aedaa044e6c408b01f8bd2f5802639b93325c95f90",
+    "protocol.py": "41ea4cd3d6a7fd1c83f612c7749d36236bcdeeacf21559583e792d93e496a862"
+  },
+  "case_count": 72,
+  "metric_rows": 864,
+  "frames_retained_by_offline_runner": true,
+  "constant_process_memory_demonstrated": false,
+  "training_updates": 0,
+  "preregistration_sha256": "dc6a95e39fcf90153abcb1e7607cca7b2705240a6b4421af44d50e37efd93133"
+}

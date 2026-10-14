@@ -1,0 +1,107 @@
+{
+  "protocol": "native_wave_sparse_numerics_negative_control_v1",
+  "device": "cpu",
+  "torch": "2.12.0",
+  "threads": 1,
+  "source_sha256": {
+    "/Users/slavaz/crumb-format/experiments/wavefield_video/wfvideo.py": "85f0d97cb23f3a68ffcef5091342b21ecaef8b321fe7f1a03cab636d33eb85fe",
+    "/Users/slavaz/crumb-format/experiments/wavefield_video/ssm_lite.py": "df7ac638f4cc0c304bc9762a3f47ae07458e34b5eaeb5600179bf90f897321d4",
+    "/Users/slavaz/crumb-format/experiments/wavefield_video/observation_memory_v2/adapters.py": "355b8c14030a7a338e6aa0fc26edc971812a5609dc41cf6a25e5112cf1040b5e",
+    "/Users/slavaz/crumb-format/experiments/wavefield_video/observation_memory_v2/test_adapters.py": "1e15290fdaf9d6a6919d59a1546c86375be836d39b9cbcf4ac04d5e615acc97c"
+  },
+  "source_unchanged": true,
+  "diagnostic_sha256": "f1c16b0f745089a6d6de67e64eff6852b4c9c99d26e3484f41af489d4718f956",
+  "wall_seconds": 0.13675520801916718,
+  "cpu_seconds": 0.13674699999999995,
+  "sparse_prefix_cue_frame": 3,
+  "poisoned_suffix_start": 12,
+  "poison_rng_seed": 31,
+  "shape": [
+    1,
+    32,
+    3,
+    4,
+    4
+  ],
+  "head": {
+    "dim": 16,
+    "heads": 2,
+    "window": 32,
+    "pole_param": "halflife",
+    "clean_write": true,
+    "residual": false
+  },
+  "prefix_poisoning": [
+    {
+      "initialization_seed": 0,
+      "dense_fft_prefix_max_delta": 0.03750698268413544,
+      "dense_fft_blank_before_cue_max_delta": 0.03750698268413544,
+      "dense_fft_prefix_rms_delta": 0.007834934629499912,
+      "dense_fft_allclose_atol3e_5_rtol3e_5": false,
+      "exact_frame_prefix_equal": true
+    },
+    {
+      "initialization_seed": 9,
+      "dense_fft_prefix_max_delta": 0.03668417036533356,
+      "dense_fft_blank_before_cue_max_delta": 0.03668417036533356,
+      "dense_fft_prefix_rms_delta": 0.0056760660372674465,
+      "dense_fft_allclose_atol3e_5_rtol3e_5": false,
+      "exact_frame_prefix_equal": true
+    },
+    {
+      "initialization_seed": 27,
+      "dense_fft_prefix_max_delta": 0.05561944842338562,
+      "dense_fft_blank_before_cue_max_delta": 0.05561944842338562,
+      "dense_fft_prefix_rms_delta": 0.008376399986445904,
+      "dense_fft_allclose_atol3e_5_rtol3e_5": false,
+      "exact_frame_prefix_equal": true
+    },
+    {
+      "initialization_seed": 42,
+      "dense_fft_prefix_max_delta": 0.010646343231201172,
+      "dense_fft_blank_before_cue_max_delta": 0.010646343231201172,
+      "dense_fft_prefix_rms_delta": 0.0018744631670415401,
+      "dense_fft_allclose_atol3e_5_rtol3e_5": false,
+      "exact_frame_prefix_equal": true
+    },
+    {
+      "initialization_seed": 83,
+      "dense_fft_prefix_max_delta": 0.10996195673942566,
+      "dense_fft_blank_before_cue_max_delta": 0.10996195673942566,
+      "dense_fft_prefix_rms_delta": 0.020340194925665855,
+      "dense_fft_allclose_atol3e_5_rtol3e_5": false,
+      "exact_frame_prefix_equal": true
+    }
+  ],
+  "chunk_frame_parity_cue_frame": 31,
+  "chunk_frame_parity": [
+    {
+      "initialization_seed": 42,
+      "layers": 1,
+      "final_prediction_chunk_frame_max_delta": 2.5331974029541016e-06,
+      "recurrent_state_chunk_frame_max_delta": 6.265012416406535e-06
+    },
+    {
+      "initialization_seed": 42,
+      "layers": 2,
+      "final_prediction_chunk_frame_max_delta": 0.006602644920349121,
+      "recurrent_state_chunk_frame_max_delta": 0.024821162223815918
+    },
+    {
+      "initialization_seed": 42,
+      "layers": 4,
+      "final_prediction_chunk_frame_max_delta": 1.7273253202438354,
+      "recurrent_state_chunk_frame_max_delta": 35.07265090942383
+    }
+  ],
+  "nonblank_control": {
+    "seed": 991,
+    "head_seed": 42,
+    "prefix_max_delta": 3.5762786865234375e-07
+  },
+  "interpretation": "Temporal FFT mathematically truncated but sparse near-zero outputs can amplify numerical contamination through RMSNorm. The exact frame API is causally unchanged under suffix poisoning. Multilayer wave FFT/frame parity is unsupported; additive adapter restricts the wave candidate to one layer. No future target was ingested in final-only retrieval.",
+  "trained": false,
+  "gpu_used": false,
+  "canonical_edited": false,
+  "quality_promotion_allowed": false
+}

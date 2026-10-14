@@ -1,0 +1,10 @@
+{
+  "backend": "ltx",
+  "repository": "Lightricks/LTX-Video",
+  "revision": "8984fa25007f376c1a299016d0957a37a2f797bb",
+  "source_kind": "official_huggingface_snapshot",
+  "files": {
+    "config.json": "e8f12ad5305b1508f6e456797d48ab8e9fdd091c686ccf814a293ee96ce89dbb",
+    "diffusion_pytorch_model.safetensors": "265ca87cb5dff5e37f924286e957324e282fe7710a952a7dafc0df43883e2010"
+  }
+}

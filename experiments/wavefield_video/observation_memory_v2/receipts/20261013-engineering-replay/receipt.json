@@ -1,0 +1,19 @@
+{
+  "method": "Independent arithmetic replay of saved registered metric rows; no new inference/training",
+  "recorded_at_utc": "2026-10-14T01:50:35.591837+00:00",
+  "source_matches": {
+    "observation.py": true,
+    "run.py": true,
+    "test_protocol.py": true,
+    "test_observation.py": true,
+    "protocol.py": true
+  },
+  "primary_count": 42,
+  "primary_min_joint": 1.0,
+  "primary_min_skill": 0.999999999982111,
+  "primary_min_erase_drop": 1.0,
+  "primary_min_donor_joint": 1.0,
+  "small_occluder_false_presence_count": 6,
+  "small_occluder_case_count": 6,
+  "generated_video_claim_allowed": false
+}

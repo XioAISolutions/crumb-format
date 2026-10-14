@@ -1,0 +1,72 @@
+{
+  "version": "observation_reference_v2",
+  "data_seeds": [
+    730101,
+    730102,
+    730103
+  ],
+  "initialization_seeds": [],
+  "trained_weights": false,
+  "raw_frame_gap": 256,
+  "last_cue": 31,
+  "hidden_interval": [
+    32,
+    288
+  ],
+  "predict_before_ingesting": 288,
+  "latent_step_gap": null,
+  "conditions": [
+    "clean",
+    "brightness_step",
+    "subpixel_quarter",
+    "subpixel_half",
+    "subpixel_write",
+    "late_half_occlusion",
+    "full_occlusion",
+    "ambiguous_texture",
+    "write_occlusion",
+    "static_noevent",
+    "partial_disocclusion",
+    "small_occluder_static"
+  ],
+  "primary_conditions": [
+    "clean",
+    "brightness_step",
+    "subpixel_quarter",
+    "subpixel_half",
+    "subpixel_write",
+    "late_half_occlusion",
+    "full_occlusion"
+  ],
+  "families": [
+    "chromatic",
+    "achromatic"
+  ],
+  "contender_input": [
+    "frames"
+  ],
+  "primary_arm": "aligned_reference_latch",
+  "baseline_scope": "integer-only ablation shares photometry and all-time latch; not original E2",
+  "gates": {
+    "joint": 0.8,
+    "memory_delta_skill": 0.5,
+    "erase_drop": 0.5,
+    "donor_joint": 0.75,
+    "static_false_presence": 0.05
+  },
+  "privileged_controls": [
+    "privileged_oracle",
+    "privileged_background_only",
+    "wrong_location",
+    "wrong_identity"
+  ],
+  "source_sha256": {
+    "observation.py": "e8b9f75a2f39307684d874d9fde13c888f9fa158d68854afa4427382a1d685c9",
+    "run.py": "24151a2bce9f7c5a7aac0a3af75e0c2fb30245ab7258ab10a91d10f7f8ac8720",
+    "test_protocol.py": "c353fb5ebd49d2bdeec19c6032db2ba57abdafe6f9fedbcc79b28efcae8ac4df",
+    "test_observation.py": "d9da6b5867c54682b6f358aedaa044e6c408b01f8bd2f5802639b93325c95f90",
+    "protocol.py": "41ea4cd3d6a7fd1c83f612c7749d36236bcdeeacf21559583e792d93e496a862"
+  },
+  "benchmark_valid": false,
+  "claim_scope": "Causal screen-space observed RGB memory engineering; not natural-video quality."
+}

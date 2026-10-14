@@ -1,0 +1,279 @@
+{
+  "status": "cpu_contract_smoke_pass",
+  "synthetic_arithmetic_fixture": true,
+  "pretrained_evidence": false,
+  "GPU_evidence": false,
+  "causal_fixture": {
+    "pass": true,
+    "rows": [
+      {
+        "raw_prefix_frames": 1,
+        "past_latent_steps": 1,
+        "poison": "zero",
+        "poison_delta_max": 0.0,
+        "longer_context_delta_max": 0.0,
+        "tolerance": 0.00011,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 1,
+        "past_latent_steps": 1,
+        "poison": "invert",
+        "poison_delta_max": 0.0,
+        "longer_context_delta_max": 0.0,
+        "tolerance": 0.00011,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 1,
+        "past_latent_steps": 1,
+        "poison": "seeded_noise",
+        "poison_delta_max": 0.0,
+        "longer_context_delta_max": 0.0,
+        "tolerance": 0.00011,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 9,
+        "past_latent_steps": 3,
+        "poison": "zero",
+        "poison_delta_max": 0.0,
+        "longer_context_delta_max": 0.0,
+        "tolerance": 0.00011,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 9,
+        "past_latent_steps": 3,
+        "poison": "invert",
+        "poison_delta_max": 0.0,
+        "longer_context_delta_max": 0.0,
+        "tolerance": 0.00011,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 9,
+        "past_latent_steps": 3,
+        "poison": "seeded_noise",
+        "poison_delta_max": 0.0,
+        "longer_context_delta_max": 0.0,
+        "tolerance": 0.00011,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 17,
+        "past_latent_steps": 5,
+        "poison": "zero",
+        "poison_delta_max": 0.0,
+        "longer_context_delta_max": 0.0,
+        "tolerance": 0.00011,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 17,
+        "past_latent_steps": 5,
+        "poison": "invert",
+        "poison_delta_max": 0.0,
+        "longer_context_delta_max": 0.0,
+        "tolerance": 0.00011,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 17,
+        "past_latent_steps": 5,
+        "poison": "seeded_noise",
+        "poison_delta_max": 0.0,
+        "longer_context_delta_max": 0.0,
+        "tolerance": 0.00011,
+        "pass": true
+      }
+    ],
+    "raw_frame_hash": "9ee06118dcf832bda152cecab0d186b3eac7067035f9ff150ba077771b76bfc9",
+    "raw_frames": 33,
+    "t_stride": 4,
+    "atol": 1e-05,
+    "rtol": 0.0001,
+    "target_or_future_observation_passed_to_predictor": false
+  },
+  "acausal_negative_fixture": {
+    "pass": false,
+    "rows": [
+      {
+        "raw_prefix_frames": 1,
+        "past_latent_steps": 1,
+        "poison": "zero",
+        "poison_delta_max": 0.7750638723373413,
+        "longer_context_delta_max": 0.3354071378707886,
+        "tolerance": 0.00016985692739486695,
+        "pass": false
+      },
+      {
+        "raw_prefix_frames": 1,
+        "past_latent_steps": 1,
+        "poison": "invert",
+        "poison_delta_max": 0.33445075154304504,
+        "longer_context_delta_max": 0.3354071378707886,
+        "tolerance": 0.00016985692739486695,
+        "pass": false
+      },
+      {
+        "raw_prefix_frames": 1,
+        "past_latent_steps": 1,
+        "poison": "seeded_noise",
+        "poison_delta_max": 0.345522403717041,
+        "longer_context_delta_max": 0.3354071378707886,
+        "tolerance": 0.00016985692739486695,
+        "pass": false
+      },
+      {
+        "raw_prefix_frames": 9,
+        "past_latent_steps": 3,
+        "poison": "zero",
+        "poison_delta_max": 0.48659104108810425,
+        "longer_context_delta_max": 0.12687259912490845,
+        "tolerance": 0.00015579813480377197,
+        "pass": false
+      },
+      {
+        "raw_prefix_frames": 9,
+        "past_latent_steps": 3,
+        "poison": "invert",
+        "poison_delta_max": 0.14437717199325562,
+        "longer_context_delta_max": 0.12687259912490845,
+        "tolerance": 0.00015579813480377197,
+        "pass": false
+      },
+      {
+        "raw_prefix_frames": 9,
+        "past_latent_steps": 3,
+        "poison": "seeded_noise",
+        "poison_delta_max": 0.131827712059021,
+        "longer_context_delta_max": 0.12687259912490845,
+        "tolerance": 0.00015579813480377197,
+        "pass": false
+      },
+      {
+        "raw_prefix_frames": 17,
+        "past_latent_steps": 5,
+        "poison": "zero",
+        "poison_delta_max": 0.28779399394989014,
+        "longer_context_delta_max": 0.10493230819702148,
+        "tolerance": 0.00014844236135482788,
+        "pass": false
+      },
+      {
+        "raw_prefix_frames": 17,
+        "past_latent_steps": 5,
+        "poison": "invert",
+        "poison_delta_max": 0.08103042840957642,
+        "longer_context_delta_max": 0.10493230819702148,
+        "tolerance": 0.00014844236135482788,
+        "pass": false
+      },
+      {
+        "raw_prefix_frames": 17,
+        "past_latent_steps": 5,
+        "poison": "seeded_noise",
+        "poison_delta_max": 0.045778870582580566,
+        "longer_context_delta_max": 0.10493230819702148,
+        "tolerance": 0.00014844236135482788,
+        "pass": false
+      }
+    ],
+    "raw_frame_hash": "9ee06118dcf832bda152cecab0d186b3eac7067035f9ff150ba077771b76bfc9",
+    "raw_frames": 33,
+    "t_stride": 4,
+    "atol": 1e-05,
+    "rtol": 0.0001,
+    "target_or_future_observation_passed_to_predictor": false
+  },
+  "decoder_fixture": {
+    "pass": true,
+    "rf_back_latents": 0,
+    "rf_forward_latents": 0,
+    "history_latents": 2,
+    "lookahead_latents": 1,
+    "lookahead_raw_frames": 4,
+    "rf_spatial_cap_latents": 8,
+    "seam_spatial_hw_latents": [
+      4,
+      4
+    ],
+    "rows": [
+      {
+        "chunk_latents": 7,
+        "decoded_frames": 112,
+        "delta_max": 0.0,
+        "tolerance": 0.0006848473787307739,
+        "pass": true
+      },
+      {
+        "chunk_latents": 13,
+        "decoded_frames": 112,
+        "delta_max": 0.0,
+        "tolerance": 0.0006848473787307739,
+        "pass": true
+      }
+    ],
+    "resume_tested": true,
+    "synthetic_latent_probe": true,
+    "native_resolution_quality_evidence": false,
+    "max_rf_latents": 40
+  },
+  "native_pixel_fixture_health": {
+    "native_resolution_hw": [
+      8,
+      8
+    ],
+    "decoded_frames": 4,
+    "fixed_context_sha256": "9a8ca9e3e075b3fad7574559eac31b4b8a518e538ef66cbb8b992cd548286d38",
+    "anchor_source": "separate_observed_clean_context",
+    "pixel_screen": {
+      "fade_ratio": 0.5,
+      "flat_ratio": 0.5,
+      "freeze_ratio": 0.1,
+      "patience": 2,
+      "structure_ratio": 0.25,
+      "high_fraction": 0.5,
+      "screen_version": 2
+    },
+    "first_collapse": {
+      "fade": {
+        "decoded_frame": 2,
+        "seconds": 0.08333333333333333,
+        "latent_step": 0,
+        "sample": 0
+      },
+      "flatten": {
+        "decoded_frame": 2,
+        "seconds": 0.08333333333333333,
+        "latent_step": 0,
+        "sample": 0
+      }
+    },
+    "frozen_feature_screen": {
+      "status": "not_run"
+    },
+    "semantic_quality": "unverified",
+    "independent_native_pixels_and_blind_human_review_required": true
+  },
+  "frozen_feature_evidence": false,
+  "learned_recall_evidence": false,
+  "quality_claim_allowed": false,
+  "wall_seconds": 0.0019295001402497292,
+  "torch": "2.12.0",
+  "command_argv": [
+    "--smoke",
+    "--out",
+    "receipts/20261013-cpu-contract-02"
+  ],
+  "source_sha256": {
+    "validation.py": "3410c17c6d1622f072d5fc853b0e3832350ad4eaa7b035e5d8c62265648493dd",
+    "run_preflight.py": "167c6e4554ba64c4e9768037f969767a7097ef7fc36914e9c2abe7afcee5740a",
+    "launch_protocol.json": "33338cebdfd27046784660679bdc27485e295aee9f1cfdc88a20aaae89a21f17"
+  },
+  "native_dependency_sha256": {
+    "video_vae.py": "47a931c01a4ea6a06f2512e6513a1be367f01e598a20b3d8e9b9600b74ee2b43",
+    "long_horizon.py": "11a039bb164802c652f2a6b3b9a57f1e124413cb6c7a8d8157c724629920a305"
+  }
+}

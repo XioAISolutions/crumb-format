@@ -1,0 +1,165 @@
+{
+  "status": "pretrained_cpu_encoder_contract_pass",
+  "stage": "complete_partial_encoder_probe",
+  "pretrained_evidence": true,
+  "GPU_evidence": false,
+  "trained_model_evidence": false,
+  "quality_claim_allowed": false,
+  "native_resolution_quality_evidence": false,
+  "device": "cpu",
+  "threads": 1,
+  "raw_probe_shape": [
+    1,
+    297,
+    3,
+    32,
+    32
+  ],
+  "raw_prefix_cuts": [
+    33,
+    129,
+    289
+  ],
+  "scope": "synthetic low-resolution raw encoder causality at full learned temporal horizon only",
+  "remaining_stages": {
+    "pretrained_decoder_rf_and_chunking": "unrun",
+    "frozen_DINO_features": "blocked_transformers_missing",
+    "native_footage_quality": "unverified",
+    "learned_three_seed_campaign": "unrun"
+  },
+  "repository": "Lightricks/LTX-Video",
+  "revision": "8984fa25007f376c1a299016d0957a37a2f797bb",
+  "publisher_metadata_sha256": "f7a6daafb1b0224f41917a41f27937095d1b335988e2ef7685407ad5f8d453ba",
+  "publisher_bytes_verified": true,
+  "weight_sha256": "265ca87cb5dff5e37f924286e957324e282fe7710a952a7dafc0df43883e2010",
+  "weight_bytes": 1676798532,
+  "vae": {
+    "backend": "ltx",
+    "repository": "Lightricks/LTX-Video",
+    "revision": "8984fa25007f376c1a299016d0957a37a2f797bb",
+    "approved_manifest_sha256": "98726b135049d74c276825ba9d15e5450fd60fe176a431c5f42d4d8928cf2bc7",
+    "artifacts": {
+      "config.json": "e8f12ad5305b1508f6e456797d48ab8e9fdd091c686ccf814a293ee96ce89dbb",
+      "diffusion_pytorch_model.safetensors": "265ca87cb5dff5e37f924286e957324e282fe7710a952a7dafc0df43883e2010"
+    },
+    "provenance_verified": true,
+    "provenance_scope": "approved publisher snapshot identity; hashes alone do not prove training",
+    "t_stride": 8,
+    "s_stride": 32,
+    "channels": 128,
+    "fingerprint": "53ae5bf00cb2bd8b",
+    "weight_parameters": 419193649
+  },
+  "loaded_state_keys_exact": true,
+  "encoder_causality": {
+    "pass": true,
+    "rows": [
+      {
+        "raw_prefix_frames": 33,
+        "past_latent_steps": 5,
+        "poison": "zero",
+        "poison_delta_max": 1.3709068298339844e-06,
+        "longer_context_delta_max": 1.3709068298339844e-06,
+        "tolerance": 0.0003054678297042847,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 33,
+        "past_latent_steps": 5,
+        "poison": "invert",
+        "poison_delta_max": 1.3709068298339844e-06,
+        "longer_context_delta_max": 1.3709068298339844e-06,
+        "tolerance": 0.0003054678297042847,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 33,
+        "past_latent_steps": 5,
+        "poison": "seeded_noise",
+        "poison_delta_max": 1.3709068298339844e-06,
+        "longer_context_delta_max": 1.3709068298339844e-06,
+        "tolerance": 0.0003054678297042847,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 129,
+        "past_latent_steps": 17,
+        "poison": "zero",
+        "poison_delta_max": 1.0728836059570312e-06,
+        "longer_context_delta_max": 1.0728836059570312e-06,
+        "tolerance": 0.0003054678297042847,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 129,
+        "past_latent_steps": 17,
+        "poison": "invert",
+        "poison_delta_max": 1.0728836059570312e-06,
+        "longer_context_delta_max": 1.0728836059570312e-06,
+        "tolerance": 0.0003054678297042847,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 129,
+        "past_latent_steps": 17,
+        "poison": "seeded_noise",
+        "poison_delta_max": 1.0728836059570312e-06,
+        "longer_context_delta_max": 1.0728836059570312e-06,
+        "tolerance": 0.0003054678297042847,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 289,
+        "past_latent_steps": 37,
+        "poison": "zero",
+        "poison_delta_max": 0.0,
+        "longer_context_delta_max": 0.0,
+        "tolerance": 0.0003054678297042847,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 289,
+        "past_latent_steps": 37,
+        "poison": "invert",
+        "poison_delta_max": 0.0,
+        "longer_context_delta_max": 0.0,
+        "tolerance": 0.0003054678297042847,
+        "pass": true
+      },
+      {
+        "raw_prefix_frames": 289,
+        "past_latent_steps": 37,
+        "poison": "seeded_noise",
+        "poison_delta_max": 0.0,
+        "longer_context_delta_max": 0.0,
+        "tolerance": 0.0003054678297042847,
+        "pass": true
+      }
+    ],
+    "raw_frame_hash": "994ca5deaaed1c824ddc181451aeddbd5bdae4ceb58bf0b101111ef90c6e186b",
+    "raw_frames": 297,
+    "t_stride": 8,
+    "atol": 1e-05,
+    "rtol": 0.0001,
+    "required_context_frames": 289,
+    "covers_required_context": true,
+    "coverage_scope": "tested raw lengths/cuts only; short probes cannot certify untested longer clips",
+    "target_or_future_observation_passed_to_predictor": false
+  },
+  "production_preflight_complete": false,
+  "torch": "2.12.0",
+  "diffusers": "0.40.0",
+  "worker_wall_seconds": 11.017452458152547,
+  "outer_wall_seconds": 12.522363583091646,
+  "peak_worker_rss_kib": 2793536,
+  "outer_timeout_seconds": 180,
+  "outer_rss_cap_GiB": 8,
+  "source_sha256": {
+    "run_cached_ltx_cpu.py": "e8feada9e9835e54874128db07c013073d2f7e8221db0e94c9f09d3efb27bf09",
+    "validation.py": "95ea09a3c1de4f5c243cefde3fe278fd6e17912ff4d334021a133739dcb75f44"
+  },
+  "native_source_sha256": {
+    "video_vae.py": "47a931c01a4ea6a06f2512e6513a1be367f01e598a20b3d8e9b9600b74ee2b43"
+  },
+  "platform": "macOS-27.0.1-arm64-arm-64bit"
+}

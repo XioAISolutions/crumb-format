@@ -1,0 +1,42 @@
+{
+  "per_data_seed": [
+    {
+      "data_seed": 730101,
+      "seed_role": "fixture_only",
+      "checks": {
+        "joint_recovery": true,
+        "memory_component_skill": true,
+        "erase_dependence": true,
+        "donor_identity": true,
+        "static_false_presence": true
+      },
+      "pass": true
+    },
+    {
+      "data_seed": 730102,
+      "seed_role": "fixture_only",
+      "checks": {
+        "joint_recovery": true,
+        "memory_component_skill": true,
+        "erase_dependence": true,
+        "donor_identity": true,
+        "static_false_presence": true
+      },
+      "pass": true
+    },
+    {
+      "data_seed": 730103,
+      "seed_role": "fixture_only",
+      "checks": {
+        "joint_recovery": true,
+        "memory_component_skill": true,
+        "erase_dependence": true,
+        "donor_identity": true,
+        "static_false_presence": true
+      },
+      "pass": true
+    }
+  ],
+  "pass": true,
+  "interpretation": "Engineering RGB-reference retention only; no learned-memory/video claim."
+}

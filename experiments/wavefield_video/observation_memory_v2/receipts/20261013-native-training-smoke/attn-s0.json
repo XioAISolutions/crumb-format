@@ -1,0 +1,38 @@
+{
+  "kind": "attn",
+  "initialization_seed": 0,
+  "requested_updates": 1,
+  "completed_updates": 1,
+  "completed": true,
+  "training_wall_seconds": 0.11302866716869175,
+  "parameter_count": 4147,
+  "changed_state_tensors": [
+    "native.embed.weight",
+    "native.embed.bias",
+    "native.posemb.py",
+    "native.posemb.px",
+    "native.blocks.0.n1.w",
+    "native.blocks.0.mix.qkv.weight",
+    "native.blocks.0.mix.qkv.bias",
+    "native.blocks.0.mix.po.weight",
+    "native.blocks.0.mix.po.bias",
+    "native.blocks.0.n2.w",
+    "native.blocks.0.ffn.fc1.weight",
+    "native.blocks.0.ffn.fc1.bias",
+    "native.blocks.0.ffn.fc2.weight",
+    "native.blocks.0.ffn.fc2.bias",
+    "native.norm.w",
+    "native.head.weight",
+    "native.head.bias"
+  ],
+  "last_loss": 0.3345209062099457,
+  "context_frames_seen": 40,
+  "bounded_attention_window": 32,
+  "native_variant": "native_bias_spatial_embed",
+  "metrics": {
+    "full_mse": 0.19656578451395035,
+    "joint_hit": 0.0,
+    "memory_delta_skill": -240.81474852019267,
+    "memory_delta_joint_hit": 0.0
+  }
+}

@@ -1,0 +1,130 @@
+{
+  "smoke_only": true,
+  "device": "cpu",
+  "initialization_seeds": [
+    0
+  ],
+  "raw_frame_gap": 8,
+  "context_frames_every_arm": 40,
+  "updates_each_arm": 1,
+  "kinds": [
+    "wave",
+    "ssm",
+    "attn"
+  ],
+  "training_data_seeds": [
+    980000,
+    980001,
+    980002,
+    980003,
+    980004,
+    980005,
+    980006,
+    980007
+  ],
+  "heldout_data_seeds": [
+    990000,
+    990001,
+    990002,
+    990003,
+    990004,
+    990005,
+    990006,
+    990007
+  ],
+  "static_heldout_data_seeds": [
+    990100,
+    990101
+  ],
+  "conditions": [
+    "clean",
+    "brightness_step",
+    "subpixel_half",
+    "subpixel_write"
+  ],
+  "families": [
+    "chromatic",
+    "achromatic"
+  ],
+  "examples_per_condition_family": 1,
+  "example_order": "same sequential cycling for every arm",
+  "shared_features": true,
+  "optimizer": {
+    "name": "AdamW",
+    "lr": 0.001,
+    "weight_decay": 0.0
+  },
+  "input_representation": "signed observed-only canonical RGB innovations",
+  "frozen_pretrained_VAE_used": false,
+  "training_target_is_not_inference_input": true,
+  "matched_parameter_or_compute_budget": false,
+  "model_variant_confound": "Wave clean-write removes biases/spatial table; stock SSM/attention retain them",
+  "required_before_superiority_claim": [
+    "matched bias/write variants",
+    "matched resource comparison",
+    "factorized attention",
+    "sink-plus-window baseline",
+    "pretrained VAE causality and decoded video"
+  ],
+  "state_intervention": {
+    "boundary_frame": 32,
+    "erasure": "actual recurrent tensors or attention window zeroed",
+    "donor": "opposite observed cue sign; same world/pose; actual donor head state at32",
+    "subsequent_input": "identical recipient hidden tail",
+    "decoder_context": "recipient reference/pose retained"
+  },
+  "descriptive_gates_each_seed_and_case": {
+    "joint": 0.8,
+    "memory_delta_skill": 0.5,
+    "erase_drop": 0.5,
+    "donor_joint": 0.75,
+    "static_false_presence": 0.05
+  },
+  "reference_only_is_not_state_erasure": true,
+  "compute_scope": "Final-only retrieval loss/readout; attention buffers the whole prefix but evaluates only its final32-frame window",
+  "training_memory_scope": "Full BPTT across all true chunks; no constant training memory claim",
+  "tensor_state_accounting_excludes": [
+    "optimizer",
+    "activations",
+    "FFT workspace",
+    "Python overhead"
+  ],
+  "deadline_scope": "global cooperative cap including preparation/training/evaluation; checked at update/example boundaries",
+  "source_sha256": {
+    "observation.py": "e8b9f75a2f39307684d874d9fde13c888f9fa158d68854afa4427382a1d685c9",
+    "run.py": "24151a2bce9f7c5a7aac0a3af75e0c2fb30245ab7258ab10a91d10f7f8ac8720",
+    "test_protocol.py": "c353fb5ebd49d2bdeec19c6032db2ba57abdafe6f9fedbcc79b28efcae8ac4df",
+    "test_train.py": "d38a701a9c81bc573014e4975c7007cc0012110dbfe7e26e8a490668cda216f2",
+    "test_observation.py": "d9da6b5867c54682b6f358aedaa044e6c408b01f8bd2f5802639b93325c95f90",
+    "protocol.py": "41ea4cd3d6a7fd1c83f612c7749d36236bcdeeacf21559583e792d93e496a862",
+    "train.py": "96f85187a5dc3170a494d2e267a30161e02c998c1b4ec5258f30b713107bcfb0",
+    "test_adapters.py": "1e15290fdaf9d6a6919d59a1546c86375be836d39b9cbcf4ac04d5e615acc97c",
+    "adapters.py": "355b8c14030a7a338e6aa0fc26edc971812a5609dc41cf6a25e5112cf1040b5e"
+  },
+  "native_source_sha256": {
+    "wfvideo.py": "85f0d97cb23f3a68ffcef5091342b21ecaef8b321fe7f1a03cab636d33eb85fe",
+    "ssm_lite.py": "df7ac638f4cc0c304bc9762a3f47ae07458e34b5eaeb5600179bf90f897321d4"
+  },
+  "observation_config": {
+    "atlas_padding": 16,
+    "max_shift": 2.0,
+    "search_step": 0.25,
+    "refinement_step": 0.0625,
+    "allow_vertical": false,
+    "min_coverage": 0.5,
+    "min_inlier_fraction": 0.7,
+    "max_alignment_error": 0.035,
+    "inlier_threshold": 0.045,
+    "ambiguity_margin": 0.012,
+    "ambiguity_distance": 0.65,
+    "min_texture": 0.02,
+    "innovation_threshold": 0.055,
+    "max_change_fraction": 0.25,
+    "min_gain": 0.65,
+    "max_gain": 1.45,
+    "max_offset": 0.25
+  },
+  "time_budget_seconds": 3600,
+  "benchmark_valid": false,
+  "promotion_allowed": false
+}
