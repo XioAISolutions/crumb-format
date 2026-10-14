@@ -1,40 +1,73 @@
-# THE POSITION — BrainSNN (merged: deep-dive + Astra strategy consult, 2026-09-26)
+# Video rescue pilot and model research
 
-VERDICT: Position C structurally, sell A commercially.
-- TODAY (sell): "Fix drift and flicker in AI-generated video. We stabilize it without regenerating it."
-- TOMORROW (story): "Make long-form AI video stay coherent from the start."
-- Framing that survives model progress: **"Generation is getting longer. Coherence isn't keeping up."**
+Updated October 13, 2026. The September position was a commercial hypothesis,
+not a validated rescue service. The fixed post-process and learned video-memory
+engine have separate gates. CRUMB remains the context handoff product.
 
-Product hierarchy (offered in this order):
-1. BrainSNN Coherence — done-for-you fix (CONCIERGE SERVICE first, not SaaS — 1080p not yet validated; manual lets us inspect/reject/learn/charge now).
-2. Coherence API — $0.02-0.08/video-second later; "POST /coherence: video in, corrected video out."
-3. Long-Horizon Engine — Research Preview ONLY; design-partner program $500-2,000/mo or $2,500-10,000 engagements. Never photoreal claims.
+## The pilot offer
 
-## Buyer + money
-Buyer #1 (start here): AI-first studios/agencies making branded ads, product campaigns, pitch films. They pay $100-500 to rescue an otherwise-usable asset (re-generation + editor time + client rounds cost more).
-Buyer #2: serious indie AI filmmakers (r/aifilmmaking ~8k, making 1-20min AI shorts/series). 
-Buyer #3 (later, largest): tooling companies wanting POST /coherence.
+Evaluate one authorized clip, up to 60 seconds, under frozen settings.
+Proposed price: **US$99 only for a useful result the creator accepts**.
+Eligibility, comparison and acceptance precede payment. A failed detail or
+motion gate makes that output ineligible for paid fulfillment.
 
-Launch offer: **$99 AI Video Rescue** — send one broken clip; we return improved version + comparison; if we can't materially improve it, no charge.
-Beta pricing ladder: ≤15s $49-79 | 15-60s $99-199 | 1-3min $249-499 | agency/difficult $500-1500+.
-Communities: r/aifilmmaking, AI Filmmakers Discord, Banodoco, Kling/Runway Discords, X AI-filmmaking, LinkedIn agency founders. No paid ads month one.
+The current engine targets limited brightness/color changes. It has not
+established identity repair, geometric continuity, detail restoration or
+general HD rescue. [Both native 1080p tests failed](reports/ENG1_1080.md).
+The later [owned native 720p house gate](../../docs/evidence/native-720-house-20261013.json)
+also fails motion preservation (0.516330 versus the 0.90 floor), despite passing detail.
+The easy synthetic gain scenario is matched closely by a 24-byte EMA, and
+[the harder phase-drift scenario fails](M0_RESULTS.md). Do not turn either
+scenario's percentages into customer-facing promises.
 
-## Site (brainsnn.com rebuild, customer-first, in order)
-1. HERO: "AI videos drift. We fix them." + subhead (remove accumulated drift/flicker without regenerating) + [Fix My Video] [Watch Before/After] + THE most important object: synced ORIGINAL vs COHERENCE ON player.
-2. QUANTIFY: −86% drift / 0.99 detail / 0.97 motion + honest small print (validation = synthetic + low-res rollouts; HD underway).
-3. WORKS AFTER GENERATION: generator-agnostic diagram (Your generator → Generated video → BrainSNN Coherence → More stable video); careful phrasing, no untested compatibility claims.
-4. FAILURE MAGNIFIED: drift slider/zoom (raw wandering vs fixed anchored).
-5. PURCHASE: Upload → We stabilize → Download + "$99 Beta Video Rescue" CTA.
-6. VISION (last): constant-state long-horizon research + Apply for Engine Preview.
-CUT: SNN history, formulas, k-space above fold, metric walls, internal names, "revolutionizing" copy, multi-project confusion.
+## The 72 hour demand test
 
-## 72h experiment: THE $99 DRIFT RESCUE CHALLENGE
-One landing page + MANUAL outreach to 50 (15 filmmakers, 15 agencies, 10 AI-video YouTubers, 10 technical creators). Script: "Saw your AI video work. We're testing a post-process that reduces accumulated drift/flicker without regenerating. Looking for difficult real footage — send one clip; we process it and show before/after. $99 only if the result is useful."
-Success bar: 3 strangers send real broken footage; >=1 pays. If nobody cares -> pricing isn't the problem; if clips fail at 720/1080p -> that's the engineering milestone to chase.
+Start the clock with the first owner-approved manual invitation. Hold the
+scope, US$99 price, processing settings and acceptance gates fixed. Record
+each invitation, independent clip source, consent, refusal, native resolution,
+blind comparison, creator decision, accepted payment and refund separately.
 
-## Order of operations
-1. Finish the non-interference (trap) test. [running tonight]
-2. Run one 720p/1080p clip through the pipeline (blind, frozen settings).
-3. Launch the $99 rescue landing + concierge offer.
-4. Collect 10 real customer clips; publish the successful before/afters as proof.
-5. Only then: self-serve/API. Swarm fitness = funnel events (visit -> demo -> upload -> paid), evolved weekly on collected cash.
+Success requires **three independent strangers to submit usable broken
+footage and at least one to accept and pay for a useful result**. Owned clips,
+draft invitations, UI analytics and AI reviews are not customer demand.
+If no one pays, revise or stop the offer before further engine tuning.
+If native-resolution clips fail, that failure is the engineering milestone.
+
+Preparation does not authorize outreach, publication or billing. A page that
+only prepares an email draft must say so and must not display “Received” or
+count the draft as a submitted lead.
+
+## Product and research scope
+
+BrainSNN's current product remains its bounded content detector/comparison
+engine and simulation interface. The clip rescue is a service evaluation.
+The learned video engine is research, not an established multi-minute
+coherence product or a deployed wave-field stage in the text analyzer.
+
+Use a dedicated video repository and evidence index as the source of truth.
+Keep old experiment paths for reproducibility; move no checkpoints or private
+customer material merely to simplify the portfolio story.
+
+## Public claims
+
+The page should lead with the evaluation offer and a real, correctly labeled
+comparison. Put numerical methods and failure gates on an evidence page.
+Every result names its baseline, hardware, initialization seeds and trained
+status. Missing metadata stays unknown.
+
+Retire “417× fewer tokens,” untrained-stream coherence claims and global
+drift/detail/motion percentages. Preserve scoped positive and negative results
+in the [claims ledger](../../docs/VIDEO_CLAIMS.md).
+
+## Research gate
+
+Train and evaluate the same 256-frame dependency on at least three
+initialization seeds. Compare explicit reference/latch memory, frozen frames,
+bounded-window attention, generic SSM and factorized attention; publish the
+complete result either way after provenance and leakage checks.
+
+Use a frozen pretrained VAE only after encoder causality is verified. Codec
+replacement does not supply a generative prior or cure the failed rollout
+objective. Decode held-out predictions and report first collapse and blind
+visual review before claiming better video. Bring the protocol and raw
+receipts to one independent human reviewer in efficient sequence modeling.

@@ -1,0 +1,39 @@
+{
+  "status": "FAIL",
+  "checks": {
+    "detail": true,
+    "motion": false,
+    "jitter": true,
+    "runtime": true
+  },
+  "frames": 121,
+  "dimensions": [
+    1280,
+    720
+  ],
+  "fps": 16.0,
+  "detail_median": 0.9919975996017456,
+  "motion_ratio": 0.5163297653198242,
+  "jitter_candidate_max_over_p95": 1.4348212480545044,
+  "jitter_input_max_over_p95": 1.1057605743408203,
+  "wall_seconds": 5.185285959159955,
+  "peak_process_rss_bytes": 397590528,
+  "hardware": "macOS-27.0.1-arm64-arm-64bit",
+  "torch": "2.12.0",
+  "threads": 1,
+  "trained_weights": false,
+  "operator": "frozen analytic ENG-1 postprocess",
+  "source_role": "owned-generated",
+  "independent_stranger_clips_received": 0,
+  "source_unchanged": true,
+  "output_sha256": {
+    "A": "7eaf1f287e1aae00eb84f4685e5ee4ac05d04e5bc077b599bad1559998cdae12",
+    "B": "8ecf76afabd5729e98ecae308307b8a22ab8fcb0e9322f42f64bc6af617e1e60"
+  },
+  "blind_mapping_shared": false,
+  "human_review": "pending",
+  "first_collapse": "not_applicable_to_analytic_nonautoregressive_postprocess",
+  "paid_orders": 0,
+  "commercial_success_claim_allowed": false,
+  "video_generation_quality_claim_allowed": false
+}

@@ -40,13 +40,13 @@ The kernel: **k(t) = exp(-α|t|) · cos(ωt + φ)**
 
 Three parameters. That's it. A standard transformer head has d² + d² = 2d² parameters (Q and K projections alone). At d=128, that's 32,768 parameters per head just for routing. Crumb LLM V1 routes information with 3.
 
-**V2 blocks** add learned components (smooth causal masking, learned scatter/gather, query-conditioned frequency gating, RoPE, short convolution) that increase per-head parameters but remain O(N log N). V2 is the SOTA variant; V1 is the minimal, fast variant.
+**V2 blocks** add learned components (smooth causal masking, learned scatter/gather, query-conditioned frequency gating, RoPE, short convolution) that increase per-head parameters. V2 is the richer experimental variant; V1 is the smaller reference variant. This does not establish state-of-the-art quality.
 
 ---
 
 ## What We Discovered
 
-### 1. Wave-field mixing dramatically outperforms attention on structured text
+### 1. A reported tiny structured-text comparison
 
 When we trained identical-shape models (same dim, same depth, same FFN) on our crumb corpus:
 
@@ -61,7 +61,12 @@ When we trained identical-shape models (same dim, same depth, same FFN) on our c
 └─────────────────┴──────────────┴──────────────┘
 ```
 
-The wave-field mixer is **10× better** at modeling structured documents. Why? Because CRUMB documents have repetitive structure (section headers, keywords, patterns) that map naturally onto spectral components. The FFT-based kernel captures these patterns in a single O(F log F) operation where attention needs O(N²) pairwise comparisons to notice the same regularities.
+This table reports lower perplexity on the example corpus, at unequal
+parameter counts and higher wave training time. It does not record the
+initialization seeds, a held-out split or enough hardware settings to establish
+a general quality or efficiency advantage. Perplexity ratios are not a
+"10× better" task-success measure. Compare held-out results against relevant
+bounded-window and state-space baselines before making a broader claim.
 
 ### 2. Context pulling via spectral matching works
 
