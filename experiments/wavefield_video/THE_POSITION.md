@@ -6,16 +6,21 @@ engine have separate gates. CRUMB remains the context handoff product.
 
 ## The pilot offer
 
-Evaluate one authorized clip, up to 60 seconds, under frozen settings.
+Evaluate one authorized clip, up to 15 seconds, under frozen settings.
 Proposed price: **US$99 only for a useful result the creator accepts**.
 Eligibility, comparison and acceptance precede payment. A failed detail or
 motion gate makes that output ineligible for paid fulfillment.
 
 The current engine targets limited brightness/color changes. It has not
 established identity repair, geometric continuity, detail restoration or
-general HD rescue. [Both native 1080p tests failed](reports/ENG1_1080.md).
+general HD rescue. [Both native 1080p tests failed](reports/ENG1_1080.md);
+their sources were rendered math reels, not natural or client footage.
 The later [owned native 720p house gate](../../docs/evidence/native-720-house-20261013.json)
-also fails motion preservation (0.516330 versus the 0.90 floor), despite passing detail.
+fails the pre-encoding motion measure (0.516330 versus the 0.90 floor), despite passing
+the pre-encoding detail measure. Independent complete native RGB decoding of the
+identically encoded A/B also [fails the motion-measure gate](../../docs/evidence/native-720-house-delivery-verification-20261013.json):
+0.488231 or 2.048211 depending on the unrevealed role order, both outside [0.90,1.10].
+Encoded detail was not remeasured. These measures do not identify intended motion.
 The easy synthetic gain scenario is matched closely by a 24-byte EMA, and
 [the harder phase-drift scenario fails](M0_RESULTS.md). Do not turn either
 scenario's percentages into customer-facing promises.

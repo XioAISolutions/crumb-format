@@ -1,0 +1,74 @@
+{
+  "status": "VERIFIED_DELIVERY_MOTION_FAIL",
+  "method": "Complete native RGB24 decode; integer pixel differences/255; no resizing or rerender",
+  "frames_per_asset": 121,
+  "dimensions": [
+    1280,
+    720
+  ],
+  "fps": 16.0,
+  "input_sha256_match": true,
+  "A_B_sha256_match_frozen_receipt": true,
+  "encoding_metadata_identical": true,
+  "encoding": {
+    "codec_name": "h264",
+    "profile": "High",
+    "pix_fmt": "yuv420p",
+    "r_frame_rate": "16/1",
+    "avg_frame_rate": "16/1",
+    "time_base": "1/16384",
+    "level": 31
+  },
+  "native_decoding_complete": true,
+  "encoded_motion_ratio_possible_role_orders_unlabeled": [
+    0.48823101620438814,
+    2.048210717488235
+  ],
+  "registered_motion_interval": [
+    0.9,
+    1.1
+  ],
+  "encoded_motion_gate_fails_regardless_of_private_role_mapping": true,
+  "original_preencoding_status": "FAIL",
+  "original_preencoding_motion_ratio": 0.5163297653198242,
+  "encoded_detail_gate": "not remeasured; this receipt verifies motion only",
+  "used_sources": [
+    {
+      "registered_name": "run_eng1_1080.py",
+      "sha256": "b55300adad692206c3fe63b86c2a5a9a49d8973aaf4eb6773e603e67125955db",
+      "retained_source_matches": true,
+      "used_driver_archive_checked": false
+    },
+    {
+      "registered_name": "core.py",
+      "sha256": "3a1866f291482a5f08f9c23942ee35e862b67d611d081ad803c8335ebf446247",
+      "retained_source_matches": true,
+      "used_driver_archive_checked": false
+    },
+    {
+      "registered_name": "metrics.py",
+      "sha256": "829adf0abcfdab656fc4d9bf4efd38a750a07979a9342c6bb85eff706fb0fd55",
+      "retained_source_matches": true,
+      "used_driver_archive_checked": false
+    },
+    {
+      "registered_name": "run_native_clip.py",
+      "sha256": "037b24c283bff84828e75ee8e0d981aeabc635e449d5d680a8afe9a7522fca87",
+      "retained_source_matches": true,
+      "used_driver_archive_checked": true
+    }
+  ],
+  "blind_key_contents_read": false,
+  "blind_mapping_disclosed": false,
+  "source_role": "owned-generated",
+  "independent_stranger_clips_received": 0,
+  "human_review": "pending",
+  "paid_orders": 0,
+  "commercial_or_generated_video_quality_claim_allowed": false,
+  "operator_executed": false,
+  "gpu_used": false,
+  "wall_seconds": 5.440425332868472,
+  "verification_utility_sha256": "c78d684ce2bda7db76aa05a9a3e802f481c9f9c9b5f51b2e6aa050bbcf046212",
+  "source_receipt_sha256": "bf7a4b6b2b5911238025de15ac1f951832877210e36e2e9befdee06a59fad92a",
+  "publication_note": "Public subset of the independent delivery verification; private A/B role mapping remains unrevealed. Original operator receipt is unchanged."
+}
