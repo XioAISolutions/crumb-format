@@ -1,0 +1,120 @@
+{"step": 2800, "K": 1, "loss": 0.01011, "st_s": 0.44}
+TELE step=2825 lr=3.00e-04 head_gn=7.2641e-02 copy_r=0.5890
+{"step": 2825, "K": 1, "loss": 0.01241, "st_s": 0.44}
+TELE step=2850 lr=3.00e-04 head_gn=1.2369e-01 copy_r=0.6297
+{"step": 2850, "K": 1, "loss": 0.01236, "st_s": 0.44}
+TELE step=2875 lr=3.00e-04 head_gn=2.1070e-02 copy_r=0.5720
+{"step": 2875, "K": 1, "loss": 0.01191, "st_s": 0.44}
+TELE step=2900 lr=3.00e-04 head_gn=3.7327e-02 copy_r=0.5775
+{"step": 2900, "K": 1, "loss": 0.01238, "st_s": 0.44}
+TELE step=2925 lr=3.00e-04 head_gn=8.0173e-02 copy_r=0.6148
+{"step": 2925, "K": 1, "loss": 0.01221, "st_s": 0.44}
+TELE step=2950 lr=3.00e-04 head_gn=8.2343e-02 copy_r=0.5727
+{"step": 2950, "K": 1, "loss": 0.01291, "st_s": 0.44}
+TELE step=2975 lr=3.00e-04 head_gn=3.9041e-02 copy_r=0.5578
+{"step": 2975, "K": 1, "loss": 0.01219, "st_s": 0.44}
+TELE step=3000 lr=3.00e-04 head_gn=4.3948e-02 copy_r=0.5465
+{"step": 3000, "K": 1, "loss": 0.01241, "st_s": 0.44}
+TELE step=3025 lr=3.00e-04 head_gn=8.4773e-02 copy_r=0.5520
+{"step": 3025, "K": 1, "loss": 0.01031, "st_s": 0.44}
+TELE step=3050 lr=3.00e-04 head_gn=7.1281e-02 copy_r=0.5619
+{"step": 3050, "K": 1, "loss": 0.01317, "st_s": 0.44}
+TELE step=3075 lr=3.00e-04 head_gn=2.6745e-02 copy_r=0.6376
+{"step": 3075, "K": 1, "loss": 0.00991, "st_s": 0.44}
+TELE step=3100 lr=3.00e-04 head_gn=4.6220e-02 copy_r=0.5970
+{"step": 3100, "K": 1, "loss": 0.0107, "st_s": 0.44}
+TELE step=3125 lr=3.00e-04 head_gn=1.1809e-01 copy_r=0.5338
+{"step": 3125, "K": 1, "loss": 0.01621, "st_s": 0.44}
+TELE step=3150 lr=3.00e-04 head_gn=2.1161e-02 copy_r=0.5947
+{"step": 3150, "K": 1, "loss": 0.01054, "st_s": 0.44}
+TELE step=3175 lr=3.00e-04 head_gn=4.5087e-02 copy_r=0.6613
+{"step": 3175, "K": 1, "loss": 0.00983, "st_s": 0.44}
+TELE step=3200 lr=3.00e-04 head_gn=6.3173e-02 copy_r=0.5633
+{"step": 3200, "K": 1, "loss": 0.01114, "st_s": 0.44}
+TELE step=3225 lr=3.00e-04 head_gn=7.3296e-02 copy_r=0.6694
+{"step": 3225, "K": 1, "loss": 0.01019, "st_s": 0.44}
+TELE step=3250 lr=3.00e-04 head_gn=4.8187e-02 copy_r=0.5934
+{"step": 3250, "K": 1, "loss": 0.01213, "st_s": 0.44}
+TELE step=3275 lr=3.00e-04 head_gn=1.3418e-01 copy_r=0.6031
+{"step": 3275, "K": 1, "loss": 0.00865, "st_s": 0.44}
+TELE step=3300 lr=3.00e-04 head_gn=4.1170e-02 copy_r=0.5978
+{"step": 3300, "K": 1, "loss": 0.01228, "st_s": 0.44}
+TELE step=3325 lr=3.00e-04 head_gn=3.6286e-02 copy_r=0.5977
+{"step": 3325, "K": 1, "loss": 0.01112, "st_s": 0.44}
+PARAM-MATCH kind=attn target=2000000 ffn_mult=13.055 achieved=1999903 off=0.0%
+/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/optim/lr_scheduler.py:227: UserWarning: Detected call of `lr_scheduler.step()` before `optimizer.step()`. In PyTorch 1.1.0 and late
+  warnings.warn(
+RESUME <- runs_long_horizon/ckpt_attn_A_attn_s2.pt at step=3250 (of 4000)
+{"step": 3251, "K": 1, "loss": 0.01032, "st_s": 0.32}
+TELE step=3275 lr=3.00e-04 head_gn=1.3426e-01 copy_r=0.6032
+{"step": 3275, "K": 1, "loss": 0.00865, "st_s": 0.44}
+TELE step=3300 lr=3.00e-04 head_gn=4.0995e-02 copy_r=0.5976
+{"step": 3300, "K": 1, "loss": 0.01228, "st_s": 0.44}
+TELE step=3325 lr=3.00e-04 head_gn=3.5792e-02 copy_r=0.5979
+{"step": 3325, "K": 1, "loss": 0.01113, "st_s": 0.44}
+TELE step=3350 lr=3.00e-04 head_gn=6.0616e-02 copy_r=0.5861
+{"step": 3350, "K": 1, "loss": 0.01173, "st_s": 0.44}
+TELE step=3375 lr=3.00e-04 head_gn=4.8370e-02 copy_r=0.5836
+{"step": 3375, "K": 1, "loss": 0.01088, "st_s": 0.44}
+TELE step=3400 lr=3.00e-04 head_gn=4.6286e-02 copy_r=0.6084
+{"step": 3400, "K": 1, "loss": 0.01147, "st_s": 0.44}
+TELE step=3425 lr=3.00e-04 head_gn=5.4961e-02 copy_r=0.6294
+{"step": 3425, "K": 1, "loss": 0.00974, "st_s": 0.44}
+TELE step=3450 lr=3.00e-04 head_gn=2.9743e-02 copy_r=0.5883
+{"step": 3450, "K": 1, "loss": 0.0105, "st_s": 0.44}
+TELE step=3475 lr=3.00e-04 head_gn=7.5149e-02 copy_r=0.5999
+{"step": 3475, "K": 1, "loss": 0.01194, "st_s": 0.44}
+TELE step=3500 lr=3.00e-04 head_gn=2.1250e-02 copy_r=0.5859
+{"step": 3500, "K": 1, "loss": 0.01159, "st_s": 0.44}
+TELE step=3525 lr=3.00e-04 head_gn=2.8885e-02 copy_r=0.6001
+{"step": 3525, "K": 1, "loss": 0.01161, "st_s": 0.44}
+TELE step=3550 lr=3.00e-04 head_gn=4.3957e-02 copy_r=0.5699
+{"step": 3550, "K": 1, "loss": 0.01186, "st_s": 0.44}
+TELE step=3575 lr=3.00e-04 head_gn=2.7338e-02 copy_r=0.5708
+{"step": 3575, "K": 1, "loss": 0.01264, "st_s": 0.44}
+TELE step=3600 lr=3.00e-04 head_gn=7.7682e-02 copy_r=0.5933
+{"step": 3600, "K": 1, "loss": 0.00982, "st_s": 0.44}
+TELE step=3625 lr=3.00e-04 head_gn=1.3008e-01 copy_r=0.6258
+{"step": 3625, "K": 1, "loss": 0.0127, "st_s": 0.44}
+TELE step=3650 lr=3.00e-04 head_gn=8.4176e-02 copy_r=0.6304
+{"step": 3650, "K": 1, "loss": 0.00891, "st_s": 0.44}
+TELE step=3675 lr=3.00e-04 head_gn=6.2934e-02 copy_r=0.5999
+{"step": 3675, "K": 1, "loss": 0.01014, "st_s": 0.44}
+TELE step=3700 lr=3.00e-04 head_gn=5.9917e-02 copy_r=0.5914
+{"step": 3700, "K": 1, "loss": 0.01022, "st_s": 0.44}
+TELE step=3725 lr=3.00e-04 head_gn=3.4637e-02 copy_r=0.6218
+{"step": 3725, "K": 1, "loss": 0.00947, "st_s": 0.44}
+TELE step=3750 lr=3.00e-04 head_gn=8.8007e-02 copy_r=0.5635
+{"step": 3750, "K": 1, "loss": 0.01418, "st_s": 0.44}
+TELE step=3775 lr=3.00e-04 head_gn=3.9804e-02 copy_r=0.6105
+{"step": 3775, "K": 1, "loss": 0.01111, "st_s": 0.44}
+TELE step=3800 lr=3.00e-04 head_gn=6.0194e-02 copy_r=0.6030
+{"step": 3800, "K": 1, "loss": 0.0121, "st_s": 0.44}
+TELE step=3825 lr=3.00e-04 head_gn=1.1164e-01 copy_r=0.5881
+{"step": 3825, "K": 1, "loss": 0.01366, "st_s": 0.44}
+TELE step=3850 lr=3.00e-04 head_gn=3.2304e-02 copy_r=0.6166
+{"step": 3850, "K": 1, "loss": 0.01134, "st_s": 0.44}
+TELE step=3875 lr=3.00e-04 head_gn=5.0237e-02 copy_r=0.5927
+{"step": 3875, "K": 1, "loss": 0.01155, "st_s": 0.44}
+TELE step=3900 lr=3.00e-04 head_gn=2.0940e-02 copy_r=0.6150
+{"step": 3900, "K": 1, "loss": 0.01093, "st_s": 0.44}
+TELE step=3925 lr=3.00e-04 head_gn=4.1031e-02 copy_r=0.6078
+{"step": 3925, "K": 1, "loss": 0.01072, "st_s": 0.44}
+TELE step=3950 lr=3.00e-04 head_gn=4.2448e-02 copy_r=0.6054
+{"step": 3950, "K": 1, "loss": 0.01196, "st_s": 0.44}
+TELE step=3975 lr=3.00e-04 head_gn=1.1172e-01 copy_r=0.5509
+{"step": 3975, "K": 1, "loss": 0.01061, "st_s": 0.44}
+TELE step=4000 lr=3.00e-04 head_gn=9.5398e-02 copy_r=0.5944
+{"step": 4000, "K": 1, "loss": 0.00983, "st_s": 0.44}
+
+=== RESULT TABLE (MSE lower=better; r>1 beats persistence) ===
+  arm=attn_A_attn_s2  params=1999903  ffn_mult=13.055
+  baseline  zero       = 0.01764
+  baseline  copy-last  = 0.01719
+  baseline  const-vel  = 0.01685
+  model     eval_mse   = 0.01088   (model/copy-last = 0.633)
+  model     copy_ratio = 0.594   (~0 collapsed | ~1 correct motion | >>1 unstable)
+  occlusion path=window  div_horizon=1/512  r=persist/model=0.088
+  emergence exit_dir_acc=0.25  pos_err=4.754  vel_err=1.02  id_survival=0.08
+  state_bytes persistent=0 window=16777216  motion_pres=0.031  div_horizon/KB_state=1000.00  ms/frame=149.8268
+RESULT {"kind": "attn", "fuse": "none", "params": 1999903, "ffn_mult": 13.055, "steps": 4000, "dim": 128, "layers": 4, "heads": 8, "grid": 32, "frames": 32, "batch": 4, "causal": true, "residual": tru

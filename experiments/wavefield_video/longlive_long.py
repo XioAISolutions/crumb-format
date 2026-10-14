@@ -119,6 +119,13 @@ def build_overlay(base, *, latent_frames, prompts, ckpt, out_dir, window=32, sin
     inf["async_vae"] = False
     inf["save_latents_only"] = True                     # blocker 2
     inf.pop("vae_device", None)
+    # [zeph 2026-10-02] M4 quality-up knobs: env SAMPLING_STEPS / GUIDANCE_SCALE
+    # override the base config so probes can sweep compute vs geometry quality
+    # without hand-editing yaml (rung3 ladder: M4 probe).
+    if os.environ.get("SAMPLING_STEPS"):
+        inf["sampling_steps"] = int(os.environ["SAMPLING_STEPS"])
+    if os.environ.get("GUIDANCE_SCALE"):
+        inf["guidance_scale"] = float(os.environ["GUIDANCE_SCALE"])
     # sm89 OOM fix: int8 KV cache (the repo's nvfp4 config uses the same
     # switches). Halves/eighths the cache init that OOMs a 24 GB card.
     cfg["use_relative_rope"] = bool(relative_rope)                     # blocker 1
