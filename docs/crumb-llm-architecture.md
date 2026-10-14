@@ -216,6 +216,11 @@ same FFT cost as 256 tokens.
 
 Empirical crossover (CPU, dim=64, 2 layers, 4 heads, F=8192):
 
+This historical forward-timing table does not record a CPU model, thread
+count, initialization seed or warmed repetition protocol. It compares the
+listed full-attention transformer; it is not a GPU, end-to-end generation,
+token-saving or deployed-windowed-model benchmark.
+
 ```
 arch          seq_len   time_ms   ratio
 crumb_llm         256     15.9
@@ -234,10 +239,10 @@ At GPU scale and 32K–128K context (per the upstream paper):
 
 ## 6. Quality
 
-The upstream paper claims **within 5% of transformer perplexity** on
-WikiText-2 at matched parameter counts. Our own head-to-head comparison
-(`crumb-wavelm compare`) on the crumb-format examples corpus shows Crumb LLM
-dramatically outperforming the matched transformer:
+The upstream paper reports a WikiText-2 comparison under its own conditions.
+The separate tiny example-corpus result below comes from
+`crumb-wavelm compare`; the parameter counts differ, and the table does not
+record initialization seeds or a held-out split:
 
 ```
 crumb-wavelm compare --config tiny --steps 1000 --data examples/
@@ -250,11 +255,10 @@ crumb-wavelm compare --config tiny --steps 1000 --data examples/
 └─────────────┴────────┴───────┴──────────┴────────┘
 ```
 
-The wave-field mixer captures CRUMB's repetitive structure patterns
-(section headers, keyword blocks) via its spectral kernels far more
-efficiently than dot-product attention. On general-purpose text the gap
-narrows — but for structured documents the FFT-based architecture has a
-natural advantage.
+The result is a reason to test structured-text modeling, not evidence of a
+general architecture advantage. Report held-out quality, train/eval causality,
+seed counts and measured compute against bounded-window and state-space
+baselines before promoting it.
 
 ## 7. Field-state cache
 

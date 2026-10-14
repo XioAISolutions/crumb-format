@@ -8,6 +8,11 @@
 
 A raw transcript is the worst possible way to move context between tools: it is optimised for a human replaying a conversation, not for an agent picking up work. CRUMB is a small structured block that carries what the next tool actually needs — the goal, what was diagnosed, the decisions, the files touched, the constraints, and what is still open.
 
+CRUMB's product is the structured handoff. The optional language-model and
+video experiments are separate research tracks; their mixer timings and
+synthetic recall results do not measure handoff quality or video coherence.
+See the [research claims and evidence ledger](docs/VIDEO_CLAIMS.md).
+
 ```bash
 # Crumb the session you just finished — finds it for you
 crumb capture --last
@@ -740,10 +745,13 @@ Local checkpoints can be added to the registry with
 The bundled tiny checkpoint can be prepared for public upload with
 `python scripts/publish_crumb_llm_model.py`.
 
-**Scaling:** at 4K tokens Crumb LLM is ~1.5× faster than a
-matched-shape transformer; at 8K it's ~2.2× faster. The gap widens
-with context length because the wave-field cost is O(F log F)
-independent of N, while attention is O(N²).
+**CPU timing example:** the [architecture reference](docs/crumb-llm-architecture.md#5-complexity)
+reports 1.53× at 4K tokens and 2.16× at 8K against its full-attention
+transformer reference (dim 64, two layers, four heads, field size 8,192).
+The table does not record a CPU model, thread count or initialization seed.
+These are forward timings, not token savings, GPU speedups or a comparison
+with deployed windowed/state-space models. FFT mixing costs O(F log F);
+scatter, gather and the rest of the model still depend on sequence length.
 
 The repo includes a tiny local checkpoint under `pretrained/crumb-llm-tiny/`
 for registry and loader smoke tests. Full architecture, math, and
