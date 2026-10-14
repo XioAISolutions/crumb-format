@@ -1,0 +1,1484 @@
+STEP {"step": 400, "loss": 0.007441, "st_s": 0.124}
+SIGTERM: saved step 521 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=521 (of 4000)
+STEP {"step": 800, "loss": 0.007875, "st_s": 0.124}
+SIGTERM: saved step 1043 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=1043 (of 4000)
+STEP {"step": 1200, "loss": 0.005315, "st_s": 0.124}
+SIGTERM: saved step 1565 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt; exiting to resume
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+usage: train_long.py [-h] [--data-source {balls,occlusion}]
+                     [--latents LATENTS] [--kind {wave,ssm}]
+                     [--pole-param {softplus,halflife}] [--hl-min HL_MIN]
+                     [--hl-max HL_MAX] [--seq-frames SEQ_FRAMES]
+                     [--chunk CHUNK] [--tbptt-chunks TBPTT_CHUNKS]
+                     [--dense | --no-dense] [--motion-loss] [--write-gate]
+                     [--clean-write] [--grid GRID] [--n-balls N_BALLS]
+                     [--radius RADIUS] [--speed SPEED] [--kicks]
+                     [--collisions | --no-collisions]
+                     [--train-occ-start TRAIN_OCC_START]
+                     [--train-occ-end TRAIN_OCC_END] [--occ-start OCC_START]
+                     [--occ-end OCC_END] [--dim DIM] [--layers LAYERS]
+                     [--heads HEADS] [--ffn-mult FFN_MULT] [--batch BATCH]
+                     [--steps STEPS] [--lr LR] [--seed SEED]
+                     [--eval-rollout EVAL_ROLLOUT] [--eval-seeds EVAL_SEEDS]
+                     [--eval-chunk EVAL_CHUNK] [--eval-batch EVAL_BATCH]
+                     [--save-every SAVE_EVERY]
+                     [--save-every-sec SAVE_EVERY_SEC] [--resume RESUME]
+                     [--out OUT] [--tag TAG] [--micro-batch MICRO_BATCH]
+                     [--grad-ckpt]
+train_long.py: error: --resume runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt records no training arguments (written before they were saved); cannot verify it continues this run, start fresh
+SIGTERM: saved step 170 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=170 (of 4000)
+STEP {"step": 400, "loss": 0.007441, "st_s": 0.124}
+SIGTERM: saved step 693 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=693 (of 4000)
+STEP {"step": 800, "loss": 0.007875, "st_s": 0.124}
+STEP {"step": 1200, "loss": 0.005315, "st_s": 0.124}
+SIGTERM: saved step 1214 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=1214 (of 4000)
+STEP {"step": 1600, "loss": 0.005597, "st_s": 0.125}
+SIGTERM: saved step 1737 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=1737 (of 4000)
+STEP {"step": 2000, "loss": 0.005068, "st_s": 0.124}
+SIGTERM: saved step 2259 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=2259 (of 4000)
+STEP {"step": 2400, "loss": 0.005442, "st_s": 0.124}
+SIGTERM: saved step 2781 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=2781 (of 4000)
+STEP {"step": 2800, "loss": 0.004544, "st_s": 0.123}
+STEP {"step": 3200, "loss": 0.004042, "st_s": 0.124}
+SIGTERM: saved step 3304 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=3304 (of 4000)
+STEP {"step": 3600, "loss": 0.003121, "st_s": 0.124}
+SIGTERM: saved step 3826 to runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt; exiting to resume
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=3826 (of 4000)
+STEP {"step": 4000, "loss": 0.003716, "st_s": 0.124}
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.48 GiB is free. Process 2000277 has 22.13 GiB memory in use. Of the allocated memory 21.58 GiB is allocated by PyTorch, and 92.92 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2157056 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2158309 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2159864 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2170683 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2172151 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2258041 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2259587 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2277425 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2278865 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2295100 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2297011 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2314035 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2315685 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2333581 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2335447 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2353714 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2355564 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2371257 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2373153 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2389923 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2391721 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2408387 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2410138 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2427153 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2429134 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2446300 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2447979 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2466463 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2468358 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2484856 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2486968 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2504213 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2505884 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2524144 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+Traceback (most recent call last):
+  File "/workspace/slava/exp/pr63/train_long.py", line 451, in <module>
+    main()
+  File "/workspace/slava/exp/pr63/train_long.py", line 423, in main
+    single, roll = pixel_eval(m, a, dev)
+  File "/workspace/slava/exp/pr63/train_long.py", line 211, in pixel_eval
+    p, last = m(ctx, states=[None] * len(m.blocks))[0].float(), ctx[:, -1]
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1739, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/workspace/slava/comfy-house/venv/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1750, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 790, in forward
+    x, st = blk.forward_stateful(x, st)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 646, in forward_stateful
+    m, state = self.mix.forward_stateful(self.n1(x), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 501, in forward_stateful
+    out, zT = self._wave_dispersion_stateful(self._write(x, h), state)
+  File "/workspace/slava/exp/pr63/wfvideo.py", line 350, in _wave_dispersion_stateful
+    Xt = torch.fft.fft(Xs, n=L, dim=2)
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 8.00 GiB. GPU 0 has a total capacity of 23.65 GiB of which 1.59 GiB is free. Process 2526172 has 22.03 GiB memory in use. Of the allocated memory 21.54 GiB is allocated by PyTorch, and 33.62 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+RESUME <- runs_long_horizon_seq/ckpt_wave_W_half_seq_cw_s0.pt at step=4000 (of 4000)
+RESULT {"eval_mse_over_copylast": 1.0789, "copy_ratio": 0.9459, "divergence_horizon": 1, "exit_direction_accuracy": 0.25, "position_error_at_emergence": 4.538}
